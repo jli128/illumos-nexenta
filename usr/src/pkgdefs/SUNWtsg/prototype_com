@@ -39,6 +39,7 @@ i depend
 i postinstall
 i i.devallocdefs
 i i.renamenew
+i i.manifest
 i r.renamenew
 
 #

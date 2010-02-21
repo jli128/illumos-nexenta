@@ -1,0 +1,13 @@
+# Use v4 compatibility mode, so ldconfig gets added to maintainer scripts.
+export DH_COMPAT=4
+
+OS_REL := $(shell cat ../RELEASE|egrep "^OS_REL="|sed -e 's/^OS_REL=\(.*\)/\1/')
+BUILD  := $(shell cat ../RELEASE|egrep "^BUILD="|sed -e 's/^BUILD=\(.*\)/\1/')
+
+export ON_COPYRIGHT=$(PWD)/../COPYRIGHT
+export ON_PKGDEFS=$(GATEROOT)/usr/src/pkgdefs
+export ON_CLASSES=$(ON_PKGDEFS)/common_files
+export ON_PROTO=$(GATEROOT)/proto/root_$(DEB_BUILD_ARCH_CPU)
+
+export NON_ON_PKGDEFS=
+export NON_ON_CLASSES=

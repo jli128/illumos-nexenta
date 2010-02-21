@@ -1,0 +1,12 @@
+Source: sunwimar
+Section: base
+Priority: required
+Maintainer: Nexenta Systems <support@nexenta.com>
+Build-Depends: debhelper(>=4.9.5gnusol5)
+
+Package: sunwimar
+Architecture: solaris-i386
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.129-1), sunwkvm (>=5.11.129-1), sunwcsr (>=5.11.129-1), sunwckr (>=5.11.129-1), sunwcnetr (>=5.11.129-1), sunwcsu (>=5.11.129-1), sunwcsd (>=5.11.129-1), sunwcsl (>=5.11.129-1), sunwcar (>=5.11.129-1), sunwimacr (>=5.11.129-1)
+Description: Solaris IMA Software Initiator Plugin (Root)
+ SNIA iSCSI Managment API plugin library for iSCSI adapters (Root)
+ .

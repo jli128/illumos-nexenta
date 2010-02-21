@@ -1,0 +1,31 @@
+#
+# Copyright 2005 Nexenta Systems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# $Id$
+#
+# The BUILD variable below should be changed to reflect the
+# current Solaris build for which the OpenSolaris code is based
+# off.  The OS_REL is currently taken from the SunOS version
+# of current OpenSolaris.  These two variables must be adjusted
+# accordingly for every OpenSolaris code drop.
+#
+OLD_BUILD=133
+BUILD=134
+OS_REL=5.11
+
+#
+# The following variables can be left alone
+#
+CORE_PATCH_LEVEL=1
+CORE_REVISION="${OS_REL}.${BUILD}-${CORE_PATCH_LEVEL}"
+DISTRO=nexenta
+URG=low
+DEBFULLNAME=${DEBFULLNAME:="Gate Keeper"}
+DEBEMAIL=${DEBEMAIL:="maintainer@nexenta.com"}
+GPGSCRIPT=/usr/bin/gpg-nexenta
+GPGKEY=Nexenta
+CORE_PKGS_LIST=core_pkgs.list
+BROKEN_PKGS_LIST=broken_pkgs.list
+NON_ON_PKGS_LIST=non_on_pkgs.list
+NEXENTALU=nexenta-lu

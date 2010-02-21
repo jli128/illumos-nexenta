@@ -1,0 +1,12 @@
+Source: sunwmptsas
+Section: base
+Priority: required
+Maintainer: Nexenta Systems <support@nexenta.com>
+Build-Depends: debhelper(>=4.9.5gnusol5)
+
+Package: sunwmptsas
+Architecture: solaris-i386
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.129-1), sunwkvm (>=5.11.129-1), sunwcsr (>=5.11.129-1), sunwckr (>=5.11.129-1), sunwcnetr (>=5.11.129-1), sunwcsu (>=5.11.129-1), sunwcsd (>=5.11.129-1), sunwcsl (>=5.11.129-1), sunwcar (>=5.11.129-1), sunwcslr (>=5.11.129-1)
+Description: LSI MPT SAS 2.0 Controller HBA Driver
+ LSI MPT SAS 2.0 Controller HBA Driver
+ .

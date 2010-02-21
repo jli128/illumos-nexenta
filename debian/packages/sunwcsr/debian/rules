@@ -1,0 +1,83 @@
+#!/usr/bin/make -f
+# debian/rules for alien
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+include ../rules.defs
+
+PACKAGE=$(shell dh_listpackages)
+
+build:
+	dh_testdir
+	cd utils; make
+
+clean:
+	dh_testdir
+	dh_testroot
+	dh_clean -d
+	dh_installproto clean
+	rm -rf debian/sysv-rc
+	rm -rf debian/lsb-base
+	rm -rf debian/sysvinit
+
+binary-indep: build
+
+binary-arch: build
+	dh_testdir
+	dh_testroot
+	dh_clean -d
+	dh_installdirs
+
+	dh_installdocs
+	dh_installchangelogs
+	dh_installproto
+
+# Copy the packages's files.
+	find . -maxdepth 1 -mindepth 1 \
+		-not -name utils \
+		-not -name netbase \
+		-not -name "*.svn*" \
+		-not -name debian -print0 | \
+		xargs -0 -r -i cp -a {} debian/sunwcsr
+
+#
+# If you need to move files around in debian/$(PACKAGE) or do some
+# binary patching, do it here
+#
+	mkdir -p debian/sysv-rc/usr/sbin
+	mkdir -p debian/sysv-rc/etc/default
+	mkdir -p debian/sysv-rc/etc/init.d
+	cp -a debian/update-rc.d debian/sysv-rc/usr/sbin/
+	cp -a debian/invoke-rc.d debian/sysv-rc/usr/sbin/
+	cp -a debian/rcS debian/sysv-rc/etc/init.d
+	cd debian/sysv-rc/etc/default; ln -s ../init.d/rcS rcS
+
+	mkdir -p debian/lsb-base/lib/lsb
+	cp -a debian/init-functions debian/lsb-base/lib/lsb/
+
+	mkdir -p debian/sysvinit/sbin
+	mkdir -p debian/sysvinit/bin
+	cp -a utils/runlevel debian/sysvinit/sbin
+	cp -a utils/mountpoint debian/sysvinit/bin
+
+# netbase
+	dh_installman -pnetbase netbase/DebianNet.3pm netbase/update-inetd.8
+	dh_installdirs -pnetbase usr/share/perl5/ usr/sbin/
+	install -o root -g root -m 0644 netbase/DebianNet.pm debian/netbase/usr/share/perl5/
+	install -o root -g root -m 0755 netbase/update-inetd debian/netbase/usr/sbin/
+
+# This has been known to break on some wacky binaries.
+	dh_sunstrip
+	dh_compress
+#	dh_fixperms
+	dh_makeshlibs
+	dh_suninstalldeb
+	-dh_shlibdeps
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+	dh_installproto clean
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary

@@ -1,0 +1,84 @@
+sunwiscsitr (5.11.134-1) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 134)
+
+ -- Nexenta Systems <support@nexenta.com>  Thu, 18 Feb 2010 18:49:57 -0800
+
+sunwiscsitr (5.11.129-1) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 129)
+
+ -- Gate Keeper <maintainer@nexenta.com>  Fri, 04 Dec 2009 04:14:21 -0800
+
+sunwiscsitr (5.11.128-1) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 128)
+
+ -- Nexenta Systems <maintainer@nexenta.com>  Thu, 12 Nov 2009 00:05:08 -0800
+
+sunwiscsitr (5.11.124-1) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 124)
+
+ -- Nexenta Systems <maintainer@nexenta.com>  Fri, 25 Sep 2009 22:10:56 -0700
+
+sunwiscsitr (5.11.123-1) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 123)
+
+ -- Nexenta Systems <maintainer@nexenta.com>  Mon, 21 Sep 2009 18:49:12 -0700
+
+sunwiscsitr (5.11.104-6) nexenta; urgency=low
+
+  * dbuf_alloc fix
+
+ -- Nexenta Systems <support@nexenta.com>  Mon, 17 Aug 2009 17:28:22 -0700
+
+sunwiscsitr (5.11.104-5) nexenta; urgency=low
+
+  * windows2003 bug fix
+
+ -- Nexenta Systems <support@nexenta.com>  Thu, 11 Jun 2009 11:14:45 -0700
+
+sunwiscsitr (5.11.104-4) nexenta; urgency=low
+
+  * bug fixes from b110
+
+ -- Nexenta Systems <support@nexenta.com>  Mon,  1 Jun 2009 12:27:31 -0700
+
+sunwiscsitr (5.11.104-3) nexenta; urgency=low
+
+  * fixes for ESX 3.5 - works now
+
+ -- Nexenta Systems <support@nexenta.com>  Fri, 20 Mar 2009 19:01:20 -0700
+
+sunwiscsitr (5.11.104-2) nexenta; urgency=low
+
+  * 105..109 backports
+  * ZFS shareiscsi integration
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 18 Feb 2009 11:26:24 -0800
+
+sunwiscsitr (5.11.104-1) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 104)
+
+ -- Nexenta Systems <support@nexenta.com>  Thu, 04 Dec 2008 07:25:36 -0800
+
+sunwiscsitr (5.11.103-2) nexenta; urgency=low
+
+  * ImmediateData support
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 26 Nov 2008 13:05:42 -0800
+
+sunwiscsitr (5.11.103-1) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 103)
+
+ -- Nexenta Systems <support@nexenta.com>  Sun, 23 Nov 2008 08:17:44 -0800
+
+sunwiscsitr (5.11.102-1) nexenta; urgency=low
+
+  * Initial release
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 12 Dec 2007 12:26:11 -0800

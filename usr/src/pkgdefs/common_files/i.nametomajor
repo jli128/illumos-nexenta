@@ -269,9 +269,19 @@ while read src dest; do
 			    >/tmp/ad.$$.tmp 2>&1; then
 				echo "added $name to $dest"
 			else
-				echo "$PKG: failed to add $name to " \
-				    "$dest:" >& 2
-				cat /tmp/ad.$$.tmp >& 2
+				aliases=`cat /etc/driver_aliases|egrep "^$name[ \t]+"|nawk '{printf "%s ", $2}'`
+				rem_drv -b $BASEDIR $name 2>/dev/null 1>&2
+				if cat /etc/driver_aliases|egrep "^$name[ \t]+" 2>/dev/null 1>&2; then
+					cat /etc/driver_aliases|sed -e "/^$name\s* /d" >/tmp/driver_aliases.$$
+					mv /tmp/driver_aliases.$$ /etc/driver_aliases
+				fi
+				if add_drv -b $BASEDIR -i "$aliases" $name 2>/dev/null 1>&2; then
+					echo "added $name to $dest"
+				else
+					echo "$PKG: failed to add $name to " \
+					    "$dest:" >& 2
+					cat /tmp/ad.$$.tmp >& 2
+				fi
 			fi
 		done
 		rm -f /tmp/ad.$$.tmp

@@ -1,0 +1,13 @@
+Source: sunwbfe
+Section: base
+Priority: required
+Maintainer: Nexenta Systems <support@nexenta.com>
+Build-Depends: debhelper(>=4.9.5gnusol5)
+
+Package: sunwbfe
+Architecture: solaris-i386
+Conflicts: myamanet-bfe
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.129-1), sunwkvm (>=5.11.129-1), sunwcsr (>=5.11.129-1), sunwckr (>=5.11.129-1), sunwcnetr (>=5.11.129-1), sunwcsu (>=5.11.129-1), sunwcsd (>=5.11.129-1), sunwcsl (>=5.11.129-1), sunwcar (>=5.11.129-1), sunwcslr (>=5.11.129-1)
+Description: Broadcom BCM4401 Fast Ethernet Driver
+ Broadcom BCM4401 Fast Ethernet Driver
+ .

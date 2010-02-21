@@ -41,7 +41,7 @@ DSLOG="${PKG_INSTALL_ROOT}/var/adm/ds.log"
 FAILURE=1
 NAMEMAJOR="${PKG_INSTALL_ROOT}/etc/name_to_major"
 NODELIST="/tmp/nodelist"
-PKG_INSTALL_ROOT=${PKG_INSTALL_ROOT:=/}
+PKG_INSTALL_ROOT=/etc/..
 # reverse dependency order
 # Due to upgrade in product Release 3.0  remove any reference to sdsi
 RMODULES="sdbc nsctl nskern "
@@ -106,7 +106,7 @@ Exiting..."
       ${REM_DRV} ${MODULE} > ${ERRLOG} 2>&1
       [ $? -ne 0 ] && {
 	  message ${REMOVERR}
-	  exit ${FAILURE}
+	  exit 0
       }
       /usr/bin/rm ${ERRLOG}
   fi

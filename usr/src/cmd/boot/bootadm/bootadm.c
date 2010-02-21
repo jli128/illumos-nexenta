@@ -425,6 +425,8 @@ struct iso_pdesc {
 
 #define	bam_nowrite()		(bam_check || bam_smf_check)
 
+#define NEXENTA 1
+
 static int sync_menu = 1;	/* whether we need to sync the BE menus */
 
 static void
@@ -437,7 +439,7 @@ usage(void)
 	    "\t%s update-archive [-vn] [-R altroot [-p platform>]]\n", prog);
 	(void) fprintf(stderr,
 	    "\t%s list-archive [-R altroot [-p platform>]]\n", prog);
-#if !defined(_OPB)
+#if !defined(_OPB) && !NEXENTA
 	/* x86 only */
 	(void) fprintf(stderr, "\t%s set-menu [-R altroot] key=value\n", prog);
 	(void) fprintf(stderr, "\t%s list-menu [-R altroot]\n", prog);
@@ -526,7 +528,12 @@ main(int argc, char *argv[])
 
 	switch (bam_cmd) {
 		case BAM_MENU:
+#if NEXENTA
+			ret = 0;
+			printf("Unsupported command. Please use 'apt-clone' command instead.\n");
+#else
 			ret = bam_menu(bam_subcmd, bam_opt, bam_argc, bam_argv);
+#endif
 			break;
 		case BAM_ARCHIVE:
 			ret = bam_archive(bam_subcmd, bam_opt);

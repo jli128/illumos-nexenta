@@ -76,13 +76,13 @@ d none dev/pts 755 root sys
 d none dev/rdsk 755 root sys
 d none dev/rmt 755 root sys
 d none dev/sad 755 root sys
-s none dev/stderr=./fd/2
-s none dev/stdin=./fd/0
-s none dev/stdout=./fd/1
+#s none dev/stderr=./fd/2
+#s none dev/stdin=./fd/0
+#s none dev/stdout=./fd/1
 d none dev/swap 755 root sys
 d none dev/term 755 root root
 d none dev/vt 755 root sys
-d none dev/zcons 755 root sys
+#d none dev/zcons 755 root sys
 d none devices 755 root sys
 d none devices/pseudo 755 root sys
 d none etc 755 root sys

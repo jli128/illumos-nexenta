@@ -1,0 +1,12 @@
+Source: sunwnfscr
+Section: net
+Priority: required
+Maintainer: Erast Benson <erast@gnusolaris.org>
+Build-Depends: debhelper(>=4.9.5gnusol5)
+
+Package: sunwnfscr
+Architecture: solaris-i386
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.129-1), sunwkvm (>=5.11.129-1), sunwcsr (>=5.11.129-1), sunwckr (>=5.11.129-1), sunwcnetr (>=5.11.129-1), sunwcsu (>=5.11.129-1), sunwcsd (>=5.11.129-1), sunwcsl (>=5.11.129-1)
+Description: Network File System (NFS) client support (Root)
+ Network File System (NFS) client support (Root)
+ .

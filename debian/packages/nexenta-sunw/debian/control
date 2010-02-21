@@ -1,0 +1,10 @@
+Source: nexenta-sunw
+Section: base
+Priority: required
+Maintainer: Erast Benson <erast@gnusolaris.org>
+Build-Depends: debhelper(>=4.0)
+
+Package: nexenta-sunw
+Architecture: solaris-i386
+Description: Nexenta SUNW meta package
+ meta package for Nexenta OS Live Upgrade transitions

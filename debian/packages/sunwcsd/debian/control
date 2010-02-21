@@ -1,0 +1,13 @@
+Source: sunwcsd
+Section: base
+Priority: required
+Maintainer: Erast Benson <erast@gnusolaris.org>
+Build-Depends: debhelper(>=4.9.5gnusol5)
+
+Package: sunwcsd
+Architecture: solaris-i386
+Depends: ${shlibs:Depends}, sunwcsr (>=5.11.129-1), nexenta-lu (>=5.11.129-1)
+Essential: Yes
+Description: Core Solaris Devices
+ core entries for /dev and /devices needed for the initial boot of Solaris
+ .

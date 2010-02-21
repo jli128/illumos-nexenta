@@ -1,0 +1,12 @@
+Source: sunwrmodu
+Section: base
+Priority: required
+Maintainer: Erast Benson <erast@gnusolaris.org>
+Build-Depends: debhelper(>=4.9.5gnusol5)
+
+Package: sunwrmodu
+Architecture: solaris-i386
+Depends: ${shlibs:Depends}, sunwcsr (>=5.11.129-1), sunwckr (>=5.11.129-1), sunwcnetr (>=5.11.129-1), sunwcsd (>=5.11.129-1), sunwcsu (>=5.11.129-1), sunwcakr (>=5.11.129-1), sunwkvm (>=5.11.129-1)
+Description: Realmode Modules, (Usr)
+ Realmode Modules, (Usr)
+ .

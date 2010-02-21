@@ -1,0 +1,12 @@
+Source: sunw0on
+Section: base
+Priority: optional
+Maintainer: Mac <mac@gnusolaris.org>
+Build-Depends: debhelper(>=4.9.5gnusol5)
+
+Package: sunw0on
+Architecture: solaris-i386
+Depends: ${shlibs:Depends}
+Description: Localizable ON message files
+ localizable message files for the OS-Networking consolidation
+ .

@@ -55,6 +55,7 @@ f none usr/include/arpa/ftp.h 644 root bin
 f none usr/include/arpa/inet.h 644 root bin
 f none usr/include/arpa/nameser.h 644 root bin
 f none usr/include/arpa/nameser_compat.h 644 root bin
+#f none usr/include/sys/pem.h 644 root bin
 f none usr/include/arpa/telnet.h 644 root bin
 f none usr/include/arpa/tftp.h 644 root bin
 d none usr/include/asm 755 root bin
@@ -235,7 +236,7 @@ f none usr/include/gssapi/gssapi_ext.h 0644 root bin
 d none usr/include/hal 755 root bin
 f none usr/include/hal/libhal.h 644 root bin
 f none usr/include/hal/libhal-storage.h 644 root bin
-f none usr/include/iconv.h 644 root bin
+m none usr/sun/include/iconv.h 644 root bin usr/include/iconv.h
 f none usr/include/idmap.h 644 root bin
 f none usr/include/ieeefp.h 644 root bin
 d none usr/include/inet 755 root bin
@@ -292,10 +293,10 @@ f none usr/include/kmfapi.h 644 root bin
 f none usr/include/kmftypes.h 644 root bin
 f none usr/include/kstat.h 644 root bin
 f none usr/include/kvm.h 644 root bin
-f none usr/include/lber.h 644 root bin
+m none usr/sun/include/lber.h 644 root bin usr/include/lber.h
 f none usr/include/langinfo.h 644 root bin
 f none usr/include/lastlog.h 644 root bin
-f none usr/include/ldap.h 644 root bin
+m none usr/sun/include/ldap.h 644 root bin usr/include/ldap.h
 f none usr/include/libcontract.h 644 root bin
 f none usr/include/libctf.h 644 root bin
 f none usr/include/libdevinfo.h 644 root bin
@@ -310,7 +311,7 @@ f none usr/include/libfstyp.h 644 root bin
 f none usr/include/libfstyp_module.h 644 root bin
 f none usr/include/libgen.h 644 root bin
 f none usr/include/libgrubmgmt.h 644 root bin
-f none usr/include/libintl.h 644 root bin
+m none usr/sun/include/libintl.h 644 root bin usr/include/libintl.h
 f none usr/include/libipmi.h 644 root bin
 f none usr/include/libnvpair.h 644 root bin
 f none usr/include/libipp.h 644 root bin
@@ -333,7 +334,7 @@ f none usr/include/link.h 644 root bin
 f none usr/include/listen.h 644 root bin
 f none usr/include/locale.h 644 root bin
 f none usr/include/macros.h 644 root bin
-f none usr/include/maillock.h 644 root bin
+m none usr/sun/include/maillock.h 644 root bin usr/include/maillock.h
 f none usr/include/malloc.h 644 root bin
 f none usr/include/md4.h 644 root bin
 f none usr/include/md5.h 644 root bin
@@ -352,7 +353,7 @@ f none usr/include/mdiox.h 644 root bin
 f none usr/include/mhdx.h 644 root bin
 f none usr/include/mon.h 644 root bin
 f none usr/include/monetary.h 644 root bin
-f none usr/include/mp.h 644 root bin
+m none usr/sun/include/mp.h 644 root bin usr/include/mp.h
 f none usr/include/mqueue.h 644 root bin
 f none usr/include/mtmalloc.h 644 root bin
 f none usr/include/nan.h 644 root bin
@@ -411,9 +412,9 @@ d none usr/include/nfs 755 root bin
 f none usr/include/nfs/auth.h 644 root bin
 f none usr/include/nfs/export.h 644 root bin
 f none usr/include/nfs/lm.h 644 root bin
-f none usr/include/nfs/lm_impl.h 644 root bin
-f none usr/include/nfs/lm_nlm.h 644 root bin
-f none usr/include/nfs/lm_server.h 644 root bin
+#f none usr/include/nfs/lm_impl.h 644 root bin
+#f none usr/include/nfs/lm_nlm.h 644 root bin
+#f none usr/include/nfs/lm_server.h 644 root bin
 f none usr/include/nfs/mapid.h 644 root bin
 f none usr/include/nfs/mount.h 644 root bin
 f none usr/include/nfs/nfs.h 644 root bin
@@ -447,7 +448,7 @@ f none usr/include/pkginfo.h 644 root bin
 f none usr/include/pkglocs.h 644 root bin
 f none usr/include/pkgstrct.h 644 root bin
 f none usr/include/pkgtrans.h 644 root bin
-f none usr/include/plot.h 644 root bin
+m none usr/sun/include/plot.h 644 root bin usr/include/plot.h
 f none usr/include/poll.h 644 root bin
 f none usr/include/port.h 644 root bin
 f none usr/include/priv.h 644 root bin
@@ -586,11 +587,11 @@ f none usr/include/schedctl.h 644 root bin
 f none usr/include/sac.h 644 root bin
 f none usr/include/sdp.h 644 root bin
 f none usr/include/sip.h 644 root bin
-d none usr/include/sasl 0755 root bin
-f none usr/include/sasl/prop.h 0644 root bin
-f none usr/include/sasl/sasl.h 0644 root bin
-f none usr/include/sasl/saslplug.h 0644 root bin
-f none usr/include/sasl/saslutil.h 0644 root bin
+d none usr/sun/include/sasl 0755 root bin
+m none usr/sun/include/sasl/prop.h 0644 root bin usr/include/sasl/prop.h
+m none usr/sun/include/sasl/sasl.h 0644 root bin usr/include/sasl/sasl.h
+m none usr/sun/include/sasl/saslplug.h 0644 root bin usr/include/sasl/saslplug.h
+m none usr/sun/include/sasl/saslutil.h 0644 root bin usr/include/sasl/saslutil.h
 d none usr/include/scsi 755 root bin
 f none usr/include/scsi/libscsi.h 644 root bin
 f none usr/include/scsi/libses.h 644 root bin
@@ -931,9 +932,9 @@ f none usr/include/sys/iapriocntl.h 644 root bin
 d none usr/include/sys/ib 755 root bin
 d none usr/include/sys/ib/adapters 755 root bin
 d none usr/include/sys/ib/adapters/tavor 755 root bin
-f none usr/include/sys/ib/adapters/tavor/tavor_ioctl.h 644 root bin
+#f none usr/include/sys/ib/adapters/tavor/tavor_ioctl.h 644 root bin
 d none usr/include/sys/ib/adapters/hermon 755 root bin
-f none usr/include/sys/ib/adapters/hermon/hermon_ioctl.h 644 root bin
+#f none usr/include/sys/ib/adapters/hermon/hermon_ioctl.h 644 root bin
 f none usr/include/sys/ib/ib_pkt_hdrs.h 644 root bin
 f none usr/include/sys/ib/ib_types.h 644 root bin
 d none usr/include/sys/ib/ibnex 755 root bin
@@ -1001,7 +1002,7 @@ f none usr/include/sys/kstr.h 644 root bin
 f none usr/include/sys/ksyms.h 644 root bin
 f none usr/include/sys/ksynch.h 644 root bin
 f none usr/include/sys/ldterm.h 644 root bin
-f none usr/include/sys/lc_core.h 644 root bin
+#f none usr/include/sys/lc_core.h 644 root bin
 f none usr/include/sys/lgrp.h 644 root bin
 f none usr/include/sys/lgrp_user.h 644 root bin
 f none usr/include/sys/link.h 644 root bin
@@ -1009,7 +1010,7 @@ f none usr/include/sys/list.h 644 root bin
 f none usr/include/sys/list_impl.h 644 root bin
 f none usr/include/sys/llc1.h 644 root bin
 f none usr/include/sys/loadavg.h 644 root bin
-f none usr/include/sys/localedef.h 644 root bin
+#f none usr/include/sys/localedef.h 644 root bin
 f none usr/include/sys/lock.h 644 root bin
 f none usr/include/sys/lockfs.h 644 root bin
 f none usr/include/sys/lofi.h 644 root bin
@@ -1222,7 +1223,7 @@ f none usr/include/sys/scsi/scsi_watch.h 644 root bin
 d none usr/include/sys/scsi/targets 755 root bin
 f none usr/include/sys/scsi/targets/ses.h 644 root bin
 f none usr/include/sys/scsi/targets/sesio.h 644 root bin
-f none usr/include/sys/scsi/targets/sgendef.h 644 root bin
+#f none usr/include/sys/scsi/targets/sgendef.h 644 root bin
 f none usr/include/sys/scsi/targets/sddef.h 644 root bin
 f none usr/include/sys/scsi/targets/smp.h 644 root bin
 f none usr/include/sys/scsi/targets/stdef.h 644 root bin
@@ -1438,7 +1439,7 @@ f none usr/include/utime.h 644 root bin
 f none usr/include/utmp.h 644 root bin
 f none usr/include/utmpx.h 644 root bin
 d none usr/include/uuid 755 root bin
-f none usr/include/uuid/uuid.h 644 root bin
+#f none usr/include/uuid/uuid.h 644 root bin
 f none usr/include/valtools.h 644 root bin
 f none usr/include/values.h 644 root bin
 f none usr/include/varargs.h 644 root bin

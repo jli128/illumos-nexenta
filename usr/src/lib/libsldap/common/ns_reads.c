@@ -2143,6 +2143,8 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 	ns_ldap_error_t *error = NULL;
 	ns_ldap_error_t **errorp;
 	struct timeval	tv;
+	int		entry_state = state;
+	int		nsearch_count = 0;
 
 	errorp = &error;
 	cookie->state = state;
@@ -2266,6 +2268,7 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 			cookie->new_state = EXIT;
 			break;
 		case NEXT_SEARCH:
+			nsearch_count++;
 			/* setup referrals search if necessary */
 			if (cookie->refpos) {
 				if (setup_referral_search(cookie) < 0) {
@@ -2470,6 +2473,7 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 						cookie->resultMsg = NULL;
 						return (cookie->new_state);
 					}
+					sleep(1);
 					rc = LDAP_TIMEOUT;
 					break;
 				case -1:
@@ -2594,6 +2598,7 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 						cookie->resultMsg = NULL;
 						return (cookie->new_state);
 					}
+					sleep(1);
 					rc = LDAP_TIMEOUT;
 					break;
 				case -1:
@@ -2810,6 +2815,11 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 			cookie->err_rc = NS_LDAP_INTERNAL;
 			cookie->errorp = *errorp;
 			return (ERROR);
+		}
+
+		if (nsearch_count > 64 && entry_state == INIT) {
+			cookie->err_rc = LDAP_SERVER_DOWN;
+			cookie->new_state = EXIT;
 		}
 
 		if (cookie->conn_user != NULL &&

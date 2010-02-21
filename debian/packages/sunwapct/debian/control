@@ -1,0 +1,12 @@
+Source: sunwapct
+Section: utils
+Priority: optional
+Maintainer: Mac <mac@gnusolaris.org>
+Build-Depends: debhelper(>=4.9.5gnusol5)
+
+Package: sunwapct
+Architecture: solaris-i386
+Depends: ${shlibs:Depends}, sunwbtool (>=5.11.129-1), sunwcsu (>=5.11.129-1), sunwcsl (>=5.11.129-1), sunwperl584core, sunwperl584usr, sunwtoo (>=5.11.129-1)
+Description: ABI Application Certification Tools
+ Appcert utility for application ABI stability checking
+ .

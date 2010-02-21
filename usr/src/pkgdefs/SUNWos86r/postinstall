@@ -193,9 +193,9 @@ i386)
 		"pci10b7,9006" "pci10b7,9050" "pci10b7,9051" "pci10b7,9055"
 		"pci10b7,9056" "pci10b7,9200" "pci10b7,9800" "pci10b7,9805"' \
 		elxl
-	check_add_drv -b "${BASEDIR}" \
-		-i '"pci1022,2000" "pci103c,104c"' \
-		pcn
+#	check_add_drv -b "${BASEDIR}" \
+#		-i '"pci1022,2000" "pci103c,104c"' \
+#		pcn
 	check_add_drv -b "${BASEDIR}" \
 		-i '"pci1011,21" "pci1014,22"' \
 		pci_pci
@@ -262,9 +262,9 @@ i386)
 		"pci8086,2449.8086.3016" "pci8086,2449.8086.3017"
 		"pci8086,2449.8086.3018" "pci8086,27dc.8086.308d"' \
 		iprb
-	check_add_drv -b "${BASEDIR}" \
-		-i '"pci10b8,5"' \
-		spwr
+#	check_add_drv -b "${BASEDIR}" \
+#		-i '"pci10b8,5"' \
+#		spwr
 
 	# The sd driver should be installed to the system before rcs9.sh
 	# is called.
@@ -292,6 +292,7 @@ i386)
 	removef $PKGINST $OWC |\
 	while read pathname
 	do
+		test "x$pathname" = x && continue
 		if [ ! -s $pathname ]; then 
 			echo Removing empty `basename $pathname`
 			rm -f $pathname

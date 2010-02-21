@@ -31,7 +31,7 @@ FMHDRS = fmd_snmp.h
 HDRDIR = common
 
 SUBDIRS = $(MACH) 
-$(BUILD64)SUBDIRS += $(MACH64)
+#$(BUILD64)SUBDIRS += $(MACH64)
 
 MIBFILES = SUN-FM-MIB.mib
 

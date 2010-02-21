@@ -1,0 +1,12 @@
+Source: sunwpkgcmdsr
+Section: base
+Priority: optional
+Maintainer: Nexenta Systems <support@nexenta.com>
+Build-Depends: debhelper(>=4.9.5gnusol5)
+
+Package: sunwpkgcmdsr
+Architecture: solaris-i386
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.129-1), sunwkvm (>=5.11.129-1), sunwcsr (>=5.11.129-1), sunwckr (>=5.11.129-1), sunwcnetr (>=5.11.129-1), sunwcsu (>=5.11.129-1), sunwcsd (>=5.11.129-1), sunwcsl (>=5.11.129-1), sunwcar (>=5.11.129-1), sunwcslr (>=5.11.129-1)
+Description: SVr4 package commands (root)
+ Solaris System V release 4 Package Commands (root)
+ .

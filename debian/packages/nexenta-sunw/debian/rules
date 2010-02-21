@@ -1,0 +1,50 @@
+#!/usr/bin/make -f
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+# Use v4 compatability mode, so ldconfig gets added to maint scripts.
+export DH_COMPAT=4
+
+include ../rules.defs
+
+CORE_BUILD_REVISION=$(OS_REL).$(BUILD)
+
+build:
+	echo 'sunw:Version=$(CORE_BUILD_REVISION)' > debian/nexenta-sunw.substvars
+	gcc -o debian/nluld debian/nluld.c
+	dh_testdir
+
+clean:
+	dh_testdir
+	dh_testroot
+	dh_clean -d
+	rm -f debian/nluld
+
+binary-indep: build
+
+binary-arch: build
+	dh_testdir
+	dh_testroot
+	dh_clean -k -d
+	dh_installdirs
+	dh_installdocs
+	dh_installchangelogs
+	mkdir -p debian/nexenta-sunw/var/lib/dpkg/alien/nexenta-sunw
+	cp debian/nluld debian/b55.* debian/postinst.sh debian/makenlu.sh debian/nexenta-sunw/var/lib/dpkg/alien/nexenta-sunw
+	cp $(GATEROOT)/proto/root_i386/lib/ld.so.1 debian/nexenta-sunw/var/lib/dpkg/alien/nexenta-sunw/ld32
+	cp $(GATEROOT)/proto/root_i386/lib/amd64/ld.so.1 debian/nexenta-sunw/var/lib/dpkg/alien/nexenta-sunw/ld64
+	# This has been known to break on some wacky binaries.
+	dh_sunstrip
+	dh_compress
+	dh_installdebconf
+#	dh_fixperms
+	dh_makeshlibs
+	dh_installdeb
+	-dh_shlibdeps
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary

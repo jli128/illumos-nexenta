@@ -1,0 +1,138 @@
+#!/usr/bin/make -f
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+# Use v4 compatability mode, so ldconfig gets added to maint scripts.
+export DH_COMPAT=4
+
+PACKAGE=$(shell dh_listpackages)
+
+# Location is used as ON work space
+GATESUBDIR=onnv-gate
+export GATEROOT=$(CURDIR)/$(GATESUBDIR)
+
+CLOSEDBIN_NAME=on-closed-bins-nd.i386.tar.bz2 
+CLOSEDBIN_URL=http://dlc.sun.com/osol/on/downloads/b133/$(CLOSEDBIN_NAME)
+GATEREV=onnv_134
+GATEPARENT_URL=http://hg.genunix.org/onnv-gate.hg
+CRYPTO_DIR=on-crypto-nd.i386.tar.bz2
+CRYPTO_URL=http://dlc.sun.com/osol/on/downloads/b133/$(CRYPTO_DIR)
+
+OS_REL := $(shell cat debian/packages/RELEASE|egrep "^OS_REL="|sed -e 's/^OS_REL=\(.*\)/\1/')
+BUILD  := $(shell cat debian/packages/RELEASE|egrep "^BUILD="|sed -e 's/^BUILD=\(.*\)/\1/')
+CORE_BUILD_REVISION=$(OS_REL).$(BUILD)
+
+# Location where built packages will be uploaded..
+APTDIR=/var/tmp/apt
+
+# Location where Debian packages will be produced..
+PKGDIR=/var/tmp/packages
+
+patch: patch-stamp
+patch-stamp:
+	dh_testdir
+	if test ! -d $(GATEROOT); then \
+		hg clone -r $(GATEREV) $(GATEPARENT_URL) $(GATESUBDIR); \
+	else \
+		cd $(GATEROOT); \
+		hg pull; \
+		hg up -r $(GATEREV); \
+	fi
+	cp $(GATEROOT)/usr/src/tools/env/opensolaris.sh $(GATEROOT)
+	cd $(GATEROOT) && cat $(CURDIR)/debian/opensolaris.patch | patch -p1
+	cd $(GATEROOT) && sed -i -e "s#__GATEROOT__#$(GATEROOT)#" opensolaris.sh
+	if test ! -L $(GATEROOT)/.hg/patches; then cd $(GATEROOT) && ln -s ../../patches .hg/patches; fi
+	cd $(GATEROOT) && hg qpush -a
+	touch $@
+
+setup-closed: setup-closed-stamp
+setup-closed-stamp:
+	dh_testdir
+	rm -rf /var/tmp/$(CLOSEDBIN_NAME)
+	wget -c -O /var/tmp/$(CLOSEDBIN_NAME) $(CLOSEDBIN_URL)
+	rm -rf $(GATEROOT)/closed
+	cd $(GATEROOT) && tar xjf /var/tmp/$(CLOSEDBIN_NAME)
+	cd $(GATEROOT)/closed && ln -s root_i386-nd root_i386
+	cd $(GATEROOT) && wget $(CRYPTO_URL)
+	touch $@
+
+build-on: patch setup-closed build-on-stamp
+build-on-stamp:
+	dh_testdir
+	env - bash -c 'cd $(GATEROOT); /opt/onbld/bin/nightly ./opensolaris.sh'
+	touch $@
+
+build-packages: build-on build-packages-stamp
+build-packages-stamp:
+	rm -rf $(PKGDIR)
+	cp -ar debian/packages $(PKGDIR)
+	cd $(PKGDIR) && ./update_rev.sh
+	cd $(PKGDIR) && ./build_pkgs.sh
+	touch $@
+
+upload-packages: build-packages upload-packages-stamp
+upload-packages-stamp:
+	rm -rf $(APTDIR)
+	ndmkrepo $(APTDIR) $(APTDIR)/upload
+	cp $(PKGDIR)/*.{deb,changes} $(APTDIR)/incoming/hardy-unstable
+	$(APTDIR)/upload
+	@echo
+	@echo "Packages uploaded into local APT repository $(APTDIR)"
+	@echo
+	@echo "Local APT preconfigured. Development upgrades are ready now."
+	@echo "Run the following command to upgrade:"
+	@echo
+	@echo "apt-clone dist-upgrade"
+	@echo
+	touch $@
+
+build: build-on build-packages upload-packages build-stamp
+build-stamp:
+	dh_testdir
+	echo 'sunw:Version=$(CORE_BUILD_REVISION)' >> debian/$(PACKAGE).substvars
+	touch $@
+
+unpatch:
+	hg qpop -a
+	rm -rf opensolaris.sh patch-stamp
+	if test -d "onnv-gate/log" ; then \
+			rm -r onnv-gate/log; \
+	else \
+			echo "no logs present"; \
+	fi		
+	if test -d "onnv-gate/proto" ; then \
+			rm -r onnv-gate/proto; \
+	else \
+			echo "no proto-dir present"; \
+	fi
+
+clean: unpatch
+	dh_testdir
+	dh_testroot
+	dh_clean -d
+	if test -d $(GATEROOT) ;then \
+		cd $(GATEROOT) ; \
+		hg qpop -a ;  \
+	fi
+
+binary-indep: build
+
+binary-arch: build
+	dh_testdir
+	dh_testroot
+	dh_clean -k -d
+	dh_installdirs
+	dh_installdocs
+	dh_installchangelogs
+	dh_installdirs  usr/src/$(PACKAGE) usr/src/$(PACKAGE)/debian usr/src/$(PACKAGE)/patches
+	cp -ar .hg debian/$(PACKAGE)/usr/src/$(PACKAGE)
+	cd debian/$(PACKAGE)/usr/src/$(PACKAGE) && hg up -C
+	dh_compress
+	dh_installdeb
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary

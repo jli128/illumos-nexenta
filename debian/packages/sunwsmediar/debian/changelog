@@ -1,0 +1,137 @@
+sunwsmediar (5.11.134-1) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 134)
+
+ -- Nexenta Systems <support@nexenta.com>  Thu, 18 Feb 2010 18:49:57 -0800
+
+sunwsmediar (5.11.129-1) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 129)
+
+ -- Gate Keeper <maintainer@nexenta.com>  Fri, 04 Dec 2009 04:14:21 -0800
+
+sunwsmediar (5.11.128-1) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 128)
+
+ -- Nexenta Systems <maintainer@nexenta.com>  Thu, 12 Nov 2009 00:05:08 -0800
+
+sunwsmediar (5.11.124-1) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 124)
+
+ -- Nexenta Systems <maintainer@nexenta.com>  Fri, 25 Sep 2009 22:10:56 -0700
+
+sunwsmediar (5.11.123-1) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 123)
+
+ -- Nexenta Systems <maintainer@nexenta.com>  Mon, 21 Sep 2009 18:49:12 -0700
+
+sunwsmediar (5.11.104-1) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 104)
+
+ -- Nexenta Systems <support@nexenta.com>  Thu, 04 Dec 2008 07:25:36 -0800
+
+sunwsmediar (5.11.103-1) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 103)
+
+ -- Nexenta Systems <support@nexenta.com>  Sun, 23 Nov 2008 08:17:44 -0800
+
+sunwsmediar (5.11.102-1) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 102)
+
+ -- Nexenta Systems <support@nexenta.com>  Tue, 28 Oct 2008 10:16:16 -0700
+
+sunwsmediar (5.11.101-1) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 101)
+
+ -- Nexenta Systems <support@nexenta.com>  Tue, 21 Oct 2008 13:17:28 -0700
+
+sunwsmediar (5.11.97-1) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 97)
+
+ -- Nexenta Systems <support@nexenta.com>  Mon, 01 Sep 2008 10:50:25 -0700
+
+sunwsmediar (5.11.85-1) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 85)
+
+ -- Nexenta Systems <support@nexenta.com>  Sat, 15 Mar 2008 22:47:00 -0700
+
+sunwsmediar (5.11.82-1) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 82)
+
+ -- Nexenta Systems <support@nexenta.com>  Sat, 02 Feb 2008 08:36:36 -0800
+
+sunwsmediar (5.11.80-1) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 80)
+
+ -- Nexenta Systems <support@nexenta.com>  Sat, 12 Jan 2008 09:08:03 -0800
+
+sunwsmediar (5.11.79-1) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 79)
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 12 Dec 2007 12:26:11 -0800
+
+sunwsmediar (5.11.70-1) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 70)
+
+ -- Erast Benson <erast@gnusolaris.org>  Fri, 10 Aug 2007 18:27:22 -0700
+
+sunwsmediar (5.11.69-1) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 69)
+
+ -- Erast Benson <erast@gnusolaris.org>  Fri, 20 Jul 2007 08:13:15 -0700
+
+sunwsmediar (5.11.67-1) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 67)
+
+ -- Erast Benson <erast@gnusolaris.org>  Thu, 21 Jun 2007 22:24:05 -0700
+
+sunwsmediar (5.11.66-1) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 66)
+
+ -- Erast Benson <erast@gnusolaris.org>  Thu, 21 Jun 2007 00:18:54 -0700
+
+sunwsmediar (5.11.65-1) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 65)
+
+ -- Erast Benson <erast@gnusolaris.org>  Thu, 31 May 2007 08:55:21 -0700
+
+sunwsmediar (5.11.63-1) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 63)
+
+ -- Erast Benson <erast@gnusolaris.org>  Sat, 28 Apr 2007 08:05:03 -0700
+
+sunwsmediar (5.11.61-1) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 61)
+
+ -- Erast Benson <erast@gnusolaris.org>  Thu, 05 Apr 2007 14:32:45 -0700
+
+sunwsmediar (5.11.55-1) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 55)
+
+ -- Erast Benson <erast@gnusolaris.org>  Sun, 07 Jan 2007 22:50:57 -0800
+
+sunwmediar (5.11.53-1) nexenta; urgency=low
+
+  * initial import
+
+ -- Mac <mac@gnusolaris.org>  Fri, 29 Sep 2006 10:00:45 -0700

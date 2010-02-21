@@ -1,0 +1,19 @@
+Source: libsunw-perl
+Section: perl
+Priority: required
+Maintainer: Erast Benson <erast@gnusolaris.org>
+Uploaders: Erast Benson <erast@gnusolaris.org>
+Standards-Version: 3.6.1
+Build-Depends: debhelper (>= 4.1), perl (>= 5.8.0-3), perl-modules
+
+Package: libsunw-perl
+Section: perl
+Priority: required
+Provides: sunwperl584core, sunwperl584usr
+Replaces: sunwperl584core, sunwperl584usr
+Conflicts: sunwperl584core, sunwperl584usr
+Architecture: solaris-i386
+Depends: ${perl:Depends}, ${shlibs:Depends}, perl-modules
+Description: Sun Solaris extenstions
+ Based on opensolaris package.
+ .

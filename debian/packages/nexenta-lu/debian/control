@@ -1,0 +1,13 @@
+Source: nexenta-lu
+Section: base
+Priority: required
+Maintainer: Erast Benson <erast@gnusolaris.org>
+Build-Depends: debhelper(>=4.9.3elatte)
+
+Package: nexenta-lu
+Architecture: solaris-i386
+Conflicts: nexenta-sunw (<< ${sunw:Version})
+Depends: ${shlibs:Depends}, debconf, nexenta-sunw (>= ${sunw:Version}), dpkg (>= 1.13.22nexenta9), apt (>= 0.6.46.4nexenta8)
+Essential: Yes
+Description: Nexenta Live Upgrade
+ wrapper for Nexenta OS Live Upgrade transitions

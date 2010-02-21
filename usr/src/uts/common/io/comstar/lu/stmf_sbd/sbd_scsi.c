@@ -45,6 +45,8 @@
 #include <stmf_sbd_ioctl.h>
 #include <sbd_impl.h>
 
+extern dev_info_t *stmf_sbd_dip;
+
 #define	SCSI2_CONFLICT_FREE_CMDS(cdb)	( \
 	/* ----------------------- */                                      \
 	/* Refer Both		   */                                      \
@@ -1141,6 +1143,7 @@ sbd_handle_inquiry(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	uint8_t *cdbp = (uint8_t *)&task->task_cdb[0];
 	uint8_t *p;
 	uint8_t byte0;
+	char *sbd_serial = NULL;
 	uint8_t page_length;
 	uint16_t bsize = 512;
 	uint16_t cmd_size;
@@ -1315,7 +1318,13 @@ sbd_handle_inquiry(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 		break;
 
 	case 0x80:
-		if (sl->sl_serial_no_size) {
+		if (ddi_prop_lookup_string(DDI_DEV_T_ANY, stmf_sbd_dip,
+		    DDI_PROP_DONTPASS, "sbd-serial-no",
+		    &sbd_serial) == DDI_PROP_SUCCESS) {
+			page_length = strlen(sbd_serial);
+			bcopy(sbd_serial, p + 4, page_length);
+			ddi_prop_free(sbd_serial);
+		} else if (sl->sl_serial_no_size) {
 			page_length = sl->sl_serial_no_size;
 			bcopy(sl->sl_serial_no, p + 4, sl->sl_serial_no_size);
 		} else {

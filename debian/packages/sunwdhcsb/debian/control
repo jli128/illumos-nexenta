@@ -1,0 +1,12 @@
+Source: sunwdhcsb
+Section: net
+Priority: optional
+Maintainer: Mac <mac@gnusolaris.org>
+Build-Depends: debhelper(>=4.9.5gnusol5)
+
+Package: sunwdhcsb
+Architecture: solaris-i386
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.129-1), sunwkvm (>=5.11.129-1), sunwcsr (>=5.11.129-1), sunwckr (>=5.11.129-1), sunwcnetr (>=5.11.129-1), sunwcsu (>=5.11.129-1), sunwcsl (>=5.11.129-1), sunwcsd (>=5.11.129-1), sunwdhcsr (>=5.11.129-1), sunwdhcsu (>=5.11.129-1)
+Description: Binary File Format Data Module for BOOTP/DHCP Services
+ Binary File Format Public module exporting Version 1 of the Service Provider Interface. Used to store DHCP data, this module has much better performance than the ASCII files and nisplus public modules.
+ .

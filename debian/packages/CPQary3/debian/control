@@ -1,0 +1,12 @@
+Source: CPQary3
+Section: base
+Priority: optional
+Maintainer: Nexenta Systems <support@nexenta.com>
+Build-Depends: debhelper(>=4.9.5gnusol5)
+
+Package: CPQary3
+Architecture: solaris-i386
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.133-1), sunwkvm (>=5.11.133-1), sunwcsr (>=5.11.133-1), sunwckr (>=5.11.133-1), sunwcnetr (>=5.11.133-1), sunwcsu (>=5.11.133-1), sunwcsd (>=5.11.133-1), sunwcsl (>=5.11.133-1), sunwcar (>=5.11.133-1), sunwcslr (>=5.11.133-1)
+Description: HP Smart Array HBA Driver 2.2.0.1
+ HP Smart Array HBA Driver 2.2.0.1
+ .

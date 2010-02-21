@@ -1,0 +1,13 @@
+Source: sunwckr
+Section: base
+Priority: required
+Maintainer: Erast Benson <erast@gnusolaris.org>
+Build-Depends: debhelper(>=4.9.5gnusol5)
+
+Package: sunwckr
+Architecture: solaris-i386
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.129-1), sunwcslr (>=5.11.129-1), nexenta-lu (>=5.11.129-1)
+Essential: Yes
+Description: Core Solaris Kernel (Root)
+ core kernel software for a specific instruction-set architecture
+ .

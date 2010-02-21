@@ -1,0 +1,12 @@
+Source: sunwuedg
+Section: base
+Priority: required
+Maintainer: Mac <mac@gnusolaris.org>
+Build-Depends: debhelper(>=4.9.5gnusol5)
+
+Package: sunwuedg
+Architecture: solaris-i386
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.129-1), sunwkvm (>=5.11.129-1), sunwcsr (>=5.11.129-1), sunwckr (>=5.11.129-1), sunwcsu (>=5.11.129-1), sunwcsd (>=5.11.129-1), sunwcsl (>=5.11.129-1), sunwusb (>=5.11.129-1), sunwusbs (>=5.11.129-1), sunwcnetr (>=5.11.129-1)
+Description: USB Digi Edgeport serial driver
+ USB Digi Edgeport serial driver
+ .

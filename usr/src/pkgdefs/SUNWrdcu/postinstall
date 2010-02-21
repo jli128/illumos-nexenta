@@ -199,7 +199,7 @@ Exiting...Please fix problem and re-run pkgadd."
                 ${REM_DRV} ${MODULE} > ${ERROR_LOG} 2>&1
                 [ $? -ne 0 ] && {
                         message "${REMERR}"
-                        exit ${FAILURE}
+                        exit 0
                 }
         fi
 	
@@ -220,7 +220,7 @@ Exiting...Please fix problem and re-run pkgadd."
 			> ${ERROR_LOG} 2>&1
 		[ $? -ne 0 ] && {
 			message "${ADDERR}"
-			exit ${FAILURE}
+			exit 0
 		}
 
 	fi
@@ -260,4 +260,4 @@ then
     echo "rdc             121/tcp                         # SNDR server daemon" >> ${PKG_INSTALL_ROOT}/etc/services 
 fi
 
-exit $EXIT
+exit 0

@@ -1,0 +1,12 @@
+Source: sunwrwn
+Section: base
+Priority: required
+Maintainer: Nexenta Systems <support@nexenta.com>
+Build-Depends: debhelper(>=4.9.5gnusol5)
+
+Package: sunwrwn
+Architecture: solaris-i386
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.129-1), sunwkvm (>=5.11.129-1), sunwcsr (>=5.11.129-1), sunwckr (>=5.11.129-1), sunwcnetr (>=5.11.129-1), sunwcsu (>=5.11.129-1), sunwcsd (>=5.11.129-1), sunwcsl (>=5.11.129-1), sunwcar (>=5.11.129-1), sunwcslr (>=5.11.129-1)
+Description: Ralink RT2700/2800 IEEE802.11 a/b/g/n Wireless Network Device
+ Ralink RT2700/RT2800 IEEE802.11 a/b/g/n Wireless Network Device
+ .

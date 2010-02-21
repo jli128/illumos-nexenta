@@ -1,0 +1,12 @@
+Source: sunwsshdu
+Section: net
+Priority: optional
+Maintainer: Mac <mac@gnusolaris.org>
+Build-Depends: debhelper(>=4.9.5gnusol5)
+
+Package: sunwsshdu
+Architecture: solaris-i386
+Depends: sunwcakr (>=5.11.129-1), sunwkvm (>=5.11.129-1), sunwcsr (>=5.11.129-1), sunwckr (>=5.11.129-1), sunwcnetr (>=5.11.129-1), sunwcsu (>=5.11.129-1), sunwcsl (>=5.11.129-1), sunwcsd (>=5.11.129-1), sunwgss (>=5.11.129-1), sunwsshdr (>=5.11.129-1), sunwsshcu (>=5.11.129-1), zlib1g, openssl, sunwzoneu
+Description: SSH Server, (Usr)
+ Secure Shell protocol Server
+ .

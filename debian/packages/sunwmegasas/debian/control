@@ -1,0 +1,14 @@
+Source: sunwmegasas
+Section: base
+Priority: required
+Maintainer: Nexenta Systems <support@nexenta.com>
+Build-Depends: debhelper(>=4.9.5gnusol5)
+
+Package: sunwmegasas
+Architecture: solaris-i386
+Conflicts: lsi-mega-sas
+Replaces: lsi-mega-sas
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.129-1), sunwkvm (>=5.11.129-1), sunwcsr (>=5.11.129-1), sunwckr (>=5.11.129-1), sunwcnetr (>=5.11.129-1), sunwcsu (>=5.11.129-1), sunwcsd (>=5.11.129-1), sunwcsl (>=5.11.129-1)
+Description: LSI MegaSAS RAID Controller HBA Driver
+ LSI MegaSAS RAID Controller HBA Driver
+ .

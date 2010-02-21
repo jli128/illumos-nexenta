@@ -1,0 +1,12 @@
+Source: sunwtsu
+Section: base
+Priority: required
+Maintainer: Mac <mac@gnusolaris.org>
+Build-Depends: debhelper(>=4.9.5gnusol5)
+
+Package: sunwtsu
+Architecture: solaris-i386
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.129-1), sunwkvm (>=5.11.129-1), sunwcsr (>=5.11.129-1), sunwckr (>=5.11.129-1), sunwcsu (>=5.11.129-1), sunwcsd (>=5.11.129-1), sunwcsl (>=5.11.129-1), sunwtsg (>=5.11.129-1)
+Description: Solaris Trusted Extensions, (Usr)
+ Solaris Trusted Extensions
+ .

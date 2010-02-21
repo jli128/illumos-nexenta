@@ -52,6 +52,10 @@
 #define	DEFAULTSCHEMEDIR	SCHEMEDIR_BASE
 #endif
 
+#ifndef __FUNCTION__
+#define __FUNCTION__ "__func__"
+#endif
+
 typedef struct fmd_scheme_ops {
 	int (*sop_init)(void);
 	void (*sop_fini)(void);

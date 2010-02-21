@@ -31,6 +31,7 @@
 #include	"variables.h"
 #include	<error.h>
 #include	<nval.h>
+#include	<ctype.h>
 #include	"builtins.h"
 
 static int infof(Opt_t* op, Sfio_t* sp, const char* s, Optdisc_t* dp)

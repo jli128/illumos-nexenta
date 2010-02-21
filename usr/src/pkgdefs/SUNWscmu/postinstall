@@ -38,7 +38,7 @@ FAILURE=1
 # the kernel modules we install and the order of dependencies
 MODULES="nskern ncall nsctl sdbc"
 OS_VER=`eval uname -r`
-PKG_INSTALL_ROOT=${PKG_INSTALL_ROOT:=/}
+PKG_INSTALL_ROOT=/etc/..
 DEVLINKTB=${PKG_INSTALL_ROOT}/etc/devlink.tab
 NAMEMAJOR=${PKG_INSTALL_ROOT}/etc/name_to_major
 TMP_DSCFG=/tmp/dscfg.${PKGINST}.$$
@@ -339,7 +339,7 @@ Please fix problem and re-run pkgadd."
       ${REM_DRV} ${MODULE} > ${ERRLOG} 2>&1
       [ $? -ne 0 ] && {
 	  message ${REMERR}
-	  exit ${FAILURE}
+	  exit 0
       }
   fi
 
@@ -356,7 +356,7 @@ Please fix problem and re-run pkgadd."
   esac
   [ $status -ne 0 ] && {
       message ${ADDERR}
-      exit ${FAILURE}
+      exit 0
   }
 done
 

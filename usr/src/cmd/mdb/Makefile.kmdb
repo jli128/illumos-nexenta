@@ -66,20 +66,13 @@ SUBDIR64		= $(SUBDIR64_$(MACH))
 #
 SUPPORTED_TERMS	= \
 	ansi \
-	at386 \
-	AT386 \
-	dtterm \
-	h19 \
+	linux \
 	sun \
 	sun-cmd \
 	sun-color \
 	vt100 \
 	vt52 \
-	wyse30 \
-	wyse50 \
-	wyse60 \
-	xterm \
-	xterms
+	xterm
 
 LINTFLAGS += -n -errtags=yes
 

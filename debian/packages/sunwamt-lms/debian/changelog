@@ -1,0 +1,29 @@
+sunwamt-lms (5.11.134-1) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 134)
+
+ -- Nexenta Systems <support@nexenta.com>  Thu, 18 Feb 2010 18:49:57 -0800
+
+sunwamt-lms (5.11.130-2) hardy; urgency=low
+
+  * Priority made optional
+
+ -- Nexenta systems <maintainer@nexenta.com>  Mon, 04 Jan 2010 17:45:11 -0800
+
+sunwamt-lms (5.11.129-1) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 129)
+
+ -- Gate Keeper <maintainer@nexenta.com>  Fri, 04 Dec 2009 04:14:21 -0800
+
+sunwamt-lms (5.11.128-1) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 128)
+
+ -- Nexenta Systems <maintainer@nexenta.com>  Thu, 12 Nov 2009 00:05:08 -0800
+
+sunwamt-lms (5.11.124-1) nexenta; urgency=low
+
+  * Initial release
+
+ -- Nexenta Systems <maintainer@nexenta.com>  Wed, 12 Dec 2007 12:26:11 -0800

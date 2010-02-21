@@ -1,0 +1,9 @@
+1 d none usr 755 root sys
+1 d none usr/lib 755 root bin
+1 d none usr/lib/inet 755 root bin
+1 d none usr/lib/inet/dhcp 755 root bin
+1 d none usr/lib/inet/dhcp/svc 755 root bin
+1 d none usr/sadm 755 root bin
+1 d none usr/sadm/admin 755 root bin
+1 d none usr/sadm/admin/dhcpmgr 755 root bin
+1 f none usr/lib/inet/dhcp/svc/ds_SUNWbinfiles.so.1 755 root bin

@@ -1,0 +1,60 @@
+#!/usr/bin/make -f
+# debian/rules for alien
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+include ../rules.defs
+
+PACKAGE=$(shell dh_listpackages)
+
+build:
+	dh_testdir
+
+clean:
+	dh_testdir
+	dh_testroot
+	dh_clean -d
+	dh_installproto clean
+	find . -maxdepth 1 -mindepth 1 \
+		-not -name "*\.svn*" \
+		-not -name debian -print0 | \
+		xargs rm -rf
+
+binary-indep: build
+
+binary-arch: build
+	dh_testdir
+	dh_testroot
+	dh_clean -d
+	dh_installdirs
+
+	dh_installdocs
+	dh_installchangelogs
+	dh_installproto
+
+# Copy the packages's files.
+	find . -maxdepth 1 -mindepth 1 \
+		-not -name "*\.svn*" \
+		-not -name debian -print0 | \
+		xargs -0 -r -i cp -a {} debian/$(PACKAGE)
+
+#
+# If you need to move files around in debian/$(PACKAGE) or do some
+# binary patching, do it here
+#
+
+# This has been known to break on some wacky binaries.
+	dh_sunstrip
+	dh_compress
+#	dh_fixperms
+	dh_makeshlibs
+	dh_suninstalldeb
+	-dh_shlibdeps
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+	dh_installproto clean
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary

@@ -37,6 +37,7 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <math.h>
+#include <signal.h>
 #include <sys/mnttab.h>
 #include <sys/mntent.h>
 #include <sys/types.h>
@@ -780,15 +781,61 @@ int
 zfs_ioctl(libzfs_handle_t *hdl, int request, zfs_cmd_t *zc)
 {
 	int error;
+	int nopipe = 0;
+
+	if (request == ZFS_IOC_SET_PROP &&
+	    zc && zc->zc_name && hdl->libzfs_log_str) {
+		if (strstr(hdl->libzfs_log_str, " nms:worm") != NULL) {
+			FILE *fpid;
+			int nms_pid;
+			char nms_pid_buf[10];
+			if (getenv("__change_req_107") == NULL)
+				return 0;
+			if (access("/var/lib/nza/nlm.key", F_OK) != 0)
+				return 0;
+			fpid = fopen("/var/run/nms.pid", "r");
+			if (fpid == NULL)
+				return 0;
+			if (fgets(nms_pid_buf, 10, fpid) == NULL) {
+				fclose(fpid);
+				return 0;
+			}
+			nms_pid = atoi(nms_pid_buf);
+			fclose(fpid);
+			if (kill(nms_pid, 0) != 0)
+				return 0;
+			nopipe = 1;
+		}
+	}
 
 	zc->zc_history = (uint64_t)(uintptr_t)hdl->libzfs_log_str;
 	error = ioctl(hdl->libzfs_fd, request, zc);
+
+	if (nopipe == 0 && getenv("NMS_CALLER") == NULL && access("/var/lib/nza/nlm.key", F_OK) == 0 &&
+	    zc && zc->zc_name && hdl->libzfs_log_str && error == 0) {
+		FILE *fpid = fopen("/var/run/nms.pid", "r");
+		if (fpid) {
+			char nms_pid_buf[10];
+			if (fgets(nms_pid_buf, 10, fpid) != NULL) {
+				int nms_pid = atoi(nms_pid_buf);
+				FILE *fpipe = fopen("/var/lib/nza/libzfs.pipe", "a+");
+				if (fpipe) {
+					fprintf(fpipe, "%s|%s\n", zc->zc_name, hdl->libzfs_log_str);
+					fclose(fpipe);
+					if (kill(nms_pid, 0) == 0)
+						kill(nms_pid, SIGUSR1);
+				}
+			}
+			fclose(fpid);
+		}
+	}
+
 	if (hdl->libzfs_log_str) {
 		free(hdl->libzfs_log_str);
 		hdl->libzfs_log_str = NULL;
 	}
-	zc->zc_history = 0;
 
+	zc->zc_history = 0;
 	return (error);
 }
 
@@ -1296,6 +1343,17 @@ zprop_get_list(libzfs_handle_t *hdl, char *props, zprop_list_t **listp,
 	 */
 	if (strcmp(props, "all") == 0)
 		return (0);
+
+	/*
+	 * If shareiscsi is specified as one of the arguemnts,
+	 * return error.
+	 */
+	if (strcmp(props, "shareiscsi") == 0) {
+		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+		    "invalid property"));
+		return (zfs_error(hdl, EZFS_BADPROP, dgettext(TEXT_DOMAIN,
+		    "bad property list")));
+	}
 
 	/*
 	 * If no props were specified, return an error.

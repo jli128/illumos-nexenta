@@ -1,0 +1,18 @@
+#!/bin/sh
+#
+# Copyright (c) 2006 by Nexenta Systems, Inc.
+# All rights reserved.
+#
+
+while read src dest
+do
+	if [ ! -f $dest ] ; then
+		cp $src $dest
+	else
+		cat $dest 2>/dev/null|grep CDDL >/dev/null
+		if test $? != 0; then
+			cat $src >> $dest
+		fi
+	fi
+done
+exit 0

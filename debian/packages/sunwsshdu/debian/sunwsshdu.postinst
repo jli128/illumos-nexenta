@@ -1,0 +1,7 @@
+#!/bin/sh
+
+if [ -x /lib/svc/method/sshd ]; then
+        # Generate SSH host keys
+        /lib/svc/method/sshd -c
+fi
+exit 0

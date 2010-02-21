@@ -59,7 +59,7 @@ install: all $(DIRS) $(ROOTTZSRCD) $(ROOTTZTABD) $(ROOTUSRSBINPROG) $(ROOTLIBTZS
 	$(NPROG) -d $(ROOTTZD) $(TZFILES)
 
 $(NPROG): $(NATIVE) $(NOBJS)
-	$(NATIVECC) -o $@ $(NOBJS)
+	$(NATIVECC) -o $@ $(NOBJS) -lintl
 
 #
 # XXX

@@ -76,7 +76,7 @@ YFLAGS = -d
 CLOBBERFILES += svccfg_lex.c svccfg_grammar.c svccfg_grammar.h \
     $(MYPROG:%=%-native)
 
-SVCCFG_EXTRA_LIBS = -lxml2 -lscf -ll -luutil -lumem -lmd5
+SVCCFG_EXTRA_LIBS = -lxml2 -lscf -ll -luutil -lumem -lmd5 -lintl
 $(NOT_NATIVE)SVCCFG_EXTRA_LIBS += -ltecla
 
 LIBSCF		= $(SRC)/lib/libscf

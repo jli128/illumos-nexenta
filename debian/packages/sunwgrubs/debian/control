@@ -1,0 +1,13 @@
+Source: sunwgrubs
+Section: devel
+Priority: optional
+Maintainer: Mac <mac@gnusolaris.org>
+Build-Depends: debhelper(>=4.9.5gnusol5)
+
+Package: sunwgrubs
+XBS-PKG: sunwgrubS
+Architecture: solaris-i386
+Depends: ${shlibs:Depends}
+Description: Source for GNU GRUB - GNU GRand Unified Bootloader
+ Source for GNU GRUB
+ .

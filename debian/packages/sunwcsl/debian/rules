@@ -1,0 +1,65 @@
+#!/usr/bin/make -f
+# debian/rules for alien
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+include ../rules.defs
+
+PACKAGE=$(shell dh_listpackages)
+
+build:
+	dh_testdir
+	cd unix_chkpwd; make
+
+clean:
+	dh_testdir
+	dh_testroot
+	dh_clean -d
+	dh_installproto clean
+	find . -maxdepth 1 -mindepth 1 -not -name .svn \
+		-not -name unix_chkpwd \
+		-not -name debian -print0 | xargs rm -rf
+
+binary-indep: build
+
+binary-arch: build
+	dh_testdir
+	dh_testroot
+	dh_clean -d
+	dh_installdirs
+
+	dh_installdocs
+	dh_installchangelogs
+	dh_installproto
+
+# Copy the packages's files.
+	find . -maxdepth 1 -mindepth 1 -not -name .svn \
+		-not -name unix_chkpwd \
+		-not -name debian -print0 | \
+		xargs -0 -r -i cp -a {} debian/sunwcsl
+
+#
+# If you need to move files around in debian/$(PACKAGE) or do some
+# binary patching, do it here
+#
+	mkdir -p debian/libpam-modules/sbin
+	cp -a unix_chkpwd/unix_chkpwd debian/libpam-modules/sbin
+	chmod u+s debian/libpam-modules/sbin/unix_chkpwd
+	chown root:root debian/libpam-modules/sbin/unix_chkpwd
+
+
+# This has been known to break on some wacky binaries.
+	dh_sunstrip
+	dh_compress
+#	dh_fixperms
+	dh_makeshlibs
+	dh_suninstalldeb
+	-dh_shlibdeps
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+	dh_installproto clean
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary

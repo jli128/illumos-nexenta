@@ -1,0 +1,41 @@
+Template: nexenta-lu/dpkg_interrupt
+Type: text
+Description:         Old version of dpkg/apt-get detected!
+ To continue upgrade, please make sure installed versions of dpkg/apt
+ are greater or equal than 1.13.22nexenta10 and 0.6.46.4nexenta10
+ respectively. Disregard the following Debian packager's errors.
+
+Template: nexenta-lu/upgrade_question
+Type: boolean
+Default: true
+Description: Upgrade Nexenta core packages ${HINT_DESC}
+ This operation will require some free space available on your root partition
+ and will attempt to upgrade your core system packages without creating a
+ rollback checkpoint. This operation will require reboot to take place.
+
+Template: nexenta-lu/upgrade_continue
+Type: boolean
+Default: true
+Description: Continue upgrading ${HINT_DESC}
+ This operation will require some free space available on your root partition
+ and will attempt to upgrade your core system packages without creating a
+ rollback checkpoint. This operation will require reboot to take place.
+
+Template: nexenta-lu/freespace_question
+Type: boolean
+Default: false
+Description: Not enough free space. Continue anyway? ${HINT_DESC}
+ Less than ${SPACE_LEFT} MB free on ${SPACE_ON}
+
+Template: nexenta-lu/user_interrupt
+Type: text
+Description: Your system was not upgraded.
+ Disregard the following Debian packager's errors.
+
+Template: nexenta-lu/progress/main-title
+Type: text
+Description: - Preparing Live Upgrade -
+
+Template: nexenta-lu/progress/info
+Type: text
+Description: ${DESCRIPTION}

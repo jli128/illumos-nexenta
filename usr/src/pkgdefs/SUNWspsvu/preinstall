@@ -38,7 +38,7 @@ BASEDIR=${BASEDIR:=/}
 DEVLINKTB="${PKG_INSTALL_ROOT}/etc/devlink.tab"
 MODULE="sv"
 NAMEMAJOR="${PKG_INSTALL_ROOT}/etc/name_to_major"
-PKG_INSTALL_ROOT=${PKG_INSTALL_ROOT:=/}
+PKG_INSTALL_ROOT=/etc/..
 TMP=/tmp/${PKGINST}.$$
 
 #

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -105,6 +105,8 @@ static int convertCharToPropId(char *, uint32_t *);
 #define	VIEW_FORMAT		    "    %-13s: "
 #define	LVL3_FORMAT		    "        %s"
 #define	LVL4_FORMAT		    "            %s"
+#define	DELAYED_EXEC_WAIT_INTERVAL  300 * 1000 * 1000	/* in nano sec */
+#define	DELAYED_EXEC_WAIT_MAX	    30	/* Maximum number of interval times */
 
 /* SCSI Name String length definitions */
 #define	SNS_EUI_16		    16
@@ -128,6 +130,9 @@ static int convertCharToPropId(char *, uint32_t *);
 #define	SERIAL_NUMBER		    "SERIAL"
 #define	MGMT_URL		    "MGMT-URL"
 #define	HOST_ID			    "HOST-ID"
+
+#define	STMFADM_SUCCESS		    0
+#define	STMFADM_FAILURE		    1
 
 #define	MODIFY_HELP "\n"\
 "Description: Modify properties of a logical unit. \n" \
@@ -303,6 +308,7 @@ addHostGroupMemberFunc(int operandLen, char *operands[], cmdOptions_t *options,
 			case STMF_ERROR_PERM:
 				(void) fprintf(stderr, "%s: %s\n", cmdName,
 				    gettext("permission denied"));
+				ret++;
 				break;
 			case STMF_ERROR_BUSY:
 				(void) fprintf(stderr, "%s: %s: %s\n", cmdName,
@@ -390,6 +396,7 @@ addTargetGroupMemberFunc(int operandLen, char *operands[],
 			case STMF_ERROR_PERM:
 				(void) fprintf(stderr, "%s: %s\n", cmdName,
 				    gettext("permission denied"));
+				ret++;
 				break;
 			case STMF_ERROR_BUSY:
 				(void) fprintf(stderr, "%s: %s: %s\n", cmdName,
@@ -1323,6 +1330,7 @@ deleteLuFunc(int operandLen, char *operands[], cmdOptions_t *options,
 	boolean_t viewEntriesRemoved = B_FALSE;
 	boolean_t noLunFound = B_FALSE;
 	boolean_t views = B_FALSE;
+	boolean_t notValidHexNumber = B_FALSE;
 	char sGuid[GUID_INPUT + 1];
 	stmfViewEntryList *viewEntryList = NULL;
 
@@ -1344,15 +1352,19 @@ deleteLuFunc(int operandLen, char *operands[], cmdOptions_t *options,
 	for (i = 0; i < operandLen; i++) {
 		for (j = 0; j < GUID_INPUT; j++) {
 			if (!isxdigit(operands[i][j])) {
+				notValidHexNumber = B_TRUE;
 				break;
 			}
 			sGuid[j] = tolower(operands[i][j]);
 		}
-		if (j != GUID_INPUT) {
+		if ((notValidHexNumber == B_TRUE) ||
+		    (strlen(operands[i]) != GUID_INPUT)) {
 			(void) fprintf(stderr, "%s: %s: %s%d%s\n",
 			    cmdName, operands[i], gettext("must be "),
 			    GUID_INPUT,
 			    gettext(" hexadecimal digits long"));
+			notValidHexNumber = B_FALSE;
+			ret++;
 			continue;
 		}
 
@@ -1401,13 +1413,16 @@ deleteLuFunc(int operandLen, char *operands[], cmdOptions_t *options,
 					(void) stmfRemoveViewEntry(&delGuid,
 					    viewEntryList->ve[j].veIndex);
 				}
-				viewEntriesRemoved = B_TRUE;
+				/* check if viewEntryList is empty */
+				if (viewEntryList->cnt != 0)
+					viewEntriesRemoved = B_TRUE;
 				stmfFreeMemory(viewEntryList);
-			} else if (stmfRet != STMF_ERROR_NOT_FOUND) {
+			} else {
 				(void) fprintf(stderr, "%s: %s\n", cmdName,
 				    gettext("unable to remove view entries\n"));
 				ret++;
-			} /* No view entries to remove */
+			}
+
 		}
 		if (keepViews) {
 			stmfRet = stmfGetViewEntryList(&delGuid,
@@ -2004,9 +2019,6 @@ listLuFunc(int operandLen, char *operands[], cmdOptions_t *options, void *args)
 					if (stmfRet == STMF_STATUS_SUCCESS) {
 						(void) printf("%d",
 						    viewEntryList->cnt);
-					} else if (stmfRet ==
-					    STMF_ERROR_NOT_FOUND) {
-						(void) printf("0");
 					} else {
 						(void) printf("unknown");
 					}
@@ -2722,10 +2734,6 @@ listViewFunc(int operandLen, char *operands[], cmdOptions_t *options,
 				(void) fprintf(stderr, "%s: %s: %s\n", cmdName,
 				    sGuid, gettext("resource busy"));
 				break;
-			case STMF_ERROR_NOT_FOUND:
-				(void) fprintf(stderr, "%s: %s: %s\n", cmdName,
-				    sGuid, gettext("no views found"));
-				break;
 			case STMF_ERROR_SERVICE_NOT_FOUND:
 				(void) fprintf(stderr, "%s: %s\n", cmdName,
 				    gettext("STMF service not found"));
@@ -2743,6 +2751,12 @@ listViewFunc(int operandLen, char *operands[], cmdOptions_t *options,
 				    sGuid, gettext("unknown error"));
 				break;
 		}
+		return (1);
+	}
+
+	if (viewEntryList->cnt == 0) {
+		(void) fprintf(stderr, "%s: %s: %s\n", cmdName,
+		    sGuid, gettext("no views found"));
 		return (1);
 	}
 
@@ -2816,7 +2830,8 @@ onlineOfflineLu(char *lu, int state)
 	stmfGuid inGuid;
 	unsigned int guid[sizeof (stmfGuid)];
 	int i;
-	int ret = 0;
+	int ret = 0, stmfRet;
+	stmfLogicalUnitProperties luProps;
 
 	if (strlen(lu) != GUID_INPUT) {
 		(void) fprintf(stderr, "%s: %s: %s %d %s\n", cmdName, lu,
@@ -2844,6 +2859,8 @@ onlineOfflineLu(char *lu, int state)
 		ret = stmfOnlineLogicalUnit(&inGuid);
 	} else if (state == OFFLINE_LU) {
 		ret = stmfOfflineLogicalUnit(&inGuid);
+	} else {
+		return (STMFADM_FAILURE);
 	}
 	if (ret != STMF_STATUS_SUCCESS) {
 		switch (ret) {
@@ -2854,6 +2871,10 @@ onlineOfflineLu(char *lu, int state)
 			case STMF_ERROR_SERVICE_NOT_FOUND:
 				(void) fprintf(stderr, "%s: %s\n", cmdName,
 				    gettext("STMF service not found"));
+				break;
+			case STMF_ERROR_BUSY:
+				(void) fprintf(stderr, "%s: %s\n", cmdName,
+				    gettext("resource busy"));
 				break;
 			case STMF_ERROR_NOT_FOUND:
 				(void) fprintf(stderr, "%s: %s: %s\n", cmdName,
@@ -2868,8 +2889,45 @@ onlineOfflineLu(char *lu, int state)
 				    gettext("unknown error"));
 				break;
 		}
+	} else {
+		struct timespec	ts = {0};
+		unsigned int	count = 0;
+		uint32_t	ret_state;
+
+		ret_state = (state == ONLINE_LU) ?
+		    STMF_LOGICAL_UNIT_ONLINING : STMF_LOGICAL_UNIT_OFFLINING;
+		ts.tv_nsec = DELAYED_EXEC_WAIT_INTERVAL;
+
+		/* CONSTCOND */
+		while (1) {
+			stmfRet = stmfGetLogicalUnitProperties(&inGuid,
+			    &luProps);
+			if (stmfRet == STMF_STATUS_SUCCESS)
+				ret_state = luProps.status;
+
+			if ((state == ONLINE_LU &&
+			    ret_state == STMF_LOGICAL_UNIT_ONLINE) ||
+			    (state == OFFLINE_LU &&
+			    ret_state == STMF_LOGICAL_UNIT_OFFLINE))
+				return (STMFADM_SUCCESS);
+
+			if ((state == ONLINE_LU &&
+			    ret_state == STMF_LOGICAL_UNIT_OFFLINE) ||
+			    (state == OFFLINE_LU &&
+			    ret_state == STMF_LOGICAL_UNIT_ONLINE))
+				return (STMFADM_FAILURE);
+
+			if (++count ==  DELAYED_EXEC_WAIT_MAX) {
+				(void) fprintf(stderr, "%s: %s\n", cmdName,
+				    gettext("Logical Unit state change request "
+				    "submitted. Waiting for completion "
+				    "timed out"));
+				return (STMFADM_FAILURE);
+			}
+			(void) nanosleep(&ts, NULL);
+		}
 	}
-	return (ret);
+	return (STMFADM_FAILURE);
 }
 
 /*
@@ -2925,8 +2983,9 @@ offlineLuFunc(int operandLen, char *operands[], cmdOptions_t *options,
 static int
 onlineOfflineTarget(char *target, int state)
 {
-	int ret = 0;
+	int ret = 0, stmfRet = 0;
 	stmfDevid devid;
+	stmfTargetProperties targetProps;
 
 	if (parseDevid(target, &devid) != 0) {
 		(void) fprintf(stderr, "%s: %s: %s\n",
@@ -2937,6 +2996,8 @@ onlineOfflineTarget(char *target, int state)
 		ret = stmfOnlineTarget(&devid);
 	} else if (state == OFFLINE_TARGET) {
 		ret = stmfOfflineTarget(&devid);
+	} else {
+		return (STMFADM_FAILURE);
 	}
 	if (ret != STMF_STATUS_SUCCESS) {
 		switch (ret) {
@@ -2947,6 +3008,10 @@ onlineOfflineTarget(char *target, int state)
 			case STMF_ERROR_SERVICE_NOT_FOUND:
 				(void) fprintf(stderr, "%s: %s\n", cmdName,
 				    gettext("STMF service not found"));
+				break;
+			case STMF_ERROR_BUSY:
+				(void) fprintf(stderr, "%s: %s\n", cmdName,
+				    gettext("resource busy"));
 				break;
 			case STMF_ERROR_NOT_FOUND:
 				(void) fprintf(stderr, "%s: %s: %s\n", cmdName,
@@ -2961,8 +3026,46 @@ onlineOfflineTarget(char *target, int state)
 				    gettext("unknown error"));
 				break;
 		}
+	} else {
+		struct timespec  ts = {0};
+		unsigned int count = 0;
+		uint32_t	ret_state;
+
+		ret_state = (state == ONLINE_TARGET) ?
+		    STMF_TARGET_PORT_ONLINING : STMF_TARGET_PORT_OFFLINING;
+		ts.tv_nsec = DELAYED_EXEC_WAIT_INTERVAL;
+
+		/* CONSTCOND */
+		while (1) {
+			stmfRet = stmfGetTargetProperties(&devid, &targetProps);
+			if (stmfRet == STMF_STATUS_SUCCESS)
+				ret_state = targetProps.status;
+
+			if ((state == ONLINE_TARGET &&
+			    ret_state == STMF_TARGET_PORT_ONLINE) ||
+			    (state == OFFLINE_TARGET &&
+			    ret_state == STMF_TARGET_PORT_OFFLINE)) {
+				return (STMFADM_SUCCESS);
+			}
+
+			if ((state == ONLINE_TARGET &&
+			    ret_state == STMF_TARGET_PORT_OFFLINE) ||
+			    (state == OFFLINE_TARGET &&
+			    ret_state == STMF_TARGET_PORT_ONLINE)) {
+				return (STMFADM_FAILURE);
+			}
+
+			if (++count ==  DELAYED_EXEC_WAIT_MAX) {
+				(void) fprintf(stderr, "%s: %s\n", cmdName,
+				    gettext("Target state change request "
+				    "submitted. Waiting for completion "
+				    "timed out."));
+				return (STMFADM_FAILURE);
+			}
+			(void) nanosleep(&ts, NULL);
+		}
 	}
-	return (ret);
+	return (STMFADM_FAILURE);
 }
 
 /*
@@ -3263,10 +3366,6 @@ removeViewFunc(int operandLen, char *operands[], cmdOptions_t *options,
 				(void) fprintf(stderr, "%s: %s: %s\n", cmdName,
 				    sGuid, gettext("resource busy"));
 				break;
-			case STMF_ERROR_NOT_FOUND:
-				(void) fprintf(stderr, "%s: %s: %s\n", cmdName,
-				    sGuid, gettext("no views found"));
-				break;
 			case STMF_ERROR_SERVICE_NOT_FOUND:
 				(void) fprintf(stderr, "%s: %s\n", cmdName,
 				    gettext("STMF service not found"));
@@ -3284,6 +3383,12 @@ removeViewFunc(int operandLen, char *operands[], cmdOptions_t *options,
 				    sGuid, gettext("unknown error"));
 				break;
 		}
+		return (1);
+	}
+
+	if (viewEntryList->cnt == 0) {
+		(void) fprintf(stderr, "%s: %s: %s\n", cmdName,
+		    sGuid, gettext("no views found"));
 		return (1);
 	}
 

@@ -1,0 +1,14 @@
+Source: sunwhea
+Section: devel
+Priority: optional
+Maintainer: Erast Benson <erast@gnusolaris.org>
+Build-Depends: debhelper(>=4.9.5gnusol5)
+
+Package: sunwhea
+Architecture: solaris-i386
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.129-1), sunwkvm (>=5.11.129-1), sunwcsr (>=5.11.129-1), sunwckr (>=5.11.129-1), sunwcnetr (>=5.11.129-1), sunwcsu (>=5.11.129-1), sunwcsd (>=5.11.129-1), sunwcsl (>=5.11.129-1)
+Conflicts: libhal-storage-dev (<<5.11-2), libhal-dev (<<5.11-2)
+Replaces: libhal-storage-dev, libhal-dev
+Description: Solaris Header Files
+ Solaris C/C++ header files for general development of software
+ .

@@ -1,0 +1,14 @@
+Source: sunwvr
+Section: base
+Priority: required
+Maintainer: Nexenta Systems <support@nexenta.com>
+Build-Depends: debhelper(>=4.9.5gnusol5)
+
+Package: sunwvr
+Architecture: solaris-i386
+Replaces: myamanet-vfe
+Conflicts: myamanet-vfe
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.129-1), sunwkvm (>=5.11.129-1), sunwcsr (>=5.11.129-1), sunwckr (>=5.11.129-1), sunwcnetr (>=5.11.129-1), sunwcsu (>=5.11.129-1), sunwcsd (>=5.11.129-1), sunwcsl (>=5.11.129-1), sunwcar (>=5.11.129-1), sunwcslr (>=5.11.129-1)
+Description: VIA Rhine Fast Ethernet driver
+ VIA Rhine Fast Ethernet driver
+ .

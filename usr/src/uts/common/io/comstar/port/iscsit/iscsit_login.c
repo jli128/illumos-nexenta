@@ -809,6 +809,7 @@ login_sm_handle_initial_login(iscsit_conn_t *ict, idm_pdu_t *pdu)
 	iscsi_login_hdr_t *lh_req = (iscsi_login_hdr_t *)pdu->isp_hdr;
 	iscsi_login_rsp_hdr_t *lh_resp =
 	    ict->ict_login_sm.icl_login_resp_tmpl;
+	int expstatsn;
 
 	/*
 	 * First login PDU, this connection should not have a sesssion
@@ -827,6 +828,14 @@ login_sm_handle_initial_login(iscsit_conn_t *ict, idm_pdu_t *pdu)
 	 * We'll need the CID as well
 	 */
 	ict->ict_cid = ntohs(lh_req->cid);
+
+	/*
+	 * work around for ESX 3.5, aka Cisco initiator
+	 */
+	expstatsn = ntohl(lh_req->expstatsn);
+	if (ict->ict_statsn == 1 && expstatsn == 0) {
+		ict->ict_statsn = 0;
+	}
 
 	/*
 	 * Set the CSG, NSG and Transit bits based on the first PDU
@@ -2076,8 +2085,13 @@ iscsit_handle_key(iscsit_conn_t *ict, nvpair_t *nvp, char *nvp_name)
 		 * However, the answer for a key not understood MUST be
 		 * key=NotUnderstood.
 		 */
+		char *ptr = strchr(nvp_name, '=');
+		if (ptr != NULL)
+			*ptr = 0;
 		kvrc = iscsit_reply_string(ict, nvp_name,
 		    ISCSI_TEXT_NOTUNDERSTOOD);
+		if (ptr != NULL)
+			*ptr = '=';
 	} else {
 		kvrc = iscsit_handle_common_key(ict, nvp, ikvx);
 		if (kvrc == KV_UNHANDLED) {

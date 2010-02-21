@@ -46,29 +46,30 @@ i postinstall
 #
 d none usr 755 root sys
 d none usr/bin 755 root bin
+d none usr/sun/bin 755 root bin
 f none usr/bin/addbib 555 root bin
-f none usr/bin/apropos 555 root bin
-l none usr/bin/catman=../../usr/bin/apropos
+m none usr/sun/bin/apropos 555 root bin usr/bin/apropos
+l none usr/sun/bin/catman=../../../usr/sun/bin/apropos
 f none usr/bin/checkeq 555 root bin
 f none usr/bin/checknr 555 root bin
 f none usr/bin/deroff 555 root bin
 f none usr/bin/diffmk 555 root bin
-f none usr/bin/eqn 555 root bin
+m none usr/sun/bin/eqn 555 root bin usr/bin/eqn
 f none usr/bin/indxbib 555 root bin
 f none usr/bin/lookbib 555 root bin
-l none usr/bin/man=../../usr/bin/apropos
-f none usr/bin/neqn 555 root bin
-f none usr/bin/nroff 555 root bin
+l none usr/sun/bin/man=../../../usr/sun/bin/apropos
+m none usr/sun/bin/neqn 555 root bin usr/bin/neqn
+m none usr/sun/bin/nroff 555 root bin usr/bin/nroff
 f none usr/bin/refer 555 root bin
 f none usr/bin/roffbib 555 root bin
-f none usr/bin/soelim 555 root bin
+m none usr/sun/bin/soelim 555 root bin usr/bin/soelim
 f none usr/bin/sortbib 555 root bin
 f none usr/bin/ta 555 root bin
-f none usr/bin/tbl 555 root bin
-f none usr/bin/troff 555 root bin
-f none usr/bin/ul 555 root bin
+m none usr/sun/bin/tbl 555 root bin usr/bin/tbl
+m none usr/sun/bin/troff 555 root bin usr/bin/troff
+m none usr/sun/bin/ul 555 root bin usr/bin/ul
 f none usr/bin/vgrind 555 root bin
-l none usr/bin/whatis=../../usr/bin/apropos
+l none usr/sun/bin/whatis=../../../usr/sun/bin/apropos
 d none usr/lib 755 root bin
 d none usr/lib/font 755 root bin
 d none usr/lib/font/devpost 755 root lp
@@ -287,9 +288,9 @@ d none usr/share/lib/sgml/locale/C 755 root bin
 d none usr/share/lib/sgml/locale/C/dtds 755 root bin
 f none usr/share/lib/sgml/locale/C/dtds/catalog 644 root bin
 d none usr/share/lib/sgml/locale/C/dtds/docbook 755 root bin
-f none usr/share/lib/sgml/locale/C/dtds/docbook/docbook.dtd 644 root bin
+#f none usr/share/lib/sgml/locale/C/dtds/docbook/docbook.dtd 644 root bin
 d none usr/share/lib/sgml/locale/C/dtds/solbookv1 755 root bin
-f none usr/share/lib/sgml/locale/C/dtds/solbookv1/solbook.dtd 644 root bin
+#f none usr/share/lib/sgml/locale/C/dtds/solbookv1/solbook.dtd 644 root bin
 d none usr/share/lib/sgml/locale/C/dtds/solbookv2 755 root bin
 f none usr/share/lib/sgml/locale/C/dtds/solbookv2/solbook.dtd 644 root bin
 f none usr/share/lib/sgml/locale/C/dtds/solbookv2/solbook.dcl 644 root bin

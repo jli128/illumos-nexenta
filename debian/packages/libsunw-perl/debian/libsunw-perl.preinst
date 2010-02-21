@@ -1,0 +1,6 @@
+#!/bin/bash
+
+# fixup for Alpha1
+if test -e /usr/perl5/bin; then
+	rm -rf /usr/perl5/bin
+fi

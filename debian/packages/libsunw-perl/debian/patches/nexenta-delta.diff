@@ -1,0 +1,529 @@
+--- contrib/Sun/Solaris/Exacct/Makefile.PL	2005-11-25 23:05:59.431243000 -0800
++++ contrib.modified/Sun/Solaris/Exacct/Makefile.PL	2006-02-15 13:56:53.578994000 -0800
+@@ -77,7 +77,7 @@
+ {
+ 	my $self = shift(@_);
+ 	my $txt = $self->SUPER::top_targets(@_);
+-	$txt =~ s/pm_to_blib subdirs/pm_to_blib \$(LINKTYPE) .WAIT subdirs/;
++	$txt =~ s/pm_to_blib subdirs/pm_to_blib \$(LINKTYPE) subdirs/;
+ 	return($txt);
+ }
+ 
+@@ -88,7 +88,7 @@
+ {
+ 	my $self = shift(@_);
+ 	my $txt = $self->SUPER::install(@_);
+-	$txt =~ s/ all / all .WAIT /g;
++	$txt =~ s/ all / all /g;
+ 	return($txt);
+ }
+ 
+--- contrib/Sun/Solaris/Intrs/Intrs.xs	2006-02-15 13:04:12.715079000 -0800
++++ contrib.modified/Sun/Solaris/Intrs/Intrs.xs	2006-02-15 14:30:17.267651000 -0800
+@@ -29,6 +29,8 @@
+ #include <sys/types.h>
+ #include <sys/stat.h>
+ #include <sys/pci.h>
++#include <dirent.h>
++#include <sys/vnode.h>
+ #include <fcntl.h>
+ #include <unistd.h>
+ #include <stropts.h>
+
+--- contrib.orig/Sun/Solaris/Kstat/Makefile.PL	2006-04-04 16:41:34.661307000 -0700
++++ contrib/Sun/Solaris/Kstat/Makefile.PL	2006-04-12 21:13:57.233048000 -0700
+@@ -27,7 +27,7 @@
+ #
+ 
+ use ExtUtils::MakeMaker;
+-my ($defines, $includes) = ('', '');
++my ($defines, $includes, $proto) = ('', '', '');
+ 
+ # Uncomment this to turn on assertions
+ #$defines .= '-DKSTAT_DEBUG ';
+@@ -40,12 +40,13 @@
+ # platform specific header files, so work out where they live.
+ #
+ my $arch = qx{uname -p}; chomp($arch);
++my $proto = "/var/lib/proto-5.11.101/root_$arch";
+ if ($arch eq 'sparc') {
+-	$includes .= '-I/usr/platform/sun4u/include' .
+-	    ' -I/usr/platform/sun4v/include';
++	$includes .= "-I$proto/usr/include -I$proto/usr/platform/sun4u/include" .
++	    " -I$proto/usr/platform/sun4v/include";
+ } elsif ($arch eq 'i386') {
+-	$includes .= '-I/usr/platform/i86pc/include' .
+-	    ' -I/usr/platform/i86xpv/include';
++	$includes .= "-I$proto/usr/include -I$proto/usr/platform/i86pc/include" .
++	    " -I$proto/usr/platform/i86xpv/include";
+ } else {
+ 	die("Unknown architecture $arch\n");
+ }
+@@ -57,4 +58,5 @@
+     DEFINE       => $defines,
+     INC          => $includes,
+     OBJECT       => '$(O_FILES)',
++    CCFLAGS	 => "-fident -finline -fno-inline-functions",
+ );
+
+--- contrib.orig/Sun/Solaris/Intrs/Makefile.PL	2006-04-04 16:41:33.863367000 -0700
++++ contrib/Sun/Solaris/Intrs/Makefile.PL	2006-04-12 21:16:17.817395000 -0700
+@@ -37,11 +37,14 @@
+ # Makefile.PL files for a template.
+ #
+ 
++my $arch = qx{uname -p}; chomp($arch);
++
+ WriteMakefile(
+     NAME		=> 'Sun::Solaris::Intrs',
+     VERSION_FROM	=> 'Intrs.pm',
+     DEFINE		=> exists($ENV{RELEASE_BUILD}) ? '-DNDEBUG' : '',
+     # Must be a relative path to avoid being interpreted as a proto area path.
+-    INC			=> "-I../../../../../../../uts/common/sys",
++    INC			=> "-I/var/lib/proto-5.11.101/root_$arch/usr/include -I.",
++    CCFLAGS             => "-fident -finline -fno-inline-functions",
+     MAN3PODS		=> {},
+ );
+--- contrib/Sun/Solaris/Task/Makefile.PL.orig	2007-04-05 14:51:46.868154611 -0700
++++ contrib/Sun/Solaris/Task/Makefile.PL	2007-04-05 14:52:40.302365975 -0700
+@@ -81,9 +81,22 @@
+ 	);
+ }
+ 
++my $arch = qx{uname -p}; chomp($arch);
++my $proto = "/var/lib/proto-5.11.101/root_$arch"; my $includes;
++if ($arch eq 'sparc') {
++	$includes .= "-I$proto/usr/include -I$proto/usr/platform/sun4u/include" .
++	    " -I$proto/usr/platform/sun4v/include";
++} elsif ($arch eq 'i386') {
++	$includes .= "-I$proto/usr/include -I$proto/usr/platform/i86pc/include" .
++	    " -I$proto/usr/platform/i86xen/include";
++} else {
++	die("Unknown architecture $arch\n");
++}
++
+ WriteMakefile(
+     NAME	 => 'Sun::Solaris::Task',
+     VERSION_FROM => 'Task.pm',
++    INC          => $includes,
+     @defines,
+     @man3pods,
+ );
+--- contrib/Sun/Solaris/Task/Task.xs.orig	2007-12-12 17:23:29.420272501 -0800
++++ contrib/Sun/Solaris/Task/Task.xs	2007-12-12 17:23:40.095150786 -0800
+@@ -29,6 +29,7 @@
+ 
+ /* Solaris includes. */
+ #include <sys/task.h>
++#include <sys/vnode.h>
+ 
+ /* Perl includes. */
+ #include "EXTERN.h"
+--- contrib/Sun/Solaris/Utils/Utils.xs.orig	2008-10-22 07:18:27.528754902 -0700
++++ contrib/Sun/Solaris/Utils/Utils.xs	2008-10-22 07:18:31.081920522 -0700
+@@ -34,6 +34,8 @@
+ /* Solaris includes */
+ #include <libgen.h>
+ #include <libintl.h>
++#include <sys/stat.h>
++#include <sys/vnode.h>
+ 
+ /* Perl XS includes */
+ #include "EXTERN.h"
+--- contrib/Sun/Solaris/Exacct/exacct_common.xh.orig	2008-10-22 07:37:33.538604231 -0700
++++ contrib/Sun/Solaris/Exacct/exacct_common.xh	2008-10-22 07:37:52.676056536 -0700
+@@ -42,6 +42,8 @@
+ 
+ /* Perl XS includes. */
+ #include "EXTERN.h"
++#include <sys/stat.h>
++#include <sys/vnode.h>
+ #include "perl.h"
+ #include "XSUB.h"
+ 
+--- contrib/Sun/Solaris/Privilege/Privilege.xs.orig	2008-10-22 07:56:39.762527260 -0700
++++ contrib/Sun/Solaris/Privilege/Privilege.xs	2008-10-22 07:57:02.607712638 -0700
+@@ -35,6 +35,8 @@
+ 
+ /* Perl includes. */
+ #include "EXTERN.h"
++#include <sys/stat.h>
++#include <sys/vnode.h>
+ #include "perl.h"
+ #include "XSUB.h"
+ 
+--- contrib/Sun/Solaris/Project/Project.xs.orig	2008-10-22 08:01:24.510927830 -0700
++++ contrib/Sun/Solaris/Project/Project.xs	2008-10-22 08:01:41.210272023 -0700
+@@ -38,6 +38,8 @@
+ 
+ /* Perl includes. */
+ #include "EXTERN.h"
++#include <sys/stat.h>
++#include <sys/vnode.h>
+ #include "perl.h"
+ #include "XSUB.h"
+ 
+--- contrib/Sun/Solaris/Ucred/Ucred.xs.orig	2008-10-22 08:05:30.080534955 -0700
++++ contrib/Sun/Solaris/Ucred/Ucred.xs	2008-10-22 08:05:34.261518202 -0700
+@@ -35,6 +35,8 @@
+ 
+ /* Perl includes. */
+ #include "EXTERN.h"
++#include <sys/stat.h>
++#include <sys/vnode.h>
+ #include "perl.h"
+ #include "XSUB.h"
+ 
+--- contrib/Sun/Solaris/Lgrp/Lgrp.xs.orig	2008-10-22 08:07:21.129471924 -0700
++++ contrib/Sun/Solaris/Lgrp/Lgrp.xs	2008-10-22 08:07:47.923960481 -0700
+@@ -42,6 +42,8 @@
+ 
+ /* Perl XS includes. */
+ #include "EXTERN.h"
++#include <sys/stat.h>
++#include <sys/vnode.h>
+ #include "perl.h"
+ #include "XSUB.h"
+ 
+--- /dev/null	2009-09-21 16:45:38.752892439 -0700
++++ contrib/Sun/Solaris/Intrs/pci_tools.h	2009-09-21 16:45:34.476922549 -0700
+@@ -0,0 +1,242 @@
++/*
++ * CDDL HEADER START
++ *
++ * The contents of this file are subject to the terms of the
++ * Common Development and Distribution License (the "License").
++ * You may not use this file except in compliance with the License.
++ *
++ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
++ * or http://www.opensolaris.org/os/licensing.
++ * See the License for the specific language governing permissions
++ * and limitations under the License.
++ *
++ * When distributing Covered Code, include this CDDL HEADER in each
++ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
++ * If applicable, add the following below this CDDL HEADER, with the
++ * fields enclosed by brackets "[]" replaced with your own identifying
++ * information: Portions Copyright [yyyy] [name of copyright owner]
++ *
++ * CDDL HEADER END
++ */
++/*
++ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
++ * Use is subject to license terms.
++ */
++
++#ifndef _SYS_PCI_TOOLS_H
++#define	_SYS_PCI_TOOLS_H
++
++#include <sys/modctl.h>
++
++#ifdef	__cplusplus
++extern "C" {
++#endif
++
++/*
++ * Versioning.
++ */
++#define	PCITOOL_V1	1
++#define	PCITOOL_V2	2
++#define	PCITOOL_VERSION	PCITOOL_V2
++
++/* File suffixes for nexus pcitool nodes. */
++#define	PCI_MINOR_REG	"reg"
++#define	PCI_MINOR_INTR	"intr"
++
++/*
++ * Ioctls for PCI tools.
++ */
++#define	PCITOOL_IOC		(('P' << 24) | ('C' << 16) | ('T' << 8))
++
++/* Read/write a device on a PCI bus, in physical space. */
++#define	PCITOOL_DEVICE_GET_REG		(PCITOOL_IOC | 1)
++#define	PCITOOL_DEVICE_SET_REG		(PCITOOL_IOC | 2)
++
++/* Read/write the PCI nexus bridge, in physical space. */
++#define	PCITOOL_NEXUS_GET_REG		(PCITOOL_IOC | 3)
++#define	PCITOOL_NEXUS_SET_REG		(PCITOOL_IOC | 4)
++
++/* Get/set interrupt-CPU mapping for PCI devices. */
++#define	PCITOOL_DEVICE_GET_INTR		(PCITOOL_IOC | 5)
++#define	PCITOOL_DEVICE_SET_INTR		(PCITOOL_IOC | 6)
++
++/* Get system interrupt information */
++#define	PCITOOL_SYSTEM_INTR_INFO	(PCITOOL_IOC | 8)
++
++/*
++ * This file contains data structures for the pci tool.
++ */
++#define	PCITOOL_CONFIG	0
++#define	PCITOOL_BAR0	1
++#define	PCITOOL_BAR1	2
++#define	PCITOOL_BAR2	3
++#define	PCITOOL_BAR3	4
++#define	PCITOOL_BAR4	5
++#define	PCITOOL_BAR5	6
++#define	PCITOOL_ROM	7
++
++/*
++ * Pass this through barnum to signal to use a base addr instead.
++ * This is for platforms which do not have a way to automatically map
++ * a selected bank to a base addr.
++ */
++#define	PCITOOL_BASE	0xFF
++
++/*
++ * BAR corresponding to space desired.
++ */
++typedef enum {
++    config = PCITOOL_CONFIG,
++    bar0 = PCITOOL_BAR0,
++    bar1 = PCITOOL_BAR1,
++    bar2 = PCITOOL_BAR2,
++    bar3 = PCITOOL_BAR3,
++    bar4 = PCITOOL_BAR4,
++    bar5 = PCITOOL_BAR5,
++    rom = PCITOOL_ROM
++} pcitool_bars_t;
++
++
++/*
++ * PCITOOL error numbers.
++ */
++
++typedef enum {
++	PCITOOL_SUCCESS = 0x0,
++	PCITOOL_INVALID_CPUID,
++	PCITOOL_INVALID_INO,
++	PCITOOL_INVALID_MSI,
++	PCITOOL_PENDING_INTRTIMEOUT,
++	PCITOOL_REGPROP_NOTWELLFORMED,
++	PCITOOL_INVALID_ADDRESS,
++	PCITOOL_NOT_ALIGNED,
++	PCITOOL_OUT_OF_RANGE,
++	PCITOOL_END_OF_RANGE,
++	PCITOOL_ROM_DISABLED,
++	PCITOOL_ROM_WRITE,
++	PCITOOL_IO_ERROR,
++	PCITOOL_INVALID_SIZE
++} pcitool_errno_t;
++
++
++/*
++ * PCITOOL_DEVICE_SET_INTR ioctl data structure to re-assign the interrupts.
++ */
++typedef struct pcitool_intr_set {
++	uint16_t user_version;	/* Userland program version - to krnl */
++	uint16_t drvr_version;	/* Driver version - from kernel */
++	uint32_t ino;		/* interrupt to set - to kernel */
++	uint32_t msi;		/* Specific MSI to set - to kernel */
++	uint32_t cpu_id;	/* to: cpu to set / from: old cpu returned */
++	uint32_t flags;		/* to kernel */
++	pcitool_errno_t status;	/* from kernel */
++} pcitool_intr_set_t;
++
++/*
++ * Flags for pcitool_intr_get/set_t/info_t
++ */
++#define	PCITOOL_INTR_FLAG_SET_GROUP	0x1
++#define	PCITOOL_INTR_FLAG_GET_MSI	0x2
++#define	PCITOOL_INTR_FLAG_SET_MSI	0x4
++
++/*
++ * PCITOOL_DEVICE_GET_INTR ioctl data structure to dump out the
++ * ino mapping information.
++ */
++
++typedef struct pcitool_intr_dev {
++	uint32_t	dev_inst;	/* device instance - from kernel */
++	char		driver_name[MAXMODCONFNAME];	/* from kernel */
++	char		path[MAXPATHLEN]; /* device path - from kernel */
++} pcitool_intr_dev_t;
++
++typedef struct pcitool_intr_get {
++	uint16_t user_version;		/* Userland program version - to krnl */
++	uint16_t drvr_version;		/* Driver version - from kernel */
++	uint32_t	ino;		/* interrupt number - to kernel */
++	uint32_t	msi;		/* MSI number - to kernel */
++	uint8_t		num_devs_ret;	/* room for this # of devs to be */
++					/* returned - to kernel */
++					/* # devs returned - from kernel */
++	uint8_t		num_devs;	/* # devs on this ino - from kernel */
++					/* intrs enabled for devs if > 0 */
++	uint8_t		ctlr;		/* controller number - from kernel */
++	uint32_t	cpu_id;		/* cpu of interrupt - from kernel */
++	uint32_t	flags;		/* to kernel */
++	pcitool_errno_t status;		/* returned status - from kernel */
++	pcitool_intr_dev_t	dev[1];	/* start of variable device list */
++					/* from kernel */
++} pcitool_intr_get_t;
++
++/*
++ * Get the size needed to return the number of devices wanted.
++ * Can't say num_devs - 1 as num_devs may be unsigned.
++ */
++#define	PCITOOL_IGET_SIZE(num_devs) \
++	(sizeof (pcitool_intr_get_t) - \
++	sizeof (pcitool_intr_dev_t) + \
++	(num_devs * sizeof (pcitool_intr_dev_t)))
++
++typedef struct pcitool_intr_info {
++	uint16_t user_version;		/* Userland program version - to krnl */
++	uint16_t drvr_version;		/* Driver version - from kernel */
++	uint32_t flags;			/* to kernel */
++	uint32_t num_intr;		/* Number of intrs suppt by nexus */
++	uint32_t ctlr_version;		/* Intr ctlr HW version - from kernel */
++	uchar_t	ctlr_type;		/* A PCITOOL_CTLR_TYPE - from kernel */
++} pcitool_intr_info_t;
++
++/*
++ * Interrupt controller types
++ */
++#define	PCITOOL_CTLR_TYPE_UNKNOWN	0
++#define	PCITOOL_CTLR_TYPE_RISC		1
++#define	PCITOOL_CTLR_TYPE_UPPC		2
++#define	PCITOOL_CTLR_TYPE_PCPLUSMP	3
++
++/*
++ * Size and endian fields for acc_attr bitmask.
++ */
++#define	PCITOOL_ACC_ATTR_SIZE_MASK	0x3
++#define	PCITOOL_ACC_ATTR_SIZE_1		0x0
++#define	PCITOOL_ACC_ATTR_SIZE_2		0x1
++#define	PCITOOL_ACC_ATTR_SIZE_4		0x2
++#define	PCITOOL_ACC_ATTR_SIZE_8		0x3
++#define	PCITOOL_ACC_ATTR_SIZE(x)	(1 << (x & PCITOOL_ACC_ATTR_SIZE_MASK))
++
++#define	PCITOOL_ACC_ATTR_ENDN_MASK	0x100
++#define	PCITOOL_ACC_ATTR_ENDN_LTL	0x0
++#define	PCITOOL_ACC_ATTR_ENDN_BIG	0x100
++#define	PCITOOL_ACC_IS_BIG_ENDIAN(x)	(x & PCITOOL_ACC_ATTR_ENDN_BIG)
++
++/*
++ * Data stucture to read and write to pci device registers.
++ * This is the argument to the following ioctls:
++ *	PCITOOL_DEVICE_SET/GET_REG
++ *	PCITOOL_NEXUS_SET/GET_REG
++ */
++typedef struct pcitool_reg {
++	uint16_t	user_version;	/* Userland program version - to krnl */
++	uint16_t	drvr_version;	/* Driver version - from kernel */
++	uint8_t		bus_no;		/* pci bus - to kernel */
++	uint8_t		dev_no;		/* pci dev - to kernel */
++	uint8_t		func_no;	/* pci function - to kernel */
++	uint8_t		barnum;		/* bank (DEVCTL_NEXUS_SET/GET_REG) or */
++					/*   BAR from pcitools_bar_t */
++					/*   (DEVCTL_DEVICE_SET/GET_REG) */
++					/*   to kernel */
++	uint64_t	offset;		/* to kernel */
++	uint32_t	acc_attr;	/* access attributes - to kernel */
++	uint32_t	padding1;	/* 8-byte align next uint64_t for X86 */
++	uint64_t	data;		/* to/from kernel, 64-bit alignment */
++	uint32_t	status;		/* from kernel */
++	uint32_t	padding2;	/* 8-byte align next uint64_t for X86 */
++	uint64_t	phys_addr;	/* from kernel, 64-bit alignment */
++} pcitool_reg_t;
++
++
++#ifdef	__cplusplus
++}
++#endif
++
++#endif	/* _SYS_PCI_TOOLS_H */
+--- /dev/null	2009-09-21 14:14:04.000000000 -0700
++++ contrib/Sun/Solaris/PerlGcc/config/5.8.8/5.11/i386/Config.pm	2009-09-21 16:58:25.843592669 -0700
+@@ -0,0 +1,94 @@
++# This file was created by configpm when Perl was built. Any changes
++# made to this file will be lost the next time perl is built.
++
++package Config;
++use strict;
++# use warnings; Pulls in Carp
++# use vars pulls in Carp
++@Config::EXPORT = qw(%Config);
++@Config::EXPORT_OK = qw(myconfig config_sh config_vars config_re);
++
++# Need to stub all the functions to make code such as print Config::config_sh
++# keep working
++
++sub myconfig;
++sub config_sh;
++sub config_vars;
++sub config_re;
++
++my %Export_Cache = map {($_ => 1)} (@Config::EXPORT, @Config::EXPORT_OK);
++
++our %Config;
++
++# Define our own import method to avoid pulling in the full Exporter:
++sub import {
++    my $pkg = shift;
++    @_ = @Config::EXPORT unless @_;
++
++    my @funcs = grep $_ ne '%Config', @_;
++    my $export_Config = @funcs < @_ ? 1 : 0;
++
++    no strict 'refs';
++    my $callpkg = caller(0);
++    foreach my $func (@funcs) {
++	die sprintf qq{"%s" is not exported by the %s module\n},
++	    $func, __PACKAGE__ unless $Export_Cache{$func};
++	*{$callpkg.'::'.$func} = \&{$func};
++    }
++
++    *{"$callpkg\::Config"} = \%Config if $export_Config;
++    return;
++}
++
++die "Perl lib version (v5.8.8) doesn't match executable version ($])"
++    unless $^V;
++
++$^V eq v5.8.8
++    or die "Perl lib version (v5.8.8) doesn't match executable version (" .
++	sprintf("v%vd",$^V) . ")";
++
++sub FETCH {
++    my($self, $key) = @_;
++
++    # check for cached value (which may be undef so we use exists not defined)
++    return $self->{$key} if exists $self->{$key};
++
++    return $self->fetch_string($key);
++}
++sub TIEHASH {
++    bless $_[1], $_[0];
++}
++
++sub DESTROY { }
++
++sub AUTOLOAD {
++    require 'Config_heavy.pl';
++    goto \&launcher unless $Config::AUTOLOAD =~ /launcher$/;
++    die "&Config::AUTOLOAD failed on $Config::AUTOLOAD";
++}
++
++# tie returns the object, so the value returned to require will be true.
++tie %Config, 'Config', {
++    archlibexp => '/usr/lib/perl/5.8',
++    archname => 'i386-pc-solaris2.11-thread-multi',
++    cc => 'gcc',
++    d_readlink => 'define',
++    d_symlink => 'define',
++    dlsrc => 'dl_dlopen.xs',
++    dont_use_nlink => undef,
++    exe_ext => '',
++    inc_version_list => '5.8.7 5.8.6 5.8.4 5.8.3 5.8.2 5.8.1 5.8.0',
++    intsize => '4',
++    ldlibpthname => 'LD_LIBRARY_PATH',
++    libpth => '/usr/local/lib /usr/lib /usr/ccs/lib',
++    osname => 'solaris',
++    osvers => '2.11',
++    path_sep => ':',
++    privlibexp => '/usr/share/perl/5.8',
++    scriptdir => '/usr/bin',
++    sitearchexp => '/usr/local/lib/perl/5.8.8',
++    sitelibexp => '/usr/local/share/perl/5.8.8',
++    useithreads => 'define',
++    usevendorprefix => 'define',
++    version => '5.8.8',
++};

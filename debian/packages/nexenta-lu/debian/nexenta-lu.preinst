@@ -1,0 +1,33 @@
+#!/bin/sh
+
+set -e
+
+NLU_LOCK="/.nexenta-lu.lock"
+
+if [ "$1" != "upgrade" ]; then
+        exit 0
+fi
+
+/var/lib/dpkg/alien/nexenta-sunw/makenlu.sh || true
+
+if test ! -f $NLU_LOCK; then
+	exit 2
+elif test "x`cat $NLU_LOCK`" = x5; then
+	if test -f /tmp/nlubin/env.sh; then
+		echo "***********************************************************************"
+		echo "*                                                                     *"
+		echo "*      To continue upgrade, please make sure you have the latest      *"
+		echo "*      versions of 'dpkg' and 'apt' packages installed!               *"
+		echo "*                                                                     *"
+		echo "*      Run 'apt-get install dpkg apt && apt-clone'                    *"
+		echo "*                                                                     *"
+		echo "***********************************************************************"
+	fi
+	# keep $NLU_LOCK so config script will think that upgrade needs
+	# to be continued on upgrade re-start
+	echo > $NLU_LOCK
+	exit 4
+fi
+
+rm -f $NLU_LOCK
+exit 0

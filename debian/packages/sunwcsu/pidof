@@ -1,0 +1,16 @@
+#!/bin/bash
+#
+# Copyright 2005 Nexenta Systems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# $Id$
+#
+# This script emulates pidof functionality required by many GNU apps.
+#
+
+if ps -ef -o pid,comm|grep -v grep|grep $@ >/dev/null; then
+	echo $(ps -ef -o pid,comm|grep -v grep|grep $@|head -1|awk '{print $1}')
+	exit 0
+fi
+exit 1
+

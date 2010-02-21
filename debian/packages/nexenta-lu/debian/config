@@ -1,0 +1,249 @@
+#!/bin/sh
+
+test "x$1" = xreconfigure && exit 0
+
+NLU_LOCK="/.nexenta-lu.lock"
+
+if test "x$NEXENTA_LU_SEEN" = xtrue || \
+   test ! -r /etc/svc/volatile/repository_door; then
+	# will remove it in nexenta-lu.preinst
+	touch $NLU_LOCK
+	exit 0
+fi
+
+# Source debconf library.
+. /usr/share/debconf/confmodule
+
+db_title "- Nexenta Live Upgrade -"
+
+# make sure subsequent upgrades will re-question user
+db_fset nexenta-lu/upgrade_question seen false
+db_fset nexenta-lu/upgrade_continue seen false
+db_fset nexenta-lu/user_interrupt seen false
+db_fset nexenta-lu/dpkg_interrupt seen false
+db_fset nexenta-lu/progress/main-title seen false
+db_fset nexenta-lu/progress/info seen false
+
+release=`grep Nexenta /etc/issue|sed -e "s/Nexenta.*GNU\/OpenSolaris //"`
+test "x$release" = x && release="unknown"
+if test "x$release" = xunknown ||
+   echo $release | grep "Alpha [1234]" >/dev/null; then
+	db_subst nexenta-lu/upgrade_question HINT_DESC "(upgrade from Alpha $release IS NOT RECOMMENDED)"
+	db_subst nexenta-lu/upgrade_continue HINT_DESC "(upgrade from Alpha $release IS NOT RECOMMENDED)"
+	db_subst nexenta-lu/freespace_question HINT_DESC "(upgrade from Alpha $release IS NOT RECOMMENDED)"
+else
+	if test "x$DEBIAN_FRONTEND" != x -a \
+		"x`echo $DEBIAN_FRONTEND|tr 'A-Z' 'a-z'`" = xgnome; then
+		db_subst nexenta-lu/upgrade_question HINT_DESC "(uncheck to skip)"
+		db_subst nexenta-lu/upgrade_continue HINT_DESC "(ucheck to cancel)"
+		db_subst nexenta-lu/freespace_question HINT_DESC "(check to continue)"
+	else
+		db_subst nexenta-lu/upgrade_question HINT_DESC "(press No to cancel)"
+		db_subst nexenta-lu/upgrade_continue HINT_DESC "(press No to cancel)"
+		db_subst nexenta-lu/freespace_question HINT_DESC "(press Yes to continue)"
+	fi
+fi
+
+dpkgver="`dpkg -s dpkg|awk '/^Version:/ {print $2}'`"
+if dpkg --compare-versions $dpkgver lt 1.13.22nexenta10; then
+	db_input critical nexenta-lu/dpkg_interrupt || true
+	db_go
+
+	# real hack... but we want to interrupt installation
+	# as soon as possible...
+	pkill -TERM apt-get
+	pkill -TERM dpkg-preconfigure
+
+#	echo 5 > $NLU_LOCK
+	exit 1
+fi
+
+if test ! -f $NLU_LOCK; then
+	# ask retorical question
+	db_input critical nexenta-lu/upgrade_question || true
+	db_go
+
+	db_get nexenta-lu/upgrade_question
+else
+	db_input critical nexenta-lu/upgrade_continue || true
+	db_go
+
+	db_get nexenta-lu/upgrade_continue
+fi
+if [ "$RET" = false ]; then
+	db_input critical nexenta-lu/user_interrupt || true
+	db_go
+	rm -f $NLU_LOCK
+	exit 1
+fi
+
+# will remove it in nexenta-lu.preinst
+touch $NLU_LOCK
+
+# execute process and draw a progress bar
+db_progress START 0 11 nexenta-lu/progress/main-title
+
+#
+# Filesystem space checks
+#
+db_subst nexenta-lu/progress/info DESCRIPTION "Checking for free space ..."
+db_progress INFO nexenta-lu/progress/info
+set / 4 /usr 6
+while [ $# -gt 0 ]
+do
+	DF="/usr/sun/bin/df"
+	# GNU df was diverted in b44
+	test ! -f /usr/sun/bin/df && DF="/usr/bin/df"
+	if ! test "`$DF -k 2>/dev/null|awk '/[\t ]+\/$/ { print $4 }'`" -ge ${2}000; then
+		db_subst nexenta-lu/freespace_question SPACE_ON "$1"
+		db_subst nexenta-lu/freespace_question SPACE_LEFT "$2"
+		db_input critical nexenta-lu/freespace_question || true
+		db_go
+		db_get nexenta-lu/upgrade_question
+		if [ "$RET" = false ]; then
+			db_input critical nexenta-lu/user_interrupt || true
+			db_go
+			exit 1
+		fi
+	fi
+	shift 2
+done
+
+#
+# Disable kernel module unloading
+#
+db_progress STEP 1
+db_subst nexenta-lu/progress/info DESCRIPTION "Disabling kernel module unloading ..."
+db_progress INFO nexenta-lu/progress/info
+echo "moddebug/W20000" | adb -kw /dev/ksyms /dev/mem >/dev/null 2>&1
+
+#
+# Load modules and drivers here not to reload them when you access
+# /devices or its subdirectories later.
+#
+cut -d' ' -f1 /etc/name_to_major | while read driver
+do
+	modload -p drv/${driver} >/dev/null 2>&1
+done
+ls $cpiodir >>/dev/null         # loads elfexec and networking
+
+# exec/intpexec and sys/kaio are needed by lofi
+modload -p exec/intpexec >/dev/null 2>&1
+modload -p sys/kaio >/dev/null 2>&1
+
+#
+# Stop Zones...
+#
+db_progress STEP 1
+db_subst nexenta-lu/progress/info DESCRIPTION "Stoping Zones if any ..."
+db_progress INFO nexenta-lu/progress/info
+export SMF_FMRI="svc:/system/zones:default"
+/lib/svc/method/svc-zones stop
+unset SMF_FMRI
+
+#
+# Stop init(1M) so extraction/manipulation of inittab is safe.
+#
+db_progress STEP 1
+db_subst nexenta-lu/progress/info DESCRIPTION "Quiescing init ..."
+db_progress INFO nexenta-lu/progress/info
+pstop 1
+
+# umount /lib/libc.so.1 if necessary
+db_progress STEP 1
+db_subst nexenta-lu/progress/info DESCRIPTION "Unmounting /lib/libc.so.1 ..."
+db_progress INFO nexenta-lu/progress/info
+if [ -n "`mount | grep '^/lib/libc.so.1'`" ]
+then
+	umount /lib/libc.so.1
+fi
+
+#
+# Stop sendmail so that mail doesn't bounce during the interval
+# where /etc/mail/aliases is (effectively) empty.
+#
+# (note that unlike other services here, /etc/init.d/sendmail
+# remains post-smf(5) because it is a public interface.)
+#
+db_progress STEP 1
+if [ -r /etc/svc/volatile/repository_door ]; then
+	db_subst nexenta-lu/progress/info DESCRIPTION "Disabling sendmail temporarily ..."
+	db_progress INFO nexenta-lu/progress/info
+	svcadm disable -t network/smtp >/dev/null 2>&1 || true
+else
+	db_subst nexenta-lu/progress/info DESCRIPTION "Killing sendmail ..."
+	db_progress INFO nexenta-lu/progress/info
+	/etc/init.d/sendmail stop || true
+fi
+
+db_progress STEP 1
+db_subst nexenta-lu/progress/info DESCRIPTION "Disabling remote logins ..."
+db_progress INFO nexenta-lu/progress/info
+echo "Nexenta Live Upgrade in progress -- remote logins disabled" >/etc/nologin
+
+#
+# Stop syslogd so it doesn't interfere with saving preserved files.
+#
+db_progress STEP 1
+if [ -f /etc/init.d/syslog ]; then
+	db_subst nexenta-lu/progress/info DESCRIPTION "Killing syslogd ..."
+	db_progress INFO nexenta-lu/progress/info
+	/etc/init.d/syslog stop >/dev/null 2>&1 || true
+elif [ -r /etc/svc/volatile/repository_door ]; then
+	db_subst nexenta-lu/progress/info DESCRIPTION "Disabling syslog temporarily ..."
+	db_progress INFO nexenta-lu/progress/info
+	svcadm disable -t system/system-log >/dev/null 2>&1 || true
+fi
+
+#
+# Stop apache so it doesn't get upset when the entire world changes
+# out from underneath it.
+#
+db_progress STEP 1
+if [ -f /etc/init.d/apache ]; then
+	db_subst nexenta-lu/progress/info DESCRIPTION "Killing httpd ..."
+	db_progress INFO nexenta-lu/progress/info
+	/etc/init.d/apache stop >/dev/null 2>&1 || true
+elif [ -r /etc/svc/volatile/repository_door ]; then
+	db_subst nexenta-lu/progress/info DESCRIPTION "Disabling httpd temporarily ..."
+	db_progress INFO nexenta-lu/progress/info
+	svcadm disable -t network/http >/dev/null 2>&1 || true
+fi
+
+#
+# Kill off fmd so it doesn't get upset when the entire world changes
+# out from underneath it.
+#
+db_progress STEP 1
+if [ -f /etc/init.d/savecore ]; then
+	db_subst nexenta-lu/progress/info DESCRIPTION "Killing fmd ..."
+	db_progress INFO nexenta-lu/progress/info >/dev/null 2>&1 || true
+	pkill -x fmd >/dev/null 2>&1 || true
+elif [ -r /etc/svc/volatile/repository_door ]; then
+	db_subst nexenta-lu/progress/info DESCRIPTION "Disabling fmd temporarily ..."
+	db_progress INFO nexenta-lu/progress/info
+	svcadm disable -t system/fmd >/dev/null 2>&1 || true
+fi
+
+#
+# Stop nscd so it doesn't interfere with stuff.
+#
+db_progress STEP 1
+if [ -x /etc/init.d/nscd ]; then
+	db_subst nexenta-lu/progress/info DESCRIPTION "Killing nscd ..."
+	db_progress INFO nexenta-lu/progress/info
+	/etc/init.d/nscd stop >/dev/null 2>&1 || true
+elif [ -r /etc/svc/volatile/repository_door ]; then
+	db_subst nexenta-lu/progress/info DESCRIPTION "Disabling nscd temporarily ..."
+	db_progress INFO nexenta-lu/progress/info
+	svcadm disable -t system/name-service-cache:default >/dev/null 2>&1 || true
+fi
+
+db_progress STEP 1
+db_subst nexenta-lu/progress/info DESCRIPTION "Live Upgrade initiated."
+db_progress INFO nexenta-lu/progress/info
+sleep 1
+db_progress STOP
+
+db_go
+exit 0

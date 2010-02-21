@@ -280,7 +280,7 @@ extern "C" {
 #define	HAVE_GETPAGESIZE 1
 
 /* Define if xauth is found in your path */
-#define	XAUTH_PATH "/usr/X11/bin/xauth"
+#define	XAUTH_PATH "/usr/bin/xauth"
 
 /* Define if rsh is found in your path */
 #define	RSH_PATH "/usr/bin/rsh"

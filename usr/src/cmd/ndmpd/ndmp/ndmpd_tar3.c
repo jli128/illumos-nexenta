@@ -2270,6 +2270,8 @@ backup_reader_v3(backup_reader_arg_t *argp)
 	char *jname;
 	ndmp_lbr_params_t *nlp;
 	tlm_commands_t *cmds;
+	char temp_name[PATH_MAX+1];
+	int str_len;
 
 	if (!argp)
 		return (-1);
@@ -2326,6 +2328,14 @@ backup_reader_v3(backup_reader_arg_t *argp)
 	/* set traversing arguments */
 	ft.ft_path = nlp->nlp_backup_path;
 	ft.ft_lpath = bp.bp_chkpnm;
+
+	if(strstr(ft.ft_lpath,"legacy")  == ft.ft_lpath) { // if word legacy at beginning
+		str_len = strlen(ft.ft_lpath)-7;
+		strncpy(temp_name,ft.ft_lpath+6,str_len);
+		temp_name[str_len+1] = '\0';
+		strcat(temp_name,ft.ft_path);
+		strcpy(ft.ft_lpath,temp_name);
+	}
 
 	NDMP_LOG(LOG_DEBUG, "path %s lpath %s", ft.ft_path, ft.ft_lpath);
 	if (NLP_ISSET(nlp, NLPF_TOKENBK) || NLP_ISSET(nlp, NLPF_LEVELBK)) {

@@ -42,11 +42,11 @@ ROOTCMDDIR=	$(ROOT)/lib/svc/method
 CPPFLAGS += -DMMS_OPENSSL
 CPPFLAGS += -I. -I../common -I$(SRC)/common/mms/mms
 CPPFLAGS += -I$(SRC)/lib/mms/mms/common -I$(SRC)/lib/mms/mms/common
-CPPFLAGS += -I/usr/include/libxml2 -I/usr/postgres/8.3/include
+CPPFLAGS += -I/usr/include/libxml2 -I/usr/include/postgresql
 
 CFLAGS +=  $(CTF_FLAGS) $(CC_VERBOSE)
 LDLIBS += -lc -lsocket -lnsl -luuid $(ZIGNORE)
-LDLIBS += -lxml2 -lscf -L/usr/postgres/8.3/lib -lpq -R/usr/postgres/8.3/lib
+LDLIBS += -lxml2 -lscf -L/usr/lib -lpq
 LDLIBS += -L$(SRC)/lib/mms/mms/$(MACH) -lmms -R/usr/lib
 
 C99MODE=	$(C99_ENABLE)

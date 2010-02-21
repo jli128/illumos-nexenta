@@ -1,0 +1,82 @@
+--- a/opensolaris.sh.orig	2009-11-11 23:21:56.065291762 -0800
++++ b/opensolaris.sh	2009-11-11 23:22:51.579827553 -0800
+@@ -38,14 +38,15 @@
+ #	checks for changes in ELF runpaths (-r)
+ #	build and use this workspace's tools in $SRC/tools (-t)
+ #
+-NIGHTLY_OPTIONS="-FNnaCDlmrt";		export NIGHTLY_OPTIONS
++NIGHTLY_OPTIONS="-Nndr";		export NIGHTLY_OPTIONS
++CW_NO_SHADOW=1; export CW_NO_SHADOW; SUN_PERSONALITY=1; export SUN_PERSONALITY
+ 
+ # This is a variable for the rest of the script - GATE doesn't matter to
+ # nightly itself
+-GATE=testws;			export GATE
++GATE=nexenta-gate;			export GATE
+ 
+ # CODEMGR_WS - where is your workspace at (or what should nightly name it)
+-CODEMGR_WS="/export/$GATE";			export CODEMGR_WS
++CODEMGR_WS="__GATEROOT__";			export CODEMGR_WS
+ 
+ # G11N_PKGDIR - where does the globalization package live
+ G11N_PKGDIR="$CODEMGR_WS/usr/src/pkgdefs/SUNW0on";	export G11N_PKGDIR
+@@ -63,7 +64,7 @@
+ # NCPUS), where NCPUS is the number of CPUs on your build system.
+ maxjobs() {
+ 	ncpu=`/usr/sbin/psrinfo -p`
+-	expr $ncpu \* 2 + 2
++	expr $ncpu \* 4 + 2
+ }
+ DMAKE_MAX_JOBS=`maxjobs`;			export DMAKE_MAX_JOBS
+ 
+@@ -82,7 +83,7 @@
+ PARENT_WS="";			export PARENT_WS
+ 
+ # CLONE_WS is the workspace nightly should do a bringover from.
+-CLONE_WS="ssh://anon@hg.opensolaris.org//hg/onnv/onnv-gate"
++CLONE_WS=""
+ export CLONE_WS
+ 
+ # The bringover, if any, is done as STAFFER.
+@@ -91,8 +92,9 @@
+ # workspace as root.
+ # Some scripts optionally send mail messages to MAILTO.
+ #
+-STAFFER=nobody;				export STAFFER
+-MAILTO=$STAFFER;			export MAILTO
++STAFFER=root;			export STAFFER
++#MAILTO=$STAFFER;		export MAILTO
++LOGNAME=$STAFFER;
+ 
+ # The project (see project(4)) under which to run this build.  If not
+ # specified, the build is simply run in a new task in the current project.
+@@ -122,15 +124,17 @@
+ #
+ ROOT="$CODEMGR_WS/proto/root_${MACH}";	export ROOT
+ SRC="$CODEMGR_WS/usr/src";         	export SRC
+-VERSION="$GATE";			export VERSION
+-
++VERSION="NexentaOS_134a ";		export VERSION
++DATE=`date +%Y-%m-%d`;
++RELEASE_CM='"@(#)SunOS Nexenta '$RELEASE' '$VERSION' '$RELEASE_DATE'"'; export RELEASE_CM
++DEV_CM='"@(#)SunOS Nexenta: ['$LOGNAME'] '$DATE'"'; export DEV_CM
+ #
+ # the RELEASE and RELEASE_DATE variables are set in Makefile.master;
+ # there might be special reasons to override them here, but that
+ # should not be the case in general
+ #
+-# RELEASE="5.11";			export RELEASE
+-# RELEASE_DATE="October 2007";		export RELEASE_DATE
++RELEASE="5.11";				export RELEASE
++RELEASE_DATE="February 2010";		export RELEASE_DATE
+ 
+ # proto area in parent for optionally depositing a copy of headers and
+ # libraries corresponding to the protolibs target
+@@ -158,7 +162,7 @@
+ # SUNWonbld and SPRO_ROOT to where you keep the compilers.  SPRO_VROOT
+ # exists to make it easier to test new versions of the compiler.
+ BUILD_TOOLS=/opt;				export BUILD_TOOLS
+-#ONBLD_TOOLS=/opt/onbld;			export ONBLD_TOOLS
++ONBLD_TOOLS=/opt/onbld;				export ONBLD_TOOLS
+ SPRO_ROOT=/opt/SUNWspro;			export SPRO_ROOT
+ SPRO_VROOT=$SPRO_ROOT;				export SPRO_VROOT
+ 

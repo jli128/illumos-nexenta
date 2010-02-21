@@ -1,0 +1,12 @@
+Source: sunwmdau
+Section: base
+Priority: optional
+Maintainer: Erast Benson <erast@gnusolaris.org>
+Build-Depends: debhelper(>=4.9.5gnusol5)
+
+Package: sunwmdau
+Architecture: solaris-i386
+Depends: ${shlibs:Depends}, sunwcsr (>=5.11.129-1), sunwckr (>=5.11.129-1), sunwcnetr (>=5.11.129-1), sunwcsd (>=5.11.129-1), sunwcsu (>=5.11.129-1), sunwcakr (>=5.11.129-1), sunwkvm (>=5.11.129-1), sunwmdr (>=5.11.129-1), sunwmdu (>=5.11.129-1), sunwsmapi (>=5.11.129-1), sunwmdar (>=5.11.129-1), libxml2
+Description: Solaris Volume Manager Assistant (Usr)
+ Solaris Volume Manager Assistant (Usr)
+ .

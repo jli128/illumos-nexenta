@@ -1,0 +1,96 @@
+#!/usr/bin/make -f
+## ----------------------------------------------------------------------
+## debian/rules : package script for libsunw-perl
+## ----------------------------------------------------------------------
+
+## ----------------------------------------------------------------------
+## uncomment this to turn on verbose mode
+#export DH_VERBOSE=1
+
+## ----------------------------------------------------------------------
+## build non-DEBUG
+export RELEASE_BUILD=
+export ARCH=$(shell uname -p)
+
+## ----------------------------------------------------------------------
+TMP_DIR	:=	$(CURDIR)/debian/tmp
+
+SHELL=/bin/sh -e
+
+SUNEXT = Utils BSM Exacct Intrs PerlGcc Kstat Privilege Project Task Ucred Lgrp
+
+## ----------------------------------------------------------------------
+CFLAGS	=	-Wall -g
+ifneq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))
+		CFLAGS	+= -O0
+else
+		CFLAGS	+= -O2
+endif
+
+## ----------------------------------------------------------------------
+## targets
+
+patch-stamp:
+		rm -rf contrib
+		cp -ar $(GATEROOT)/usr/src/cmd/perl/contrib .
+		cat debian/patches/nexenta-delta.diff | patch -p0 --dry-run && \
+			cat debian/patches/nexenta-delta.diff | patch -p0
+		touch patch-stamp
+
+clean:
+		dh_testdir
+		dh_testroot
+		rm -rf contrib
+		dh_clean build-stamp install-stamp patch-stamp
+
+build:		build-stamp
+build-stamp:	patch-stamp
+		dh_testdir
+		for e in $(SUNEXT); do \
+			echo "BUILDING: $$e ..."; \
+			cd contrib/Sun/Solaris/$$e; \
+			perl Makefile.PL INSTALLDIRS=vendor; \
+			$(MAKE) OPTIMIZE="$(CFLAGS)"; \
+			cd $(CURDIR); \
+		done
+		touch build-stamp
+
+install:	install-stamp
+install-stamp:	build
+		dh_testdir
+		dh_testroot
+		dh_clean -k
+		dh_installdirs
+		for e in $(SUNEXT); do \
+			cd contrib/Sun/Solaris/$$e; \
+			perl Makefile.PL INSTALLDIRS=vendor; \
+			$(MAKE) install DESTDIR=$(TMP_DIR) PREFIX=/usr; \
+			cd $(CURDIR); \
+		done
+		touch install-stamp
+
+binary-indep:
+
+binary-arch:	build install
+		dh_testdir
+		dh_testroot
+		dh_install --sourcedir=$(TMP_DIR)
+		mkdir -p debian/libsunw-perl/usr/perl5
+		cd debian/libsunw-perl/usr/perl5; ln -s ../bin bin
+		dh_installdocs
+		dh_installexamples
+		dh_strip
+		dh_compress
+		dh_fixperms
+		dh_installdeb
+		dh_shlibdeps
+		dh_perl
+		dh_gencontrol
+		dh_md5sums
+		dh_builddeb
+
+binary:		binary-indep binary-arch
+
+.PHONY:		clean build install binary-indep binary-arch binary
+
+## ----------------------------------------------------------------------

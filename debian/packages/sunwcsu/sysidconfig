@@ -1,0 +1,5 @@
+#!/bin/sh
+#
+# This wrapper helps to avoid breakage of legacy SUN software
+
+touch /etc/.sysidconfig.apps

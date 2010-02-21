@@ -613,7 +613,8 @@ approved_env(char **env)
 }
 
 /*
- * Create a duplicate environment which does not contain any SMF_ variables.
+ * Create a duplicate environment which does not contain any SMF_ variables
+ * as well as disables SUN_PERSONALITY if any.
  */
 static char **
 env_without_smf(char **env)
@@ -632,6 +633,8 @@ env_without_smf(char **env)
 
 	for (i = 0; env[i] != NULL; ++i) {
 		if (strncmp(env[i], "SMF_", sizeof ("SMF_") - 1) == 0)
+			continue;
+		if (strncmp(env[i], "SUN_PERSONALITY", sizeof ("SUN_PERSONALITY") - 1) == 0)
 			continue;
 
 		newenv[i_new++] = env[i];
@@ -921,6 +924,7 @@ main(int argc, char *argv[], char *envp[])
 			arg3 = script;
 		}
 
+		unsetenv("SUN_PERSONALITY");
 		(void) execle(arg1, arg1, arg2, arg3, NULL, newenv);
 
 		uu_warn(gettext("Could not exec \"%s %s %s\""), arg1,

@@ -40,6 +40,7 @@ OBJECTS=	$(SLDAPOBJ)
 
 include ../../Makefile.lib
 
+NSPR_HDRS=	/usr/include/nspr
 SRCS =		$(SLDAPOBJ:%.o=../common/%.c)
 LIBS =		$(DYNLIB) $(LINTLIB)
 $(LINTLIB):= 	SRCS=../common/llib-lsldap
@@ -50,7 +51,7 @@ SRCDIR =	../common
 CFLAGS +=	$(CCVERBOSE)
 LOCFLAGS +=	-D_REENTRANT -DSUNW_OPTIONS
 CPPFLAGS +=	-I../common -I$(SRC)/lib/libldap5/include/ldap \
-		-I/usr/include/mps $(LOCFLAGS)
+		-I$(NSPR_HDRS) $(LOCFLAGS)
 LINTFLAGS +=	-erroff=E_BAD_PTR_CAST_ALIGN
 LINTFLAGS64 +=	-erroff=E_BAD_PTR_CAST_ALIGN
 

@@ -44,37 +44,36 @@ i depend
 d none usr 755 root sys
 d none usr/bin 755 root bin
 f none usr/bin/asa 555 root bin
-f none usr/bin/awk 555 root bin
+m none usr/sun/bin/awk 555 root bin usr/bin/awk
 f none usr/bin/banner 555 root bin
 f none usr/bin/batch 555 root bin
-f none usr/bin/bc 555 root bin
+m none usr/sun/bin/bc 555 root bin usr/bin/bc
 f none usr/bin/bdiff 755 root bin
 f none usr/bin/bfs 555 root bin
-f none usr/bin/cal 555 root bin
-f none usr/bin/calendar 555 root bin
-f none usr/bin/col 555 root bin
+m none usr/sun/bin/cal 555 root bin usr/bin/cal
+m none usr/sun/bin/calendar 555 root bin usr/bin/calendar
+m none usr/sun/bin/col 555 root bin usr/bin/col
 f none usr/bin/compress 555 root bin
-f none usr/bin/csplit 555 root bin
-f none usr/bin/dc 555 root bin
-f none usr/bin/diff 555 root bin
-f none usr/bin/diff3 555 root bin
+m none usr/sun/bin/csplit 555 root bin usr/bin/csplit
+m none usr/sun/bin/dc 555 root bin usr/bin/dc
+m none usr/sun/bin/diff 555 root bin usr/bin/diff
+m none usr/sun/bin/diff3 555 root bin usr/bin/diff3
 f none usr/bin/dircmp 555 root bin
 s none usr/bin/dmesg=../sbin/dmesg
 f none usr/bin/dos2unix 555 root bin
-f none usr/bin/expand 555 root bin
-f none usr/bin/factor 555 root bin
+m none usr/sun/bin/expand 555 root bin usr/bin/expand
+m none usr/sun/bin/factor 555 root bin usr/bin/factor
 f none usr/bin/graph 555 root bin
 f none usr/bin/kstat 555 root bin
 f none usr/bin/last 555 root bin
 f none usr/bin/lastcomm 555 root bin
-f none usr/bin/look 755 root bin
 f none usr/bin/lgrpinfo 555 root bin
-f none usr/bin/mkfifo 555 root bin
+m none usr/sun/bin/mkfifo 555 root bin usr/bin/mkfifo
 f none usr/bin/nawk 555 root bin
 f none usr/bin/newform 555 root bin
 f none usr/bin/news 555 root bin
-f none usr/bin/nl 555 root bin
-l none usr/bin/oawk=../../usr/bin/awk
+m none usr/sun/bin/nl 555 root bin usr/bin/nl
+s none usr/bin/oawk=../../usr/sun/bin/awk
 f none usr/bin/pack 555 root bin
 l none usr/bin/pargs=../../usr/lib/isaexec
 s none usr/bin/pcat=./unpack
@@ -96,23 +95,23 @@ l none usr/bin/ptime=../../usr/lib/isaexec
 l none usr/bin/ptree=../../usr/lib/isaexec
 l none usr/bin/pwait=../../usr/lib/isaexec
 l none usr/bin/pwdx=../../usr/lib/isaexec
-f none usr/bin/sdiff 555 root bin
-l none usr/bin/sort=../../usr/lib/isaexec
+m none usr/sun/bin/sdiff 555 root bin usr/bin/sdiff
+l none usr/sun/bin/sort=../../../usr/lib/isaexec
 f none usr/bin/spell 555 root bin
 f none usr/bin/spline 555 root bin
-f none usr/bin/split 555 root bin
+m none usr/sun/bin/split 555 root bin usr/bin/split
 s none usr/bin/strace=../sbin/strace
 f none usr/bin/tcopy 555 root bin
-l none usr/bin/uncompress=../../usr/bin/compress
-f none usr/bin/unexpand 555 root bin
+l none usr/sun/bin/uncompress=../../../usr/bin/compress
+m none usr/sun/bin/unexpand 555 root bin usr/bin/unexpand
 f none usr/bin/units 555 root bin
 f none usr/bin/unix2dos 555 root bin
 f none usr/bin/unpack 555 root bin
-f none usr/bin/uudecode 555 root uucp
-f none usr/bin/uuencode 555 root uucp
+m none usr/sun/bin/uudecode 555 root uucp usr/bin/uudecode
+m none usr/sun/bin/uuencode 555 root uucp usr/bin/uuencode
 f none usr/bin/vsig 755 root bin
-f none usr/bin/yes 555 root bin
-l none usr/bin/zcat=../../usr/bin/compress
+m none usr/sun/bin/yes 555 root bin usr/bin/yes
+l none usr/sun/bin/zcat=../../../usr/bin/compress
 s none usr/dict=./share/lib/dict
 d none usr/proc 755 root bin
 d none usr/proc/bin 755 root bin

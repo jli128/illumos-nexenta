@@ -1,0 +1,12 @@
+Source: sunwmddr
+Section: base
+Priority: optional
+Maintainer: Mac <mac@gnusolaris.org>
+Build-Depends: debhelper(>=4.9.5gnusol5)
+
+Package: sunwmddr
+Architecture: solaris-i386
+Depends: ${shlibs:Depends}, sunwmdr (>=5.11.129-1), sunwcsl (>=5.11.129-1)
+Description: SVM RCM Module
+ reconfiguration coordination manager module for SVM
+ .

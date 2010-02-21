@@ -1,0 +1,25 @@
+Source: sunwcsu
+Section: base
+Priority: required
+Maintainer: Erast Benson <erast@gnusolaris.org>
+Build-Depends: debhelper(>=4.9.5gnusol5)
+
+Package: sunwcsu
+Architecture: solaris-i386
+Conflicts: mailx, ksh
+Replaces: mailx, ksh
+Provides: mailx, ksh
+Depends: ${shlibs:Depends}, sunwcsr (>=5.11.129-1), sunwcsd (>=5.11.129-1), sunwcsl (>=5.11.129-1), sunwcslr (>=5.11.129-1), hostname, nexenta-lu (>=5.11.129-1)
+Essential: Yes
+Description: Core Solaris, (Usr)
+ core software for a specific instruction-set architecture
+ .
+
+Package: bsdutils
+XBS-Virtual: bsdutils
+Architecture: all
+Priority: required
+Depends: sunwcsu (>=5.11.129-1)
+Description: Transitional package
+ This dummy package is provided for a smooth transition from the
+ SUNW PKG to GNU/OpenSolaris naming convention

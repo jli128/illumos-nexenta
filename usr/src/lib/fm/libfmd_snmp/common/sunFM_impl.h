@@ -39,6 +39,10 @@ extern "C" {
 #include <libnvpair.h>
 #include <stdarg.h>
 
+#ifndef __FUNCTION__
+#define __FUNCTION__ "__func__"
+#endif
+
 #ifdef DEBUG
 extern void sunFm_panic(const char *format, ...) __NORETURN;
 extern void sunFm_vpanic(const char *format, va_list ap) __NORETURN;

@@ -38,10 +38,61 @@
  */
 
 #pragma weak _execv = execv
+#define execve _execve
 
 #include "lint.h"
 #include <sys/types.h>
 #include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
+
+extern int __execve(const char *file, char *const *argv, char *const *envp);
+
+#pragma weak execve = _execve
+int execve(const char *file, char *const *argv, char *const *envp)
+{
+	char path[256];
+
+	if (getenv("SUN_PERSONALITY")) {
+		if (strncmp(file, "/usr/bin", strlen("/usr/bin")) == 0 ||
+		    strncmp(file, "/bin", strlen("/bin")) == 0) {
+			*path = 0;
+			if (getenv("NLU_ENABLED"))
+				strcpy(path, "/tmp/nlubin/sun");
+			else
+				strcpy(path, "/usr/sun/bin");
+			strcat(path, strrchr(file, '/'));
+			if (access(path, F_OK) == 0)
+				file = path;
+		} else if (strncmp(file, "/usr/sbin", strlen("/usr/sbin")) == 0 ||
+			   strncmp(file, "/sbin", strlen("/sbin")) == 0) {
+			*path = 0;
+			if (getenv("NLU_ENABLED"))
+				strcpy(path, "/tmp/nlubin/sun");
+			else
+				strcpy(path, "/usr/sun/sbin");
+			strcat(path, strrchr(file, '/'));
+			if (access(path, F_OK) == 0)
+				file = path;
+		}
+	}
+	if (getenv("NLU_ENABLED")) {
+		/* if SUN_PERSONALITY succeeded above we simply fall
+		 * through... */
+		if (strncmp(file, "/usr/bin", strlen("/usr/bin")) == 0 ||
+		    strncmp(file, "/bin", strlen("/bin")) == 0 ||
+		    strncmp(file, "/usr/sbin", strlen("/usr/sbin")) == 0 ||
+		    strncmp(file, "/sbin", strlen("/sbin")) == 0) {
+			*path = 0;
+			strcpy(path, "/tmp/nlubin");
+			strcat(path, strrchr(file, '/'));
+			if (access(path, F_OK) == 0)
+				file = path;
+		}
+	}
+
+	return (__execve(file, argv, envp));
+}
 
 int
 execv(const char *file, char *const argv[])

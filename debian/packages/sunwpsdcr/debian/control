@@ -1,0 +1,13 @@
+Source: sunwpsdcr
+Section: base
+Priority: required
+Maintainer: Erast Benson <erast@gnusolaris.org>
+Build-Depends: debhelper(>=4.9.5gnusol5)
+
+Package: sunwpsdcr
+Architecture: solaris-i386
+Essential: Yes
+Depends: ${shlibs:Depends}, sunwcsr (>=5.11.129-1), sunwckr (>=5.11.129-1), sunwcnetr (>=5.11.129-1), sunwcsd (>=5.11.129-1), sunwcakr (>=5.11.129-1), nexenta-lu (>=5.11.129-1)
+Description: Platform Support, Bus-independent Device Drivers (Root)
+ Platform Support, Bus-independent Device Drivers, (Root)
+ .

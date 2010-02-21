@@ -100,11 +100,11 @@ static ldi_ident_t	sbd_zfs_ident;
 static stmf_lu_provider_t *sbd_lp;
 static sbd_lu_t		*sbd_lu_list = NULL;
 static kmutex_t		sbd_lock;
-static dev_info_t	*sbd_dip;
+dev_info_t		*stmf_sbd_dip;
 static uint32_t		sbd_lu_count = 0;
 
 /* Global property settings for the logical unit */
-char sbd_vendor_id[]	= "SUN     ";
+char sbd_vendor_id[]	= "NEXENTA     ";
 char sbd_product_id[]	= "COMSTAR         ";
 char sbd_revision[]	= "1.0 ";
 char *sbd_mgmt_url = NULL;
@@ -250,10 +250,10 @@ sbd_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 {
 	switch (cmd) {
 	case DDI_INFO_DEVT2DEVINFO:
-		*result = sbd_dip;
+		*result = stmf_sbd_dip;
 		break;
 	case DDI_INFO_DEVT2INSTANCE:
-		*result = (void *)(uintptr_t)ddi_get_instance(sbd_dip);
+		*result = (void *)(uintptr_t)ddi_get_instance(stmf_sbd_dip);
 		break;
 	default:
 		return (DDI_FAILURE);
@@ -267,7 +267,7 @@ sbd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	switch (cmd) {
 	case DDI_ATTACH:
-		sbd_dip = dip;
+		stmf_sbd_dip = dip;
 
 		if (ddi_create_minor_node(dip, "admin", S_IFCHR, 0,
 		    DDI_NT_STMF_LP, 0) != DDI_SUCCESS) {
@@ -2362,6 +2362,9 @@ sbd_import_lu(sbd_import_lu_t *ilu, int struct_sz, uint32_t *err_ret,
 
 	sl->sl_lu_size = sli->sli_lu_size;
 	sl->sl_data_blocksize_shift = sli->sli_data_blocksize_shift;
+	if (sl->sl_data_blocksize_shift < 9 || sl->sl_data_blocksize_shift > 16) {
+		sl->sl_data_blocksize_shift = 9;
+	}
 	bcopy(sli->sli_device_id, sl->sl_device_id, 20);
 	if (sli->sli_flags & SLI_SERIAL_VALID) {
 		sl->sl_serial_no_size = sl->sl_serial_no_alloc_size =
