@@ -770,8 +770,6 @@ stmf_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
 		ctl_ret = stmf_ctl(cmd, (void *)ilu->ilu_lu, &ssi);
 		if (ctl_ret == STMF_ALREADY)
 			ret = 0;
-		else if (ctl_ret == STMF_BUSY)
-			ret = EBUSY;
 		else if (ctl_ret != STMF_SUCCESS)
 			ret = EIO;
 		mutex_enter(&stmf_state.stmf_lock);
@@ -816,8 +814,6 @@ stmf_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
 		ctl_ret = stmf_ctl(cmd, (void *)ilport->ilport_lport, &ssi);
 		if (ctl_ret == STMF_ALREADY)
 			ret = 0;
-		else if (ctl_ret == STMF_BUSY)
-			ret = EBUSY;
 		else if (ctl_ret != STMF_SUCCESS)
 			ret = EIO;
 		mutex_enter(&stmf_state.stmf_lock);
@@ -4878,24 +4874,15 @@ stmf_ctl(int cmd, void *obj, void *arg)
 
 	switch (cmd) {
 	case STMF_CMD_LU_ONLINE:
-		switch (ilu->ilu_state) {
-			case STMF_STATE_OFFLINE:
-				ret = STMF_SUCCESS;
-				break;
-			case STMF_STATE_ONLINE:
-			case STMF_STATE_ONLINING:
-				ret = STMF_ALREADY;
-				break;
-			case STMF_STATE_OFFLINING:
-				ret = STMF_BUSY;
-				break;
-			default:
-				ret = STMF_BADSTATE;
-				break;
-		}
-		if (ret != STMF_SUCCESS)
+		if ((ilu->ilu_state == STMF_STATE_ONLINE) ||
+		    (ilu->ilu_state == STMF_STATE_ONLINING)) {
+			ret = STMF_ALREADY;
 			goto stmf_ctl_lock_exit;
-
+		}
+		if (ilu->ilu_state != STMF_STATE_OFFLINE) {
+			ret = STMF_INVALID_ARG;
+			goto stmf_ctl_lock_exit;
+		}
 		ilu->ilu_state = STMF_STATE_ONLINING;
 		mutex_exit(&stmf_state.stmf_lock);
 		stmf_svc_queue(cmd, obj, (stmf_state_change_info_t *)arg);
@@ -4903,7 +4890,7 @@ stmf_ctl(int cmd, void *obj, void *arg)
 
 	case STMF_CMD_LU_ONLINE_COMPLETE:
 		if (ilu->ilu_state != STMF_STATE_ONLINING) {
-			ret = STMF_BADSTATE;
+			ret = STMF_INVALID_ARG;
 			goto stmf_ctl_lock_exit;
 		}
 		if (((stmf_change_status_t *)arg)->st_completion_status ==
@@ -4922,23 +4909,15 @@ stmf_ctl(int cmd, void *obj, void *arg)
 		goto stmf_ctl_lock_exit;
 
 	case STMF_CMD_LU_OFFLINE:
-		switch (ilu->ilu_state) {
-			case STMF_STATE_ONLINE:
-				ret = STMF_SUCCESS;
-				break;
-			case STMF_STATE_OFFLINE:
-			case STMF_STATE_OFFLINING:
-				ret = STMF_ALREADY;
-				break;
-			case STMF_STATE_ONLINING:
-				ret = STMF_BUSY;
-				break;
-			default:
-				ret = STMF_BADSTATE;
-				break;
-		}
-		if (ret != STMF_SUCCESS)
+		if ((ilu->ilu_state == STMF_STATE_OFFLINE) ||
+		    (ilu->ilu_state == STMF_STATE_OFFLINING)) {
+			ret = STMF_ALREADY;
 			goto stmf_ctl_lock_exit;
+		}
+		if (ilu->ilu_state != STMF_STATE_ONLINE) {
+			ret = STMF_INVALID_ARG;
+			goto stmf_ctl_lock_exit;
+		}
 		ilu->ilu_state = STMF_STATE_OFFLINING;
 		mutex_exit(&stmf_state.stmf_lock);
 		stmf_svc_queue(cmd, obj, (stmf_state_change_info_t *)arg);
@@ -4946,7 +4925,7 @@ stmf_ctl(int cmd, void *obj, void *arg)
 
 	case STMF_CMD_LU_OFFLINE_COMPLETE:
 		if (ilu->ilu_state != STMF_STATE_OFFLINING) {
-			ret = STMF_BADSTATE;
+			ret = STMF_INVALID_ARG;
 			goto stmf_ctl_lock_exit;
 		}
 		if (((stmf_change_status_t *)arg)->st_completion_status ==
@@ -4968,23 +4947,14 @@ stmf_ctl(int cmd, void *obj, void *arg)
 	 * It's related with hardware disable/enable.
 	 */
 	case STMF_CMD_LPORT_ONLINE:
-		switch (ilport->ilport_state) {
-			case STMF_STATE_OFFLINE:
-				ret = STMF_SUCCESS;
-				break;
-			case STMF_STATE_ONLINE:
-			case STMF_STATE_ONLINING:
-				ret = STMF_ALREADY;
-				break;
-			case STMF_STATE_OFFLINING:
-				ret = STMF_BUSY;
-				break;
-			default:
-				ret = STMF_BADSTATE;
-				break;
-		}
-		if (ret != STMF_SUCCESS)
+		if (ilport->ilport_state == STMF_STATE_ONLINE) {
+			ret = STMF_ALREADY;
 			goto stmf_ctl_lock_exit;
+		}
+		if (ilport->ilport_state != STMF_STATE_OFFLINE) {
+			ret = STMF_INVALID_ARG;
+			goto stmf_ctl_lock_exit;
+		}
 
 		/*
 		 * Only user request can recover the port from the
@@ -5039,7 +5009,7 @@ stmf_ctl(int cmd, void *obj, void *arg)
 
 	case STMF_CMD_LPORT_ONLINE_COMPLETE:
 		if (ilport->ilport_state != STMF_STATE_ONLINING) {
-			ret = STMF_BADSTATE;
+			ret = STMF_INVALID_ARG;
 			goto stmf_ctl_lock_exit;
 		}
 		if (((stmf_change_status_t *)arg)->st_completion_status ==
@@ -5057,24 +5027,14 @@ stmf_ctl(int cmd, void *obj, void *arg)
 		goto stmf_ctl_lock_exit;
 
 	case STMF_CMD_LPORT_OFFLINE:
-		switch (ilport->ilport_state) {
-			case STMF_STATE_ONLINE:
-				ret = STMF_SUCCESS;
-				break;
-			case STMF_STATE_OFFLINE:
-			case STMF_STATE_OFFLINING:
-				ret = STMF_ALREADY;
-				break;
-			case STMF_STATE_ONLINING:
-				ret = STMF_BUSY;
-				break;
-			default:
-				ret = STMF_BADSTATE;
-				break;
-		}
-		if (ret != STMF_SUCCESS)
+		if (ilport->ilport_state == STMF_STATE_OFFLINE) {
+			ret = STMF_ALREADY;
 			goto stmf_ctl_lock_exit;
-
+		}
+		if (ilport->ilport_state != STMF_STATE_ONLINE) {
+			ret = STMF_INVALID_ARG;
+			goto stmf_ctl_lock_exit;
+		}
 		ilport->ilport_state = STMF_STATE_OFFLINING;
 		mutex_exit(&stmf_state.stmf_lock);
 		stmf_svc_queue(cmd, obj, (stmf_state_change_info_t *)arg);
@@ -5082,7 +5042,7 @@ stmf_ctl(int cmd, void *obj, void *arg)
 
 	case STMF_CMD_LPORT_OFFLINE_COMPLETE:
 		if (ilport->ilport_state != STMF_STATE_OFFLINING) {
-			ret = STMF_BADSTATE;
+			ret = STMF_INVALID_ARG;
 			goto stmf_ctl_lock_exit;
 		}
 		if (((stmf_change_status_t *)arg)->st_completion_status ==
@@ -6848,7 +6808,6 @@ stmf_svc_loop:
 	for (preq = &stmf_state.stmf_svc_waiting; (*preq) != NULL; ) {
 		req = *preq;
 		deq = 0;
-
 		switch (req->svc_cmd) {
 		case STMF_CMD_LU_ONLINE:
 			lu = (stmf_lu_t *)req->svc_obj;
