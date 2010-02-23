@@ -150,3 +150,7 @@ RhostsRSAAuthentication no
 # Is pure RSA authentication allowed.
 # Default is yes
 RSAAuthentication yes
+
+# Patched to make ssh binding work between NCP 2.x and NCP 3.x versions
+# It could also have serious sercurity issues if CBC mode is used on server-side.
+Ciphers aes128-ctr,aes192-ctr,aes256-ctr,aes128-cbc,aes192-cbc,aes256-cbc,arcfour,arcfour128,arcfour256,3des-cbc,blowfish-cbc
