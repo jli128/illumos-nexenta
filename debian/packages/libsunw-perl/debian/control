@@ -14,6 +14,6 @@ Replaces: sunwperl584core, sunwperl584usr
 Conflicts: sunwperl584core, sunwperl584usr
 Architecture: solaris-i386
 Depends: ${perl:Depends}, ${shlibs:Depends}, perl-modules
-Description: Sun Solaris extenstions
+Description: Sun Solaris extensions.
  Based on opensolaris package.
  .
