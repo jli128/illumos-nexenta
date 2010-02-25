@@ -1,3 +1,9 @@
+nexenta-on-source (5.11.134-3) hardy; urgency=low
+
+  * Rebuild with newer patches 
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 24 Feb 2010 22:09:29 -0800
+
 nexenta-on-source (5.11.134-2) hardy; urgency=low
 
   * Update to onnv-134 with actual closed and crypto binaries
