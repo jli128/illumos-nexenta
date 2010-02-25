@@ -6,7 +6,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwxwdv
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwcakr (>=5.11.129-1), sunwkvm (>=5.11.129-1), sunwcsr (>=5.11.129-1), sunwckr (>=5.11.129-1), sunwcnetr (>=5.11.129-1), sunwcsu (>=5.11.129-1), sunwcsd (>=5.11.129-1), sunwcsl (>=5.11.129-1)
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-2), sunwkvm (>=5.11.134-2), sunwcsr (>=5.11.134-2), sunwckr (>=5.11.134-2), sunwcnetr (>=5.11.134-2), sunwcsu (>=5.11.134-2), sunwcsd (>=5.11.134-2), sunwcsl (>=5.11.134-2)
 Description: X Windows System Window Drivers
  kernel device drivers for X Windows System
  .

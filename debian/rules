@@ -13,11 +13,11 @@ GATESUBDIR=onnv-gate
 export GATEROOT=$(CURDIR)/$(GATESUBDIR)
 
 CLOSEDBIN_NAME=on-closed-bins-nd.i386.tar.bz2 
-CLOSEDBIN_URL=http://dlc.sun.com/osol/on/downloads/b133/$(CLOSEDBIN_NAME)
+CLOSEDBIN_URL=http://dlc.sun.com/osol/on/downloads/b134/$(CLOSEDBIN_NAME)
 GATEREV=onnv_134
 GATEPARENT_URL=http://hg.genunix.org/onnv-gate.hg
 CRYPTO_DIR=on-crypto-nd.i386.tar.bz2
-CRYPTO_URL=http://dlc.sun.com/osol/on/downloads/b133/$(CRYPTO_DIR)
+CRYPTO_URL=http://dlc.sun.com/osol/on/downloads/b134/$(CRYPTO_DIR)
 
 OS_REL := $(shell cat debian/packages/RELEASE|egrep "^OS_REL="|sed -e 's/^OS_REL=\(.*\)/\1/')
 BUILD  := $(shell cat debian/packages/RELEASE|egrep "^BUILD="|sed -e 's/^BUILD=\(.*\)/\1/')

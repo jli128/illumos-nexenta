@@ -9,7 +9,7 @@ Architecture: solaris-i386
 Conflicts: mail-transport-agent, pop3-server, finger-server
 Replaces: mail-transport-agent, pop3-server, finger-server
 Provides: mail-transport-agent, pop3-server, finger-server
-Depends: sunwcakr (>=5.11.129-1), sunwkvm (>=5.11.129-1), sunwcsr (>=5.11.129-1), sunwckr (>=5.11.129-1), sunwcnetr (>=5.11.129-1), sunwcsu (>=5.11.129-1), sunwcsd (>=5.11.129-1), sunwcsl (>=5.11.129-1), sunwperl584core, sunwperl584usr, sunwsndmr (>=5.11.129-1), openssl
+Depends: sunwcakr (>=5.11.134-2), sunwkvm (>=5.11.134-2), sunwcsr (>=5.11.134-2), sunwckr (>=5.11.134-2), sunwcnetr (>=5.11.134-2), sunwcsu (>=5.11.134-2), sunwcsd (>=5.11.134-2), sunwcsl (>=5.11.134-2), sunwperl584core, sunwperl584usr, sunwsndmr (>=5.11.134-2), openssl
 Description: Sendmail (/usr)
  Sendmail Utilities
  .

@@ -10,14 +10,14 @@
 # of current OpenSolaris.  These two variables must be adjusted
 # accordingly for every OpenSolaris code drop.
 #
-OLD_BUILD=133
+OLD_BUILD=129
 BUILD=134
 OS_REL=5.11
 
 #
 # The following variables can be left alone
 #
-CORE_PATCH_LEVEL=1
+CORE_PATCH_LEVEL=2
 CORE_REVISION="${OS_REL}.${BUILD}-${CORE_PATCH_LEVEL}"
 DISTRO=nexenta
 URG=low

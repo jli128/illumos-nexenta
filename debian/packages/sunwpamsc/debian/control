@@ -6,7 +6,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwpamsc
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwocf (>=5.11.129-1)
+Depends: ${shlibs:Depends}, sunwocf (>=5.11.134-2)
 Description: PAM Smart Card module
  Pluggable Authentication Module for Smart Card Authentication
  .

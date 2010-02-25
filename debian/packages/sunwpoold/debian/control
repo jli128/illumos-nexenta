@@ -6,7 +6,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwpoold
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwcsl (>=5.11.129-1), sunwj5rt | sunwjre1.5, sunwpoolr (>=5.11.129-1), sunwpool (>=5.11.129-1)
+Depends: ${shlibs:Depends}, sunwcsl (>=5.11.134-2), sunwj5rt | sunwjre1.5, sunwpoolr (>=5.11.134-2), sunwpool (>=5.11.134-2)
 Description: Dynamic Resource Pools
  core software for dynamic resource pools
  .

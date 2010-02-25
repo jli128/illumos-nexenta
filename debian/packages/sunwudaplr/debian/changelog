@@ -1,3 +1,9 @@
+sunwudaplr (5.11.134-2) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 134)
+
+ -- Nexenta Systems <support@nexenta.com>  Tue, 23 Feb 2010 17:35:12 -0800
+
 sunwudaplr (5.11.134-1) nexenta; urgency=low
 
   * Synchronized with OpenSolaris code (5.11 build 134)

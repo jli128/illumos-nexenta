@@ -7,7 +7,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 Package: sunwcar
 XBS-PKG: sunwcar.i
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, nexenta-lu (>=5.11.129-1)
+Depends: ${shlibs:Depends}, nexenta-lu (>=5.11.134-2)
 Essential: Yes
 Description: Core Architecture, (Root)
  core software for a specific hardware platform group

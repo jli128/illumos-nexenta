@@ -34,7 +34,6 @@
 #include <sys/modctl.h>
 #include <sys/autoconf.h>
 #include <sys/ddi_impldefs.h>
-#include <sys/x86_archext.h>
 #include <sys/pci.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -296,8 +295,6 @@ pcieb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 
 	case DDI_ATTACH:
-		if (vmware_platform())
-			return (DDI_FAILURE);
 		break;
 	}
 
