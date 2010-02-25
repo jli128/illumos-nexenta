@@ -1,12 +1,12 @@
 Source: sunwmmsr
 Section: base
-Priority: required
+Priority: optional
 Maintainer: Nexenta Systems <support@nexenta.com>
 Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwmmsr
 Architecture: solaris-i386
-Depends: libxml2, libpq4 | libpq5, sunwcakr (>=5.11.134-2), sunwkvm (>=5.11.134-2), sunwcsr (>=5.11.134-2), sunwckr (>=5.11.134-2), sunwcnetr (>=5.11.134-2), sunwcsu (>=5.11.134-2), sunwcsd (>=5.11.134-2), sunwcsl (>=5.11.134-2), sunwcar (>=5.11.134-2), sunwmmsu (>=5.11.134-2)
+Depends: libxml2, libpq5, sunwcakr (>=5.11.134-2), sunwkvm (>=5.11.134-2), sunwcsr (>=5.11.134-2), sunwckr (>=5.11.134-2), sunwcnetr (>=5.11.134-2), sunwcsu (>=5.11.134-2), sunwcsd (>=5.11.134-2), sunwcsl (>=5.11.134-2), sunwcar (>=5.11.134-2), sunwmmsu (>=5.11.134-2)
 Description: MMS - Media Management Software (root)
  Media Management System
  .
