@@ -1,6 +1,6 @@
 Source: sunwmmsr
 Section: base
-Priority: optional
+Priority: required
 Maintainer: Nexenta Systems <support@nexenta.com>
 Build-Depends: debhelper(>=4.9.5gnusol5)
 
