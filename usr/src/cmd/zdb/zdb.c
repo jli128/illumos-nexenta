@@ -94,7 +94,7 @@ static void
 usage(void)
 {
 	(void) fprintf(stderr,
-	    "Usage: %s [-CumdibcsvhL] "
+	    "Usage: %s [-CumdibcsDvhL] "
 	    "poolname [object...]\n"
 	    "       %s [-div] dataset [object...]\n"
 	    "       %s -m [-L] poolname [vdev [metaslab...]]\n"
@@ -121,6 +121,7 @@ usage(void)
 	(void) fprintf(stderr, "        -c checksum all metadata (twice for "
 	    "all data) blocks\n");
 	(void) fprintf(stderr, "        -s report stats on zdb's I/O\n");
+	(void) fprintf(stderr, "        -D dedup statistics\n");
 	(void) fprintf(stderr, "        -S simulate dedup to measure effect\n");
 	(void) fprintf(stderr, "        -v verbose (applies to all others)\n");
 	(void) fprintf(stderr, "        -l dump label contents\n");
