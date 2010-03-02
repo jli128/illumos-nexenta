@@ -263,8 +263,7 @@ pmcs_iport_attach(dev_info_t *dip)
 
 	pwp = ddi_get_soft_state(pmcs_softc_state, hba_inst);
 	if (pwp == NULL) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
-		    "%s: iport%d attach invoked with NULL parent (HBA) node)",
+		cmn_err(CE_WARN, "%s: No HBA softstate for instance %d",
 		    __func__, inst);
 		return (DDI_FAILURE);
 	}
@@ -424,6 +423,7 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	pmcs_phy_t *phyp;
 	uint32_t num_threads;
 	char buf[64];
+	char *fwl_file;
 
 	switch (cmd) {
 	case DDI_ATTACH:
@@ -528,6 +528,23 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (pwp->fwlog > PMCS_FWLOG_MAX) {
 		pwp->fwlog = PMCS_FWLOG_MAX;
 	}
+	if ((ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, 0, "pmcs-fwlogfile",
+	    &fwl_file) == DDI_SUCCESS)) {
+		if (snprintf(pwp->fwlogfile_aap1, MAXPATHLEN, "%s%d-aap1.0",
+		    fwl_file, ddi_get_instance(dip)) > MAXPATHLEN) {
+			pwp->fwlogfile_aap1[0] = '\0';
+			pwp->fwlogfile_iop[0] = '\0';
+		} else if (snprintf(pwp->fwlogfile_iop, MAXPATHLEN,
+		    "%s%d-iop.0", fwl_file,
+		    ddi_get_instance(dip)) > MAXPATHLEN) {
+			pwp->fwlogfile_aap1[0] = '\0';
+			pwp->fwlogfile_iop[0] = '\0';
+		}
+		ddi_prop_free(fwl_file);
+	} else {
+		pwp->fwlogfile_aap1[0] = '\0';
+		pwp->fwlogfile_iop[0] = '\0';
+	}
 
 	mutex_enter(&pmcs_trace_lock);
 	if (pmcs_tbuf == NULL) {
@@ -546,6 +563,24 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		pmcs_tbuf_idx = 0;
 	}
 	mutex_exit(&pmcs_trace_lock);
+
+	if (pwp->fwlog && strlen(pwp->fwlogfile_aap1) > 0) {
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: firmware event log files: %s, %s", __func__,
+		    pwp->fwlogfile_aap1, pwp->fwlogfile_iop);
+		pwp->fwlog_file = 1;
+	} else {
+		if (pwp->fwlog == 0) {
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+			    "%s: No firmware event log will be written "
+			    "(event log disabled)", __func__);
+		} else {
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+			    "%s: No firmware event log will be written "
+			    "(no filename configured - too long?)", __func__);
+		}
+		pwp->fwlog_file = 0;
+	}
 
 	disable_msix = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
 	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "pmcs-disable-msix",
@@ -708,6 +743,9 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			pwp->fwlog = 0;
 		} else {
 			bzero(pwp->fwlogp, PMCS_FWLOG_SIZE);
+			pwp->fwlogp_aap1 = (pmcs_fw_event_hdr_t *)pwp->fwlogp;
+			pwp->fwlogp_iop = (pmcs_fw_event_hdr_t *)((void *)
+			    ((caddr_t)pwp->fwlogp + (PMCS_FWLOG_SIZE / 2)));
 		}
 	}
 
@@ -895,6 +933,7 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if (pmcs_soft_reset(pwp, B_FALSE)) {
 			goto failure;
 		}
+		pwp->last_reset_reason = PMCS_LAST_RST_ATTACH;
 	}
 
 	/*
@@ -1375,6 +1414,7 @@ pmcs_unattach(pmcs_hw_t *pwp)
 		 * Reset chip
 		 */
 		(void) pmcs_soft_reset(pwp, B_FALSE);
+		pwp->last_reset_reason = PMCS_LAST_RST_DETACH;
 	}
 
 	/*
@@ -1611,6 +1651,7 @@ pmcs_quiesce(dev_info_t *dip)
 	/* Stop MPI & Reset chip (no need to re-initialize) */
 	(void) pmcs_stop_mpi(pwp);
 	(void) pmcs_soft_reset(pwp, B_TRUE);
+	pwp->last_reset_reason = PMCS_LAST_RST_QUIESCE;
 
 	return (DDI_SUCCESS);
 }
@@ -1836,6 +1877,96 @@ pmcs_add_more_chunks(pmcs_hw_t *pwp, unsigned long nsize)
 	return (0);
 }
 
+static void
+pmcs_check_forward_progress(pmcs_hw_t *pwp)
+{
+	pmcwork_t	*wrkp;
+	uint32_t	*iqp;
+	uint32_t	cur_iqci;
+	uint32_t	cur_work_idx;
+	uint32_t	cur_msgu_tick;
+	uint32_t	cur_iop_tick;
+	int 		i;
+
+	mutex_enter(&pwp->lock);
+
+	if (pwp->state == STATE_IN_RESET) {
+		mutex_exit(&pwp->lock);
+		return;
+	}
+
+	/*
+	 * Ensure that inbound work is getting picked up.  First, check to
+	 * see if new work has been posted.  If it has, ensure that the
+	 * work is moving forward by checking the consumer index and the
+	 * last_htag for the work being processed against what we saw last
+	 * time.  Note: we use the work structure's 'last_htag' because at
+	 * any given moment it could be freed back, thus clearing 'htag'
+	 * and setting 'last_htag' (see pmcs_pwork).
+	 */
+	for (i = 0; i < PMCS_NIQ; i++) {
+		cur_iqci = pmcs_rd_iqci(pwp, i);
+		iqp = &pwp->iqp[i][cur_iqci * (PMCS_QENTRY_SIZE >> 2)];
+		cur_work_idx = PMCS_TAG_INDEX(LE_32(*(iqp+1)));
+		wrkp = &pwp->work[cur_work_idx];
+		if (cur_iqci == pwp->shadow_iqpi[i]) {
+			pwp->last_iqci[i] = cur_iqci;
+			pwp->last_htag[i] = wrkp->last_htag;
+			continue;
+		}
+		if ((cur_iqci == pwp->last_iqci[i]) &&
+		    (wrkp->last_htag == pwp->last_htag[i])) {
+			pmcs_prt(pwp, PMCS_PRT_WARN, NULL, NULL,
+			    "Inbound Queue stall detected, issuing reset");
+			goto hot_reset;
+		}
+		pwp->last_iqci[i] = cur_iqci;
+		pwp->last_htag[i] = wrkp->last_htag;
+	}
+
+	/*
+	 * Check heartbeat on both the MSGU and IOP.  It is unlikely that
+	 * we'd ever fail here, as the inbound queue monitoring code above
+	 * would detect a stall due to either of these elements being
+	 * stalled, but we might as well keep an eye on them.
+	 */
+	cur_msgu_tick = pmcs_rd_gst_tbl(pwp, PMCS_GST_MSGU_TICK);
+	if (cur_msgu_tick == pwp->last_msgu_tick) {
+		pmcs_prt(pwp, PMCS_PRT_WARN, NULL, NULL,
+		    "Stall detected on MSGU, issuing reset");
+		goto hot_reset;
+	}
+	pwp->last_msgu_tick = cur_msgu_tick;
+
+	cur_iop_tick  = pmcs_rd_gst_tbl(pwp, PMCS_GST_IOP_TICK);
+	if (cur_iop_tick == pwp->last_iop_tick) {
+		pmcs_prt(pwp, PMCS_PRT_WARN, NULL, NULL,
+		    "Stall detected on IOP, issuing reset");
+		goto hot_reset;
+	}
+	pwp->last_iop_tick = cur_iop_tick;
+
+	mutex_exit(&pwp->lock);
+	return;
+
+hot_reset:
+	pwp->state = STATE_DEAD;
+	/*
+	 * We've detected a stall. Attempt to recover service via hot
+	 * reset. In case of failure, pmcs_hot_reset() will handle the
+	 * failure and issue any required FM notifications.
+	 * See pmcs_subr.c for more details.
+	 */
+	if (pmcs_hot_reset(pwp)) {
+		pmcs_prt(pwp, PMCS_PRT_ERR, NULL, NULL,
+		    "%s: hot reset failure", __func__);
+	} else {
+		pmcs_prt(pwp, PMCS_PRT_ERR, NULL, NULL,
+		    "%s: hot reset complete", __func__);
+		pwp->last_reset_reason = PMCS_LAST_RST_STALL;
+	}
+	mutex_exit(&pwp->lock);
+}
 
 static void
 pmcs_check_commands(pmcs_hw_t *pwp)
@@ -2018,6 +2149,14 @@ pmcs_watchdog(void *arg)
 	    pwp->config_changed);
 
 	/*
+	 * Check forward progress on the chip
+	 */
+	if (++pwp->watchdog_count == PMCS_FWD_PROG_TRIGGER) {
+		pwp->watchdog_count = 0;
+		pmcs_check_forward_progress(pwp);
+	}
+
+	/*
 	 * Check to see if we need to kick discovery off again
 	 */
 	mutex_enter(&pwp->config_lock);
@@ -2032,7 +2171,6 @@ pmcs_watchdog(void *arg)
 	mutex_exit(&pwp->config_lock);
 
 	mutex_enter(&pwp->lock);
-
 	if (pwp->state != STATE_RUNNING) {
 		mutex_exit(&pwp->lock);
 		return;
@@ -2047,7 +2185,9 @@ pmcs_watchdog(void *arg)
 	}
 	pwp->wdhandle = timeout(pmcs_watchdog, pwp,
 	    drv_usectohz(PMCS_WATCH_INTERVAL));
+
 	mutex_exit(&pwp->lock);
+
 	pmcs_check_commands(pwp);
 	pmcs_handle_dead_phys(pwp);
 }
@@ -2570,18 +2710,24 @@ void
 pmcs_fatal_handler(pmcs_hw_t *pwp)
 {
 	pmcs_prt(pwp, PMCS_PRT_ERR, NULL, NULL, "Fatal Interrupt caught");
+
 	mutex_enter(&pwp->lock);
 	pwp->state = STATE_DEAD;
-	pmcs_register_dump_int(pwp);
-	pmcs_wr_msgunit(pwp, PMCS_MSGU_OBDB_MASK, 0xffffffff);
-	pmcs_wr_msgunit(pwp, PMCS_MSGU_OBDB_CLEAR, 0xffffffff);
-	mutex_exit(&pwp->lock);
-	pmcs_fm_ereport(pwp, DDI_FM_DEVICE_NO_RESPONSE);
-	ddi_fm_service_impact(pwp->dip, DDI_SERVICE_LOST);
 
-#ifdef	DEBUG
-	cmn_err(CE_PANIC, "PMCS Fatal Firmware Error");
-#endif
+	/*
+	 * Attempt a hot reset. In case of failure, pmcs_hot_reset() will
+	 * handle the failure and issue any required FM notifications.
+	 * See pmcs_subr.c for more details.
+	 */
+	if (pmcs_hot_reset(pwp)) {
+		pmcs_prt(pwp, PMCS_PRT_ERR, NULL, NULL,
+		    "%s: hot reset failure", __func__);
+	} else {
+		pmcs_prt(pwp, PMCS_PRT_ERR, NULL, NULL,
+		    "%s: hot reset complete", __func__);
+		pwp->last_reset_reason = PMCS_LAST_RST_FATAL_ERROR;
+	}
+	mutex_exit(&pwp->lock);
 }
 
 /*

@@ -38,6 +38,7 @@ extern "C" {
 #include <sys/modctl.h>
 #include <sys/pci.h>
 #include <sys/pcie.h>
+#include <sys/file.h>
 #include <sys/isa_defs.h>
 #include <sys/sunmdi.h>
 #include <sys/mdi_impldefs.h>
@@ -292,8 +293,22 @@ struct pmcs_hw {
 		STATE_PROBING,
 		STATE_RUNNING,
 		STATE_UNPROBING,
+		STATE_IN_RESET,
 		STATE_DEAD
 	} state;
+
+	/*
+	 * Last reason for a soft reset
+	 */
+	enum pwp_last_reset_reason {
+		PMCS_LAST_RST_UNINIT,
+		PMCS_LAST_RST_ATTACH,
+		PMCS_LAST_RST_FW_UPGRADE,
+		PMCS_LAST_RST_FATAL_ERROR,
+		PMCS_LAST_RST_STALL,
+		PMCS_LAST_RST_QUIESCE,
+		PMCS_LAST_RST_DETACH
+	} last_reset_reason;
 
 	uint32_t
 		fw_disable_update	: 1,
@@ -311,7 +326,9 @@ struct pmcs_hw {
 		physpeed		: 3,
 		resource_limited	: 1,
 		configuring		: 1,
-		ds_err_recovering	: 1;
+		ds_err_recovering	: 1,
+		quiesced		: 1,
+		fwlog_file		: 1;
 
 	/*
 	 * This HBA instance's iportmap and list of iport states.
@@ -407,6 +424,8 @@ struct pmcs_hw {
 	 */
 	uint32_t	shadow_iqpi[PMCS_MAX_IQ];
 	uint32_t	iqpi_offset[PMCS_MAX_IQ];
+	uint32_t	last_iqci[PMCS_MAX_IQ];
+	uint32_t	last_htag[PMCS_MAX_IQ];
 	uint32_t	*iqp[PMCS_MAX_IQ];
 	kmutex_t	iqp_lock[PMCS_NIQ];
 
@@ -448,10 +467,42 @@ struct pmcs_hw {
 	volatile uint8_t	scratch_locked;	/* Scratch area ownership */
 
 	/*
-	 * Firmware log pointer
+	 * Firmware info
+	 *
+	 * fwlogp: Pointer to block of memory mapped for the event logs
+	 * fwlogp_aap1: Pointer to the beginning of the AAP1 event log
+	 * fwlogp_iop: Pointer to the beginning of the IOP event log
+	 * fwaddr: The physical address of fwlogp
+	 *
+	 * fwlogfile_aap1/iop: Path to the saved AAP1/IOP event logs
+	 * fwlog_max_entries_aap1/iop: Max # of entries in each log
+	 * fwlog_oldest_idx_aap1/iop: Index of oldest entry in each log
+	 * fwlog_latest_idx_aap1/iop: Index of newest entry in each log
+	 * fwlog_threshold_aap1/iop: % full at which we save the event log
+	 * fwlog_findex_aap1/iop: Suffix to each event log's next filename
+	 *
+	 * Firmware event logs are written out to the filenames specified in
+	 * fwlogp_aap1/iop when the number of entries in the in-memory copy
+	 * reaches or exceeds the threshold value.  The filenames are suffixed
+	 * with .X where X is an integer ranging from 0 to 4.  This allows us
+	 * to save up to 5MB of event log data for each log.
 	 */
 	uint32_t	*fwlogp;
+	pmcs_fw_event_hdr_t *fwlogp_aap1;
+	pmcs_fw_event_hdr_t *fwlogp_iop;
 	uint64_t	fwaddr;
+	char		fwlogfile_aap1[MAXPATHLEN + 1];
+	uint32_t	fwlog_max_entries_aap1;
+	uint32_t	fwlog_oldest_idx_aap1;
+	uint32_t	fwlog_latest_idx_aap1;
+	uint32_t	fwlog_threshold_aap1;
+	uint32_t	fwlog_findex_aap1;
+	char		fwlogfile_iop[MAXPATHLEN + 1];
+	uint32_t	fwlog_max_entries_iop;
+	uint32_t	fwlog_oldest_idx_iop;
+	uint32_t	fwlog_latest_idx_iop;
+	uint32_t	fwlog_threshold_iop;
+	uint32_t	fwlog_findex_iop;
 
 	/*
 	 * Internal register dump region and flash chunk DMA info
@@ -460,6 +511,12 @@ struct pmcs_hw {
 	caddr_t		regdumpp;
 	uint32_t	*flash_chunkp;
 	uint64_t	flash_chunk_addr;
+
+	/*
+	 * Copies of the last read MSGU and IOP heartbeats.
+	 */
+	uint32_t	last_msgu_tick;
+	uint32_t	last_iop_tick;
 
 	/*
 	 * Card information, some determined during MPI setup
@@ -473,6 +530,12 @@ struct pmcs_hw {
 	uint16_t	max_dev;	/* max number of devices supported */
 	uint16_t	last_wq_dev;	/* last dev whose wq was serviced */
 
+	/*
+	 * Counter for the number of times watchdog fires.  We can use this
+	 * to throttle events which fire off of the watchdog, such as the
+	 * forward progress detection routine.
+	 */
+	uint8_t		watchdog_count;
 
 	/*
 	 * Interrupt Setup stuff.

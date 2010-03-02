@@ -19,7 +19,7 @@
  * CDDL HEADER END
  *
  *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -61,6 +61,8 @@ extern "C" {
  */
 #define	PMCS_FWLOG_SIZE		(2 << 20)
 #define	PMCS_FWLOG_MAX		5	/* maximum logging level */
+#define	PMCS_FWLOG_THRESH	75	/* Write to file when log this % full */
+
 #define	SATLSIZE		1024
 
 /*
@@ -76,6 +78,15 @@ extern "C" {
  * NB: Needs to be evenly divisible by 10
  */
 #define	PMCS_WATCH_INTERVAL	250000	/* watchdog interval in us */
+
+/*
+ * Forward progress trigger. This is the number of times we run through
+ * watchdog before checking for forward progress.  Implicitly bound to
+ * PMCS_WATCH_INTERVAL above. For example, with a PMCS_WATCH_INTERVAL of
+ * 250000, the watchdog will run every quarter second, so forward progress
+ * will be checked every 16th watchdog fire, or every four seconds.
+ */
+#define	PMCS_FWD_PROG_TRIGGER	16
 
 /*
  * Inbound Queue definitions
