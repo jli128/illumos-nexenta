@@ -32,6 +32,12 @@
 #include <sys/damap.h>
 #include <sys/scsi/scsi.h>
 #include <sys/scsi/adapters/pmcs/pmcs.h>
+#ifndef _KMDB
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#endif	/* _KMDB */
 
 /*
  * We need use this to pass the settings when display_iport
@@ -2363,6 +2369,9 @@ pmcs_tag(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	case STATE_DEAD:
 		state_str = "Dead";
 		break;
+	case STATE_IN_RESET:
+		state_str = "In Reset";
+		break;
 	}
 
 	mdb_printf("%16p %9s %4d %1d %1d 0x%08x 0x%04x 0x%04x %16p\n", addr,
@@ -2377,6 +2386,108 @@ pmcs_tag(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	return (DCMD_OK);
 }
+
+#ifndef _KMDB
+static int
+pmcs_dump_fwlog(struct pmcs_hw *ss, int instance, const char *ofile)
+{
+	uint8_t *fwlogp;
+	int	ofilefd = -1;
+	char	ofilename[MAXPATHLEN];
+	int	rval = DCMD_OK;
+
+	if (ss->fwlogp == NULL) {
+		mdb_warn("Firmware event log disabled for instance %d",
+		    instance);
+		return (DCMD_OK);
+	}
+
+	if (snprintf(ofilename, MAXPATHLEN, "%s%d", ofile, instance) >
+	    MAXPATHLEN) {
+		mdb_warn("Output filename is too long for instance %d",
+		    instance);
+		return (DCMD_ERR);
+	}
+
+	fwlogp = mdb_alloc(PMCS_FWLOG_SIZE, UM_SLEEP);
+
+	if (MDB_RD(fwlogp, PMCS_FWLOG_SIZE, ss->fwlogp) == -1) {
+		NOREAD(fwlogp, ss->fwlogp);
+		rval = DCMD_ERR;
+		goto cleanup;
+	}
+
+	ofilefd = open(ofilename, O_WRONLY | O_CREAT,
+	    S_IRUSR | S_IRGRP | S_IROTH);
+	if (ofilefd < 0) {
+		mdb_warn("Unable to open '%s' to dump instance %d event log",
+		    ofilename, instance);
+		rval = DCMD_ERR;
+		goto cleanup;
+	}
+
+	if (write(ofilefd, fwlogp, PMCS_FWLOG_SIZE) != PMCS_FWLOG_SIZE) {
+		mdb_warn("Failed to write %d bytes to output file: instance %d",
+		    PMCS_FWLOG_SIZE, instance);
+		rval = DCMD_ERR;
+		goto cleanup;
+	}
+
+	mdb_printf("Event log for instance %d written to %s\n", instance,
+	    ofilename);
+
+cleanup:
+	if (ofilefd >= 0) {
+		close(ofilefd);
+	}
+	mdb_free(fwlogp, PMCS_FWLOG_SIZE);
+	return (rval);
+}
+
+static int
+pmcs_fwlog(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	void		*pmcs_state;
+	const char	*ofile = NULL;
+	struct pmcs_hw	ss;
+	struct dev_info	dip;
+
+	if (mdb_getopts(argc, argv, 'o', MDB_OPT_STR, &ofile, NULL) != argc) {
+		return (DCMD_USAGE);
+	}
+
+	if (ofile == NULL) {
+		mdb_printf("No output file specified\n");
+		return (DCMD_USAGE);
+	}
+
+	if (!(flags & DCMD_ADDRSPEC)) {
+		pmcs_state = NULL;
+		if (mdb_readvar(&pmcs_state, "pmcs_softc_state") == -1) {
+			mdb_warn("can't read pmcs_softc_state");
+			return (DCMD_ERR);
+		}
+		if (mdb_pwalk_dcmd("genunix`softstate", "pmcs`pmcs_fwlog", argc,
+		    argv, (uintptr_t)pmcs_state) == -1) {
+			mdb_warn("mdb_pwalk_dcmd failed for pmcs_log");
+			return (DCMD_ERR);
+		}
+		return (DCMD_OK);
+	}
+
+	if (MDB_RD(&ss, sizeof (ss), addr) == -1) {
+		NOREAD(pmcs_hw_t, addr);
+		return (DCMD_ERR);
+	}
+
+	if (MDB_RD(&dip, sizeof (struct dev_info), ss.dip) == -1) {
+		NOREAD(pmcs_hw_t, addr);
+		return (DCMD_ERR);
+	}
+
+	return (pmcs_dump_fwlog(&ss, dip.devi_instance, ofile));
+}
+#endif	/* _KMDB */
 
 static int
 pmcs_log(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
@@ -2537,6 +2648,9 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	case STATE_DEAD:
 		state_str = "Dead";
 		break;
+	case STATE_IN_RESET:
+		state_str = "In Reset";
+		break;
 	}
 
 	mdb_printf("%16p %9s %4d %1d %1d 0x%08x 0x%04x 0x%04x %16p\n", addr,
@@ -2638,6 +2752,12 @@ static const mdb_dcmd_t dcmds[] = {
 	    "Find work structures by tag type, serial number or index",
 	    pmcs_tag, pmcs_tag_help
 	},
+#ifndef _KMDB
+	{ "pmcs_fwlog",
+	    "?-o output_file",
+	    "dump pmcs firmware event log to output_file", pmcs_fwlog, NULL
+	},
+#endif	/* _KMDB */
 	{ NULL }
 };
 

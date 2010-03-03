@@ -94,7 +94,7 @@ static void
 usage(void)
 {
 	(void) fprintf(stderr,
-	    "Usage: %s [-CumdibcsDvhL] "
+	    "Usage: %s [-CumdibcsDvhL] poolname [object...]\n"
 	    "poolname [object...]\n"
 	    "       %s [-div] dataset [object...]\n"
 	    "       %s -m [-L] poolname [vdev [metaslab...]]\n"

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -45,7 +45,7 @@ C99MODE=        -xc99=%all
 C99LMODE=       -Xc99=%all
 
 LIBS =		$(DYNLIB)
-LDLIBS +=	-lc -lnvpair -lpython2.4 -lzfs
+LDLIBS +=	-lc -lnvpair -lsec -lidmap -lpython2.4 -lzfs
 CFLAGS +=	$(CCVERBOSE) -D_XPG6
 CPPFLAGS +=	-I/usr/include/python2.4
 CPPFLAGS +=	-I../../../uts/common/fs/zfs
