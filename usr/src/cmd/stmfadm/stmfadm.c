@@ -1993,13 +1993,18 @@ listLuFunc(int operandLen, char *operands[], cmdOptions_t *options, void *args)
 				}
 			}
 			if ((found && operandEntered) || !operandEntered) {
+         stmfRet = stmfGetLogicalUnitProperties(
+             &(luList->guid[j]), &luProps);
+         if ((stmfRet == STMF_STATUS_SUCCESS) &&
+             strcmp(luProps.providerName, "sbd")) {
+           continue;
+         }
+
 				(void) printf("LU Name: ");
 				printGuid(&luList->guid[j], stdout);
 				(void) printf("\n");
 
 				if (verbose) {
-					stmfRet = stmfGetLogicalUnitProperties(
-					    &(luList->guid[j]), &luProps);
 					if (stmfRet == STMF_STATUS_SUCCESS) {
 						printLuProps(&luProps);
 					} else {
