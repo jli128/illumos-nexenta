@@ -1722,6 +1722,7 @@ it_validate_configprops(nvlist_t *nvl, nvlist_t *errs)
 	 */
 	if (update_rad_server) {
 		(void) nvlist_add_string(nvl, PROP_RADIUS_SERVER, rad_server);
+		free(rad_server);
 	}
 
 	/*
@@ -1963,6 +1964,7 @@ is_iscsit_enabled(void)
 		if (strcmp(state, SCF_STATE_STRING_ONLINE) == 0) {
 			return (B_TRUE);
 		}
+		free(state);
 	}
 
 	return (B_FALSE);
