@@ -6,7 +6,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwrmvolmgr
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-2), sunwkvm (>=5.11.134-2), sunwcsr (>=5.11.134-2), sunwckr (>=5.11.134-2), sunwcsu (>=5.11.134-2), sunwcsd (>=5.11.134-2), sunwcsl (>=5.11.134-2), sunwrmvolmgrr (>=5.11.134-2), sunwhal (>=5.11.134-2), sunwsmedia (>=5.11.134-2), dbus
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-4), sunwkvm (>=5.11.134-4), sunwcsr (>=5.11.134-4), sunwckr (>=5.11.134-4), sunwcsu (>=5.11.134-4), sunwcsd (>=5.11.134-4), sunwcsl (>=5.11.134-4), sunwrmvolmgrr (>=5.11.134-4), sunwhal (>=5.11.134-4), sunwsmedia (>=5.11.134-4), dbus
 Conflicts: sunwvolu
 Replaces: sunwvolu
 Provides: sunwvolu

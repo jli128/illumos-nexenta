@@ -6,7 +6,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwhea
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-2), sunwkvm (>=5.11.134-2), sunwcsr (>=5.11.134-2), sunwckr (>=5.11.134-2), sunwcnetr (>=5.11.134-2), sunwcsu (>=5.11.134-2), sunwcsd (>=5.11.134-2), sunwcsl (>=5.11.134-2)
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-4), sunwkvm (>=5.11.134-4), sunwcsr (>=5.11.134-4), sunwckr (>=5.11.134-4), sunwcnetr (>=5.11.134-4), sunwcsu (>=5.11.134-4), sunwcsd (>=5.11.134-4), sunwcsl (>=5.11.134-4)
 Conflicts: libhal-storage-dev (<<5.11-2), libhal-dev (<<5.11-2)
 Replaces: libhal-storage-dev, libhal-dev
 Description: Solaris Header Files

@@ -7,7 +7,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 Package: sunwcakr
 XBS-PKG: sunwcakr.i
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, coreutils, diff, ed, findutils, gawk, grep, sed, nexenta-lu (>=5.11.134-2)
+Depends: ${shlibs:Depends}, coreutils, diff, ed, findutils, gawk, grep, sed, nexenta-lu (>=5.11.134-4)
 Essential: Yes
 Description: Core Solaris Kernel Architecture (Root)
  core kernel software for a specific hardware platform group

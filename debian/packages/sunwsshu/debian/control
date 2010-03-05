@@ -7,7 +7,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 Package: sunwsshu
 Architecture: solaris-i386
 Provides: ssh
-Depends: sunwcakr (>=5.11.134-2), sunwkvm (>=5.11.134-2), sunwcsr (>=5.11.134-2), sunwckr (>=5.11.134-2), sunwcnetr (>=5.11.134-2), sunwcsu (>=5.11.134-2), sunwcsl (>=5.11.134-2), sunwcsd (>=5.11.134-2), sunwgss (>=5.11.134-2), sunwsshcu (>=5.11.134-2), zlib1g, openssl
+Depends: sunwcakr (>=5.11.134-4), sunwkvm (>=5.11.134-4), sunwcsr (>=5.11.134-4), sunwckr (>=5.11.134-4), sunwcnetr (>=5.11.134-4), sunwcsu (>=5.11.134-4), sunwcsl (>=5.11.134-4), sunwcsd (>=5.11.134-4), sunwgss (>=5.11.134-4), sunwsshcu (>=5.11.134-4), zlib1g, openssl
 Description: SSH Client and utilities, (Usr)
  Secure Shell protocol Client and associated Utilities
  .

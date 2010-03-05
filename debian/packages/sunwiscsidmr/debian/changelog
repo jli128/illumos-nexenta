@@ -1,3 +1,15 @@
+sunwiscsidmr (5.11.134-5) hardy; urgency=low
+
+  * Recompiled with 11857:64ac0ea7036d from genunix
+
+ -- Nexenta Systems <maintainer@nexenta.com>  Fri, 05 Mar 2010 11:37:23 -0800
+
+sunwiscsidmr (5.11.134-4) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 134)
+
+ -- Nexenta Systems <maintainer@nexenta.com>  Fri, 05 Mar 2010 11:32:52 -0800
+
 sunwiscsidmr (5.11.134-2) nexenta; urgency=low
 
   * Synchronized with OpenSolaris code (5.11 build 134)

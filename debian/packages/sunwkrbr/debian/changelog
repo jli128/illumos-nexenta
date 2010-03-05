@@ -1,3 +1,9 @@
+sunwkrbr (5.11.134-4) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 134)
+
+ -- Nexenta Systems <maintainer@nexenta.com>  Fri, 05 Mar 2010 11:32:52 -0800
+
 sunwkrbr (5.11.134-2) nexenta; urgency=low
 
   * Synchronized with OpenSolaris code (5.11 build 134)
