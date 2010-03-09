@@ -175,17 +175,6 @@ prepare_nlu_env() {
 	for lib in `echo $libs | sed -e 's/ /\n/g' | sort -u`
 	do
 		test -L $lib && continue
-		if test $release_date -lt 20070402; then
-			case $lib in
-			*64/libc.so.1*)
-				cp /var/lib/dpkg/alien/nexenta-sunw/b55.libc.64 $nlulib/amd64/libc.so.1
-				continue;;
-			*lib/libc.so.1*)
-				cp /var/lib/dpkg/alien/nexenta-sunw/b55.libc.32 $nlulib/libc.so.1
-				continue;;
-			*) ;;
-			esac
-		fi
 		case $lib in
 		*/64/* | */$link/*)
 			cp $lib $nlulib/64;;
