@@ -164,9 +164,6 @@ prepare_nlu_env() {
 	libs_sun64="`ldd $nlubin/sun/amd64/* 2>/dev/null | nawk '$3 ~ /lib/ { print $3 }' |sed -e 's/\/\//\//' | sort -u`"
 	libs="$libs_gnu $libs_gnu64 $libs_sun $libs_sun64 /usr/lib/64/nss_* /usr/lib/nss_*"
 
-# Removed release_date variable which was used to calculate the 
-# Current version of NCP...
-
 	ln -s $link $nlulib/64
 	mkdir $nlulib/$link
 
