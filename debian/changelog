@@ -1,3 +1,9 @@
+nexenta-on-source (5.11.134-6) hardy; urgency=low
+
+  * Upgrade to beta2 
+
+ -- Nexenta Systems <support@nexenta.com>  Fri, 12 Mar 2010 07:42:29 -0800
+
 nexenta-on-source (5.11.134-4) hardy; urgency=low
 
   * New build with a lot of backports added as patches. 

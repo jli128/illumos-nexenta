@@ -115,6 +115,7 @@ clean: unpatch
 		cd $(GATEROOT) ; \
 		hg qpop -a ;  \
 	fi
+	rm -rf *stamp
 
 binary-indep: build
 
