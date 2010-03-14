@@ -1,0 +1,10 @@
+#!/sbin/sh
+
+# Provide divert to libgmp3.so which is a part of libgmp3-dev
+
+GMP3_LIB="/usr/lib/amd64/libmp.so"
+if [ -f "$GMP3_LIB" ];then
+		dpkg-divert --add --package sunwcsl --rename --divert /usr/lib/amd64/libmp.so.gmp /usr/lib/amd64/libmp.so
+fi
+
+
