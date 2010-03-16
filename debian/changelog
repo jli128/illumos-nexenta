@@ -1,3 +1,10 @@
+nexenta-on-source (5.11.134-7) hardy; urgency=low
+
+  * Dropping NFS client patches, causing deadlock on PXE install
+  * New patches, bug fixes for mptsas and pmcs
+
+ -- Nexenta Systems <support@nexenta.com>  Mon, 15 Mar 2010 13:40:42 -0700
+
 nexenta-on-source (5.11.134-6) hardy; urgency=low
 
   * Upgrade to beta2 

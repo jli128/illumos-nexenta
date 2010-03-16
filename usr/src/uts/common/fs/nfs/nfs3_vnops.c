@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -120,6 +120,11 @@ static int	nfs3_commit(vnode_t *, offset3, count3, cred_t *);
 static void	nfs3_set_mod(vnode_t *);
 static void	nfs3_get_commit(vnode_t *);
 static void	nfs3_get_commit_range(vnode_t *, u_offset_t, size_t);
+#if 0 /* unused */
+#ifdef DEBUG
+static int	nfs3_no_uncommitted_pages(vnode_t *);
+#endif
+#endif /* unused */
 static int	nfs3_putpage_commit(vnode_t *, offset_t, size_t, cred_t *);
 static int	nfs3_commit_vp(vnode_t *, u_offset_t, size_t,  cred_t *);
 static int	nfs3_sync_commit(vnode_t *, page_t *, offset3, count3,
@@ -6247,10 +6252,23 @@ doitagain:
 static void
 nfs3_set_mod(vnode_t *vp)
 {
-	ASSERT(nfs_zone() == VTOMI(vp)->mi_zone);
+	page_t *pp;
+	kmutex_t *vphm;
 
-	pvn_vplist_setdirty(vp, nfs_setmod_check);
+	ASSERT(nfs_zone() == VTOMI(vp)->mi_zone);
+	vphm = page_vnode_mutex(vp);
+	mutex_enter(vphm);
+	if ((pp = vp->v_pages) != NULL) {
+		do {
+			if (pp->p_fsdata != C_NOCOMMIT) {
+				hat_setmod(pp);
+				pp->p_fsdata = C_NOCOMMIT;
+			}
+		} while ((pp = pp->p_vpnext) != vp->v_pages);
+	}
+	mutex_exit(vphm);
 }
+
 
 /*
  * This routine is used to gather together a page list of the pages
@@ -6290,10 +6308,6 @@ nfs3_get_commit(vnode_t *vp)
 	 * looking for pages which need to be committed.
 	 */
 	do {
-		/* Skip marker pages. */
-		if (pp->p_hash == PVN_VPLIST_HASH_TAG)
-			continue;
-
 		/*
 		 * If this page does not need to be committed or is
 		 * modified, then just skip it.
@@ -6418,6 +6432,31 @@ nfs3_get_commit_range(vnode_t *vp, u_offset_t soff, size_t len)
 		page_add(&rp->r_commit.c_pages, pp);
 	}
 }
+
+#if 0	/* unused */
+#ifdef DEBUG
+static int
+nfs3_no_uncommitted_pages(vnode_t *vp)
+{
+	page_t *pp;
+	kmutex_t *vphm;
+
+	vphm = page_vnode_mutex(vp);
+	mutex_enter(vphm);
+	if ((pp = vp->v_pages) != NULL) {
+		do {
+			if (pp->p_fsdata != C_NOCOMMIT) {
+				mutex_exit(vphm);
+				return (0);
+			}
+		} while ((pp = pp->p_vpnext) != vp->v_pages);
+	}
+	mutex_exit(vphm);
+
+	return (1);
+}
+#endif
+#endif
 
 static int
 nfs3_putpage_commit(vnode_t *vp, offset_t poff, size_t plen, cred_t *cr)
