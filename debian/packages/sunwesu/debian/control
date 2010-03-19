@@ -1,6 +1,6 @@
 Source: sunwesu
 Section: utils
-Priority: extra
+Priority: required
 Maintainer: Erast Benson <erast@gnusolaris.org>
 Build-Depends: debhelper(>=4.9.5gnusol5)
 

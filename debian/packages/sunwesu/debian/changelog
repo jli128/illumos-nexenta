@@ -1,3 +1,9 @@
+sunwesu (5.11.134-5) nexenta; urgency=low
+
+  * Package made required 
+
+ -- Nexenta Systems <maintainer@nexenta.com>  Fri, 19 Mar 2010 11:03:44 -0700
+
 sunwesu (5.11.134-4) nexenta; urgency=low
 
   * Synchronized with OpenSolaris code (5.11 build 134)
