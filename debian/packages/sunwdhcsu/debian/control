@@ -6,7 +6,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwdhcsu
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-4), sunwkvm (>=5.11.134-4), sunwcsr (>=5.11.134-4), sunwckr (>=5.11.134-4), sunwcnetr (>=5.11.134-4), sunwcsu (>=5.11.134-4), sunwcsl (>=5.11.134-4), sunwcsd (>=5.11.134-4), sunwbip (>=5.11.134-4), sunwj5rt | sunwjre1.5
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-7), sunwkvm (>=5.11.134-7), sunwcsr (>=5.11.134-7), sunwckr (>=5.11.134-7), sunwcnetr (>=5.11.134-7), sunwcsu (>=5.11.134-7), sunwcsl (>=5.11.134-7), sunwcsd (>=5.11.134-7), sunwbip (>=5.11.134-7), sunwj5rt | sunwjre1.5
 Description: BOOTP/DHCP Server Services, (Usr)
  Usr filesystem portion of the SunOS BOOTP/DHCP service, which uses the BOOT Protocol and/or Dynamic Host Configuration Protocol to provide network configuration parameters to BOOTP/DHCP clients. Adminstration utilities for the service are included.
  .

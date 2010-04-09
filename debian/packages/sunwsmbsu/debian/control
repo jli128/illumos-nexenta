@@ -6,7 +6,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwsmbsu
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-4), sunwkvm (>=5.11.134-4), sunwcsr (>=5.11.134-4), sunwckr (>=5.11.134-4), sunwcnetr (>=5.11.134-4), sunwcsu (>=5.11.134-4), sunwcsd (>=5.11.134-4), sunwcsl (>=5.11.134-4), sunwcar (>=5.11.134-4), sunwsmbskr (>=5.11.134-4), sunwsmbsr (>=5.11.134-4), sunwgss (>=5.11.134-4), sunwkrbu (>=5.11.134-4), libxml2
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-7), sunwkvm (>=5.11.134-7), sunwcsr (>=5.11.134-7), sunwckr (>=5.11.134-7), sunwcnetr (>=5.11.134-7), sunwcsu (>=5.11.134-7), sunwcsd (>=5.11.134-7), sunwcsl (>=5.11.134-7), sunwcar (>=5.11.134-7), sunwsmbskr (>=5.11.134-7), sunwsmbsr (>=5.11.134-7), sunwgss (>=5.11.134-7), sunwkrbu (>=5.11.134-7), libxml2
 Description: SMB Server (Usr)
  SMB Server libraries and commands
  .

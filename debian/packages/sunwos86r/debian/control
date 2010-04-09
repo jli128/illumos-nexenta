@@ -6,7 +6,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwos86r
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwcsr (>=5.11.134-4), sunwckr (>=5.11.134-4), sunwcnetr (>=5.11.134-4), sunwcsd (>=5.11.134-4), sunwcsu (>=5.11.134-4), sunwcakr (>=5.11.134-4), sunwkvm (>=5.11.134-4), nexenta-lu (>=5.11.134-4)
+Depends: ${shlibs:Depends}, sunwcsr (>=5.11.134-7), sunwckr (>=5.11.134-7), sunwcnetr (>=5.11.134-7), sunwcsd (>=5.11.134-7), sunwcsu (>=5.11.134-7), sunwcakr (>=5.11.134-7), sunwkvm (>=5.11.134-7), nexenta-lu (>=5.11.134-7)
 Essential: Yes
 Description: Platform Support, OS Functionality (Root)
  Platform Support, OS Functionality (Root)

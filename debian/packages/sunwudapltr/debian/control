@@ -6,7 +6,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwudapltr
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-4), sunwkvm (>=5.11.134-4), sunwcsr (>=5.11.134-4), sunwckr (>=5.11.134-4), sunwcnetr (>=5.11.134-4), sunwcsu (>=5.11.134-4), sunwcsd (>=5.11.134-4), sunwcsl (>=5.11.134-4), sunwudaplr (>=5.11.134-4), sunwudaplu (>=5.11.134-4), sunwudapltu (>=5.11.134-4), sunwtavor (>=5.11.134-4), sunwib (>=5.11.134-4), sunwipoib (>=5.11.134-4)
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-7), sunwkvm (>=5.11.134-7), sunwcsr (>=5.11.134-7), sunwckr (>=5.11.134-7), sunwcnetr (>=5.11.134-7), sunwcsu (>=5.11.134-7), sunwcsd (>=5.11.134-7), sunwcsl (>=5.11.134-7), sunwudaplr (>=5.11.134-7), sunwudaplu (>=5.11.134-7), sunwudapltu (>=5.11.134-7), sunwtavor (>=5.11.134-7), sunwib (>=5.11.134-7), sunwipoib (>=5.11.134-7)
 Description: Sun uDAPL for Tavor (Root)
  Sun uDAPL provider for Tavor driver and registration script
  .

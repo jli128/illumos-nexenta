@@ -6,7 +6,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwrwd
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-4), sunwkvm (>=5.11.134-4), sunwcsr (>=5.11.134-4), sunwckr (>=5.11.134-4), sunwcnetr (>=5.11.134-4), sunwcsu (>=5.11.134-4), sunwcsd (>=5.11.134-4), sunwcsl (>=5.11.134-4), sunwcar (>=5.11.134-4), sunwcslr (>=5.11.134-4)
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-7), sunwkvm (>=5.11.134-7), sunwcsr (>=5.11.134-7), sunwckr (>=5.11.134-7), sunwcnetr (>=5.11.134-7), sunwcsu (>=5.11.134-7), sunwcsd (>=5.11.134-7), sunwcsl (>=5.11.134-7), sunwcar (>=5.11.134-7), sunwcslr (>=5.11.134-7)
 Description: Ralink RT2561/RT2561S/RT2661 IEEE802.11b/g Wireless Network Device
  Ralink RT2561/RT2561S/RT2661 IEEE802.11b/g Wireless Network Device
  .

@@ -6,7 +6,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwdhcsb
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-4), sunwkvm (>=5.11.134-4), sunwcsr (>=5.11.134-4), sunwckr (>=5.11.134-4), sunwcnetr (>=5.11.134-4), sunwcsu (>=5.11.134-4), sunwcsl (>=5.11.134-4), sunwcsd (>=5.11.134-4), sunwdhcsr (>=5.11.134-4), sunwdhcsu (>=5.11.134-4)
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-7), sunwkvm (>=5.11.134-7), sunwcsr (>=5.11.134-7), sunwckr (>=5.11.134-7), sunwcnetr (>=5.11.134-7), sunwcsu (>=5.11.134-7), sunwcsl (>=5.11.134-7), sunwcsd (>=5.11.134-7), sunwdhcsr (>=5.11.134-7), sunwdhcsu (>=5.11.134-7)
 Description: Binary File Format Data Module for BOOTP/DHCP Services
  Binary File Format Public module exporting Version 1 of the Service Provider Interface. Used to store DHCP data, this module has much better performance than the ASCII files and nisplus public modules.
  .

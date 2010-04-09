@@ -9,7 +9,7 @@ Architecture: solaris-i386
 Conflicts: mailx, ksh
 Replaces: mailx, ksh
 Provides: mailx, ksh
-Depends: ${shlibs:Depends}, sunwcsr (>=5.11.134-4), sunwcsd (>=5.11.134-4), sunwcsl (>=5.11.134-4), sunwcslr (>=5.11.134-4), hostname, nexenta-lu (>=5.11.134-4)
+Depends: ${shlibs:Depends}, sunwcsr (>=5.11.134-7), sunwcsd (>=5.11.134-7), sunwcsl (>=5.11.134-7), sunwcslr (>=5.11.134-7), hostname, nexenta-lu (>=5.11.134-7)
 Essential: Yes
 Description: Core Solaris, (Usr)
  core software for a specific instruction-set architecture
@@ -19,7 +19,7 @@ Package: bsdutils
 XBS-Virtual: bsdutils
 Architecture: all
 Priority: required
-Depends: sunwcsu (>=5.11.134-4)
+Depends: sunwcsu (>=5.11.134-7)
 Description: Transitional package
  This dummy package is provided for a smooth transition from the
  SUNW PKG to GNU/OpenSolaris naming convention
