@@ -1,3 +1,9 @@
+sunwkvm (5.11.134-5) nexenta; urgency=low
+
+  * bump, to trigger upgrade
+
+ -- Nexenta Systems <maintainer@nexenta.com>  Fri, 09 Apr 2010 15:13:55 -0700
+
 sunwkvm (5.11.134-4) nexenta; urgency=low
 
   * Synchronized with OpenSolaris code (5.11 build 134)
