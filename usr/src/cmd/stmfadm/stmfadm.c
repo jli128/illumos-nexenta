@@ -1993,12 +1993,13 @@ listLuFunc(int operandLen, char *operands[], cmdOptions_t *options, void *args)
 				}
 			}
 			if ((found && operandEntered) || !operandEntered) {
-         stmfRet = stmfGetLogicalUnitProperties(
-             &(luList->guid[j]), &luProps);
-         if ((stmfRet == STMF_STATUS_SUCCESS) &&
-             strcmp(luProps.providerName, "sbd")) {
-           continue;
-         }
+				stmfRet = stmfGetLogicalUnitProperties(
+				    &(luList->guid[j]), &luProps);
+				if ((stmfRet == STMF_STATUS_SUCCESS) &&
+				    strcmp(luProps.providerName, "sbd") &&
+				    (luProps.status != STMF_LOGICAL_UNIT_UNREGISTERED)) {
+					continue;
+				}
 
 				(void) printf("LU Name: ");
 				printGuid(&luList->guid[j], stdout);
@@ -2028,8 +2029,12 @@ listLuFunc(int operandLen, char *operands[], cmdOptions_t *options, void *args)
 						(void) printf("unknown");
 					}
 					(void) printf("\n");
-					ret = printExtLuProps(
-					    &(luList->guid[j]));
+
+					ret = 0;
+					if (luProps.status != STMF_LOGICAL_UNIT_UNREGISTERED) {
+						ret = printExtLuProps(
+						    &(luList->guid[j]));
+					}
 				}
 				if (found && operandEntered) {
 					break;
