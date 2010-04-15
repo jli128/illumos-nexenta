@@ -134,6 +134,5 @@ check_add_drv()
 # specific cards, or they will be wrongly matched by other drivers.
 
 check_add_drv -i \
-	'"pci1000,72"
-	"pciex1000,72"' \
+	'"pci1000,72" "pciex1000,72" "pci1000,64" "pciex1000,64" "pci1000,70" "pciex1000,70" "pci1000,76" "pciex1000,76"' \
 	${BASEDIR_OPT} -c scsi-self-identifying mpt_sas

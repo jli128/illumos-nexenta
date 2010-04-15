@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -315,10 +314,11 @@ static int mptsas_parse_address(char *name, uint64_t *wwid, uint8_t *phy,
     int *lun);
 static int mptsas_parse_smp_name(char *name, uint64_t *wwn);
 
-static mptsas_target_t *mptsas_phy_to_tgt(dev_info_t *pdip, uint8_t phy);
-static mptsas_target_t *mptsas_wwid_to_ptgt(mptsas_t *mpt, int port,
+static mptsas_target_t *mptsas_phy_to_tgt(mptsas_t *mpt, int phymask,
+    uint8_t phy);
+static mptsas_target_t *mptsas_wwid_to_ptgt(mptsas_t *mpt, int phymask,
     uint64_t wwid);
-static mptsas_smp_t *mptsas_wwid_to_psmp(mptsas_t *mpt, int port,
+static mptsas_smp_t *mptsas_wwid_to_psmp(mptsas_t *mpt, int phymask,
     uint64_t wwid);
 
 static int mptsas_inquiry(mptsas_t *mpt, mptsas_target_t *ptgt, int lun,
@@ -327,6 +327,16 @@ static int mptsas_inquiry(mptsas_t *mpt, mptsas_target_t *ptgt, int lun,
 static int mptsas_get_target_device_info(mptsas_t *mpt, uint32_t page_address,
     uint16_t *handle, mptsas_target_t **pptgt);
 static void mptsas_update_phymask(mptsas_t *mpt);
+
+static int mptsas_send_sep(mptsas_t *mpt, mptsas_target_t *ptgt,
+    uint32_t *status, uint8_t cmd);
+static dev_info_t *mptsas_get_dip_from_dev(dev_t dev,
+    mptsas_phymask_t *phymask);
+static mptsas_target_t *mptsas_addr_to_ptgt(mptsas_t *mpt, char *addr,
+    mptsas_phymask_t phymask);
+static int mptsas_set_led_status(mptsas_t *mpt, mptsas_target_t *ptgt,
+    uint32_t slotstatus);
+
 
 /*
  * Enumeration / DR functions
@@ -380,18 +390,18 @@ static void mptsas_hash_init(mptsas_hash_table_t *hashtab);
 static void mptsas_hash_uninit(mptsas_hash_table_t *hashtab, size_t datalen);
 static void mptsas_hash_add(mptsas_hash_table_t *hashtab, void *data);
 static void * mptsas_hash_rem(mptsas_hash_table_t *hashtab, uint64_t key1,
-    uint8_t key2);
+    mptsas_phymask_t key2);
 static void * mptsas_hash_search(mptsas_hash_table_t *hashtab, uint64_t key1,
-    uint8_t key2);
+    mptsas_phymask_t key2);
 static void * mptsas_hash_traverse(mptsas_hash_table_t *hashtab, int pos);
 
 mptsas_target_t *mptsas_tgt_alloc(mptsas_hash_table_t *, uint16_t, uint64_t,
-    uint32_t, uint8_t, uint8_t);
+    uint32_t, mptsas_phymask_t, uint8_t);
 static mptsas_smp_t *mptsas_smp_alloc(mptsas_hash_table_t *hashtab,
     mptsas_smp_t *data);
 static void mptsas_smp_free(mptsas_hash_table_t *hashtab, uint64_t wwid,
-    uint8_t physport);
-static void mptsas_tgt_free(mptsas_hash_table_t *, uint64_t, uint8_t);
+    mptsas_phymask_t phymask);
+static void mptsas_tgt_free(mptsas_hash_table_t *, uint64_t, mptsas_phymask_t);
 static void * mptsas_search_by_devhdl(mptsas_hash_table_t *, uint16_t);
 static int mptsas_online_smp(dev_info_t *pdip, mptsas_smp_t *smp_node,
     dev_info_t **smp_dip);
@@ -525,7 +535,7 @@ static struct dev_ops mptsas_ops = {
 };
 
 
-#define	MPTSAS_MOD_STRING "MPTSAS HBA Driver 00.00.00.22"
+#define	MPTSAS_MOD_STRING "MPTSAS HBA Driver 00.00.00.23"
 
 static struct modldrv modldrv = {
 	&mod_driverops,	/* Type of module. This one is a driver */
@@ -565,7 +575,6 @@ static clock_t mptsas_tick;
 static timeout_id_t mptsas_reset_watch;
 static timeout_id_t mptsas_timeout_id;
 static int mptsas_timeouts_enabled = 0;
-
 /*
  * warlock directives
  */
@@ -664,8 +673,8 @@ mptsas_iport_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	mptsas_t		*mpt;
 	scsi_hba_tran_t		*hba_tran;
 	char			*iport = NULL;
-	char			phymask[8];
-	uint8_t			phy_mask = 0;
+	char			phymask[MPTSAS_MAX_PHYS];
+	mptsas_phymask_t	phy_mask = 0;
 	int			physport = -1;
 	int			dynamic_port = 0;
 	uint32_t		page_address;
@@ -824,7 +833,7 @@ mptsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	scsi_hba_tran_t		*hba_tran;
 	int			intr_types;
 	uint_t			mem_bar = MEM_SPACE;
-	uint8_t			mask = 0x0;
+	mptsas_phymask_t	mask = 0x0;
 	int			tran_flags = 0;
 	int			rval = DDI_FAILURE;
 
@@ -1220,8 +1229,8 @@ intr_done:
 	 */
 	mutex_enter(&mpt->m_mutex);
 	for (i = 0; i < mpt->m_num_phys; i++) {
-		uint8_t	phy_mask = 0x00;
-		char phy_mask_name[8];
+		mptsas_phymask_t phy_mask = 0x0;
+		char phy_mask_name[MPTSAS_MAX_PHYS];
 		uint8_t current_port;
 
 		if (mpt->m_phy_info[i].attached_devhdl == 0)
@@ -5502,30 +5511,11 @@ mptsas_handle_qfull(mptsas_t *mpt, mptsas_cmd_t *cmd)
 	}
 }
 
-uint8_t
-mptsas_phymask_to_physport(mptsas_t *mpt, uint8_t phymask)
-{
-	int i;
-
-	/*
-	 * RAID doesn't have valid phymask and physport so we use phymask == 0
-	 * and physport == 0xff to indicate that it's RAID.
-	 */
-	if (phymask == 0) {
-		return (0xff);
-	}
-	for (i = 0; i < 8; i++) {
-		if (phymask & (1 << i)) {
-			break;
-		}
-	}
-	return (mpt->m_phy_info[i].port_num);
-}
-uint8_t
+mptsas_phymask_t
 mptsas_physport_to_phymask(mptsas_t *mpt, uint8_t physport)
 {
-	uint8_t		phy_mask = 0;
-	uint8_t		i = 0;
+	mptsas_phymask_t	phy_mask = 0;
+	uint8_t			i = 0;
 
 	NDBG20(("mptsas%d physport_to_phymask enter", mpt->m_instance));
 
@@ -5595,10 +5585,10 @@ mptsas_free_devhdl(mptsas_t *mpt, uint16_t devhdl)
 static void
 mptsas_update_phymask(mptsas_t *mpt)
 {
-	uint8_t	mask = 0, phy_mask;
-	char	*phy_mask_name;
-	uint8_t current_port;
-	int	i, j;
+	mptsas_phymask_t mask = 0, phy_mask;
+	char		*phy_mask_name;
+	uint8_t		current_port;
+	int		i, j;
 
 	NDBG20(("mptsas%d update phymask ", mpt->m_instance));
 
@@ -5606,7 +5596,7 @@ mptsas_update_phymask(mptsas_t *mpt)
 
 	(void) mptsas_get_sas_io_unit_page(mpt);
 
-	phy_mask_name = kmem_zalloc(8, KM_SLEEP);
+	phy_mask_name = kmem_zalloc(MPTSAS_MAX_PHYS, KM_SLEEP);
 
 	for (i = 0; i < mpt->m_num_phys; i++) {
 		phy_mask = 0x00;
@@ -5645,7 +5635,7 @@ mptsas_update_phymask(mptsas_t *mpt)
 		(void) scsi_hba_iport_register(mpt->m_dip, phy_mask_name);
 		mutex_enter(&mpt->m_mutex);
 	}
-	kmem_free(phy_mask_name, 8);
+	kmem_free(phy_mask_name, MPTSAS_MAX_PHYS);
 	NDBG20(("mptsas%d update phymask return", mpt->m_instance));
 }
 
@@ -5665,7 +5655,7 @@ mptsas_handle_dr(void *args) {
 	mptsas_topo_change_list_t	*save_node = NULL;
 	mptsas_t			*mpt;
 	dev_info_t			*parent = NULL;
-	uint8_t				phymask = 0;
+	mptsas_phymask_t		phymask = 0;
 	char				*phy_mask_name;
 	uint8_t				flags = 0, physport = 0xff;
 	uint8_t				port_update = 0;
@@ -5677,7 +5667,7 @@ mptsas_handle_dr(void *args) {
 	event = topo_node->event;
 	flags = topo_node->flags;
 
-	phy_mask_name = kmem_zalloc(8, KM_SLEEP);
+	phy_mask_name = kmem_zalloc(MPTSAS_MAX_PHYS, KM_SLEEP);
 
 	NDBG20(("mptsas%d handle_dr enter", mpt->m_instance));
 
@@ -5774,7 +5764,7 @@ mptsas_handle_dr(void *args) {
 			mutex_exit(&mpt->m_mutex);
 
 find_parent:
-			bzero(phy_mask_name, 8);
+			bzero(phy_mask_name, MPTSAS_MAX_PHYS);
 			/*
 			 * For RAID topology change node, write the iport name
 			 * as v0.
@@ -5836,7 +5826,7 @@ handle_topo_change:
 		}
 	}
 out:
-	kmem_free(phy_mask_name, 8);
+	kmem_free(phy_mask_name, MPTSAS_MAX_PHYS);
 }
 
 static void
@@ -5863,7 +5853,7 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 	case MPTSAS_DR_EVENT_RECONFIG_TARGET:
 	{
 		char *phy_mask_name;
-		uint8_t phymask = 0;
+		mptsas_phymask_t phymask = 0;
 
 		if (topo_node->flags == MPTSAS_TOPO_FLAG_RAID_ASSOCIATED) {
 			/*
@@ -5921,11 +5911,11 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 
 		if (flags == MPTSAS_TOPO_FLAG_RAID_PHYSDRV_ASSOCIATED) {
 			phymask = ptgt->m_phymask;
-			phy_mask_name = kmem_zalloc(8, KM_SLEEP);
+			phy_mask_name = kmem_zalloc(MPTSAS_MAX_PHYS, KM_SLEEP);
 			(void) sprintf(phy_mask_name, "%x", phymask);
 			parent = scsi_hba_iport_find(mpt->m_dip,
 			    phy_mask_name);
-			kmem_free(phy_mask_name, 8);
+			kmem_free(phy_mask_name, MPTSAS_MAX_PHYS);
 			if (parent == NULL) {
 				mptsas_log(mpt, CE_WARN, "Failed to find a "
 				    "iport for PD, should not happen!");
@@ -6025,6 +6015,7 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 			 * Invalidate the devhdl
 			 */
 			ptgt->m_devhdl = MPTSAS_INVALID_DEVHDL;
+			ptgt->m_tgt_unconfigured = 0;
 			mutex_enter(&mpt->m_tx_waitq_mutex);
 			ptgt->m_dr_flag = MPTSAS_DR_INACTIVE;
 			mutex_exit(&mpt->m_tx_waitq_mutex);
@@ -11064,15 +11055,31 @@ mptsas_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *credp,
 	mptsas_pci_info_t	pci_info;
 	int			copylen;
 
+	int			iport_flag = 0;
+	dev_info_t		*dip = NULL;
+	mptsas_phymask_t	phymask = 0;
+	struct devctl_iocdata	*dcp = NULL;
+	uint32_t		slotstatus = 0;
+	char			*addr = NULL;
+	mptsas_target_t		*ptgt = NULL;
+
 	*rval = MPTIOCTL_STATUS_GOOD;
-	mpt = ddi_get_soft_state(mptsas_state, MINOR2INST(getminor(dev)));
-	if (mpt == NULL) {
-		return (scsi_hba_ioctl(dev, cmd, data, mode, credp, rval));
-	}
 	if (secpolicy_sys_config(credp, B_FALSE) != 0) {
 		return (EPERM);
 	}
 
+	mpt = ddi_get_soft_state(mptsas_state, MINOR2INST(getminor(dev)));
+	if (mpt == NULL) {
+		/*
+		 * Called from iport node, get the states
+		 */
+		iport_flag = 1;
+		dip = mptsas_get_dip_from_dev(dev, &phymask);
+		if (dip == NULL) {
+			return (ENXIO);
+		}
+		mpt = DIP2MPT(dip);
+	}
 	/* Make sure power level is D0 before accessing registers */
 	mutex_enter(&mpt->m_mutex);
 	if (mpt->m_options & MPTSAS_OPT_PM) {
@@ -11094,6 +11101,68 @@ mptsas_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *credp,
 		mutex_exit(&mpt->m_mutex);
 	}
 
+	if (iport_flag) {
+		status = scsi_hba_ioctl(dev, cmd, data, mode, credp, rval);
+		if (status != 0) {
+			goto out;
+		}
+		/*
+		 * The following code control the OK2RM LED, it doesn't affect
+		 * the ioctl return status.
+		 */
+		if ((cmd == DEVCTL_DEVICE_ONLINE) ||
+		    (cmd == DEVCTL_DEVICE_OFFLINE)) {
+			if (ndi_dc_allochdl((void *)data, &dcp) !=
+			    NDI_SUCCESS) {
+				goto out;
+			}
+			addr = ndi_dc_getaddr(dcp);
+			ptgt = mptsas_addr_to_ptgt(mpt, addr, phymask);
+			if (ptgt == NULL) {
+				NDBG14(("mptsas_ioctl led control: tgt %s not "
+				    "found", addr));
+				ndi_dc_freehdl(dcp);
+				goto out;
+			}
+			mutex_enter(&mpt->m_mutex);
+			if (cmd == DEVCTL_DEVICE_ONLINE) {
+				ptgt->m_tgt_unconfigured = 0;
+			} else if (cmd == DEVCTL_DEVICE_OFFLINE) {
+				ptgt->m_tgt_unconfigured = 1;
+			}
+			slotstatus = 0;
+#ifdef MPTSAS_GET_LED
+			/*
+			 * The get led status can't get a valid/reasonable
+			 * state, so ignore the get led status, and write the
+			 * required value directly
+			 */
+			if (mptsas_get_led_status(mpt, ptgt, &slotstatus) !=
+			    DDI_SUCCESS) {
+				NDBG14(("mptsas_ioctl: get LED for tgt %s "
+				    "failed %x", addr, slotstatus));
+				slotstatus = 0;
+			}
+			NDBG14(("mptsas_ioctl: LED status %x for %s",
+			    slotstatus, addr));
+#endif
+			if (cmd == DEVCTL_DEVICE_OFFLINE) {
+				slotstatus |=
+				    MPI2_SEP_REQ_SLOTSTATUS_REQUEST_REMOVE;
+			} else {
+				slotstatus &=
+				    ~MPI2_SEP_REQ_SLOTSTATUS_REQUEST_REMOVE;
+			}
+			if (mptsas_set_led_status(mpt, ptgt, slotstatus) !=
+			    DDI_SUCCESS) {
+				NDBG14(("mptsas_ioctl: set LED for tgt %s "
+				    "failed %x", addr, slotstatus));
+			}
+			mutex_exit(&mpt->m_mutex);
+			ndi_dc_freehdl(dcp);
+		}
+		goto out;
+	}
 	switch (cmd) {
 		case MPTIOCTL_UPDATE_FLASH:
 			if (ddi_copyin((void *)data, &flashdata,
@@ -11249,6 +11318,7 @@ mptsas_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *credp,
 			break;
 	}
 
+out:
 	/*
 	 * Report idle status to pm after grace period because
 	 * multiple ioctls may be queued and raising power
@@ -11524,20 +11594,19 @@ mptsas_init_chip(mptsas_t *mpt, int first_time)
 	}
 
 	/*
-	 * First, make sure the HBA is set in "initiator" mode.  Once that
-	 * is complete, get the base WWID.
+	 * Fill in the phy_info structure and get the base WWID
 	 */
 
 	if (first_time == TRUE) {
-		if (mptsas_set_initiator_mode(mpt)) {
-			mptsas_log(mpt, CE_WARN, "mptsas_set_initiator_mode "
-			    "failed!");
-			goto fail;
-		}
-
 		if (mptsas_get_manufacture_page5(mpt) == DDI_FAILURE) {
 			mptsas_log(mpt, CE_WARN,
 			    "mptsas_get_manufacture_page5 failed!");
+			goto fail;
+		}
+
+		if (mptsas_get_sas_io_unit_page_hndshk(mpt)) {
+			mptsas_log(mpt, CE_WARN,
+			    "mptsas_get_sas_io_unit_page_hndshk failed!");
 			goto fail;
 		}
 	}
@@ -11950,16 +12019,17 @@ mptsas_get_target_device_info(mptsas_t *mpt, uint32_t page_address,
 	int		rval;
 	uint32_t	dev_info;
 	uint64_t	sas_wwn;
-	uint8_t		physport, phymask;
-	uint8_t		phynum, config, disk;
+	mptsas_phymask_t phymask;
+	uint8_t		physport, phynum, config, disk;
 	mptsas_slots_t	*slots = mpt->m_active;
-	uint64_t		devicename;
-	mptsas_target_t		*tmp_tgt = NULL;
+	uint64_t	devicename;
+	mptsas_target_t	*tmp_tgt = NULL;
+	uint16_t	bay_num, enclosure;
 
 	ASSERT(*pptgt == NULL);
 
 	rval = mptsas_get_sas_device_page0(mpt, page_address, dev_handle,
-	    &sas_wwn, &dev_info, &physport, &phynum);
+	    &sas_wwn, &dev_info, &physport, &phynum, &bay_num, &enclosure);
 	if (rval != DDI_SUCCESS) {
 		rval = DEV_INFO_FAIL_PAGE0;
 		return (rval);
@@ -12023,6 +12093,8 @@ mptsas_get_target_device_info(mptsas_t *mpt, uint32_t page_address,
 		rval = DEV_INFO_FAIL_ALLOC;
 		return (rval);
 	}
+	(*pptgt)->m_enclosure = enclosure;
+	(*pptgt)->m_slot_num = bay_num;
 	return (DEV_INFO_SUCCESS);
 }
 
@@ -12226,7 +12298,7 @@ mptsas_parse_address(char *name, uint64_t *wwid, uint8_t *phy, int *lun)
 		goto out;
 
 	if (phyid != -1) {
-		ASSERT(phyid < 8);
+		ASSERT(phyid < MPTSAS_MAX_PHYS);
 		*phy = (uint8_t)phyid;
 	}
 	rc = ddi_strtol(lun_str, NULL, 0x10, &lunnum);
@@ -12458,9 +12530,17 @@ mptsas_config_one_phy(dev_info_t *pdip, uint8_t phy, int lun,
     dev_info_t **lundip)
 {
 	int		rval;
+	mptsas_t	*mpt = DIP2MPT(pdip);
+	int		phymask;
 	mptsas_target_t	*ptgt = NULL;
 
-	ptgt = mptsas_phy_to_tgt(pdip, phy);
+	/*
+	 * Get the physical port associated to the iport
+	 */
+	phymask = ddi_prop_get_int(DDI_DEV_T_ANY, pdip, 0,
+	    "phymask", 0);
+
+	ptgt = mptsas_phy_to_tgt(mpt, phymask, phy);
 	if (ptgt == NULL) {
 		/*
 		 * didn't match any device by searching
@@ -12910,7 +12990,7 @@ mptsas_config_all(dev_info_t *pdip)
 	dev_info_t	*smpdip = NULL;
 	mptsas_t	*mpt = DIP2MPT(pdip);
 	int		phymask = 0;
-	uint8_t		phy_mask;
+	mptsas_phymask_t phy_mask;
 	mptsas_target_t	*ptgt = NULL;
 	mptsas_smp_t	*psmp;
 
@@ -13427,9 +13507,14 @@ mptsas_create_virt_lun(dev_info_t *pdip, struct scsi_inquiry *inq, char *guid,
 				 * Same path back online again.
 				 */
 				(void) ddi_prop_free(old_guid);
-				if (!MDI_PI_IS_ONLINE(*pip) &&
-				    !MDI_PI_IS_STANDBY(*pip)) {
+				if ((!MDI_PI_IS_ONLINE(*pip)) &&
+				    (!MDI_PI_IS_STANDBY(*pip)) &&
+				    (ptgt->m_tgt_unconfigured == 0)) {
 					rval = mdi_pi_online(*pip, 0);
+					mutex_enter(&mpt->m_mutex);
+					(void) mptsas_set_led_status(mpt, ptgt,
+					    0);
+					mutex_exit(&mpt->m_mutex);
 				} else {
 					rval = DDI_SUCCESS;
 				}
@@ -13586,6 +13671,15 @@ mptsas_create_virt_lun(dev_info_t *pdip, struct scsi_inquiry *inq, char *guid,
 		}
 		NDBG20(("new path:%s onlining,", MDI_PI(*pip)->pi_addr));
 		mdi_rtn = mdi_pi_online(*pip, 0);
+		if (mdi_rtn == MDI_SUCCESS) {
+			mutex_enter(&mpt->m_mutex);
+			if (mptsas_set_led_status(mpt, ptgt, 0) !=
+			    DDI_SUCCESS) {
+				NDBG14(("mptsas: clear LED for slot %x "
+				    "failed", ptgt->m_slot_num));
+			}
+			mutex_exit(&mpt->m_mutex);
+		}
 		if (mdi_rtn == MDI_NOT_SUPPORTED) {
 			mdi_rtn = MDI_FAILURE;
 		}
@@ -13789,6 +13883,15 @@ phys_create_done:
 			 * Try to online the new node
 			 */
 			ndi_rtn = ndi_devi_online(*lun_dip, NDI_ONLINE_ATTACH);
+		}
+		if (ndi_rtn == NDI_SUCCESS) {
+			mutex_enter(&mpt->m_mutex);
+			if (mptsas_set_led_status(mpt, ptgt, 0) !=
+			    DDI_SUCCESS) {
+				NDBG14(("mptsas: clear LED for tgt %x "
+				    "failed", ptgt->m_slot_num));
+			}
+			mutex_exit(&mpt->m_mutex);
 		}
 
 		/*
@@ -14035,27 +14138,15 @@ mptsas_idle_pm(void *arg)
 /*
  * If we didn't get a match, we need to get sas page0 for each device, and
  * untill we get a match. If failed, return NULL
- * TODO should be implemented similar to mptsas_wwid_to_ptgt?
  */
 static mptsas_target_t *
-mptsas_phy_to_tgt(dev_info_t *pdip, uint8_t phy)
+mptsas_phy_to_tgt(mptsas_t *mpt, int phymask, uint8_t phy)
 {
 	int		i, j = 0;
 	int		rval = 0;
 	uint16_t	cur_handle;
 	uint32_t	page_address;
 	mptsas_target_t	*ptgt = NULL;
-	mptsas_t	*mpt = DIP2MPT(pdip);
-	int		phymask;
-
-	/*
-	 * Get the physical port associated to the iport
-	 */
-	phymask = ddi_prop_get_int(DDI_DEV_T_ANY, pdip, 0,
-	    "phymask", 0);
-
-	if (phymask == 0)
-		return (NULL);
 
 	/*
 	 * PHY named device must be direct attached and attaches to
@@ -14262,7 +14353,7 @@ mptsas_search_by_devhdl(mptsas_hash_table_t *hashtab, uint16_t devhdl)
 
 mptsas_target_t *
 mptsas_tgt_alloc(mptsas_hash_table_t *hashtab, uint16_t devhdl, uint64_t wwid,
-    uint32_t devinfo, uint8_t phymask, uint8_t phynum)
+    uint32_t devinfo, mptsas_phymask_t phymask, uint8_t phynum)
 {
 	mptsas_target_t *tmp_tgt = NULL;
 
@@ -14295,7 +14386,8 @@ mptsas_tgt_alloc(mptsas_hash_table_t *hashtab, uint16_t devhdl, uint64_t wwid,
 }
 
 static void
-mptsas_tgt_free(mptsas_hash_table_t *hashtab, uint64_t wwid, uint8_t phymask)
+mptsas_tgt_free(mptsas_hash_table_t *hashtab, uint64_t wwid,
+    mptsas_phymask_t phymask)
 {
 	mptsas_target_t *tmp_tgt;
 	tmp_tgt = mptsas_hash_rem(hashtab, wwid, phymask);
@@ -14313,7 +14405,7 @@ static mptsas_smp_t *
 mptsas_smp_alloc(mptsas_hash_table_t *hashtab, mptsas_smp_t *data)
 {
 	uint64_t key1 = data->m_sasaddr;
-	uint8_t key2 = data->m_phymask;
+	mptsas_phymask_t key2 = data->m_phymask;
 	mptsas_smp_t *ret_data;
 
 	ret_data = mptsas_hash_search(hashtab, key1, key2);
@@ -14329,7 +14421,8 @@ mptsas_smp_alloc(mptsas_hash_table_t *hashtab, mptsas_smp_t *data)
 }
 
 static void
-mptsas_smp_free(mptsas_hash_table_t *hashtab, uint64_t wwid, uint8_t phymask)
+mptsas_smp_free(mptsas_hash_table_t *hashtab, uint64_t wwid,
+    mptsas_phymask_t phymask)
 {
 	mptsas_smp_t *tmp_smp;
 	tmp_smp = mptsas_hash_rem(hashtab, wwid, phymask);
@@ -14384,7 +14477,7 @@ static void
 mptsas_hash_add(mptsas_hash_table_t *hashtab, void *data)
 {
 	uint64_t key1 = ((mptsas_hash_data_t *)data)->key1;
-	uint8_t	key2 = ((mptsas_hash_data_t *)data)->key2;
+	mptsas_phymask_t key2 = ((mptsas_hash_data_t *)data)->key2;
 	mptsas_hash_node_t **head = NULL;
 	mptsas_hash_node_t *node = NULL;
 
@@ -14405,7 +14498,8 @@ mptsas_hash_add(mptsas_hash_table_t *hashtab, void *data)
 }
 
 static void *
-mptsas_hash_rem(mptsas_hash_table_t *hashtab, uint64_t key1, uint8_t key2)
+mptsas_hash_rem(mptsas_hash_table_t *hashtab, uint64_t key1,
+    mptsas_phymask_t key2)
 {
 	mptsas_hash_node_t **head = NULL;
 	mptsas_hash_node_t *last = NULL, *cur = NULL;
@@ -14434,7 +14528,8 @@ mptsas_hash_rem(mptsas_hash_table_t *hashtab, uint64_t key1, uint8_t key2)
 }
 
 static void *
-mptsas_hash_search(mptsas_hash_table_t *hashtab, uint64_t key1, uint8_t key2)
+mptsas_hash_search(mptsas_hash_table_t *hashtab, uint64_t key1,
+    mptsas_phymask_t key2)
 {
 	mptsas_hash_node_t *cur = NULL;
 	mptsas_hash_data_t *data;
@@ -14486,4 +14581,107 @@ mptsas_hash_traverse(mptsas_hash_table_t *hashtab, int pos)
 	}
 	hashtab->cur = this;
 	return (this->data);
+}
+
+/*
+ * Functions for SGPIO LED support
+ */
+static dev_info_t *
+mptsas_get_dip_from_dev(dev_t dev, mptsas_phymask_t *phymask)
+{
+	dev_info_t	*dip;
+	int		prop;
+	dip = e_ddi_hold_devi_by_dev(dev, 0);
+	if (dip == NULL)
+		return (dip);
+	prop = ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0,
+	    "phymask", 0);
+	*phymask = (mptsas_phymask_t)prop;
+	ddi_release_devi(dip);
+	return (dip);
+}
+static mptsas_target_t *
+mptsas_addr_to_ptgt(mptsas_t *mpt, char *addr, mptsas_phymask_t phymask)
+{
+	uint8_t			phynum;
+	uint64_t		wwn;
+	int			lun;
+	mptsas_target_t		*ptgt = NULL;
+
+	if (mptsas_parse_address(addr, &wwn, &phynum, &lun) != DDI_SUCCESS) {
+		return (NULL);
+	}
+	if (addr[0] == 'w') {
+		ptgt = mptsas_wwid_to_ptgt(mpt, (int)phymask, wwn);
+	} else {
+		ptgt = mptsas_phy_to_tgt(mpt, (int)phymask, phynum);
+	}
+	return (ptgt);
+}
+
+#ifdef MPTSAS_GET_LED
+static int
+mptsas_get_led_status(mptsas_t *mpt, mptsas_target_t *ptgt,
+    uint32_t *slotstatus)
+{
+	return (mptsas_send_sep(mpt, ptgt, slotstatus,
+	    MPI2_SEP_REQ_ACTION_READ_STATUS));
+}
+#endif
+static int
+mptsas_set_led_status(mptsas_t *mpt, mptsas_target_t *ptgt, uint32_t slotstatus)
+{
+	NDBG14(("mptsas_ioctl: set LED status %x for slot %x",
+	    slotstatus, ptgt->m_slot_num));
+	return (mptsas_send_sep(mpt, ptgt, &slotstatus,
+	    MPI2_SEP_REQ_ACTION_WRITE_STATUS));
+}
+/*
+ *  send sep request, use enclosure/slot addressing
+ */
+static int mptsas_send_sep(mptsas_t *mpt, mptsas_target_t *ptgt,
+    uint32_t *status, uint8_t act)
+{
+	Mpi2SepRequest_t	req;
+	Mpi2SepReply_t		rep;
+	int			ret;
+
+	ASSERT(mutex_owned(&mpt->m_mutex));
+
+	bzero(&req, sizeof (req));
+	bzero(&rep, sizeof (rep));
+
+	req.Function = MPI2_FUNCTION_SCSI_ENCLOSURE_PROCESSOR;
+	req.Action = act;
+	req.Flags = MPI2_SEP_REQ_FLAGS_ENCLOSURE_SLOT_ADDRESS;
+	req.EnclosureHandle = LE_16(ptgt->m_enclosure);
+	req.Slot = LE_16(ptgt->m_slot_num);
+	if (act == MPI2_SEP_REQ_ACTION_WRITE_STATUS) {
+		req.SlotStatus = LE_32(*status);
+	}
+	ret = mptsas_do_passthru(mpt, (uint8_t *)&req, (uint8_t *)&rep, NULL,
+	    sizeof (req), sizeof (rep), NULL, 0, NULL, 0, 60, FKIOCTL);
+	if (ret != 0) {
+		mptsas_log(mpt, CE_NOTE, "mptsas_send_sep: passthru SEP "
+		    "Processor Request message error %d", ret);
+		return (DDI_FAILURE);
+	}
+	/* do passthrough success, check the ioc status */
+	if (LE_16(rep.IOCStatus) != MPI2_IOCSTATUS_SUCCESS) {
+		if ((LE_16(rep.IOCStatus) & MPI2_IOCSTATUS_MASK) ==
+		    MPI2_IOCSTATUS_INVALID_FIELD) {
+			mptsas_log(mpt, CE_NOTE, "send sep act %x: Not "
+			    "supported action, loginfo %x", act,
+			    LE_32(rep.IOCLogInfo));
+			return (DDI_FAILURE);
+		}
+		mptsas_log(mpt, CE_NOTE, "send_sep act %x: ioc "
+		    "status:%x", act, LE_16(rep.IOCStatus));
+		return (DDI_FAILURE);
+	}
+	if (act != MPI2_SEP_REQ_ACTION_WRITE_STATUS) {
+		*status = LE_32(rep.SlotStatus);
+	}
+
+	return (DDI_SUCCESS);
 }
