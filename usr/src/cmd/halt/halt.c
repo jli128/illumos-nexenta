@@ -1021,14 +1021,12 @@ parse_fastboot_args(char *bootargs_buf, size_t buf_size,
 	/*
 	 * Always perform a dry run to identify all the drivers that
 	 * need to implement devo_reset().
-	 */
-	if (uadmin(A_SHUTDOWN, AD_FASTREBOOT_DRYRUN,
-	    (uintptr_t)bootargs_saved) != 0) {
-		(void) fprintf(stderr, gettext("%s: Not all drivers "
-		    "have implemented quiesce(9E)\n"
-		    "\tPlease see /var/adm/messages for drivers that haven't\n"
-		    "\timplemented quiesce(9E).\n"), cmdname);
-	} else if (*is_dryrun) {
+	 * Recently patched to remove the following error message on fast reboot
+	 * "Not all drivers have implemented quiesce(9E)
+	 * "Please see /var/adm/messages for drivers that haven't implemented quiesce"
+   */
+
+	 if (*is_dryrun) {
 		(void) fprintf(stderr, gettext("%s: All drivers have "
 		    "implemented quiesce(9E)\n"), cmdname);
 	}
