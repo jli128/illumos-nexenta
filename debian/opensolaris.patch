@@ -55,7 +55,7 @@
  SRC="$CODEMGR_WS/usr/src";         	export SRC
 -VERSION="$GATE";			export VERSION
 -
-+VERSION="NexentaOS_134b";		export VERSION
++VERSION="NexentaOS_134c";		export VERSION
 +DATE=`date +%Y-%m-%d`;
 +RELEASE_CM='"@(#)SunOS Nexenta '$RELEASE' '$VERSION' '$RELEASE_DATE'"'; export RELEASE_CM
 +DEV_CM='"@(#)SunOS Nexenta: ['$LOGNAME'] '$DATE'"'; export DEV_CM

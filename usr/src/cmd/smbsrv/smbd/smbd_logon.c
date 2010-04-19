@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -36,6 +35,9 @@
 #include <bsm/adt.h>
 #include <bsm/adt_event.h>
 #include <bsm/audit_uevents.h>
+#include <pwd.h>
+#include <nss_dbdefs.h>
+#include <sys/idmap.h>
 #include "smbd.h"
 
 
@@ -76,7 +78,7 @@ static smb_audit_t *smbd_audit_unlink(uint32_t);
  * user, start an audit session and audit the event.
  */
 smb_token_t *
-smbd_user_auth_logon(netr_client_t *clnt)
+smbd_user_auth_logon(smb_logon_t *user_info)
 {
 	smb_token_t *token;
 	smb_audit_t *entry;
@@ -92,12 +94,12 @@ smbd_user_auth_logon(netr_client_t *clnt)
 	int status;
 	int retval;
 
-	if ((token = smb_logon(clnt)) == NULL) {
+	if ((token = smb_logon(user_info)) == NULL) {
 		uid = ADT_NO_ATTRIB;
 		gid = ADT_NO_ATTRIB;
 		sid = NT_NULL_SIDSTR;
-		username = clnt->e_username;
-		domain = clnt->e_domain;
+		username = user_info->lg_e_username;
+		domain = user_info->lg_e_domain;
 		status = ADT_FAILURE;
 		retval = ADT_FAIL_VALUE_AUTH;
 	} else {
@@ -126,13 +128,14 @@ smbd_user_auth_logon(netr_client_t *clnt)
 	}
 
 	(void) memset(&termid, 0, sizeof (au_tid_addr_t));
-	termid.at_port = clnt->local_port;
+	termid.at_port = user_info->lg_local_port;
 
-	if (clnt->ipaddr.a_family == AF_INET) {
-		termid.at_addr[0] = clnt->ipaddr.a_ipv4;
+	if (user_info->lg_clnt_ipaddr.a_family == AF_INET) {
+		termid.at_addr[0] = user_info->lg_clnt_ipaddr.a_ipv4;
 		termid.at_type = AU_IPv4;
 	} else {
-		bcopy(&clnt->ipaddr.a_ip, termid.at_addr, IPV6_ADDR_LEN);
+		bcopy(&user_info->lg_clnt_ipaddr.a_ip, termid.at_addr,
+		    IPV6_ADDR_LEN);
 		termid.at_type = AU_IPv6;
 	}
 	adt_set_termid(ah, &termid);
@@ -211,11 +214,20 @@ smbd_user_auth_logoff(uint32_t audit_sid)
 	smb_audit_t *entry;
 	adt_session_data_t *ah;
 	adt_event_data_t *event;
+	struct passwd pw;
+	char buf[NSS_LINELEN_PASSWD];
 
 	if ((entry = smbd_audit_unlink(audit_sid)) == NULL)
 		return;
 
-	smb_autohome_remove(entry->sa_username);
+	if (IDMAP_ID_IS_EPHEMERAL(entry->sa_uid)) {
+		smb_autohome_remove(entry->sa_username);
+	} else {
+		if (getpwuid_r(entry->sa_uid, &pw, buf, sizeof (buf)) == NULL)
+			return;
+
+		smb_autohome_remove(pw.pw_name);
+	}
 
 	ah = entry->sa_handle;
 

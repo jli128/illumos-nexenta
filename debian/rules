@@ -55,6 +55,7 @@ setup-closed-stamp:
 	cd $(GATEROOT) && tar xjf /var/tmp/$(CLOSEDBIN_NAME)
 	cd $(GATEROOT)/closed && ln -s root_i386-nd root_i386
 	cd $(GATEROOT) && wget $(CRYPTO_URL)
+	cp debian/eventlog.dll $(GATEROOT)/usr/src/cmd/smbsrv/smbd
 	touch $@
 
 build-on: patch setup-closed build-on-stamp

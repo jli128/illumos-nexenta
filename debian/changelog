@@ -1,3 +1,9 @@
+nexenta-on-source (5.11.134-8) hardy; urgency=low
+
+  * New patches, bug fixes for ZFS and CIFS
+
+ -- Nexenta Systems <support@nexenta.com>  Mon, 15 Mar 2010 13:40:42 -0700
+
 nexenta-on-source (5.11.134-7) hardy; urgency=low
 
   * Dropping NFS client patches, causing deadlock on PXE install

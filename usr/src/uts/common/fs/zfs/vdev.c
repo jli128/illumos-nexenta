@@ -1420,6 +1420,35 @@ vdev_close(vdev_t *vd)
 	vd->vdev_stat.vs_aux = VDEV_AUX_NONE;
 }
 
+void
+vdev_hold(vdev_t *vd)
+{
+	spa_t *spa = vd->vdev_spa;
+
+	ASSERT(spa_is_root(spa));
+	if (spa->spa_state == POOL_STATE_UNINITIALIZED)
+		return;
+
+	for (int c = 0; c < vd->vdev_children; c++)
+		vdev_hold(vd->vdev_child[c]);
+
+	if (vd->vdev_ops->vdev_op_leaf)
+		vd->vdev_ops->vdev_op_hold(vd);
+}
+
+void
+vdev_rele(vdev_t *vd)
+{
+	spa_t *spa = vd->vdev_spa;
+
+	ASSERT(spa_is_root(spa));
+	for (int c = 0; c < vd->vdev_children; c++)
+		vdev_rele(vd->vdev_child[c]);
+
+	if (vd->vdev_ops->vdev_op_leaf)
+		vd->vdev_ops->vdev_op_rele(vd);
+}
+
 /*
  * Reopen all interior vdevs and any unopened leaves.  We don't actually
  * reopen leaf vdevs which had previously been opened as they might deadlock
@@ -2049,12 +2078,10 @@ vdev_fault(spa_t *spa, uint64_t guid, vdev_aux_t aux)
 	vdev_set_state(vd, B_FALSE, VDEV_STATE_FAULTED, aux);
 
 	/*
-	 * If marking the vdev as faulted cause the top-level vdev to become
-	 * unavailable, then back off and simply mark the vdev as degraded
-	 * instead.
+	 * If this device has the only valid copy of the data, then
+	 * back off and simply mark the vdev as degraded instead.
 	 */
-	if (vdev_is_dead(vd->vdev_top) && !vd->vdev_islog &&
-	    vd->vdev_aux == NULL) {
+	if (!vd->vdev_islog && vd->vdev_aux == NULL && vdev_dtl_required(vd)) {
 		vd->vdev_degraded = 1ULL;
 		vd->vdev_faulted = 0ULL;
 
