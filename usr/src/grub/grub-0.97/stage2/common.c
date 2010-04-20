@@ -154,7 +154,8 @@ void
 init_bios_info (void)
 {
 #ifndef STAGE1_5
-  unsigned long cont, memtmp, addr;
+  unsigned long memtmp, addr;
+  volatile unsigned long cont;
   int drive;
 #endif
 
