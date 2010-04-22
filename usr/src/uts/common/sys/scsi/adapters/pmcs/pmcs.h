@@ -17,10 +17,9 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ */
+/*
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * This file is the principle header file for the PMCS driver
@@ -328,7 +327,8 @@ struct pmcs_hw {
 		configuring		: 1,
 		ds_err_recovering	: 1,
 		quiesced		: 1,
-		fwlog_file		: 1;
+		fwlog_file		: 1,
+		fw_active_img		: 1;	/* 1='A', 0='B' */
 
 	/*
 	 * This HBA instance's iportmap and list of iport states.
@@ -522,6 +522,7 @@ struct pmcs_hw {
 	 * Card information, some determined during MPI setup
 	 */
 	uint32_t	fw;		/* firmware version */
+	uint32_t	ila_ver;	/* ILA version */
 	uint8_t		max_iq;		/* maximum inbound queues this card */
 	uint8_t 	max_oq;		/* "" outbound "" */
 	uint8_t		nphy;		/* number of phys this card */
@@ -609,23 +610,26 @@ struct pmcs_hw {
 	/*
 	 * Discovery-related items.
 	 * config_lock: Protects config_changed and should never be held
-	 * outside of getting or setting the value of config_changed.
+	 * outside of getting or setting the value of config_changed or
+	 * configuring.
 	 * config_changed: Boolean indicating whether discovery needs to
 	 * be restarted.
 	 * configuring: 1 = discovery is running, 0 = discovery not running.
 	 * NOTE: configuring is now in the bitfield above.
-	 *
 	 * config_restart_time is set by the tgtmap_[de]activate callbacks each
 	 * time we decide we want SCSA to retry enumeration on some device.
 	 * The watchdog timer will not fire discovery unless it has reached
 	 * config_restart_time and config_restart is TRUE.  This ensures that
 	 * we don't ask SCSA to retry enumerating devices while it is still
 	 * running.
+	 * config_cv can be used by any thread waiting on the configuring
+	 * bit to clear.
 	 */
 	kmutex_t		config_lock;
 	volatile boolean_t	config_changed;
 	boolean_t		config_restart;
 	clock_t			config_restart_time;
+	kcondvar_t		config_cv;
 
 	/*
 	 * Work Related Stuff
@@ -672,6 +676,7 @@ struct pmcs_hw {
 	uint16_t			debug_mask;
 	uint16_t			phyid_block_mask;
 	uint16_t			phys_started;
+	uint16_t			open_retry_interval;
 	uint32_t			hipri_queue;
 	uint32_t			mpibar;
 	uint32_t			intr_pri;
@@ -681,6 +686,22 @@ struct pmcs_hw {
 	kmutex_t			ict_lock;
 	kcondvar_t			ict_cv;
 	kthread_t			*ict_thread;
+
+	/*
+	 * Receptacle information - FMA
+	 */
+	char				*recept_labels[PMCS_NUM_RECEPTACLES];
+	char				*recept_pm[PMCS_NUM_RECEPTACLES];
+
+	/*
+	 * fw_timestamp: Firmware timestamp taken after PHYs are started
+	 * sys_timestamp: System timestamp taken at roughly the same time
+	 * hrtimestamp is the hrtime at roughly the same time
+	 * All of these are protected by the global pmcs_trace_lock.
+	 */
+	uint64_t	fw_timestamp;
+	timespec_t	sys_timestamp;
+	hrtime_t	hrtimestamp;
 
 #ifdef	DEBUG
 	kmutex_t	dbglock;

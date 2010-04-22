@@ -17,10 +17,9 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ */
+/*
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * This file provides prototype function definitions.
@@ -54,7 +53,7 @@ typedef enum {
 	int lvl = level;					\
 	if (((pwp->debug_mask & (1 << lvl)) != 0) ||		\
 	    (lvl > PMCS_PRT_DEBUG_DEVEL)) {			\
-		pmcs_prt_impl(pwp, lvl, phy, tgt, fmt);	\
+		pmcs_prt_impl(pwp, lvl, phy, tgt, fmt);		\
 	}							\
 }
 
@@ -225,11 +224,6 @@ int pmcs_get_diag_report(pmcs_hw_t *, uint32_t, uint8_t);
 int pmcs_clear_diag_counters(pmcs_hw_t *, uint8_t);
 
 /*
- * Get current firmware timestamp
- */
-int pmcs_get_time_stamp(pmcs_hw_t *, uint64_t *);
-
-/*
  * Register Dump (including "internal" registers)
  */
 void pmcs_register_dump(pmcs_hw_t *);
@@ -289,7 +283,7 @@ void pmcs_set_intr_coal_timer(pmcs_hw_t *pwp, pmcs_coal_timer_adj_t adj);
  */
 void pmcs_check_iomb_status(pmcs_hw_t *pwp, uint32_t *iomb);
 void pmcs_clear_xp(pmcs_hw_t *, pmcs_xscsi_t *);
-
+void pmcs_create_one_phy_stats(pmcs_iport_t *, pmcs_phy_t *);
 int pmcs_run_sata_cmd(pmcs_hw_t *, pmcs_phy_t *, fis_t, uint32_t,
     uint32_t, uint32_t);
 int pmcs_sata_identify(pmcs_hw_t *, pmcs_phy_t *);

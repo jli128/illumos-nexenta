@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <limits.h>
@@ -47,6 +46,16 @@ typedef struct per_iport_setting {
 	uint_t  pis_dtc_info; /* -d: device tree children: dev_info/path_info */
 } per_iport_setting_t;
 
+/*
+ * This structure is used for sorting work structures by the wserno
+ */
+typedef struct wserno_list {
+	int serno;
+	int idx;
+	struct wserno_list *next;
+	struct wserno_list *prev;
+} wserno_list_t;
+
 #define	MDB_RD(a, b, c)		mdb_vread(a, b, (uintptr_t)c)
 #define	NOREAD(a, b)		mdb_warn("could not read " #a " at 0x%p", b)
 
@@ -66,6 +75,52 @@ print_sas_address(pmcs_phy_t *phy)
 
 	for (idx = 0; idx < 8; idx++) {
 		mdb_printf("%02x", phy->sas_address[idx]);
+	}
+}
+
+static void
+pmcs_fwtime_to_systime(struct pmcs_hw ss, uint32_t fw_hi, uint32_t fw_lo,
+    struct timespec *stime)
+{
+	uint64_t fwtime;
+	time_t secs;
+	long nsecs;
+	boolean_t backward_time = B_FALSE;
+
+	fwtime = ((uint64_t)fw_hi << 32) | fw_lo;
+
+	/*
+	 * If fwtime < ss.fw_timestamp, then we need to adjust the clock
+	 * time backwards from ss.sys_timestamp.  Otherwise, the adjustment
+	 * goes forward in time
+	 */
+	if (fwtime >= ss.fw_timestamp) {
+		fwtime -= ss.fw_timestamp;
+	} else {
+		fwtime = ss.fw_timestamp - fwtime;
+		backward_time = B_TRUE;
+	}
+
+	secs = ((time_t)fwtime / NSECS_PER_SEC);
+	nsecs = ((long)fwtime % NSECS_PER_SEC);
+
+	stime->tv_sec = ss.sys_timestamp.tv_sec;
+	stime->tv_nsec = ss.sys_timestamp.tv_nsec;
+
+	if (backward_time) {
+		if (stime->tv_nsec < nsecs) {
+			stime->tv_sec--;
+			stime->tv_nsec = stime->tv_nsec + NSECS_PER_SEC - nsecs;
+		} else {
+			stime->tv_nsec -= nsecs;
+		}
+		stime->tv_sec -= secs;
+	} else {
+		if (stime->tv_nsec + nsecs > NSECS_PER_SEC) {
+			stime->tv_sec++;
+		}
+		stime->tv_nsec = (stime->tv_nsec + nsecs) % NSECS_PER_SEC;
+		stime->tv_sec += secs;
 	}
 }
 
@@ -500,6 +555,102 @@ display_completion_queue(struct pmcs_hw ss)
 	}
 }
 
+static void
+display_event_log(struct pmcs_hw ss)
+{
+	pmcs_fw_event_hdr_t fwhdr;
+	char *header_id, *entry, *fwlogp;
+	uint32_t total_size = PMCS_FWLOG_SIZE, log_size, index, *swapp, sidx;
+	pmcs_fw_event_entry_t *fw_entryp;
+	struct timespec systime;
+
+	if (ss.fwlogp == NULL) {
+		mdb_printf("There is no firmware event log.\n");
+		return;
+	}
+
+	fwlogp = (char *)ss.fwlogp;
+
+	while (total_size != 0) {
+		if (mdb_vread(&fwhdr, sizeof (pmcs_fw_event_hdr_t),
+		    (uintptr_t)fwlogp) != sizeof (pmcs_fw_event_hdr_t)) {
+			mdb_warn("Unable to read firmware event log header\n");
+			return;
+		}
+
+		/*
+		 * Firmware event log is little-endian
+		 */
+		swapp = (uint32_t *)&fwhdr;
+		for (sidx = 0; sidx < (sizeof (pmcs_fw_event_hdr_t) /
+		    sizeof (uint32_t)); sidx++) {
+			*swapp = LE_32(*swapp);
+			swapp++;
+		}
+
+		if (fwhdr.fw_el_signature == PMCS_FWLOG_AAP1_SIG) {
+			header_id = "AAP1";
+		} else if (fwhdr.fw_el_signature == PMCS_FWLOG_IOP_SIG) {
+			header_id = "IOP";
+		} else {
+			mdb_warn("Invalid firmware event log signature\n");
+			return;
+		}
+
+		mdb_printf("Event Log:    %s\n", header_id);
+		mdb_printf("Oldest entry: %d\n", fwhdr.fw_el_oldest_idx);
+		mdb_printf("Latest entry: %d\n", fwhdr.fw_el_latest_idx);
+
+		entry = mdb_alloc(fwhdr.fw_el_entry_size, UM_SLEEP);
+		fw_entryp = (pmcs_fw_event_entry_t *)((void *)entry);
+		total_size -= sizeof (pmcs_fw_event_hdr_t);
+		log_size = fwhdr.fw_el_buf_size;
+		fwlogp += fwhdr.fw_el_entry_start_offset;
+		swapp = (uint32_t *)((void *)entry);
+		index = 0;
+
+		mdb_printf("%8s %16s %32s %8s %3s %8s %8s %8s %8s",
+		    "Index", "Timestamp", "Time", "Seq Num", "Sev", "Word 0",
+		    "Word 1", "Word 2", "Word 3");
+		mdb_printf("\n");
+
+		while (log_size != 0) {
+			if (mdb_vread(entry, fwhdr.fw_el_entry_size,
+			    (uintptr_t)fwlogp) != fwhdr.fw_el_entry_size) {
+				mdb_warn("Unable to read event log entry\n");
+				goto bail_out;
+			}
+
+			for (sidx = 0; sidx < (fwhdr.fw_el_entry_size /
+			    sizeof (uint32_t)); sidx++) {
+				*(swapp + sidx) = LE_32(*(swapp + sidx));
+			}
+
+			if (fw_entryp->ts_upper || fw_entryp->ts_lower) {
+				pmcs_fwtime_to_systime(ss, fw_entryp->ts_upper,
+				    fw_entryp->ts_lower, &systime);
+				mdb_printf("%8d %08x%08x [%Y.%09ld] %8d %3d "
+				    "%08x %08x %08x %08x\n", index,
+				    fw_entryp->ts_upper, fw_entryp->ts_lower,
+				    systime, fw_entryp->seq_num,
+				    fw_entryp->severity, fw_entryp->logw0,
+				    fw_entryp->logw1, fw_entryp->logw2,
+				    fw_entryp->logw3);
+			}
+
+			fwlogp += fwhdr.fw_el_entry_size;
+			total_size -= fwhdr.fw_el_entry_size;
+			log_size -= fwhdr.fw_el_entry_size;
+			index++;
+		}
+
+		mdb_printf("\n");
+	}
+
+bail_out:
+	mdb_free(entry, fwhdr.fw_el_entry_size);
+}
+
 /*ARGSUSED*/
 static void
 display_hwinfo(struct pmcs_hw m, int verbose)
@@ -533,15 +684,27 @@ display_hwinfo(struct pmcs_hw m, int verbose)
 	mdb_printf("Firmware version: %x.%x.%x (%s)\n",
 	    PMCS_FW_MAJOR(mp), PMCS_FW_MINOR(mp), PMCS_FW_MICRO(mp),
 	    fwsupport);
+	mdb_printf("ILA version:      %08x\n", m.ila_ver);
+	mdb_printf("Active f/w img:   %c\n", (m.fw_active_img) ? 'A' : 'B');
 
 	mdb_printf("Number of PHYs:   %d\n", m.nphy);
 	mdb_printf("Maximum commands: %d\n", m.max_cmd);
 	mdb_printf("Maximum devices:  %d\n", m.max_dev);
 	mdb_printf("I/O queue depth:  %d\n", m.ioq_depth);
+	mdb_printf("Open retry intvl: %d usecs\n", m.open_retry_interval);
 	if (m.fwlog == 0) {
 		mdb_printf("Firmware logging: Disabled\n");
 	} else {
 		mdb_printf("Firmware logging: Enabled (%d)\n", m.fwlog);
+	}
+	if (m.fwlog_file == 0) {
+		mdb_printf("Firmware logfile: Not configured\n");
+	} else {
+		mdb_printf("Firmware logfile: Configured\n");
+		mdb_inc_indent(2);
+		mdb_printf("AAP1 log file:  %s\n", m.fwlogfile_aap1);
+		mdb_printf("IOP logfile:    %s\n", m.fwlogfile_iop);
+		mdb_dec_indent(2);
 	}
 }
 
@@ -766,25 +929,112 @@ display_one_work(pmcwork_t *wp, int verbose, int idx)
 }
 
 static void
-display_work(struct pmcs_hw m, int verbose)
+display_work(struct pmcs_hw m, int verbose, int wserno)
 {
 	int		idx;
 	boolean_t	header_printed = B_FALSE;
-	pmcwork_t	work, *wp = &work;
+	pmcwork_t	*wp;
+	wserno_list_t	*sernop, *sp, *newsp, *sphead = NULL;
 	uintptr_t	_wp;
+	int		serno;
+
+	wp = mdb_alloc(sizeof (pmcwork_t) * m.max_cmd, UM_SLEEP);
+	_wp = (uintptr_t)m.work;
+	sernop = mdb_alloc(sizeof (wserno_list_t) * m.max_cmd, UM_SLEEP);
+	bzero(sernop, sizeof (wserno_list_t) * m.max_cmd);
 
 	mdb_printf("\nActive Work structure information:\n");
 	mdb_printf("----------------------------------\n");
 
-	_wp = (uintptr_t)m.work;
-
+	/*
+	 * Read in all the work structures
+	 */
 	for (idx = 0; idx < m.max_cmd; idx++, _wp += sizeof (pmcwork_t)) {
-		if (MDB_RD(&work, sizeof (pmcwork_t), _wp) == -1) {
+		if (MDB_RD(wp + idx, sizeof (pmcwork_t), _wp) == -1) {
 			NOREAD(pmcwork_t, _wp);
 			continue;
 		}
+	}
 
-		if (!verbose && (wp->htag == PMCS_TAG_TYPE_FREE)) {
+	/*
+	 * Sort by serial number?
+	 */
+	if (wserno) {
+		for (idx = 0; idx < m.max_cmd; idx++) {
+			if ((wp + idx)->htag == 0) {
+				serno = PMCS_TAG_SERNO((wp + idx)->last_htag);
+			} else {
+				serno = PMCS_TAG_SERNO((wp + idx)->htag);
+			}
+
+			/* Start at the beginning of the list */
+			sp = sphead;
+			newsp = sernop + idx;
+			/* If this is the first entry, just add it */
+			if (sphead == NULL) {
+				sphead = sernop;
+				sphead->serno = serno;
+				sphead->idx = idx;
+				sphead->next = NULL;
+				sphead->prev = NULL;
+				continue;
+			}
+
+			newsp->serno = serno;
+			newsp->idx = idx;
+
+			/* Find out where in the list this goes */
+			while (sp) {
+				/* This item goes before sp */
+				if (serno < sp->serno) {
+					newsp->next = sp;
+					newsp->prev = sp->prev;
+					if (newsp->prev == NULL) {
+						sphead = newsp;
+					} else {
+						newsp->prev->next = newsp;
+					}
+					sp->prev = newsp;
+					break;
+				}
+
+				/*
+				 * If sp->next is NULL, this entry goes at the
+				 * end of the list
+				 */
+				if (sp->next == NULL) {
+					sp->next = newsp;
+					newsp->next = NULL;
+					newsp->prev = sp;
+					break;
+				}
+
+				sp = sp->next;
+			}
+		}
+
+		/*
+		 * Now print the sorted list
+		 */
+		mdb_printf(" Idx %8s %10s %20s %8s %8s O D ",
+		    "HTag", "State", "Phy Path", "Target", "Timer");
+		mdb_printf("%8s %10s %18s %18s %18s\n", "LastHTAG",
+		    "LastState", "LastPHY", "LastTgt", "LastArg");
+
+		sp = sphead;
+		while (sp) {
+			display_one_work(wp + sp->idx, 1, sp->idx);
+			sp = sp->next;
+		}
+
+		goto out;
+	}
+
+	/*
+	 * Now print the list, sorted by index
+	 */
+	for (idx = 0; idx < m.max_cmd; idx++) {
+		if (!verbose && ((wp + idx)->htag == PMCS_TAG_TYPE_FREE)) {
 			continue;
 		}
 
@@ -804,8 +1054,12 @@ display_work(struct pmcs_hw m, int verbose)
 			header_printed = B_TRUE;
 		}
 
-		display_one_work(wp, verbose, idx);
+		display_one_work(wp + idx, verbose, idx);
 	}
+
+out:
+	mdb_free(wp, sizeof (pmcwork_t) * m.max_cmd);
+	mdb_free(sernop, sizeof (wserno_list_t) * m.max_cmd);
 }
 
 static void
@@ -1848,7 +2102,7 @@ display_phys(struct pmcs_hw ss, int verbose, struct pmcs_phy *parent, int level,
 
 static int
 pmcs_dump_tracelog(boolean_t filter, int instance, uint64_t tail_lines,
-    const char *phy_path, uint64_t sas_address)
+    const char *phy_path, uint64_t sas_address, uint64_t verbose)
 {
 	pmcs_tbuf_t *tbuf_addr;
 	uint_t tbuf_idx;
@@ -1997,7 +2251,16 @@ pmcs_dump_tracelog(boolean_t filter, int instance, uint64_t tail_lines,
 		}
 
 		if (!elem_filtered) {
-			mdb_printf("%Y.%09ld %s\n", tbuf.timestamp, tbuf.buf);
+			/*
+			 * If the -v flag was given, print the firmware
+			 * timestamp along with the clock time
+			 */
+			mdb_printf("%Y.%09ld ", tbuf.timestamp);
+			if (verbose) {
+				mdb_printf("(0x%" PRIx64 ") ",
+				    tbuf.fw_timestamp);
+			}
+			mdb_printf("%s\n", tbuf.buf);
 		}
 
 		--elems_to_print;
@@ -2505,6 +2768,7 @@ pmcs_log(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	struct dev_info	dip;
 	const char	*match_phy_path = NULL;
 	uint64_t 	match_sas_address = 0, tail_lines = 0;
+	uint_t		verbose = 0;
 
 	if (!(flags & DCMD_ADDRSPEC)) {
 		pmcs_state = NULL;
@@ -2524,6 +2788,7 @@ pmcs_log(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    'l', MDB_OPT_UINT64, &tail_lines,
 	    'p', MDB_OPT_STR, &match_phy_path,
 	    's', MDB_OPT_UINT64, &match_sas_address,
+	    'v', MDB_OPT_SETBITS, TRUE, &verbose,
 	    NULL) != argc) {
 		return (DCMD_USAGE);
 	}
@@ -2540,10 +2805,10 @@ pmcs_log(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (!(flags & DCMD_LOOP)) {
 		return (pmcs_dump_tracelog(B_TRUE, dip.devi_instance,
-		    tail_lines, match_phy_path, match_sas_address));
+		    tail_lines, match_phy_path, match_sas_address, verbose));
 	} else if (flags & DCMD_LOOPFIRST) {
 		return (pmcs_dump_tracelog(B_FALSE, 0, tail_lines,
-		    match_phy_path, match_sas_address));
+		    match_phy_path, match_sas_address, verbose));
 	} else {
 		return (DCMD_OK);
 	}
@@ -2568,6 +2833,8 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	uint_t			unconfigured = FALSE;
 	uint_t			damap_info = FALSE;
 	uint_t			dtc_info = FALSE;
+	uint_t			wserno = FALSE;
+	uint_t			fwlog = FALSE;
 	int			rv = DCMD_OK;
 	void			*pmcs_state;
 	char			*state_str;
@@ -2591,6 +2858,7 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (mdb_getopts(argc, argv,
 	    'c', MDB_OPT_SETBITS, TRUE, &compq,
 	    'd', MDB_OPT_SETBITS, TRUE, &dtc_info,
+	    'e', MDB_OPT_SETBITS, TRUE, &fwlog,
 	    'h', MDB_OPT_SETBITS, TRUE, &hw_info,
 	    'i', MDB_OPT_SETBITS, TRUE, &ic_info,
 	    'I', MDB_OPT_SETBITS, TRUE, &iport_info,
@@ -2598,6 +2866,7 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    'p', MDB_OPT_SETBITS, TRUE, &phy_info,
 	    'q', MDB_OPT_SETBITS, TRUE, &ibq,
 	    'Q', MDB_OPT_SETBITS, TRUE, &obq,
+	    's', MDB_OPT_SETBITS, TRUE, &wserno,
 	    't', MDB_OPT_SETBITS, TRUE, &target_info,
 	    'T', MDB_OPT_SETBITS, TRUE, &tgt_phy_count,
 	    'u', MDB_OPT_SETBITS, TRUE, &unconfigured,
@@ -2631,7 +2900,7 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (((flags & DCMD_ADDRSPEC) && !(flags & DCMD_LOOP)) ||
 	    (flags & DCMD_LOOPFIRST) || phy_info || target_info || hw_info ||
 	    work_info || waitqs_info || ibq || obq || tgt_phy_count || compq ||
-	    unconfigured) {
+	    unconfigured || fwlog) {
 		if ((flags & DCMD_LOOP) && !(flags & DCMD_LOOPFIRST))
 			mdb_printf("\n");
 		mdb_printf("%16s %9s %4s B C  WorkFlags wserno DbgMsk %16s\n",
@@ -2680,8 +2949,8 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (target_info || tgt_phy_count)
 		display_targets(ss, verbose, tgt_phy_count);
 
-	if (work_info)
-		display_work(ss, verbose);
+	if (work_info || wserno)
+		display_work(ss, verbose, wserno);
 
 	if (ic_info)
 		display_ic(ss, verbose);
@@ -2701,6 +2970,9 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (unconfigured)
 		display_unconfigured_targets(addr);
 
+	if (fwlog)
+		display_event_log(ss);
+
 	mdb_dec_indent(4);
 
 	return (rv);
@@ -2712,6 +2984,7 @@ pmcs_help()
 	mdb_printf("Prints summary information about each pmcs instance.\n"
 	    "    -c: Dump the completion queue\n"
 	    "    -d: Print per-iport information about device tree children\n"
+	    "    -e: Display the in-memory firmware event log\n"
 	    "    -h: Print more detailed hardware information\n"
 	    "    -i: Print interrupt coalescing information\n"
 	    "    -I: Print information about each iport\n"
@@ -2719,6 +2992,7 @@ pmcs_help()
 	    "    -p: Print information about each attached PHY\n"
 	    "    -q: Dump inbound queues\n"
 	    "    -Q: Dump outbound queues\n"
+	    "    -s: Dump all work structures sorted by serial number\n"
 	    "    -t: Print information about each configured target\n"
 	    "    -T: Print target and PHY count summary\n"
 	    "    -u: Show SAS address of all unconfigured targets\n"
@@ -2749,11 +3023,11 @@ pmcs_tag_help()
 }
 
 static const mdb_dcmd_t dcmds[] = {
-	{ "pmcs", "?[-cdhiImpQqtTuwWv]", "print pmcs information",
+	{ "pmcs", "?[-cdehiImpQqtTuwWv]", "print pmcs information",
 	    pmcs_dcmd, pmcs_help
 	},
 	{ "pmcs_log",
-	    "?[-p PHY_PATH | -s SAS_ADDRESS | -l TAIL_LINES]",
+	    "?[-v] [-p PHY_PATH | -s SAS_ADDRESS | -l TAIL_LINES]",
 	    "dump pmcs log file", pmcs_log, pmcs_log_help
 	},
 	{ "pmcs_tag", "?[-t tagtype|-s serialnum|-i index]",

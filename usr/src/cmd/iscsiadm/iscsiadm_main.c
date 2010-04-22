@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <stdlib.h>
@@ -257,7 +256,7 @@ static char *cmdName;
 /*
  * Available option letters:
  *
- * bcefgijklmnoquwxyz
+ * befgijklmnoquwxyz
  *
  * DEFGHIJKLMOQUVWXYZ
  */
@@ -1485,16 +1484,24 @@ printTargetLuns(IMA_OID_LIST * lunList)
 			return;
 		}
 
+		(void) fprintf(stdout, "\tLUN: %lld\n",
+		    lunProps.imaProps.targetLun);
+		(void) fprintf(stdout, "\t     Vendor:  %s\n",
+		    lunProps.vendorId);
+		(void) fprintf(stdout, "\t     Product: %s\n",
+		    lunProps.productId);
+		/*
+		 * The lun is valid though the os Device Name is not.
+		 * Give this information to users for judgement.
+		 */
 		if (lunProps.imaProps.osDeviceNameValid == IMA_TRUE) {
-			(void) fprintf(stdout, "\tLUN: %lld\n",
-			    lunProps.imaProps.targetLun);
-			(void) fprintf(stdout, "\t     Vendor:  %s\n",
-			    lunProps.vendorId);
-			(void) fprintf(stdout, "\t     Product: %s\n",
-			    lunProps.productId);
 			(void) fprintf(stdout,
 			    gettext("\t     OS Device Name: %ws\n"),
 			    lunProps.imaProps.osDeviceName);
+		} else {
+			(void) fprintf(stdout,
+			    gettext("\t     OS Device Name: Not"
+			    " Available\n"));
 		}
 	}
 }
@@ -2619,6 +2626,17 @@ listTarget(int objectLen, char *objects[], cmdOptions_t *options, int *funcRet)
 			}
 
 			if (scsi_target) {
+				status = SUN_IMA_ReEnumeration(
+				    targetList->oids[j]);
+				if (!IMA_SUCCESS(status)) {
+					/*
+					 * Proceeds the listing
+					 * but indicates the
+					 * error in return value
+					 */
+					ret = 1;
+				}
+
 				status = IMA_GetLuOidList(
 				    targetList->oids[j],
 				    &lunList);
@@ -5716,8 +5734,10 @@ chkConnLoginMaxPollingLoginDelay(IMA_OID oid, int key, int uintValue)
 
 	if (key == CONN_LOGIN_MAX) {
 		getObj.tunable_objectType = ISCSI_LOGIN_POLLING_DELAY;
-	} else {
+	} else if (key == POLLING_LOGIN_DELAY) {
 		getObj.tunable_objectType = ISCSI_CONN_DEFAULT_LOGIN_MAX;
+	} else {
+		return (0);
 	}
 	valuep[0] = '\0';
 	getObj.tunable_objectValue = valuep;
