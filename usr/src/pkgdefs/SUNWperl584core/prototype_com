@@ -45,7 +45,7 @@ i depend
 # SUNWperl584core
 #
 d none usr 0755 root sys
-#d none usr/bin 0755 root bin
+d none usr/bin 0755 root bin
 d none usr/perl5 0755 root bin
 d none usr/perl5/5.8.4 0755 root bin
 d none usr/perl5/5.8.4/bin 0755 root bin
@@ -55,7 +55,7 @@ d none usr/perl5/vendor_perl 0755 root bin
 d none usr/perl5/vendor_perl/5.8.4 0755 root bin
 l none usr/perl5/5.8.4/bin/perl=./perl5.8.4
 s none usr/perl5/bin=./5.8.4/bin
-#s none usr/bin/perl=../perl5/5.8.4/bin/perl
+s none usr/bin/perl=../perl5/5.8.4/bin/perl
 f none usr/perl5/5.8.4/bin/perl5.8.4 0555 root bin
 d none usr/perl5/5.8.4/lib 0755 root bin
 f none usr/perl5/5.8.4/lib/AnyDBM_File.pm 0444 root bin

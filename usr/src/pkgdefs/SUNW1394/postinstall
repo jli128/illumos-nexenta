@@ -93,10 +93,8 @@ grep "^${DRV} " $BASEDIR/etc/name_to_major > /dev/null 2>&1
 if [ $? -ne 0 ]; then
 	${ADD_DRV} -m "${DRVPERM}" -i "\"${DRVALIAS}\"" ${DRV}
 	if [ $? -ne 0 ]; then
-		echo
-		echo "Failed add_drv of ${DRV}!" >&2
-		# do not fail upgrade
-		exit 0
+		echo "\nFailed add_drv of ${DRV}!\n" >&2
+		exit 1
 	fi
 fi
 

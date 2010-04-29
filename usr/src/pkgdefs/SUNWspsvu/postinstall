@@ -49,7 +49,7 @@ To load the new modules you must reboot the system."
 MODBUSY=0
 MODULE="sv"
 OS_VER=`eval uname -r`
-PKG_INSTALL_ROOT=/etc/..
+PKG_INSTALL_ROOT=${PKG_INSTALL_ROOT:=/}
 DEVLINKTB="${PKG_INSTALL_ROOT}/etc/devlink.tab"
 DSCFG_UPGRADE="${PKG_INSTALL_ROOT}/etc/opt/SUNWesm/dscfg.cf.upgrade"
 
@@ -196,7 +196,7 @@ then
     ${REM_DRV} ${MODULE} > ${ERROR_LOG} 2>&1
     [ $? -ne 0 ] && {
 	message ${REMERR}
-	exit 0
+	exit ${FAILURE}
     }
 fi
 
@@ -209,7 +209,7 @@ add_devlink "type=ddi_pseudo;name=${MODULE}" '\D'
 ${ADD_DRV} $NOPT -m '* 0666 root sys' ${MODULE} > ${ERROR_LOG} 2>&1
 [ $? -ne 0 ] && {
     message ${ADDERR}
-    exit 0
+    exit ${FAILURE}
 }
 
 # deal with upgrades from AVS3.2
@@ -228,4 +228,4 @@ then
     message $MODBUSYMSG
 fi
 
-exit 0
+exit $EXIT

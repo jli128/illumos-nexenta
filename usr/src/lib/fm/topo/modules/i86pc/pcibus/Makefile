@@ -20,7 +20,10 @@
 #
 
 #
-# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 MODULE = pcibus
@@ -35,6 +38,6 @@ MODULESRCS = $(UTILSRCS) $(PCISRCS) pci_i86pc.c
 
 include ../../Makefile.plugin
 
-LDLIBS += -ldevinfo -lsmbios
+LDLIBS += -ldevinfo
 
 CPPFLAGS += -I$(UTILDIR) -I$(HBDIR)

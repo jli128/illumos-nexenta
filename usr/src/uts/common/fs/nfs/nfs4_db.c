@@ -19,7 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #include <sys/systm.h>
@@ -217,8 +218,8 @@ rfs4_database_shutdown(rfs4_database_t *db)
 
 	mutex_enter(db->db_lock);
 	for (table = db->db_tables; table; table = table->dbt_tnext) {
-		mutex_enter(&table->dbt_reaper_cv_lock);
 		table->dbt_reaper_shutdown = TRUE;
+		mutex_enter(&table->dbt_reaper_cv_lock);
 		cv_broadcast(&table->dbt_reaper_wait);
 		db->db_shutdown_count++;
 		mutex_exit(&table->dbt_reaper_cv_lock);

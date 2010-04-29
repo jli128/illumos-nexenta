@@ -372,7 +372,6 @@ main(void)
 	extern void	sysevent_evc_thrinit();
 #if defined(__x86)
 	extern void	fastboot_post_startup(void);
-	extern void	progressbar_start(void);
 #endif
 	/*
 	 * In the horrible world of x86 in-lines, you can't get symbolic
@@ -406,13 +405,6 @@ main(void)
 	clock_tick_init_pre();
 	clock_init();
 
-#if defined(__x86)
-	/*
-	 * The progressbar thread uses cv_reltimedwait() and hence needs to be
-	 * started after the callout mechanism has been initialized.
-	 */
-	progressbar_start();
-#endif
 	/*
 	 * On some platforms, clkinitf() changes the timing source that
 	 * gethrtime_unscaled() uses to generate timestamps.  cbe_init() calls

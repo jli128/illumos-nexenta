@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,7 +39,6 @@
 #include <assert.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/sid.h>
 #include <ucred.h>
 #include <pwd.h>
 #include <auth_attr.h>
@@ -911,17 +910,8 @@ out:
 			res->retcode =
 			    sql_exec_no_cb(db, IDMAP_DBNAME,
 			    "COMMIT TRANSACTION;");
-			if (res->retcode ==  IDMAP_SUCCESS) {
-				/*
-				 * We've updated the rules.  Expire the cache
-				 * so that existing mappings will be
-				 * reconsidered.
-				 */
-				res->retcode =
-				    idmap_cache_flush(IDMAP_FLUSH_EXPIRE);
-			} else {
+			if (res->retcode !=  IDMAP_SUCCESS)
 				res->error_index = -2;
-			}
 		}
 		else
 			(void) sql_exec_no_cb(db, IDMAP_DBNAME,
@@ -1206,22 +1196,6 @@ out:
 	return (TRUE);
 }
 
-int
-idmap_flush_1_svc(
-    idmap_flush_op  op,
-    idmap_retcode *result,
-    struct svc_req *rqstp)
-{
-	NOTE(ARGUNUSED(rqstp))
-	if (verify_rules_auth(rqstp) < 0) {
-		*result = IDMAP_ERR_PERMISSION_DENIED;
-		return (TRUE);
-	}
-
-	*result = idmap_cache_flush(op);
-
-	return (TRUE);
-}
 
 /* ARGSUSED */
 int

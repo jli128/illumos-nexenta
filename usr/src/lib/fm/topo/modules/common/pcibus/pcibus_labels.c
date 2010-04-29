@@ -20,7 +20,8 @@
  */
 
 /*
- * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #include <alloca.h>
@@ -60,7 +61,7 @@ pci_label_physlot_lookup(topo_mod_t *mod, char *platform, did_t *dp)
 	for (p = 0; p < Physlot_Names->psn_nplats; p++) {
 		topo_mod_dprintf(mod, "%s: comparing against platform=%s\n",
 		    __func__, Physlot_Names->psn_names[p].pnm_platform);
-		if (strcasecmp(Physlot_Names->psn_names[p].pnm_platform,
+		if (strcmp(Physlot_Names->psn_names[p].pnm_platform,
 		    platform) != 0)
 			continue;
 		topo_mod_dprintf(mod, "%s: found lookup table for this "
@@ -103,7 +104,7 @@ pci_label_slotname_lookup(topo_mod_t *mod, char *platform,
 	for (s = 0; s < Slot_Rewrites->srw_nplats; s++) {
 		topo_mod_dprintf(mod, "%s: comparing against platform=%s\n",
 		    __func__, Slot_Rewrites->srw_platrewrites[s].prw_platform);
-		if (strcasecmp(Slot_Rewrites->srw_platrewrites[s].prw_platform,
+		if (strcmp(Slot_Rewrites->srw_platrewrites[s].prw_platform,
 		    platform) != 0)
 			continue;
 		topo_mod_dprintf(mod, "%s: found lookup table for this "
@@ -116,8 +117,7 @@ pci_label_slotname_lookup(topo_mod_t *mod, char *platform,
 			if (strcmp(rw.srw_obp, label) == 0) {
 				topo_mod_dprintf(mod, "%s: matched entry=%d, "
 				    "old_label=%s, new_label=%s\n",
-				    __func__, i, rw.srw_obp,
-				    rw.srw_new ? rw.srw_new : NULL);
+				    __func__, i, rw.srw_obp, rw.srw_new);
 				/*
 				 * If a test function is specified then call
 				 * it to do an additional check.
@@ -139,8 +139,8 @@ pci_label_slotname_lookup(topo_mod_t *mod, char *platform,
 		}
 		break;
 	}
-	topo_mod_dprintf(mod, "%s: returning label=%s\n", __func__,
-	    rlabel ? rlabel : "NULL");
+	assert(rlabel != NULL);
+	topo_mod_dprintf(mod, "%s: returning label=%s\n", __func__, rlabel);
 	return (rlabel);
 }
 
@@ -169,7 +169,7 @@ pci_label_missing_lookup(topo_mod_t *mod, char *platform, did_t *dp)
 	for (p = 0; p < Missing_Names->mn_nplats; p++) {
 		topo_mod_dprintf(mod, "%s: comparing against platform=%s\n",
 		    __func__, Missing_Names->mn_names[p].pdl_platform);
-		if (strcasecmp(Missing_Names->mn_names[p].pdl_platform,
+		if (strcmp(Missing_Names->mn_names[p].pdl_platform,
 		    platform) != 0)
 			continue;
 		topo_mod_dprintf(mod, "%s: found lookup table for this "
@@ -178,9 +178,8 @@ pci_label_missing_lookup(topo_mod_t *mod, char *platform, did_t *dp)
 			devlab_t m;
 			m = Missing_Names->mn_names[p].pdl_names[i];
 			if (m.dl_board == board && m.dl_bridge == bridge &&
-			    m.dl_rc == rc &&
-			    (m.dl_bus == -1 || m.dl_bus == bus) &&
-			    (m.dl_dev == -1 || m.dl_dev == dev)) {
+			    m.dl_rc == rc && m.dl_bus == bus &&
+			    m.dl_dev == dev) {
 				topo_mod_dprintf(mod, "%s: matched entry=%d, "
 				    "label=%s\n", __func__, i, m.dl_label);
 				/*
@@ -196,12 +195,11 @@ pci_label_missing_lookup(topo_mod_t *mod, char *platform, did_t *dp)
 					topo_mod_dprintf(mod,
 					    "%s: test function return=%d\n",
 					    __func__, ret);
-					if (ret)
-						break;
 				} else {
 					rlabel = m.dl_label;
-					break;
 				}
+
+				break;
 			}
 		}
 		break;
@@ -389,8 +387,7 @@ pci_slot_label_lookup(topo_mod_t *mod, tnode_t *node, did_t *dp, did_t *pdp)
 			if ((l = (char *)did_physlot_name(pdp, d)) != NULL) {
 				l = (char *)
 				    pci_label_slotname_lookup(mod, pp, l, dp);
-			}
-			if (l == NULL) {
+			} else {
 				l = (char *)
 				    pci_label_missing_lookup(mod, pp, dp);
 			}

@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*
@@ -63,7 +64,6 @@
 #define	INT_MAXCMD	12
 
 extern mutex_t log_lock;
-extern mutex_t ndmpd_zfs_fd_lock;
 
 /* Connection data structure. */
 typedef struct msg_info {
@@ -277,6 +277,6 @@ extern int ndmp_log_msg_id;
 /*
  * Module function prototypes.
  */
-typedef int module_start_func_t(void *);
+typedef int module_start_func_t(ndmpd_module_params_t *);
 typedef int module_abort_func_t(void *);
 #endif	/* _NDMP_COMMON_H */

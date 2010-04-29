@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*
@@ -282,7 +283,6 @@ main(int argc, char *argv[])
 
 	openlog(argv[0], LOG_PID | LOG_NDELAY, LOG_DAEMON);
 	(void) mutex_init(&log_lock, 0, NULL);
-	(void) mutex_init(&ndmpd_zfs_fd_lock, 0, NULL);
 
 	if (mod_init() != 0) {
 		syslog(LOG_ERR, "Failed to load the plugin module.");
@@ -339,7 +339,6 @@ main(int argc, char *argv[])
 		ndmpd.s_sigval = 0;
 	}
 
-	(void) mutex_destroy(&ndmpd_zfs_fd_lock);
 	(void) mutex_destroy(&log_lock);
 	libzfs_fini(zlibh);
 	mod_fini();

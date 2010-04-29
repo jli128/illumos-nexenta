@@ -17,9 +17,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-/*
- * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ *
+ *
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*
@@ -46,16 +47,13 @@ int
 pmcs_firmware_update(pmcs_hw_t *pwp)
 {
 	ddi_modhandle_t modhp;
-	char buf[64], *bufp;
+	char buf[64];
 	int errno;
 	uint8_t *cstart, *cend;		/* Firmware image file */
 	uint8_t *istart, *iend; 	/* ila */
 	uint8_t *sstart, *send;		/* SPCBoot */
 	uint32_t *fwvp;
 	int defret = 0;
-	int first_pass = 1;
-	long fw_version, ila_version;
-	uint8_t *fw_verp, *ila_verp;
 
 	/*
 	 * If updating is disabled, we're done.
@@ -76,6 +74,10 @@ pmcs_firmware_update(pmcs_hw_t *pwp)
 
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "Firmware version matches, but still forcing update");
+	} else {
+		pmcs_prt(pwp, PMCS_PRT_WARN, NULL, NULL,
+		    "Upgrading firmware on card from 0x%x to 0x%x",
+		    pwp->fw, PMCS_FIRMWARE_VERSION);
 	}
 
 	modhp = ddi_modopen(PMCS_FIRMWARE_FILENAME, KRTLD_MODE_FIRST, &errno);
@@ -174,32 +176,6 @@ pmcs_firmware_update(pmcs_hw_t *pwp)
 	}
 
 	/*
-	 * Get the ILA and firmware versions from the modules themselves
-	 */
-	ila_verp = iend - PMCS_ILA_VER_OFFSET;
-	(void) ddi_strtol((const char *)ila_verp, &bufp, 16, &ila_version);
-	fw_verp = cend - PMCS_FW_VER_OFFSET;
-	(void) ddi_strtol((const char *)fw_verp, &bufp, 16, &fw_version);
-
-	/*
-	 * If force update is not set, verify that what we're loading is
-	 * what we expect.
-	 */
-	if (pwp->fw_force_update == 0) {
-		if (fw_version != PMCS_FIRMWARE_VERSION) {
-			pmcs_prt(pwp, PMCS_PRT_ERR, NULL, NULL,
-			    "Expected fw version 0x%x, not 0x%lx: not "
-			    "updating", PMCS_FIRMWARE_VERSION, fw_version);
-			(void) ddi_modclose(modhp);
-			return (defret);
-		}
-	}
-
-	pmcs_prt(pwp, PMCS_PRT_WARN, NULL, NULL,
-	    "Upgrading firmware on card from 0x%x to 0x%lx (ILA version 0x%lx)",
-	    pwp->fw, fw_version, ila_version);
-
-	/*
 	 * The SPCBoot image must be updated first, and this is written to
 	 * SEEPROM, not flash.
 	 */
@@ -211,11 +187,6 @@ pmcs_firmware_update(pmcs_hw_t *pwp)
 		(void) ddi_modclose(modhp);
 		return (-1);
 	}
-
-repeat:
-	pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
-	    "%s: Beginning firmware update of %s image.",
-	    __func__, (first_pass ? "first" : "second"));
 
 	if (pmcs_fw_flash(pwp, (void *)istart,
 	    (uint32_t)((size_t)iend - (size_t)istart))) {
@@ -235,27 +206,16 @@ repeat:
 		return (-1);
 	}
 
+	(void) ddi_modclose(modhp);
+
 	if (pmcs_soft_reset(pwp, B_FALSE)) {
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "%s: soft reset after flash update failed", __func__);
-		(void) ddi_modclose(modhp);
 		return (-1);
 	} else {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
-		    "%s: %s image successfully upgraded.",
-		    __func__, (first_pass ? "First" : "Second"));
-		pwp->last_reset_reason = PMCS_LAST_RST_FW_UPGRADE;
+		pmcs_prt(pwp, PMCS_PRT_WARN, NULL, NULL,
+		    "%s: Firmware successfully upgraded.", __func__);
 	}
-
-	if (first_pass) {
-		first_pass = 0;
-		goto repeat;
-	}
-
-	pmcs_prt(pwp, PMCS_PRT_WARN, NULL, NULL,
-	    "%s: Firmware successfully upgraded", __func__);
-
-	(void) ddi_modclose(modhp);
 	return (0);
 }
 
@@ -383,7 +343,7 @@ pmcs_flash_chunk(pmcs_hw_t *pwp, uint8_t *chunk)
 		(void) memset(msg, 0xaf, sizeof (msg));
 		pwrk->state = PMCS_WORK_STATE_ONCHIP;
 		INC_IQ_ENTRY(pwp, PMCS_IQ_OTHER);
-		WAIT_FOR(pwrk, PMCS_FLASH_WAIT_TIME, result);
+		WAIT_FOR(pwrk, 5000, result);
 		pmcs_pwork(pwp, pwrk);
 		if (result) {
 			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
@@ -468,7 +428,14 @@ pmcs_validate_vpd(pmcs_hw_t *pwp, uint8_t *data)
 
 	if (vpd_header->eeprom_version < PMCS_VPD_VERSION) {
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
-		    "%s: VPD version(%d) unsupported; requires version %d.",
+		    "%s: VPD version(%d) out-of-date; (%d) required."
+		    " Thebe card needs to be flashed.",
+		    __func__, vpd_header->eeprom_version, PMCS_VPD_VERSION);
+	}
+	if ((vpd_header->eeprom_version != PMCS_VPD_VERSION) &&
+	    (vpd_header->eeprom_version != (PMCS_VPD_VERSION - 1))) {
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: VPD version mismatch (%d != %d)",
 		    __func__, vpd_header->eeprom_version, PMCS_VPD_VERSION);
 		return (B_FALSE);
 	}
@@ -514,9 +481,8 @@ pmcs_validate_vpd(pmcs_hw_t *pwp, uint8_t *data)
 	}
 	ASSERT (*chksump == PMCS_VPD_END);
 	if (chksum) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
-		    "%s: VPD checksum failure", __func__);
-		return (B_FALSE);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL, "%s: VPD checksum(%d)"
+		    " non-zero. Checksum validation failed.", __func__, chksum);
 	}
 
 	/*

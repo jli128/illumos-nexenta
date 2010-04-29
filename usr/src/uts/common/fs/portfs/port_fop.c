@@ -19,10 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * File Events Notification
@@ -1319,15 +1320,6 @@ port_associate_fop(port_t *pp, int source, uintptr_t object, int events,
 	if (vp != NULL && vnevent_support(vp, NULL)) {
 		error = ENOTSUP;
 		goto errout;
-	}
-
-	/*
-	 * If dvp belongs to a different filesystem just ignore it.
-	 * Hardlinks cannot exist across filesystems.
-	 */
-	if (dvp != NULL && dvp->v_vfsp != vp->v_vfsp) {
-		VN_RELE(dvp);
-		dvp = NULL;
 	}
 
 	/*

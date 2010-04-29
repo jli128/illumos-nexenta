@@ -20,8 +20,11 @@
  */
 
 /*
- * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+
 
 
 /*
@@ -201,7 +204,6 @@
 #include <sys/sata/sata_hba.h>
 #include <sys/sata/adapters/si3124/si3124reg.h>
 #include <sys/sata/adapters/si3124/si3124var.h>
-#include <sys/sdt.h>
 
 /*
  * Function prototypes for driver entry points
@@ -244,7 +246,7 @@ static	int si_deliver_satapkt(si_ctl_state_t *, si_port_state_t *, int,
 						sata_pkt_t *);
 
 static	int si_initialize_controller(si_ctl_state_t *);
-static	void si_deinitialize_controller(si_ctl_state_t *);
+static	void si_deinititalize_controller(si_ctl_state_t *);
 static void si_init_port(si_ctl_state_t *, int);
 static	int si_enumerate_port_multiplier(si_ctl_state_t *,
 						si_port_state_t *, int);
@@ -305,7 +307,7 @@ static	void si_watchdog_handler(si_ctl_state_t *);
 static	void si_log(si_ctl_state_t *, uint_t, char *, ...);
 #endif	/* SI_DEBUG */
 
-static void si_copy_out_regs(sata_cmd_t *, si_ctl_state_t *, uint8_t, uint8_t);
+static	void si_copy_out_regs(sata_cmd_t *, fis_reg_h2d_t *);
 
 /*
  * DMA attributes for the data buffer
@@ -697,7 +699,7 @@ err_out:
 	if (attach_state & ATTACH_PROGRESS_HW_INIT) {
 		si_ctlp->sictl_flags |= SI_DETACH;
 		/* We want to set SI_DETACH to deallocate all memory */
-		si_deinitialize_controller(si_ctlp);
+		si_deinititalize_controller(si_ctlp);
 		si_ctlp->sictl_flags &= ~SI_DETACH;
 	}
 
@@ -766,9 +768,9 @@ si_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		(void) untimeout(si_ctlp->sictl_timeout_id);
 		si_ctlp->sictl_flags &= ~SI_NO_TIMEOUTS;
 
-		/* de-initialize the controller. */
+		/* deinitialize the controller. */
 		si_ctlp->sictl_flags |= SI_DETACH;
-		si_deinitialize_controller(si_ctlp);
+		si_deinititalize_controller(si_ctlp);
 		si_ctlp->sictl_flags &= ~SI_DETACH;
 
 		/* destroy any mutexes */
@@ -801,7 +803,7 @@ si_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		 * handle dump(9e) to save CPR state after DDI_SUSPEND
 		 * completes.  This is OK since presumably power will be
 		 * removed anyways.  No outstanding transactions should be
-		 * on the controller since the children are already quiesced.
+		 * on the controller since the children are already quiesed.
 		 *
 		 * If any ioctls/cfgadm support is added that touches
 		 * hardware, those entry points will need to check for
@@ -816,7 +818,7 @@ si_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 			mutex_enter(&si_ctlp->sictl_mutex);
 		}
 
-		si_deinitialize_controller(si_ctlp);
+		si_deinititalize_controller(si_ctlp);
 
 		si_ctlp->sictl_flags |= SI_NO_TIMEOUTS;
 		(void) untimeout(si_ctlp->sictl_timeout_id);
@@ -908,7 +910,7 @@ si_power(dev_info_t *dip, int component, int level)
 			(void) untimeout(si_ctlp->sictl_timeout_id);
 			si_ctlp->sictl_flags &= ~SI_NO_TIMEOUTS;
 
-			si_deinitialize_controller(si_ctlp);
+			si_deinititalize_controller(si_ctlp);
 
 			si_ctlp->sictl_power_level = PM_LEVEL_D3;
 		}
@@ -1217,7 +1219,7 @@ si_tran_start(dev_info_t *dip, sata_pkt_t *spkt)
 		return (SATA_TRAN_BUSY);
 	}
 
-	if (si_portp->mopping_in_progress > 0) {
+	if (si_portp->mopping_in_progress) {
 		spkt->satapkt_reason = SATA_PKT_BUSY;
 		SIDBG1(SIDBG_ERRS, si_ctlp,
 		    "si_tran_start returning BUSY while "
@@ -1238,8 +1240,9 @@ si_tran_start(dev_info_t *dip, sata_pkt_t *spkt)
 
 	if (spkt->satapkt_op_mode & (SATA_OPMODE_POLLING|SATA_OPMODE_SYNCH)) {
 		/* we need to poll now */
+		mutex_exit(&si_portp->siport_mutex);
 		si_poll_cmd(si_ctlp, si_portp, cport, slot, spkt);
-
+		mutex_enter(&si_portp->siport_mutex);
 	}
 
 	mutex_exit(&si_portp->siport_mutex);
@@ -1283,7 +1286,8 @@ si_tran_start(dev_info_t *dip, sata_pkt_t *spkt)
  * In all these scenarios, we need to send any pending unfinished
  * commands up to sata framework.
  *
- * WARNING!!! siport_mutex should be acquired before the function is called.
+ * Only one mopping process at a time is allowed; this is achieved
+ * by using siport_mop_mutex.
  */
 static void
 si_mop_commands(si_ctl_state_t *si_ctlp,
@@ -1299,7 +1303,9 @@ si_mop_commands(si_ctl_state_t *si_ctlp,
 	uint32_t finished_tags, unfinished_tags;
 	int tmpslot;
 	sata_pkt_t *satapkt;
-	struct sata_cmd_flags *flagsp;
+	si_prb_t *prb;
+	uint32_t *prb_word_ptr;
+	int i;
 
 	SIDBG1(SIDBG_ERRS|SIDBG_ENTRY, si_ctlp,
 	    "si_mop_commands entered: slot_status: 0x%x",
@@ -1312,12 +1318,18 @@ si_mop_commands(si_ctl_state_t *si_ctlp,
 	    timedout_tags,
 	    aborting_tags,
 	    reset_tags);
-
 	/*
 	 * We could be here for four reasons: abort, reset,
 	 * timeout or error handling. Only one such mopping
 	 * is allowed at a time.
+	 *
+	 * Note that we are already holding the main per port
+	 * mutex; all we need now is siport_mop_mutex.
 	 */
+	mutex_enter(&si_portp->siport_mop_mutex);
+	mutex_enter(&si_portp->siport_mutex);
+
+	si_portp->mopping_in_progress = 1;
 
 	finished_tags =  si_portp->siport_pending_tags &
 	    ~slot_status & SI_SLOT_MASK;
@@ -1337,11 +1349,12 @@ si_mop_commands(si_ctl_state_t *si_ctlp,
 
 		satapkt = si_portp->siport_slot_pkts[tmpslot];
 		ASSERT(satapkt != NULL);
-
-		if (satapkt->satapkt_cmd.satacmd_flags.sata_special_regs) {
-			si_copy_out_regs(&satapkt->satapkt_cmd, si_ctlp,
-			    port, tmpslot);
-		}
+		prb =  &si_portp->siport_prbpool[tmpslot];
+		ASSERT(prb != NULL);
+		satapkt->satapkt_cmd.satacmd_status_reg =
+		    GET_FIS_COMMAND(prb->prb_fis);
+		if (satapkt->satapkt_cmd.satacmd_flags.sata_special_regs)
+			si_copy_out_regs(&satapkt->satapkt_cmd, &prb->prb_fis);
 
 		SIDBG1(SIDBG_ERRS, si_ctlp,
 		    "si_mop_commands sending up completed satapkt: %x",
@@ -1370,21 +1383,48 @@ si_mop_commands(si_ctl_state_t *si_ctlp,
 			si_set_sense_data(satapkt, SATA_PKT_DEV_ERROR);
 		}
 
+		/*
+		 * The LRAM contains the the modified FIS.
+		 * Read the modified FIS to obtain the Error & Status.
+		 */
+		prb =  &(si_portp->siport_prbpool[tmpslot]);
 
-		flagsp = &satapkt->satapkt_cmd.satacmd_flags;
+		prb_word_ptr = (uint32_t *)(void *)prb;
+		for (i = 0; i < (sizeof (si_prb_t)/4); i++) {
+			prb_word_ptr[i] = ddi_get32(
+			    si_ctlp->sictl_port_acc_handle,
+			    (uint32_t *)(PORT_LRAM(si_ctlp, port,
+			    tmpslot)+i*4));
+		}
 
-		flagsp->sata_copy_out_lba_low_msb = B_TRUE;
-		flagsp->sata_copy_out_lba_mid_msb = B_TRUE;
-		flagsp->sata_copy_out_lba_high_msb = B_TRUE;
-		flagsp->sata_copy_out_lba_low_lsb = B_TRUE;
-		flagsp->sata_copy_out_lba_mid_lsb = B_TRUE;
-		flagsp->sata_copy_out_lba_high_lsb = B_TRUE;
-		flagsp->sata_copy_out_error_reg = B_TRUE;
-		flagsp->sata_copy_out_sec_count_msb = B_TRUE;
-		flagsp->sata_copy_out_sec_count_lsb = B_TRUE;
-		flagsp->sata_copy_out_device_reg = B_TRUE;
+		satapkt->satapkt_cmd.satacmd_status_reg =
+		    GET_FIS_COMMAND(prb->prb_fis);
+		satapkt->satapkt_cmd.satacmd_error_reg =
+		    GET_FIS_FEATURES(prb->prb_fis);
+		satapkt->satapkt_cmd.satacmd_sec_count_lsb =
+		    GET_FIS_SECTOR_COUNT(prb->prb_fis);
+		satapkt->satapkt_cmd.satacmd_lba_low_lsb =
+		    GET_FIS_SECTOR(prb->prb_fis);
+		satapkt->satapkt_cmd.satacmd_lba_mid_lsb =
+		    GET_FIS_CYL_LOW(prb->prb_fis);
+		satapkt->satapkt_cmd.satacmd_lba_high_lsb =
+		    GET_FIS_CYL_HI(prb->prb_fis);
+		satapkt->satapkt_cmd.satacmd_device_reg =
+		    GET_FIS_DEV_HEAD(prb->prb_fis);
 
-		si_copy_out_regs(&satapkt->satapkt_cmd, si_ctlp, port, tmpslot);
+		if (satapkt->satapkt_cmd.satacmd_addr_type == ATA_ADDR_LBA48) {
+			satapkt->satapkt_cmd.satacmd_sec_count_msb =
+			    GET_FIS_SECTOR_COUNT_EXP(prb->prb_fis);
+			satapkt->satapkt_cmd.satacmd_lba_low_msb =
+			    GET_FIS_SECTOR_EXP(prb->prb_fis);
+			satapkt->satapkt_cmd.satacmd_lba_mid_msb =
+			    GET_FIS_CYL_LOW_EXP(prb->prb_fis);
+			satapkt->satapkt_cmd.satacmd_lba_high_msb =
+			    GET_FIS_CYL_HI_EXP(prb->prb_fis);
+		}
+
+		if (satapkt->satapkt_cmd.satacmd_flags.sata_special_regs)
+			si_copy_out_regs(&satapkt->satapkt_cmd, &prb->prb_fis);
 
 		/*
 		 * In the case of NCQ command failures, the error is
@@ -1426,7 +1466,7 @@ si_mop_commands(si_ctl_state_t *si_ctlp,
 
 	/* Send up aborting packets with SATA_PKT_ABORTED. */
 	while (aborting_tags) {
-		tmpslot = ddi_ffs(aborting_tags) - 1;
+		tmpslot = ddi_ffs(unfinished_tags) - 1;
 		if (tmpslot == -1) {
 			break;
 		}
@@ -1489,8 +1529,11 @@ si_mop_commands(si_ctl_state_t *si_ctlp,
 
 	ASSERT(unfinished_tags == 0);
 
-	si_portp->mopping_in_progress--;
-	ASSERT(si_portp->mopping_in_progress >= 0);
+	si_portp->mopping_in_progress = 0;
+
+	mutex_exit(&si_portp->siport_mutex);
+	mutex_exit(&si_portp->siport_mop_mutex);
+
 }
 
 /*
@@ -1518,17 +1561,6 @@ si_tran_abort(dev_info_t *dip, sata_pkt_t *spkt, int flag)
 	SIDBG1(SIDBG_ENTRY, si_ctlp, "si_tran_abort on port: %x", port);
 
 	mutex_enter(&si_portp->siport_mutex);
-
-	/*
-	 * If already mopping, then no need to abort anything.
-	 */
-	if (si_portp->mopping_in_progress > 0) {
-		SIDBG1(SIDBG_INFO, si_ctlp,
-		    "si_tran_abort: port %d mopping "
-		    "in progress, so just return", port);
-		mutex_exit(&si_portp->siport_mutex);
-		return (SATA_SUCCESS);
-	}
 
 	if ((si_portp->siport_port_type == PORT_TYPE_NODEV) ||
 	    !si_portp->siport_active) {
@@ -1567,7 +1599,6 @@ si_tran_abort(dev_info_t *dip, sata_pkt_t *spkt, int flag)
 		}
 	}
 
-	si_portp->mopping_in_progress++;
 
 	slot_status = ddi_get32(si_ctlp->sictl_port_acc_handle,
 	    (uint32_t *)(PORT_SLOT_STATUS(si_ctlp, port)));
@@ -1585,6 +1616,7 @@ si_tran_abort(dev_info_t *dip, sata_pkt_t *spkt, int flag)
 	    ~slot_status & SI_SLOT_MASK;
 	aborting_tags &= ~finished_tags;
 
+	mutex_exit(&si_portp->siport_mutex);
 	si_mop_commands(si_ctlp,
 	    si_portp,
 	    port,
@@ -1593,6 +1625,7 @@ si_tran_abort(dev_info_t *dip, sata_pkt_t *spkt, int flag)
 	    0, /* timedout_tags */
 	    aborting_tags,
 	    0); /* reset_tags */
+	mutex_enter(&si_portp->siport_mutex);
 
 	fill_dev_sregisters(si_ctlp, port, &spkt->satapkt_device);
 	mutex_exit(&si_portp->siport_mutex);
@@ -1628,8 +1661,7 @@ si_reject_all_reset_pkts(
 	/* Compute which tags need to be sent up. */
 	reset_tags = slot_status & SI_SLOT_MASK;
 
-	si_portp->mopping_in_progress++;
-
+	mutex_exit(&si_portp->siport_mutex);
 	si_mop_commands(si_ctlp,
 	    si_portp,
 	    port,
@@ -1638,6 +1670,8 @@ si_reject_all_reset_pkts(
 	    0, /* timedout_tags */
 	    0, /* aborting_tags */
 	    reset_tags);
+	mutex_enter(&si_portp->siport_mutex);
+
 }
 
 
@@ -1666,19 +1700,6 @@ si_tran_reset_dport(dev_info_t *dip, sata_device_t *sd)
 		mutex_exit(&si_ctlp->sictl_mutex);
 
 		mutex_enter(&si_portp->siport_mutex);
-
-		/*
-		 * If already mopping, then no need to reset or mop again.
-		 */
-		if (si_portp->mopping_in_progress > 0) {
-			SIDBG1(SIDBG_INFO, si_ctlp,
-			    "si_tran_reset_dport: CPORT port %d mopping "
-			    "in progress, so just return", port);
-			mutex_exit(&si_portp->siport_mutex);
-			retval = SI_SUCCESS;
-			break;
-		}
-
 		retval = si_reset_dport_wait_till_ready(si_ctlp, si_portp, port,
 		    SI_PORT_RESET);
 		si_reject_all_reset_pkts(si_ctlp,  si_portp, port);
@@ -1700,18 +1721,6 @@ si_tran_reset_dport(dev_info_t *dip, sata_device_t *sd)
 			break;
 		}
 
-		/*
-		 * If already mopping, then no need to reset or mop again.
-		 */
-		if (si_portp->mopping_in_progress > 0) {
-			SIDBG1(SIDBG_INFO, si_ctlp,
-			    "si_tran_reset_dport: DCPORT port %d mopping "
-			    "in progress, so just return", port);
-			mutex_exit(&si_portp->siport_mutex);
-			retval = SI_SUCCESS;
-			break;
-		}
-
 		retval = si_reset_dport_wait_till_ready(si_ctlp, si_portp, port,
 		    SI_DEVICE_RESET);
 		si_reject_all_reset_pkts(si_ctlp,  si_portp, port);
@@ -1722,31 +1731,17 @@ si_tran_reset_dport(dev_info_t *dip, sata_device_t *sd)
 	case SATA_ADDR_CNTRL:
 		for (i = 0; i < si_ctlp->sictl_num_ports; i++) {
 			mutex_enter(&si_ctlp->sictl_mutex);
-			si_portp = si_ctlp->sictl_ports[i];
+			si_portp = si_ctlp->sictl_ports[port];
 			mutex_exit(&si_ctlp->sictl_mutex);
 
 			mutex_enter(&si_portp->siport_mutex);
-
-			/*
-			 * If mopping, then all the pending commands are being
-			 * mopped, therefore there is nothing else to do.
-			 */
-			if (si_portp->mopping_in_progress > 0) {
-				SIDBG1(SIDBG_INFO, si_ctlp,
-				    "si_tran_reset_dport: CNTRL port %d mopping"
-				    " in progress, so just return", i);
-				mutex_exit(&si_portp->siport_mutex);
-				retval = SI_SUCCESS;
-				break;
-			}
-
 			retval = si_reset_dport_wait_till_ready(si_ctlp,
 			    si_portp, i, SI_PORT_RESET);
 			if (retval) {
 				mutex_exit(&si_portp->siport_mutex);
 				break;
 			}
-			si_reject_all_reset_pkts(si_ctlp,  si_portp, i);
+			si_reject_all_reset_pkts(si_ctlp,  si_portp, port);
 			mutex_exit(&si_portp->siport_mutex);
 		}
 		break;
@@ -1873,6 +1868,8 @@ si_alloc_port_state(si_ctl_state_t *si_ctlp, int port)
 	si_portp = si_ctlp->sictl_ports[port];
 	mutex_init(&si_portp->siport_mutex, NULL, MUTEX_DRIVER,
 	    (void *)(uintptr_t)si_ctlp->sictl_intr_pri);
+	mutex_init(&si_portp->siport_mop_mutex, NULL, MUTEX_DRIVER,
+	    (void *)(uintptr_t)si_ctlp->sictl_intr_pri);
 	mutex_enter(&si_portp->siport_mutex);
 
 	/* allocate prb & sgt pkts for this port. */
@@ -1910,6 +1907,7 @@ si_dealloc_port_state(si_ctl_state_t *si_ctlp, int port)
 	mutex_exit(&si_portp->siport_mutex);
 
 	mutex_destroy(&si_portp->siport_mutex);
+	mutex_destroy(&si_portp->siport_mop_mutex);
 
 	kmem_free(si_ctlp->sictl_ports[port], sizeof (si_port_state_t));
 
@@ -2260,6 +2258,7 @@ si_poll_cmd(
 	pkt_timeout_ticks = drv_usectohz((clock_t)satapkt->satapkt_time *
 	    1000000);
 
+	mutex_enter(&si_portp->siport_mutex);
 
 	/* we start out with SATA_PKT_COMPLETED as the satapkt_reason */
 	satapkt->satapkt_reason = SATA_PKT_COMPLETED;
@@ -2294,8 +2293,7 @@ si_poll_cmd(
 
 	if (satapkt->satapkt_reason != SATA_PKT_COMPLETED) {
 		/* The si_mop_command() got to our packet before us */
-
-		return;
+		goto poll_done;
 	}
 
 	/*
@@ -2317,7 +2315,7 @@ si_poll_cmd(
 			(void) si_intr_command_error(si_ctlp, si_portp, port);
 			mutex_enter(&si_portp->siport_mutex);
 
-			return;
+			goto poll_done;
 
 			/*
 			 * Why do we need to call si_intr_command_error() ?
@@ -2350,14 +2348,10 @@ si_poll_cmd(
 			    port_intr_status & INTR_MASK);
 		}
 
+
 	} else if (slot_status & SI_SLOT_MASK & (0x1 << slot)) {
 		satapkt->satapkt_reason = SATA_PKT_TIMEOUT;
-
 	} /* else: the command completed successfully */
-
-	if (satapkt->satapkt_cmd.satacmd_flags.sata_special_regs) {
-		si_copy_out_regs(&satapkt->satapkt_cmd, si_ctlp, port, slot);
-	}
 
 	if ((satapkt->satapkt_cmd.satacmd_cmd_reg ==
 	    SATAC_WRITE_FPDMA_QUEUED) ||
@@ -2367,6 +2361,9 @@ si_poll_cmd(
 	}
 
 	CLEAR_BIT(si_portp->siport_pending_tags, slot);
+
+poll_done:
+	mutex_exit(&si_portp->siport_mutex);
 
 	/*
 	 * tidbit: What is the interaction of abort with polling ?
@@ -2993,14 +2990,14 @@ si_initialize_controller(si_ctl_state_t *si_ctlp)
  * before calling us.
  */
 static void
-si_deinitialize_controller(si_ctl_state_t *si_ctlp)
+si_deinititalize_controller(si_ctl_state_t *si_ctlp)
 {
 	int port;
 
 	_NOTE(ASSUMING_PROTECTED(si_ctlp))
 
 	SIDBG0(SIDBG_INIT|SIDBG_ENTRY, si_ctlp,
-	    "si3124: si_deinitialize_controller entered");
+	    "si3124: si_deinititalize_controller entered");
 
 	/* disable all the interrupts. */
 	si_disable_all_interrupts(si_ctlp);
@@ -3036,7 +3033,7 @@ si_init_port(si_ctl_state_t *si_ctlp, int port)
 	    PORT_CONTROL_SET_BITS_PORT_INITIALIZE);
 
 	/*
-	 * Clear the InterruptNCOR (Interrupt No Clear on Read).
+	 * Clear the InterruptNCOR (Interupt No Clear on Read).
 	 * This step ensures that a mere reading of slot_status will clear
 	 * the interrupt; no explicit clearing of interrupt condition
 	 * will be needed for successful completion of commands.
@@ -3635,18 +3632,20 @@ si_intr_command_complete(
 	finished_tags =  si_portp->siport_pending_tags &
 	    ~slot_status & SI_SLOT_MASK;
 	while (finished_tags) {
+		si_prb_t *prb;
 
 		finished_slot = ddi_ffs(finished_tags) - 1;
 		if (finished_slot == -1) {
 			break;
 		}
+		prb =  &si_portp->siport_prbpool[finished_slot];
 
 		satapkt = si_portp->siport_slot_pkts[finished_slot];
+		satapkt->satapkt_cmd.satacmd_status_reg =
+		    GET_FIS_COMMAND(prb->prb_fis);
 
-		if (satapkt->satapkt_cmd.satacmd_flags.sata_special_regs) {
-			si_copy_out_regs(&satapkt->satapkt_cmd, si_ctlp, port,
-			    finished_slot);
-		}
+		if (satapkt->satapkt_cmd.satacmd_flags.sata_special_regs)
+			si_copy_out_regs(&satapkt->satapkt_cmd, &prb->prb_fis);
 
 		CLEAR_BIT(si_portp->siport_pending_tags, finished_slot);
 		CLEAR_BIT(finished_tags, finished_slot);
@@ -3753,8 +3752,7 @@ si_intr_command_error(
 	    slot_status,
 	    si_portp->siport_pending_tags);
 
-	si_portp->mopping_in_progress++;
-
+	mutex_exit(&si_portp->siport_mutex);
 	si_mop_commands(si_ctlp,
 	    si_portp,
 	    port,
@@ -3763,6 +3761,7 @@ si_intr_command_error(
 	    0, 	/* timedout_tags */
 	    0, 	/* aborting_tags */
 	    0); 	/* reset_tags */
+	mutex_enter(&si_portp->siport_mutex);
 
 	ASSERT(si_portp->siport_pending_tags == 0);
 
@@ -4964,7 +4963,6 @@ si_reset_dport_wait_till_ready(
 	sata_device_t sdevice;
 	uint32_t SStatus;
 	uint32_t SControl;
-	uint32_t port_intr_status;
 
 	_NOTE(ASSUMING_PROTECTED(si_portp))
 
@@ -4994,6 +4992,28 @@ si_reset_dport_wait_till_ready(
 		si_portp->siport_reset_in_progress = 1;
 	}
 
+	/*
+	 * For some reason, we are losing the interrupt enablement after
+	 * any reset condition. So restore them back now.
+	 */
+	SIDBG1(SIDBG_INIT, si_ctlp,
+	    "current interrupt enable set: 0x%x",
+	    ddi_get32(si_ctlp->sictl_port_acc_handle,
+	    (uint32_t *)PORT_INTERRUPT_ENABLE_SET(si_ctlp, port)));
+
+	ddi_put32(si_ctlp->sictl_port_acc_handle,
+	    (uint32_t *)PORT_INTERRUPT_ENABLE_SET(si_ctlp, port),
+	    (INTR_COMMAND_COMPLETE |
+	    INTR_COMMAND_ERROR |
+	    INTR_PORT_READY |
+	    INTR_POWER_CHANGE |
+	    INTR_PHYRDY_CHANGE |
+	    INTR_COMWAKE_RECEIVED |
+	    INTR_UNRECOG_FIS |
+	    INTR_DEV_XCHANGED |
+	    INTR_SETDEVBITS_NOTIFY));
+
+	si_enable_port_interrupts(si_ctlp, port);
 
 	/*
 	 * Every reset needs a PHY initialization.
@@ -5125,43 +5145,6 @@ si_reset_dport_wait_till_ready(
 		}
 	}
 
-
-	/*
-	 * For some reason, we are losing the interrupt enablement after
-	 * any reset condition. So restore them back now.
-	 */
-
-	SIDBG1(SIDBG_INIT, si_ctlp,
-	    "current interrupt enable set: 0x%x",
-	    ddi_get32(si_ctlp->sictl_port_acc_handle,
-	    (uint32_t *)PORT_INTERRUPT_ENABLE_SET(si_ctlp, port)));
-
-	ddi_put32(si_ctlp->sictl_port_acc_handle,
-	    (uint32_t *)PORT_INTERRUPT_ENABLE_SET(si_ctlp, port),
-	    (INTR_COMMAND_COMPLETE |
-	    INTR_COMMAND_ERROR |
-	    INTR_PORT_READY |
-	    INTR_POWER_CHANGE |
-	    INTR_PHYRDY_CHANGE |
-	    INTR_COMWAKE_RECEIVED |
-	    INTR_UNRECOG_FIS |
-	    INTR_DEV_XCHANGED |
-	    INTR_SETDEVBITS_NOTIFY));
-
-	si_enable_port_interrupts(si_ctlp, port);
-
-	/*
-	 * make sure interrupts are cleared
-	 */
-	port_intr_status = ddi_get32(si_ctlp->sictl_global_acc_handle,
-	    (uint32_t *)PORT_INTERRUPT_STATUS(si_ctlp, port));
-
-	ddi_put32(si_ctlp->sictl_port_acc_handle,
-	    (uint32_t *)(PORT_INTERRUPT_STATUS(si_ctlp,
-	    port)),
-	    port_intr_status & INTR_MASK);
-
-
 	SIDBG0(SIDBG_POLL_LOOP, si_ctlp,
 	    "si_reset_dport_wait_till_ready returning success");
 
@@ -5256,8 +5239,6 @@ si_timeout_pkts(
 	slot_status = ddi_get32(si_ctlp->sictl_port_acc_handle,
 	    (uint32_t *)(PORT_SLOT_STATUS(si_ctlp, port)));
 
-	si_portp->mopping_in_progress++;
-
 	/*
 	 * Initialize the controller. The only way to timeout the commands
 	 * is to reset or initialize the controller. We mop commands after
@@ -5278,6 +5259,7 @@ si_timeout_pkts(
 	    finished_tags,
 	    timedout_tags);
 
+	mutex_exit(&si_portp->siport_mutex);
 	si_mop_commands(si_ctlp,
 	    si_portp,
 	    port,
@@ -5287,7 +5269,6 @@ si_timeout_pkts(
 	    0, /* aborting_tags */
 	    0);  /* reset_tags */
 
-	mutex_exit(&si_portp->siport_mutex);
 }
 
 
@@ -5326,15 +5307,6 @@ si_watchdog_handler(si_ctl_state_t *si_ctlp)
 		mutex_enter(&si_portp->siport_mutex);
 
 		if (si_portp->siport_port_type == PORT_TYPE_NODEV) {
-			mutex_exit(&si_portp->siport_mutex);
-			continue;
-		}
-
-		/* Skip the check for those ports in error recovery */
-		if (si_portp->mopping_in_progress > 0) {
-			SIDBG1(SIDBG_INFO, si_ctlp,
-			    "si_watchdog_handler: port %d mopping "
-			    "in progress, so just return", port);
 			mutex_exit(&si_portp->siport_mutex);
 			continue;
 		}
@@ -5428,97 +5400,28 @@ si_log(si_ctl_state_t *si_ctlp, uint_t level, char *fmt, ...)
 #endif	/* SI_DEBUG */
 
 static void
-si_copy_out_regs(sata_cmd_t *scmd, si_ctl_state_t *si_ctlp, uint8_t port,
-	uint8_t slot)
+si_copy_out_regs(sata_cmd_t *scmd, fis_reg_h2d_t *fisp)
 {
-	uint32_t *fis_word_ptr;
-	si_prb_t *prb;
-	int i;
+	fis_reg_h2d_t	fis = *fisp;
 
-	/*
-	 * The LRAM contains the the modified FIS after command completion, so
-	 * first copy it back to the in-core PRB pool.  To save read cycles,
-	 * just copy over the FIS portion of the PRB pool.
-	 */
-	prb =  &si_ctlp->sictl_ports[port]->siport_prbpool[slot];
-
-	fis_word_ptr = (uint32_t *)(void *)(&prb->prb_fis);
-
-	for (i = 0; i < (sizeof (fis_reg_h2d_t)/4); i++) {
-		fis_word_ptr[i] = ddi_get32(
-		    si_ctlp->sictl_port_acc_handle,
-		    (uint32_t *)(PORT_LRAM(si_ctlp, port,
-		    slot) + i * 4 + 0x08));
-	}
-
-	/*
-	 * always get the status register
-	 */
-	scmd->satacmd_status_reg = GET_FIS_COMMAND(prb->prb_fis);
-
-	DTRACE_PROBE1(satacmd_status_reg, int, scmd->satacmd_status_reg);
-
-	if (scmd->satacmd_flags.sata_copy_out_sec_count_msb) {
-		scmd->satacmd_sec_count_msb =
-		    GET_FIS_SECTOR_COUNT_EXP(prb->prb_fis);
-		SIDBG1(SIDBG_VERBOSE, NULL,
-		    "copyout satacmd_sec_count_msb %x\n",
-		    scmd->satacmd_sec_count_msb);
-	}
-
-	if (scmd->satacmd_flags.sata_copy_out_lba_low_msb) {
-		scmd->satacmd_lba_low_msb = GET_FIS_SECTOR_EXP(prb->prb_fis);
-		SIDBG1(SIDBG_VERBOSE, NULL, "copyout satacmd_lba_low_msb %x\n",
-		    scmd->satacmd_lba_low_msb);
-	}
-
-	if (scmd->satacmd_flags.sata_copy_out_lba_mid_msb) {
-		scmd->satacmd_lba_mid_msb = GET_FIS_CYL_LOW_EXP(prb->prb_fis);
-		SIDBG1(SIDBG_VERBOSE, NULL, "copyout satacmd_lba_mid_msb %x\n",
-		    scmd->satacmd_lba_mid_msb);
-	}
-
-	if (scmd->satacmd_flags.sata_copy_out_lba_high_msb) {
-		scmd->satacmd_lba_high_msb = GET_FIS_CYL_HI_EXP(prb->prb_fis);
-		SIDBG1(SIDBG_VERBOSE, NULL, "copyout satacmd_lba_high_msb %x\n",
-		    scmd->satacmd_lba_high_msb);
-	}
-
-	if (scmd->satacmd_flags.sata_copy_out_sec_count_lsb) {
-		scmd->satacmd_sec_count_lsb =
-		    GET_FIS_SECTOR_COUNT(prb->prb_fis);
-		SIDBG1(SIDBG_VERBOSE, NULL,
-		    "copyout satacmd_sec_count_lsb %x\n",
-		    scmd->satacmd_sec_count_lsb);
-	}
-
-	if (scmd->satacmd_flags.sata_copy_out_lba_low_lsb) {
-		scmd->satacmd_lba_low_lsb = GET_FIS_SECTOR(prb->prb_fis);
-		SIDBG1(SIDBG_VERBOSE, NULL, "copyout satacmd_lba_low_lsb %x\n",
-		    scmd->satacmd_lba_low_lsb);
-	}
-
-	if (scmd->satacmd_flags.sata_copy_out_lba_mid_lsb) {
-		scmd->satacmd_lba_mid_lsb = GET_FIS_CYL_LOW(prb->prb_fis);
-		SIDBG1(SIDBG_VERBOSE, NULL, "copyout satacmd_lba_mid_lsb %x\n",
-		    scmd->satacmd_lba_mid_lsb);
-	}
-
-	if (scmd->satacmd_flags.sata_copy_out_lba_high_lsb) {
-		scmd->satacmd_lba_high_lsb = GET_FIS_CYL_HI(prb->prb_fis);
-		SIDBG1(SIDBG_VERBOSE, NULL, "copyout satacmd_lba_high_lsb %x\n",
-		    scmd->satacmd_lba_high_lsb);
-	}
-
-	if (scmd->satacmd_flags.sata_copy_out_device_reg) {
-		scmd->satacmd_device_reg = GET_FIS_DEV_HEAD(prb->prb_fis);
-		SIDBG1(SIDBG_VERBOSE, NULL, "copyout satacmd_device_reg %x\n",
-		    scmd->satacmd_device_reg);
-	}
-
-	if (scmd->satacmd_flags.sata_copy_out_error_reg) {
-		scmd->satacmd_error_reg = GET_FIS_FEATURES(prb->prb_fis);
-		SIDBG1(SIDBG_VERBOSE, NULL, "copyout satacmd_error_reg %x\n",
-		    scmd->satacmd_error_reg);
-	}
+	if (scmd->satacmd_flags.sata_copy_out_sec_count_msb)
+		scmd->satacmd_sec_count_msb = GET_FIS_SECTOR_COUNT_EXP(fis);
+	if (scmd->satacmd_flags.sata_copy_out_lba_low_msb)
+		scmd->satacmd_lba_low_msb = GET_FIS_SECTOR_EXP(fis);
+	if (scmd->satacmd_flags.sata_copy_out_lba_mid_msb)
+		scmd->satacmd_lba_mid_msb = GET_FIS_CYL_LOW_EXP(fis);
+	if (scmd->satacmd_flags.sata_copy_out_lba_high_msb)
+		scmd->satacmd_lba_high_msb = GET_FIS_CYL_HI_EXP(fis);
+	if (scmd->satacmd_flags.sata_copy_out_sec_count_lsb)
+		scmd->satacmd_sec_count_lsb = GET_FIS_SECTOR_COUNT(fis);
+	if (scmd->satacmd_flags.sata_copy_out_lba_low_lsb)
+		scmd->satacmd_lba_low_lsb = GET_FIS_SECTOR(fis);
+	if (scmd->satacmd_flags.sata_copy_out_lba_mid_lsb)
+		scmd->satacmd_lba_mid_lsb = GET_FIS_CYL_LOW(fis);
+	if (scmd->satacmd_flags.sata_copy_out_lba_high_lsb)
+		scmd->satacmd_lba_high_lsb = GET_FIS_CYL_HI(fis);
+	if (scmd->satacmd_flags.sata_copy_out_device_reg)
+		scmd->satacmd_device_reg = GET_FIS_DEV_HEAD(fis);
+	if (scmd->satacmd_flags.sata_copy_out_error_reg)
+		scmd->satacmd_error_reg = GET_FIS_FEATURES(fis);
 }

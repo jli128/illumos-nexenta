@@ -39,7 +39,6 @@ i pkginfo
 i copyright
 i depend
 i postinstall
-i i.manifest
 #
 # source locations relative to the prototype file
 #

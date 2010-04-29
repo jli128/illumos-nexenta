@@ -459,9 +459,7 @@ make_dataset_handle_common(zfs_handle_t *zhp, zfs_cmd_t *zc)
 	else
 		abort();	/* we should never see any other types */
 
-	if ((zhp->zpool_hdl = zpool_handle(zhp)) == NULL)
-		return (-1);
-
+	zhp->zpool_hdl = zpool_handle(zhp);
 	return (0);
 }
 
@@ -4080,7 +4078,6 @@ zfs_hold_range(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
 	arg.temphold = temphold;
 	arg.holding = B_TRUE;
 	arg.recursive = recursive;
-	arg.seenfrom = (fromsnap == NULL);
 
 	error = zfs_iter_snapshots_sorted(zhp, zfs_hold_range_one, &arg);
 
@@ -4150,7 +4147,6 @@ zfs_release_range(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
 	arg.tosnap = tosnap;
 	arg.tag = tag;
 	arg.recursive = recursive;
-	arg.seenfrom = (fromsnap == NULL);
 
 	return (zfs_iter_snapshots_sorted(zhp, zfs_hold_range_one, &arg));
 }

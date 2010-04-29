@@ -19,7 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*
@@ -163,6 +164,7 @@
 #include <smbsrv/smb_fsops.h>
 
 static boolean_t smb_ofile_is_open_locked(smb_ofile_t *);
+static void smb_ofile_delete(smb_ofile_t *);
 static smb_ofile_t *smb_ofile_close_and_next(smb_ofile_t *);
 static void smb_ofile_set_close_attrs(smb_ofile_t *, uint32_t);
 static int smb_ofile_netinfo_encode(smb_ofile_t *, uint8_t *, size_t,
@@ -219,7 +221,7 @@ smb_ofile_open(
 
 
 	if (ftype == SMB_FTYPE_MESG_PIPE) {
-		of->f_pipe = smb_opipe_alloc(tree->t_server);
+		of->f_pipe = kmem_zalloc(sizeof (smb_opipe_t), KM_SLEEP);
 	} else {
 		ASSERT(ftype == SMB_FTYPE_DISK); /* Regular file, not a pipe */
 		ASSERT(node);
@@ -248,7 +250,7 @@ smb_ofile_open(
 			of->f_granted_access |= FILE_READ_ATTRIBUTES;
 		}
 
-		if (smb_node_is_file(node)) {
+		if (node->vp->v_type == VREG) {
 			of->f_mode =
 			    smb_fsop_amask_to_omode(of->f_granted_access);
 			if (smb_fsop_open(node, of->f_mode, of->f_cr) != 0) {
@@ -319,7 +321,7 @@ smb_ofile_close(smb_ofile_t *of, uint32_t last_wtime)
 			smb_fsop_unshrlock(of->f_cr, of->f_node, of->f_uniqid);
 			smb_node_destroy_lock_by_ofile(of->f_node, of);
 
-			if (smb_node_is_file(of->f_node))
+			if (of->f_node->vp->v_type == VREG)
 				(void) smb_fsop_close(of->f_node, of->f_mode,
 				    of->f_cr);
 
@@ -476,17 +478,16 @@ smb_ofile_hold(smb_ofile_t *of)
 }
 
 /*
- * Release a reference on a file.  If the reference count falls to
- * zero and the file has been closed, post the object for deletion.
- * Object deletion is deferred to avoid modifying a list while an
- * iteration may be in progress.
+ * smb_ofile_release
+ *
  */
 void
 smb_ofile_release(smb_ofile_t	*of)
 {
 	boolean_t	rb;
 
-	SMB_OFILE_VALID(of);
+	ASSERT(of);
+	ASSERT(of->f_magic == SMB_OFILE_MAGIC);
 
 	mutex_enter(&of->f_mutex);
 	if (of->f_oplock_exit) {
@@ -504,8 +505,11 @@ smb_ofile_release(smb_ofile_t	*of)
 		break;
 
 	case SMB_OFILE_STATE_CLOSED:
-		if (of->f_refcnt == 0)
-			smb_tree_post_ofile(of->f_tree, of);
+		if (of->f_refcnt == 0) {
+			mutex_exit(&of->f_mutex);
+			smb_ofile_delete(of);
+			return;
+		}
 		break;
 
 	default:
@@ -877,6 +881,8 @@ smb_ofile_set_close_attrs(smb_ofile_t *of, uint32_t last_wtime)
 }
 
 /*
+ * smb_ofile_close_and_next
+ *
  * This function closes the file passed in (if appropriate) and returns the
  * next open file in the list of open files of the tree of the open file passed
  * in. It requires that the list of open files of the tree be entered in
@@ -924,33 +930,30 @@ smb_ofile_close_and_next(smb_ofile_t *of)
 }
 
 /*
- * Delete an ofile.
+ * smb_ofile_delete
  *
- * Remove the ofile from the tree list before freeing resources
- * associated with the ofile.
+ *
  */
-void
-smb_ofile_delete(void *arg)
+static void
+smb_ofile_delete(smb_ofile_t *of)
 {
-	smb_tree_t	*tree;
-	smb_ofile_t	*of = (smb_ofile_t *)arg;
-
-	SMB_OFILE_VALID(of);
+	ASSERT(of);
+	ASSERT(of->f_magic == SMB_OFILE_MAGIC);
 	ASSERT(of->f_refcnt == 0);
 	ASSERT(of->f_state == SMB_OFILE_STATE_CLOSED);
 
-	tree = of->f_tree;
-	smb_llist_enter(&tree->t_ofile_list, RW_WRITER);
-	smb_llist_remove(&tree->t_ofile_list, of);
-	smb_idpool_free(&tree->t_fid_pool, of->f_fid);
-	atomic_dec_32(&tree->t_session->s_file_cnt);
-	smb_llist_exit(&tree->t_ofile_list);
-
-	mutex_enter(&of->f_mutex);
-	mutex_exit(&of->f_mutex);
+	/*
+	 * Let's remove the ofile from the list of ofiles of the tree. This has
+	 * to be done before any resources associated with the ofile are
+	 * released.
+	 */
+	smb_llist_enter(&of->f_tree->t_ofile_list, RW_WRITER);
+	smb_llist_remove(&of->f_tree->t_ofile_list, of);
+	smb_llist_exit(&of->f_tree->t_ofile_list);
+	atomic_dec_32(&of->f_session->s_file_cnt);
 
 	if (of->f_ftype == SMB_FTYPE_MESG_PIPE) {
-		smb_opipe_dealloc(of->f_pipe);
+		kmem_free(of->f_pipe, sizeof (smb_opipe_t));
 		of->f_pipe = NULL;
 	} else {
 		ASSERT(of->f_ftype == SMB_FTYPE_DISK);
@@ -962,6 +965,7 @@ smb_ofile_delete(void *arg)
 	of->f_magic = (uint32_t)~SMB_OFILE_MAGIC;
 	mutex_destroy(&of->f_mutex);
 	crfree(of->f_cr);
+	smb_idpool_free(&of->f_tree->t_fid_pool, of->f_fid);
 	kmem_cache_free(of->f_tree->t_server->si_cache_ofile, of);
 }
 
@@ -995,6 +999,8 @@ smb_ofile_access(smb_ofile_t *of, cred_t *cr, uint32_t access)
 
 
 /*
+ * smb_ofile_open_check
+ *
  * check file sharing rules for current open request
  * against existing open instances of the same file
  *
@@ -1002,16 +1008,39 @@ smb_ofile_access(smb_ofile_t *of, cred_t *cr, uint32_t access)
  * sharing conflict, otherwise returns NT_STATUS_SUCCESS.
  */
 uint32_t
-smb_ofile_open_check(smb_ofile_t *of, uint32_t desired_access,
+smb_ofile_open_check(
+    smb_ofile_t *of,
+    cred_t *cr,
+    uint32_t desired_access,
     uint32_t share_access)
 {
+	smb_node_t *node;
+
 	ASSERT(of->f_magic == SMB_OFILE_MAGIC);
+
+	node = of->f_node;
 
 	mutex_enter(&of->f_mutex);
 
-	if (of->f_state != SMB_OFILE_STATE_OPEN) {
+	if (of->f_state !=  SMB_OFILE_STATE_OPEN) {
 		mutex_exit(&of->f_mutex);
 		return (NT_STATUS_INVALID_HANDLE);
+	}
+
+	/*
+	 * It appears that share modes are not relevant to
+	 * directories, but this check will remain as it is not
+	 * clear whether it was originally put here for a reason.
+	 */
+	if (smb_node_is_dir(node)) {
+		if (SMB_DENY_RW(of->f_share_access) &&
+		    (node->n_orig_uid != crgetuid(cr))) {
+			mutex_exit(&of->f_mutex);
+			return (NT_STATUS_SHARING_VIOLATION);
+		}
+
+		mutex_exit(&of->f_mutex);
+		return (NT_STATUS_SUCCESS);
 	}
 
 	/* if it's just meta data */
@@ -1253,7 +1282,7 @@ smb_ofile_netinfo_init(smb_ofile_t *of, smb_netfileinfo_t *fi)
 	fi->fi_fid = of->f_fid;
 	fi->fi_uniqid = of->f_uniqid;
 	fi->fi_pathlen = strlen(buf) + 1;
-	fi->fi_path = smb_mem_strdup(buf);
+	fi->fi_path = smb_strdup(buf);
 	kmem_free(buf, MAXPATHLEN);
 
 	fi->fi_namelen = user->u_domain_len + user->u_name_len + 2;
@@ -1270,36 +1299,9 @@ smb_ofile_netinfo_fini(smb_netfileinfo_t *fi)
 		return;
 
 	if (fi->fi_path)
-		smb_mem_free(fi->fi_path);
+		smb_mfree(fi->fi_path);
 	if (fi->fi_username)
 		kmem_free(fi->fi_username, fi->fi_namelen);
 
 	bzero(fi, sizeof (smb_netfileinfo_t));
-}
-
-/*
- * A query of user and group quotas may span multiple requests.
- * f_quota_resume is used to determine where the query should
- * be resumed, in a subsequent request. f_quota_resume contains
- * the SID of the last quota entry returned to the client.
- */
-void
-smb_ofile_set_quota_resume(smb_ofile_t *ofile, char *resume)
-{
-	ASSERT(ofile);
-	mutex_enter(&ofile->f_mutex);
-	if (resume == NULL)
-		bzero(ofile->f_quota_resume, SMB_SID_STRSZ);
-	else
-		(void) strlcpy(ofile->f_quota_resume, resume, SMB_SID_STRSZ);
-	mutex_exit(&ofile->f_mutex);
-}
-
-void
-smb_ofile_get_quota_resume(smb_ofile_t *ofile, char *buf, int bufsize)
-{
-	ASSERT(ofile);
-	mutex_enter(&ofile->f_mutex);
-	(void) strlcpy(buf, ofile->f_quota_resume, bufsize);
-	mutex_exit(&ofile->f_mutex);
 }

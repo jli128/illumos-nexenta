@@ -42,8 +42,7 @@ i depend
 # SUNWipplu - Sun Open Print Apache IPP Listener /usr files
 #
 d none usr 0755 root sys
-d none usr/lib 0755 root bin
-d none usr/lib/apache2 0755 root bin
-d none usr/lib/apache2/modules 0755 root bin
+d none usr/apache 0755 root bin
+d none usr/apache/libexec 0755 root bin
 #	Apache/IPP Listener glue code
-f none usr/lib/apache2/modules/mod_ipp.so 0555 root bin
+f none usr/apache/libexec/mod_ipp.so 0555 root bin

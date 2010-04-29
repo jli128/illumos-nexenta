@@ -36,6 +36,7 @@ killproc() {            # kill the named process(es)
 
 PATH="/usr/bin:/usr/sbin:${PATH}"
 export PATH
+status=0
 
 ISA_TYPE_I386="i386"
 ISA_TYPE_SPARC="sparc"
@@ -201,7 +202,7 @@ fi
 if [ "${ISA_TYPE}" = "${ISA_TYPE_SPARC}" ]; then
 	modnum=`grep -c ecpp ${NAMEMAJOR}`
 	if [ "$modnum" = "1" ]; then
-		/usr/sbin/rem_drv -b ${BASEDIR} ecpp
+		/usr/sbin/rem_drv -b ${BASEDIR} ecpp || status=1
 	fi
 fi
 
@@ -266,4 +267,4 @@ if [ "${ISA_TYPE}" = "${ISA_TYPE_I386}" ]; then
 	mv $PATH_TO_INST.new $PATH_TO_INST
 fi
 
-exit 0
+exit $status

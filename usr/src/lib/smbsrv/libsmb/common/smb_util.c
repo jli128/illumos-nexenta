@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -817,10 +817,7 @@ smb_dlclose(void *handle)
 }
 
 /*
- * This function is a wrapper for getnameinfo() to look up a hostname given an
- * IP address. The hostname returned by this function is used for constructing
- * the service principal name field of KRB AP-REQs. Hence, it should be
- * converted to lowercase for RFC 4120 section 6.2.1 conformance.
+ * Returns the hostname given the IP address.  Wrapper for getnameinfo.
  */
 int
 smb_getnameinfo(smb_inaddr_t *ip, char *hostname, int hostlen, int flags)
@@ -829,7 +826,6 @@ smb_getnameinfo(smb_inaddr_t *ip, char *hostname, int hostlen, int flags)
 	struct sockaddr_in6 sin6;
 	struct sockaddr_in sin;
 	void *sp;
-	int rc;
 
 	if (ip->a_family == AF_INET) {
 		salen = sizeof (struct sockaddr_in);
@@ -845,12 +841,8 @@ smb_getnameinfo(smb_inaddr_t *ip, char *hostname, int hostlen, int flags)
 		    sizeof (sin6.sin6_addr.s6_addr));
 		sp = &sin6;
 	}
-
-	if ((rc = (getnameinfo((struct sockaddr *)sp, salen,
-	    hostname, hostlen, NULL, 0, flags))) == 0)
-		(void) smb_strlwr(hostname);
-
-	return (rc);
+	return (getnameinfo((struct sockaddr *)sp, salen,
+	    hostname, hostlen, NULL, 0, flags));
 }
 
 /*
@@ -1046,36 +1038,6 @@ smb_name_validate_workgroup(const char *workgroup)
 
 	for (p = workgroup; *p != '\0'; p++) {
 		if (iscntrl(*p))
-			return (ERROR_INVALID_NAME);
-	}
-
-	return (ERROR_SUCCESS);
-}
-
-/*
- * Check for invalid characters in the given path.  The list of invalid
- * characters includes control characters and the following:
- *
- * " / \ [ ] : | < > + ; , ? * =
- *
- * Since this is checking a path not each component, '/' is accepted
- * as separator not an invalid character, except as the first character
- * since this is supposed to be a relative path.
- */
-uint32_t
-smb_name_validate_rpath(const char *relpath)
-{
-	char *invalid = "\"\\[]:|<>+;,?*=";
-	char *cp;
-
-	if ((relpath == NULL) || (*relpath == '\0') || (*relpath == '/'))
-		return (ERROR_INVALID_NAME);
-
-	if (strpbrk(relpath, invalid))
-		return (ERROR_INVALID_NAME);
-
-	for (cp = (char *)relpath; *cp != '\0'; cp++) {
-		if (iscntrl(*cp))
 			return (ERROR_INVALID_NAME);
 	}
 

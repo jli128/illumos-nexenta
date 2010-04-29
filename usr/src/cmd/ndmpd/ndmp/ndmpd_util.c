@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*
@@ -2740,12 +2741,4 @@ void *
 ndmp_context_get_specific(ndmp_context_t *nctx)
 {
 	return (nctx->nc_pldata);
-}
-
-ndmpd_backup_type_t
-ndmp_get_backup_type(ndmp_context_t *ctx)
-{
-	ndmpd_session_t *session = (ndmpd_session_t *)ctx->nc_ddata;
-
-	return (session->ns_butype);
 }

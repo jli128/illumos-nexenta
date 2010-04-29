@@ -114,7 +114,8 @@ HTMLFILES = index.html
 
 DEMOFILES = \
 	$(DFILES) \
-	$(HTMLFILES)
+	$(HTMLFILES) \
+	sunlogo.gif
 
 MKDEMO	= mkdemo
 CLEANFILES += $(DFILES) $(MKDEMO)

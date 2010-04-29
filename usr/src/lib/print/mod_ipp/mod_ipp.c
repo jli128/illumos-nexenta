@@ -51,6 +51,7 @@
 #include "papi.h"
 #ifndef APACHE_RELEASE	/* appears to only exist in Apache 1.X */
 #define	APACHE2
+#include "apr_compat.h"
 #endif
 
 #include <papi.h>
@@ -219,7 +220,7 @@ ipp_handler(request_rec *r)
 	 * try and handle it.
 	 */
 	if (r->headers_in != NULL) {
-		char *mime_type = (char *)apr_table_get(r->headers_in,
+		char *mime_type = (char *)ap_table_get(r->headers_in,
 							"Content-Type");
 
 		if ((mime_type == NULL) ||
@@ -260,7 +261,7 @@ ipp_handler(request_rec *r)
 	(void) papiAttributeListAddInteger(&request, PAPI_ATTR_EXCL,
 				"uri-port", ap_get_server_port(r));
 	if (r->headers_in != NULL) {
-		char *host = (char *)apr_table_get(r->headers_in, "Host");
+		char *host = (char *)ap_table_get(r->headers_in, "Host");
 
 		if ((host == NULL) || (host[0] == '\0'))
 			host = (char *)ap_get_server_name(r);
@@ -293,10 +294,8 @@ ipp_handler(request_rec *r)
 	 * service to retrieve the sensativity label off of a multi-level
 	 * port.
 	 */
-#ifndef APACHE2
 	(void) papiAttributeListAddInteger(&request, PAPI_ATTR_EXCL,
 			"peer-socket", ap_bfileno(r->connection->client, B_RD));
-#endif
 
 	/* process the request */
 	status = ipp_process_request(request, &response, read_data, r);
@@ -317,7 +316,7 @@ ipp_handler(request_rec *r)
 	 * remain in the post request.
 	 */
 	if ((r->read_chunked != 0) &&
-	    (apr_table_get(r->headers_in, "Content-Length") == NULL))
+	    (ap_table_get(r->headers_in, "Content-Length") == NULL))
 		discard_data(r);
 
 	/* write an IPP response back to the network */
@@ -495,7 +494,7 @@ ipp_register_hooks(apr_pool_t *p)
 	/* Need to make sure we don't get directory listings by accident */
 	ap_hook_handler(ipp_handler, NULL, modules, APR_HOOK_MIDDLE);
 	ap_hook_default_port(ipp_port, NULL, NULL, APR_HOOK_MIDDLE);
-	ap_hook_http_scheme(ipp_method, NULL, NULL, APR_HOOK_MIDDLE);
+	ap_hook_http_method(ipp_method, NULL, NULL, APR_HOOK_MIDDLE);
 }
 
 module AP_MODULE_DECLARE_DATA ipp_module = {

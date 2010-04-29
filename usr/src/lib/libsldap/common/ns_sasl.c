@@ -19,9 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -263,13 +265,10 @@ __s_api_sasl_bind_callback(
 		}
 
 		if (ret) {
-			/*
-			 * No need to do strdup(ret), the data is always
-			 * available in 'defaults' and libldap won't
-			 * free it either. strdup(ret) causes memory
-			 * leak.
-			 */
-			interact->result = ret;
+			interact->result = strdup(ret);
+			if (interact->result == NULL)
+				return (LDAP_NO_MEMORY);
+
 			interact->len = strlen(ret);
 		} else {
 			interact->result = NULL;

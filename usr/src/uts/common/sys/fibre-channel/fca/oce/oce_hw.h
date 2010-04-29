@@ -719,8 +719,7 @@ struct mbx_query_common_link_status {
 			/* dw 1 */
 			uint8_t mgmt_mac_duplex;
 			uint8_t mgmt_mac_speed;
-			uint16_t qos_link_speed;
-			uint32_t logical_link_status;
+			uint16_t rsvd0;
 		}rsp;
 	}params;
 };
@@ -1073,7 +1072,7 @@ struct mbx_create_common_cq {
 			uint16_t rsvd0;
 #endif
 			struct oce_cq_ctx cq_ctx;
-			struct phys_addr pages[4];
+			struct phys_addr pages[8];
 		}req;
 
 		struct {

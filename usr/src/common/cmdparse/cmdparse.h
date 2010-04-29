@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,7 +41,7 @@ extern "C" {
 #define	OPERAND_OPTIONAL	0x10
 
 /* maximum length of an option argument */
-#define	MAXOPTARGLEN  512
+#define	MAXOPTARGLEN   256
 
 
 /* Following are used to express operand requirements */

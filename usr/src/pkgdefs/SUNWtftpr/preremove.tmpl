@@ -49,6 +49,6 @@ if [ "${PKG_INSTALL_ROOT:-/}" = "/" ]; then
 	svccfg delete network/tftp/udp6:default
 fi
 
-rm -f $BASEDIR/var/svc/manifest/network/tftp-udp6.xml
+rm $BASEDIR/var/svc/manifest/network/tftp-udp6.xml
 
 exit 0

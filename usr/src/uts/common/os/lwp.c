@@ -887,8 +887,6 @@ lwp_exit(void)
 	if (PROC_IS_BRANDED(p))
 		BROP(p)->b_lwpexit(lwp);
 
-	lwp_pcb_exit();
-
 	mutex_enter(&p->p_lock);
 	lwp_cleanup();
 
@@ -899,12 +897,6 @@ lwp_exit(void)
 	 */
 	if (p->p_flag & SCOREDUMP)
 		stop(PR_SUSPENDED, SUSPEND_NORMAL);
-
-	/*
-	 * Block the process against /proc now that we have really acquired
-	 * p->p_lock (to decrement p_lwpcnt and manipulate p_tlist at least).
-	 */
-	prbarrier(p);
 
 	/*
 	 * Call proc_exit() if this is the last non-daemon lwp in the process.
@@ -924,8 +916,19 @@ lwp_exit(void)
 		 */
 		mutex_enter(&p->p_lock);
 		ASSERT(curproc->p_flag & SEXITLWPS);
-		prbarrier(p);
 	}
+
+	mutex_exit(&p->p_lock);
+
+	lwp_pcb_exit();
+
+	mutex_enter(&p->p_lock);
+
+	/*
+	 * Block the process against /proc now that we have really acquired
+	 * p->p_lock (to decrement p_lwpcnt and manipulate p_tlist at least).
+	 */
+	prbarrier(p);
 
 	DTRACE_PROC(lwp__exit);
 

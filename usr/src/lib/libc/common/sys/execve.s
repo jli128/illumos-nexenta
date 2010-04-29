@@ -35,14 +35,12 @@
  * where argv is a vector argv[0] ... argv[x], 0
  * last vector element must be 0
  */
-/*	SYSCALL_RVAL1(execve) */
 
 #include <sys/asm_linkage.h>
 
-/*	ANSI_PRAGMA_WEAK(execve,function) */
+	ANSI_PRAGMA_WEAK(execve,function)
 
 #include "SYS.h"
 
-	ANSI_PRAGMA_WEAK2(_private_execve,__execve,function)
-	SYSCALL2_RVAL1(__execve,execve)
-	SET_SIZE(__execve)
+	SYSCALL_RVAL1(execve)
+	SET_SIZE(execve)

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -90,7 +90,6 @@ mutex_t dns_msgid_mtx;
 typedef struct dyndns_qentry {
 	list_node_t	dqe_lnd;
 	int		dqe_op;
-	/* fully-qualified domain name is in lower case */
 	char		dqe_fqdn[MAXHOSTNAMELEN];
 } dyndns_qentry_t;
 
@@ -223,11 +222,6 @@ dyndns_queue_request(int op, const char *fqdn)
 	bzero(entry, sizeof (dyndns_qentry_t));
 	entry->dqe_op = op;
 	(void) strlcpy(entry->dqe_fqdn, fqdn, MAXNAMELEN);
-	/*
-	 * To comply with RFC 4120 section 6.2.1, entry->dqe_fqdn is converted
-	 * to lower case.
-	 */
-	(void) smb_strlwr(entry->dqe_fqdn);
 
 	list_insert_tail(&dyndns_queue.ddq_list, entry);
 	(void) cond_signal(&dyndns_queue.ddq_cv);
@@ -356,11 +350,10 @@ dyndns_update(char *fqdn)
 {
 	int rc;
 
-	if (smb_nic_init() != SMB_NIC_SUCCESS)
+	if (smb_nic_init() != 0)
 		return (-1);
 
 	dyndns_msgid_init();
-	(void) smb_strlwr(fqdn);
 	rc = dyndns_update_core(fqdn);
 	smb_nic_fini();
 	return (rc);
@@ -1021,8 +1014,7 @@ dyndns_build_tkey_msg(char *buf, char *key_name, uint16_t *id,
  *   cred_handle  : handle to credential
  *   s           : socket descriptor to DNS server
  *   key_name    : TKEY key name
- *   dns_hostname: fully qualified DNS hostname which will be used for
- *                 constructing the DNS service principal name.
+ *   dns_hostname: fully qualified DNS hostname
  *   oid         : contains Kerberos 5 object identifier
  * Returns:
  *   gss_context    : handle to security context
@@ -2010,7 +2002,7 @@ dyndns_remove_entry(int update_zone, const char *hostname, const char *ip_addr,
  * hostname will show current IP addresses and pointer entries for current
  * IP addresses will show current hostname.
  * Parameters:
- *  fqdn - fully-qualified domain name (in lower case)
+ *  fqhn - fully-qualified hostname
  *
  * Returns:
  *   -1: some dynamic DNS updates errors
@@ -2031,15 +2023,11 @@ dyndns_update_core(char *fqdn)
 
 	if (!smb_config_getbool(SMB_CI_DYNDNS_ENABLE))
 		return (0);
-	if (smb_gethostname(fqhn, MAXHOSTNAMELEN, SMB_CASE_LOWER) != 0)
+
+	if (smb_gethostname(fqhn, MAXHOSTNAMELEN, 0) != 0)
 		return (-1);
 
-	/*
-	 * To comply with RFC 4120 section 6.2.1, the fully-qualified hostname
-	 * must be set to lower case.
-	 */
 	(void) snprintf(fqhn, MAXHOSTNAMELEN, "%s.%s", fqhn, fqdn);
-
 	error = 0;
 	forw_update_ok = 0;
 
@@ -2052,7 +2040,7 @@ dyndns_update_core(char *fqdn)
 		error++;
 	}
 
-	if (smb_nic_getfirst(&ni) != SMB_NIC_SUCCESS)
+	if (smb_nic_getfirst(&ni) != 0)
 		return (-1);
 
 	do {
@@ -2083,7 +2071,7 @@ dyndns_update_core(char *fqdn)
 		if (rc == -1)
 			error++;
 
-	} while (smb_nic_getnext(&ni) == SMB_NIC_SUCCESS);
+	} while (smb_nic_getnext(&ni) == 0);
 
 	return ((error == 0) ? 0 : -1);
 }
@@ -2094,7 +2082,7 @@ dyndns_update_core(char *fqdn)
  * of down records prior to updating the list with new information.
  *
  * Parameters:
- *   fqdn - fully-qualified domain name (in lower case)
+ *   fqhn - fully-qualified hostname
  * Returns:
  *   -1: some dynamic DNS updates errors
  *    0: successful or DDNS disabled.
@@ -2112,18 +2100,13 @@ dyndns_clear_rev_zone(char *fqdn)
 	if (!smb_config_getbool(SMB_CI_DYNDNS_ENABLE))
 		return (0);
 
-	if (smb_gethostname(fqhn, MAXHOSTNAMELEN, SMB_CASE_LOWER) != 0)
+	if (smb_gethostname(fqhn, MAXHOSTNAMELEN, 0) != 0)
 		return (-1);
 
-	/*
-	 * To comply with RFC 4120 section 6.2.1, the fully-qualified hostname
-	 * must be set to lower case.
-	 */
 	(void) snprintf(fqhn, MAXHOSTNAMELEN, "%s.%s", fqhn, fqdn);
-
 	error = 0;
 
-	if (smb_nic_getfirst(&ni) != SMB_NIC_SUCCESS)
+	if (smb_nic_getfirst(&ni) != 0)
 		return (-1);
 
 	do {
@@ -2140,7 +2123,7 @@ dyndns_clear_rev_zone(char *fqdn)
 		if (rc != 0)
 			error++;
 
-	} while (smb_nic_getnext(&ni) == SMB_NIC_SUCCESS);
+	} while (smb_nic_getnext(&ni) == 0);
 
 	return ((error == 0) ? 0 : -1);
 }

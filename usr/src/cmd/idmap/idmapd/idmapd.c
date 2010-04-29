@@ -19,7 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 
@@ -292,7 +293,6 @@ main(int argc, char **argv)
 	(void) textdomain(TEXT_DOMAIN);
 
 	idmap_set_logger(idmapdlog);
-	adutils_set_logger(idmapdlog);
 	idmap_log_syslog(B_TRUE);
 	idmap_log_stderr(_idmapdstate.daemon_mode ? -1 : LOG_DEBUG);
 
@@ -413,7 +413,7 @@ init_idmapd()
 		idmapdlog(LOG_ERR, "unable to register door");
 		goto errout;
 	}
-	if ((error = __idmap_reg(dfd)) != 0) {
+	if ((error = idmap_reg(dfd)) != 0) {
 		idmapdlog(LOG_ERR, "unable to register door (%s)",
 		    strerror(errno));
 		goto errout;
@@ -424,10 +424,8 @@ init_idmapd()
 	    8192, &_idmapdstate.next_gid)) != 0) {
 		idmapdlog(LOG_ERR, "unable to allocate ephemeral IDs (%s)",
 		    strerror(errno));
-		_idmapdstate.next_uid = IDMAP_SENTINEL_PID;
-		_idmapdstate.limit_uid = IDMAP_SENTINEL_PID;
-		_idmapdstate.next_gid = IDMAP_SENTINEL_PID;
-		_idmapdstate.limit_gid = IDMAP_SENTINEL_PID;
+		_idmapdstate.next_uid = _idmapdstate.limit_uid = SENTINEL_PID;
+		_idmapdstate.next_gid = _idmapdstate.limit_gid = SENTINEL_PID;
 	} else {
 		_idmapdstate.limit_uid = _idmapdstate.next_uid + 8192;
 		_idmapdstate.limit_gid = _idmapdstate.next_gid + 8192;
@@ -445,7 +443,7 @@ errout:
 static void
 fini_idmapd()
 {
-	__idmap_unreg(dfd);
+	idmap_unreg(dfd);
 	fini_mapping_system();
 	if (xprt != NULL)
 		svc_destroy(xprt);
@@ -488,6 +486,13 @@ degrade_svc(int poke_discovery, const char *reason)
 {
 	const char *fmri;
 
+	/*
+	 * If the config update thread is in a state where auto-discovery could
+	 * be re-tried, then this will make it try it -- a sort of auto-refresh.
+	 */
+	if (poke_discovery)
+		idmap_cfg_poke_updates();
+
 	membar_consumer();
 	if (degraded)
 		return;
@@ -502,13 +507,6 @@ degrade_svc(int poke_discovery, const char *reason)
 
 	if ((fmri = get_fmri()) != NULL)
 		(void) smf_degrade_instance(fmri, 0);
-
-	/*
-	 * If the config update thread is in a state where auto-discovery could
-	 * be re-tried, then this will make it try it -- a sort of auto-refresh.
-	 */
-	if (poke_discovery)
-		idmap_cfg_poke_updates();
 }
 
 void

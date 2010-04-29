@@ -19,8 +19,9 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  *
- * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * iSCSI Software Initiator
  */
 
@@ -745,7 +746,6 @@ iscsi_set_params(iscsi_param_set_t *ils, iscsi_hba_t *ihp, boolean_t persist)
 	iscsi_sess_t		*isp	= NULL;
 	iscsi_param_get_t	*ilg;
 	int			rtn	= 0;
-	uint32_t		event_count;
 
 	/* handle special case for Initiator name */
 	if (ils->s_param == ISCSI_LOGIN_PARAM_INITIATOR_NAME) {
@@ -915,10 +915,9 @@ iscsi_set_params(iscsi_param_set_t *ils, iscsi_hba_t *ihp, boolean_t persist)
 					if (strncmp((char *)isp->sess_name,
 					    (char *)name,
 					    ISCSI_MAX_NAME_LEN) == 0) {
-event_count = atomic_inc_32_nv(&isp->sess_state_event_count);
-iscsi_sess_enter_state_zone(isp);
-iscsi_sess_state_machine(isp, ISCSI_SESS_EVENT_N7, event_count);
-iscsi_sess_exit_state_zone(isp);
+mutex_enter(&isp->sess_state_mutex);
+iscsi_sess_state_machine(isp, ISCSI_SESS_EVENT_N7);
+mutex_exit(&isp->sess_state_mutex);
 					}
 				}
 				rw_exit(&ihp->hba_sess_list_rwlock);
@@ -978,12 +977,12 @@ iscsi_sess_exit_state_zone(isp);
 					 * the login parameters have
 					 * changed.
 					 */
-					event_count = atomic_inc_32_nv(
-					    &isp->sess_state_event_count);
-					iscsi_sess_enter_state_zone(isp);
+					mutex_enter(&isp->
+					    sess_state_mutex);
 					iscsi_sess_state_machine(isp,
-					    ISCSI_SESS_EVENT_N7, event_count);
-					iscsi_sess_exit_state_zone(isp);
+					    ISCSI_SESS_EVENT_N7);
+					mutex_exit(&isp->
+					    sess_state_mutex);
 				}
 			}
 			kmem_free(ilg, sizeof (*ilg));
@@ -1171,7 +1170,6 @@ iscsi_ioctl_set_config_sess(iscsi_hba_t *ihp, iscsi_config_sess_t *ics)
 {
 	uchar_t *name;
 	iscsi_sess_t *isp;
-	uint32_t event_count;
 
 	/* check range infomration */
 	if ((ics->ics_in < ISCSI_MIN_CONFIG_SESSIONS) ||
@@ -1222,13 +1220,10 @@ iscsi_ioctl_set_config_sess(iscsi_hba_t *ihp, iscsi_config_sess_t *ics)
 					 * atleast poke it to disconnect
 					 * it.
 					 */
-					event_count = atomic_inc_32_nv(
-					    &isp->sess_state_event_count);
-					iscsi_sess_enter_state_zone(isp);
+					mutex_enter(&isp->sess_state_mutex);
 					iscsi_sess_state_machine(isp,
-					    ISCSI_SESS_EVENT_N7, event_count);
-					iscsi_sess_exit_state_zone(isp);
-
+					    ISCSI_SESS_EVENT_N7);
+					mutex_exit(&isp->sess_state_mutex);
 					isp = isp->sess_next;
 				}
 			} else {

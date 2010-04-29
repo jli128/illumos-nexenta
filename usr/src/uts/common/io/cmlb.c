@@ -247,12 +247,6 @@ static i_ddi_prop_dyn_t cmlb_prop_dyn[] = {
 };
 
 /*
- * This implies an upper limit of 8192 GPT partitions
- * in one transfer for GUID Partition Entry Array.
- */
-len_t cmlb_tg_max_efi_xfer = 1024 * 1024;
-
-/*
  * External kernel interfaces
  */
 extern struct mod_ops mod_miscops;
@@ -365,9 +359,9 @@ static int cmlb_dkio_extpartinfo(struct cmlb_lun *cl, dev_t dev, caddr_t arg,
 #endif
 
 static void cmlb_dbg(uint_t comp, struct cmlb_lun *cl, const char *fmt, ...);
-static void cmlb_v_log(dev_info_t *dev, const char *label, uint_t level,
+static void cmlb_v_log(dev_info_t *dev, char *label, uint_t level,
     const char *fmt, va_list ap);
-static void cmlb_log(dev_info_t *dev, const char *label, uint_t level,
+static void cmlb_log(dev_info_t *dev, char *label, uint_t level,
     const char *fmt, ...);
 
 int
@@ -437,7 +431,7 @@ cmlb_dbg(uint_t comp, struct cmlb_lun *cl, const char *fmt, ...)
  * so that this module does not depend on scsi module.
  */
 static void
-cmlb_log(dev_info_t *dev, const char *label, uint_t level, const char *fmt, ...)
+cmlb_log(dev_info_t *dev, char *label, uint_t level, const char *fmt, ...)
 {
 	va_list		ap;
 
@@ -447,7 +441,7 @@ cmlb_log(dev_info_t *dev, const char *label, uint_t level, const char *fmt, ...)
 }
 
 static void
-cmlb_v_log(dev_info_t *dev, const char *label, uint_t level, const char *fmt,
+cmlb_v_log(dev_info_t *dev, char *label, uint_t level, const char *fmt,
     va_list ap)
 {
 	static char 	name[256];
@@ -1073,10 +1067,10 @@ cmlb_partinfo(cmlb_handle_t cmlbhandle, int part, diskaddr_t *nblocksp,
 				    cl->cl_map[part].dkl_nblk;
 
 			if (tagp != NULL)
-				*tagp =
-				    ((cl->cl_cur_labeltype == CMLB_LABEL_EFI) ||
-				    (part >= NDKMAP)) ? V_UNASSIGNED :
-				    cl->cl_vtoc.v_part[part].p_tag;
+				if (cl->cl_cur_labeltype == CMLB_LABEL_EFI)
+					*tagp = V_UNASSIGNED;
+				else
+					*tagp = cl->cl_vtoc.v_part[part].p_tag;
 			rval = 0;
 		}
 
@@ -1819,13 +1813,7 @@ cmlb_convert_geometry(struct cmlb_lun *cl, diskaddr_t capacity,
 	ASSERT(mutex_owned(CMLB_MUTEX(cl)));
 
 	/* Unlabeled SCSI floppy device */
-	if (capacity < 160) {
-		/* Less than 80K */
-		cl_g->dkg_nhead = 1;
-		cl_g->dkg_ncyl = capacity;
-		cl_g->dkg_nsect = 1;
-		return;
-	} else if (capacity <= 0x1000) {
+	if (capacity <= 0x1000) {
 		cl_g->dkg_nhead = 2;
 		cl_g->dkg_ncyl = 80;
 		cl_g->dkg_nsect = capacity / (cl_g->dkg_nhead * cl_g->dkg_ncyl);
@@ -3312,12 +3300,7 @@ cmlb_build_default_label(struct cmlb_lun *cl, void *tg_cookie)
 			cl->cl_g.dkg_nsect = cl->cl_blockcount;
 		}
 	} else {
-		if (cl->cl_blockcount < 160) {
-			/* Less than 80K */
-			cl->cl_g.dkg_nhead = 1;
-			cl->cl_g.dkg_ncyl = cl->cl_blockcount;
-			cl->cl_g.dkg_nsect = 1;
-		} else if (cl->cl_blockcount <= 0x1000) {
+		if (cl->cl_blockcount <= 0x1000) {
 			/* unlabeled SCSI floppy device */
 			cl->cl_g.dkg_nhead = 2;
 			cl->cl_g.dkg_ncyl = 80;
@@ -4098,12 +4081,6 @@ cmlb_dkio_get_extvtoc(struct cmlb_lun *cl, caddr_t arg, int flag,
 
 	return (rval);
 }
-
-/*
- * This routine implements the DKIOCGETEFI ioctl. This ioctl is currently
- * used to read the GPT Partition Table Header (primary/backup), the GUID
- * partition Entry Array (primary/backup), and the MBR.
- */
 static int
 cmlb_dkio_get_efi(struct cmlb_lun *cl, caddr_t arg, int flag, void *tg_cookie)
 {
@@ -4117,16 +4094,11 @@ cmlb_dkio_get_efi(struct cmlb_lun *cl, caddr_t arg, int flag, void *tg_cookie)
 
 	user_efi.dki_data = (void *)(uintptr_t)user_efi.dki_data_64;
 
-	if (user_efi.dki_length == 0 ||
-	    user_efi.dki_length > cmlb_tg_max_efi_xfer)
-		return (EINVAL);
-
 	tgt_lba = user_efi.dki_lba;
 
 	mutex_enter(CMLB_MUTEX(cl));
 	if ((cmlb_check_update_blockcount(cl, tg_cookie) != 0) ||
-	    (cl->cl_tgt_blocksize == 0) ||
-	    (user_efi.dki_length % cl->cl_sys_blocksize)) {
+	    (cl->cl_tgt_blocksize == 0)) {
 		mutex_exit(CMLB_MUTEX(cl));
 		return (EINVAL);
 	}
@@ -4912,12 +4884,6 @@ exit:
 	return (rval);
 }
 
-/*
- * This routine implements the DKIOCSETEFI ioctl. This ioctl is currently
- * used to write (or clear) the GPT Partition Table header (primary/backup)
- * and GUID partition Entry Array (primary/backup). It is also used to write
- * the Protective MBR.
- */
 static int
 cmlb_dkio_set_efi(struct cmlb_lun *cl, dev_t dev, caddr_t arg, int flag,
     void *tg_cookie)
@@ -4935,24 +4901,6 @@ cmlb_dkio_set_efi(struct cmlb_lun *cl, dev_t dev, caddr_t arg, int flag,
 	    (cl->cl_alter_behavior & (CMLB_INTERNAL_MINOR_NODES)) != 0);
 
 	user_efi.dki_data = (void *)(uintptr_t)user_efi.dki_data_64;
-
-	if (user_efi.dki_length == 0 ||
-	    user_efi.dki_length > cmlb_tg_max_efi_xfer)
-		return (EINVAL);
-
-	tgt_lba = user_efi.dki_lba;
-
-	mutex_enter(CMLB_MUTEX(cl));
-	if ((cmlb_check_update_blockcount(cl, tg_cookie) != 0) ||
-	    (cl->cl_tgt_blocksize == 0) ||
-	    (user_efi.dki_length % cl->cl_sys_blocksize)) {
-		mutex_exit(CMLB_MUTEX(cl));
-		return (EINVAL);
-	}
-	if (cl->cl_tgt_blocksize != cl->cl_sys_blocksize)
-		tgt_lba = tgt_lba *
-		    cl->cl_tgt_blocksize / cl->cl_sys_blocksize;
-	mutex_exit(CMLB_MUTEX(cl));
 
 	buffer = kmem_alloc(user_efi.dki_length, KM_SLEEP);
 	if (ddi_copyin(user_efi.dki_data, buffer, user_efi.dki_length, flag)) {
@@ -4983,6 +4931,20 @@ cmlb_dkio_set_efi(struct cmlb_lun *cl, dev_t dev, caddr_t arg, int flag,
 		} else
 			mutex_exit(CMLB_MUTEX(cl));
 
+		tgt_lba = user_efi.dki_lba;
+
+		mutex_enter(CMLB_MUTEX(cl));
+		if ((cmlb_check_update_blockcount(cl, tg_cookie) != 0) ||
+		    (cl->cl_tgt_blocksize == 0)) {
+			kmem_free(buffer, user_efi.dki_length);
+			mutex_exit(CMLB_MUTEX(cl));
+			return (EINVAL);
+		}
+		if (cl->cl_tgt_blocksize != cl->cl_sys_blocksize)
+			tgt_lba = tgt_lba *
+			    cl->cl_tgt_blocksize / cl->cl_sys_blocksize;
+
+		mutex_exit(CMLB_MUTEX(cl));
 		rval = DK_TG_WRITE(cl, buffer, tgt_lba, user_efi.dki_length,
 		    tg_cookie);
 
@@ -5241,11 +5203,6 @@ cmlb_setup_default_geometry(struct cmlb_lun *cl, void *tg_cookie)
 			cl->cl_g.dkg_ncyl = 1;
 			cl->cl_g.dkg_nhead = 1;
 			cl->cl_g.dkg_nsect = cl->cl_blockcount;
-		} else if (cl->cl_blockcount < 160) {
-			/* Less than 80K */
-			cl->cl_g.dkg_nhead = 1;
-			cl->cl_g.dkg_ncyl = cl->cl_blockcount;
-			cl->cl_g.dkg_nsect = 1;
 		} else if (cl->cl_blockcount <= 0x1000) {
 			/* Needed for unlabeled SCSI floppies. */
 			cl->cl_g.dkg_nhead = 2;

@@ -37,7 +37,6 @@
 #include <sys/acl.h>
 #include <aclutils.h>
 #include <idmap.h>
-#include <synch.h>
 
 #define	ID_STR_MAX	20	/* digits in LONG_MAX */
 
@@ -50,7 +49,6 @@
 int	yyinteractive;
 acl_t	*yyacl;
 char	*yybuf;
-mutex_t	yymutex;
 
 extern acl_t *acl_alloc(enum acl_type);
 
@@ -1009,8 +1007,6 @@ acl_fromtext(const char *acltextp, acl_t **ret_aclp)
 		return (EACL_MEM_ERROR);
 	strcpy(buf, acltextp);
 	strcat(buf, "\n");
-
-	(void) mutex_lock(&yymutex);
 	yybuf = buf;
 	yyreset();
 	error = yyparse();
@@ -1024,8 +1020,6 @@ acl_fromtext(const char *acltextp, acl_t **ret_aclp)
 		}
 		yyacl = NULL;
 	}
-	(void) mutex_unlock(&yymutex);
-
 	return (error);
 }
 

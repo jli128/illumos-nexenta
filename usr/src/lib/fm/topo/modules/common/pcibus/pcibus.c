@@ -20,7 +20,8 @@
  */
 
 /*
- * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #include <sys/fm/protocol.h>
@@ -596,19 +597,15 @@ pciexbus_enum(topo_mod_t *mp, tnode_t *ptn, char *pnm, topo_instance_t min,
     topo_instance_t max)
 {
 	di_node_t pdn;
-	int rc, hb;
-	tnode_t *hbtn;
+	int rc;
 	int retval;
 
 	/*
-	 * PCI-Express; parent node's private data is a simple di_node_t
+	 * PCI-Express; root complex shares the hostbridge's instance
+	 * number.  Parent node's private data is a simple di_node_t
 	 * and we have to construct our own did hash and did_t.
 	 */
 	rc = topo_node_instance(ptn);
-	if ((hbtn = topo_node_parent(ptn)) != NULL)
-		hb = topo_node_instance(hbtn);
-	else
-		hb = rc;
 
 	if ((pdn = topo_node_getspecific(ptn)) == DI_NODE_NIL) {
 		topo_mod_dprintf(mp,
@@ -618,10 +615,10 @@ pciexbus_enum(topo_mod_t *mp, tnode_t *ptn, char *pnm, topo_instance_t min,
 	}
 	if (did_hash_init(mp) != 0)
 		return (-1);
-	if ((did_create(mp, pdn, 0, hb, rc, TRUST_BDF)) == NULL)
+	if ((did_create(mp, pdn, 0, 0, rc, TRUST_BDF)) == NULL)
 		return (-1);	/* errno already set */
 
-	retval = pci_children_instantiate(mp, ptn, pdn, 0, hb, rc,
+	retval = pci_children_instantiate(mp, ptn, pdn, 0, 0, rc,
 	    (min == max) ? min : TRUST_BDF, 0);
 	did_hash_fini(mp);
 

@@ -36,20 +36,20 @@
 #include <ber_der.h>
 /* NSS related headers */
 
-#include <nss/nss.h>
-#include <nss/cert.h>
-#include <nss/certdb.h>
-#include <nss/secoid.h>
-#include <nss/secder.h>
-#include <nss/secerr.h>
-#include <nss/cryptohi.h>
-#include <nss/keyhi.h>
-#include <nss/keythi.h>
-#include <nss/pk11func.h>
-#include <nss/pk11pqg.h>
-#include <nss/pkcs12.h>
-#include <nss/p12plcy.h>
-#include <nspr/prerror.h>
+#include <mps/nss.h>
+#include <mps/cert.h>
+#include <mps/certdb.h>
+#include <mps/secoid.h>
+#include <mps/secder.h>
+#include <mps/secerr.h>
+#include <mps/cryptohi.h>
+#include <mps/keyhi.h>
+#include <mps/keythi.h>
+#include <mps/pk11func.h>
+#include <mps/pk11pqg.h>
+#include <mps/pkcs12.h>
+#include <mps/p12plcy.h>
+#include <mps/prerror.h>
 
 #define	NSS_OK		0
 

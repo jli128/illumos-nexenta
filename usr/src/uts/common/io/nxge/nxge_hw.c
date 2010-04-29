@@ -18,8 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #include <sys/nxge/nxge_impl.h>
@@ -708,7 +710,6 @@ nxge_loopback_ioctl(p_nxge_t nxgep, queue_t *wq, mblk_t *mp,
 			 * internal loopback test.
 			 */
 			if (nxgep->mac.portmode == PORT_10G_FIBER ||
-			    nxgep->mac.portmode == PORT_10G_COPPER ||
 			    nxgep->mac.portmode == PORT_10G_TN1010 ||
 			    nxgep->mac.portmode == PORT_10G_SERDES)
 				size += sizeof (lb_serdes10g);
@@ -762,7 +763,6 @@ nxge_loopback_ioctl(p_nxge_t nxgep, queue_t *wq, mblk_t *mp,
 					size += sizeof (lb_phy10g);
 			}
 			if (nxgep->mac.portmode == PORT_10G_FIBER ||
-			    nxgep->mac.portmode == PORT_10G_COPPER ||
 			    nxgep->mac.portmode == PORT_10G_TN1010 ||
 			    nxgep->mac.portmode == PORT_10G_SERDES)
 				size += sizeof (lb_serdes10g);
@@ -818,7 +818,6 @@ nxge_loopback_ioctl(p_nxge_t nxgep, queue_t *wq, mblk_t *mp,
 				}
 
 				if (nxgep->mac.portmode == PORT_10G_FIBER ||
-				    nxgep->mac.portmode == PORT_10G_COPPER ||
 				    nxgep->mac.portmode == PORT_10G_TN1010 ||
 				    nxgep->mac.portmode == PORT_10G_SERDES)
 					lb_props[i++] = lb_serdes10g;

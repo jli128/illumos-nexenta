@@ -51,4 +51,4 @@
 d none usr/bin/i86 755 root bin
 f none usr/bin/i86/latencytop 555 root bin
 d none usr/bin/amd64 755 root bin
-#f none usr/bin/amd64/latencytop 555 root bin
+f none usr/bin/amd64/latencytop 555 root bin

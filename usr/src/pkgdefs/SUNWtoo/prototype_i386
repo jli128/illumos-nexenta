@@ -63,7 +63,7 @@ f none usr/bin/amd64/pvs 555 root bin
 f none usr/bin/amd64/strings 555 root bin
 f none usr/bin/amd64/truss 555 root bin
 d none usr/ccs/bin/amd64 755 root bin
-m none usr/ccs/bin/amd64/ld 555 root bin usr/bin/amd64/ld
+s none usr/ccs/bin/amd64/ld=../../../bin/amd64/ld
 f none usr/lib/ld/map.noexdata 444 root bin
 d none usr/lib/ld/amd64 755 root bin
 f none usr/lib/ld/amd64/map.above4G 444 root bin

@@ -116,13 +116,6 @@ devices/pseudo/conskbd@0:kbd          dev/kbd
 #
 
 #
-# Get out if we are in non-global zone...
-#
-if test "x`zonename`" != xglobal; then
-	exit 0
-fi
-
-#
 # Determine an appropriate place for our private error log file.  If $PKGSAV
 # is available, use that; otherwise use /tmp or /dev/null.  We keep a private
 # error log primarily as a debugging facility.
@@ -157,7 +150,7 @@ while read path symlink; do
 	fi
 done
 
-cat << EOF 2>/dev/null > ${BASEDIR}/devices/README
+cat << EOF > ${BASEDIR}/devices/README
 
 Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
 Use is subject to license terms.
@@ -175,16 +168,6 @@ incompatible change or removal without notification.
  Please reference devfs(7FS) for more information.
 
 EOF
-
-ln -sf /dev/fd/0 ${BASEDIR}/dev/stdin
-ln -sf /dev/fd/1 ${BASEDIR}/dev/stdout
-ln -sf /dev/fd/2 ${BASEDIR}/dev/stderr
-
-if test ! -d ${BASEDIR}/dev/zcons; then
-	mkdir ${BASEDIR}/dev/zcons
-	chown root:sys ${BASEDIR}/dev/zcons
-	chmod 755 ${BASEDIR}/dev/zcons
-fi
 
 if [ -f ${BASEDIR}/devices/README ]; then
 	chown root:sys ${BASEDIR}/devices/README

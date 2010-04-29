@@ -1,5 +1,6 @@
 #
-# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 
 #
@@ -80,19 +81,18 @@ NDMP_OBJ = \
 	ndmpd_data.o \
 	ndmpd_door.o \
 	ndmpd_dtime.o \
+	ndmpd_prop.o \
 	ndmpd_fhistory.o \
 	ndmpd_handler.o \
 	ndmpd_log.o \
 	ndmpd_main.o \
 	ndmpd_mark.o \
 	ndmpd_mover.o \
-	ndmpd_prop.o \
 	ndmpd_scsi.o \
 	ndmpd_tape.o \
 	ndmpd_tar.o \
 	ndmpd_tar3.o \
-	ndmpd_util.o \
-	ndmpd_zfs.o
+	ndmpd_util.o
 
 TLM_OBJ = \
 	tlm_backup_reader.o \

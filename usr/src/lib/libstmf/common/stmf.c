@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2141,9 +2141,6 @@ stmfGetLuResource(stmfGuid *luGuid, luResource *hdl)
 	int ret = STMF_STATUS_SUCCESS;
 	stmfLogicalUnitProperties luProps;
 
-	if (hdl == NULL) {
-		return (STMF_ERROR_INVALID_ARG);
-	}
 
 	/* Check logical unit provider name to call correct dtype function */
 	if ((ret = stmfGetLogicalUnitProperties(luGuid, &luProps))
@@ -2827,7 +2824,7 @@ getDiskProp(luResourceImpl *hdl, uint32_t prop, char *propVal, size_t *propLen)
 			}
 			break;
 		default:
-			ret = STMF_ERROR_INVALID_PROP;
+			ret = STMF_ERROR_NO_PROP;
 			break;
 	}
 
@@ -2872,13 +2869,7 @@ setDiskProp(luResourceImpl *hdl, uint32_t resourceProp, const char *propVal)
 			}
 			diskLu->luAliasValid = B_TRUE;
 			break;
-		case STMF_LU_PROP_BLOCK_SIZE: {
-			const char *tmp = propVal;
-			while (*tmp) {
-				if (!isdigit(*tmp++)) {
-					return (STMF_ERROR_INVALID_ARG);
-				}
-			}
+		case STMF_LU_PROP_BLOCK_SIZE:
 			(void) sscanf(propVal, "%llu", &numericProp);
 			if (numericProp > UINT16_MAX) {
 				return (STMF_ERROR_INVALID_PROPSIZE);
@@ -2886,7 +2877,6 @@ setDiskProp(luResourceImpl *hdl, uint32_t resourceProp, const char *propVal)
 			diskLu->blkSize = numericProp;
 			diskLu->blkSizeValid = B_TRUE;
 			break;
-		}
 		case STMF_LU_PROP_COMPANY_ID:
 			if ((strlcpy(ouiProp, propVal, sizeof (ouiProp))) >=
 			    sizeof (ouiProp)) {
@@ -3031,7 +3021,7 @@ setDiskProp(luResourceImpl *hdl, uint32_t resourceProp, const char *propVal)
 			ret = STMF_ERROR_INVALID_PROP;
 			break;
 		default:
-			ret = STMF_ERROR_INVALID_PROP;
+			ret = STMF_ERROR_NO_PROP;
 			break;
 	}
 	return (ret);
@@ -4833,6 +4823,11 @@ stmfGetViewEntryList(stmfGuid *lu, stmfViewEntryList **viewEntryList)
 	}
 
 	if (ret != STMF_STATUS_SUCCESS) {
+		goto done;
+	}
+
+	if (stmfIoctl.stmf_obuf_nentries == 0) {
+		ret = STMF_ERROR_NOT_FOUND;
 		goto done;
 	}
 

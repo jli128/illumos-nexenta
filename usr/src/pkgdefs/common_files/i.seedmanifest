@@ -61,9 +61,8 @@ fi
 while read src dst; do
 	/usr/bin/cp -p $src $dst
 
-	[ "$PKG_INSTALL_ROOT" = "" -o "$PKG_INSTALL_ROOT" = "/" ] && \
-		SVCCFG_REPOSITORY=$repfile SVCCFG_CHECKHASH=1 \
-		    /usr/sbin/svccfg import $dst
+	SVCCFG_REPOSITORY=$repfile SVCCFG_CHECKHASH=1 \
+	    /usr/sbin/svccfg import $dst
 done
 
 exit 0

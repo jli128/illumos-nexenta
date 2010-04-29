@@ -75,7 +75,6 @@
 #include <sys/kidmap.h>
 #include <sys/cred.h>
 #include <sys/attr.h>
-#include <sys/dsl_prop.h>
 
 /*
  * Programming rules.
@@ -166,32 +165,6 @@
  *	ZFS_EXIT(zfsvfs);		// finished in zfs
  *	return (error);			// done, report error
  */
-
-static int nms_worm_transition_time = 30;
-static int
-zfs_worm_in_trans(znode_t *zp)
-{
-	timestruc_t now;
-	if (!nms_worm_transition_time)
-		return 0;
-	gethrestime(&now);
-	return (zp->z_phys && (uint64_t)now.tv_sec - zp->z_phys->zp_ctime[0] < nms_worm_transition_time);
-}
-
-static int
-zfs_is_wormed(znode_t *zp)
-{
-	zfsvfs_t *zfsvfs = zp->z_zfsvfs;
-	char worminfo[13] = {0};
-	char osname[MAXNAMELEN];
-	dmu_objset_name(zfsvfs->z_os, osname);
-	if (dsl_prop_get(osname, "nms:worm", 1, 12, &worminfo, NULL) == 0 &&
-	    worminfo[0] && strcmp(worminfo, "0") != 0 &&
-	    strcmp(worminfo, "off") != 0 && strcmp(worminfo, "-") != 0) {
-		return 1;
-	}
-	return 0;
-}
 
 /* ARGSUSED */
 static int
@@ -653,12 +626,8 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 	if ((pflags & (ZFS_IMMUTABLE | ZFS_READONLY)) ||
 	    ((pflags & ZFS_APPENDONLY) && !(ioflag & FAPPEND) &&
 	    (uio->uio_loffset < zp->z_phys->zp_size))) {
-		if ((pflags & ZFS_IMMUTABLE) && zfs_is_wormed(zp)) {
-			/* do nothing */
-		} else {
-			ZFS_EXIT(zfsvfs);
-			return (EPERM);
-		}
+		ZFS_EXIT(zfsvfs);
+		return (EPERM);
 	}
 
 	zilog = zfsvfs->z_log;
@@ -1298,7 +1267,6 @@ zfs_create(vnode_t *dvp, char *name, vattr_t *vap, vcexcl_t excl,
     int mode, vnode_t **vpp, cred_t *cr, int flag, caller_context_t *ct,
     vsecattr_t *vsecp)
 {
-	int		imm_was_set = 0;
 	znode_t		*zp, *dzp = VTOZ(dvp);
 	zfsvfs_t	*zfsvfs = dzp->z_zfsvfs;
 	zilog_t		*zilog;
@@ -1379,24 +1347,13 @@ top:
 	if (zp == NULL) {
 		uint64_t txtype;
 
-		if ((dzp->z_phys->zp_flags & ZFS_IMMUTABLE) &&
-		    zfs_is_wormed(dzp)) {
-			imm_was_set = 1;
-			ZFS_ATTR_SET(dzp, ZFS_IMMUTABLE, 0);
-		}
-
 		/*
 		 * Create a new file object and update the directory
 		 * to reference it.
 		 */
 		if (error = zfs_zaccess(dzp, ACE_ADD_FILE, 0, B_FALSE, cr)) {
-			if (imm_was_set)
-				ZFS_ATTR_SET(dzp, ZFS_IMMUTABLE, 1);
 			goto out;
 		}
-
-		if (imm_was_set)
-			ZFS_ATTR_SET(dzp, ZFS_IMMUTABLE, 1);
 
 		/*
 		 * We only support the creation of regular files in
@@ -1446,9 +1403,6 @@ top:
 		if (fuid_dirtied)
 			zfs_fuid_sync(zfsvfs, tx);
 
-		if (imm_was_set)
-			ZFS_ATTR_SET(zp, ZFS_IMMUTABLE, 1);
-
 		(void) zfs_link_create(dl, zp, tx, ZNEW);
 
 		txtype = zfs_log_create_txtype(Z_FILE, vsecp, vap);
@@ -1478,23 +1432,12 @@ top:
 			error = EISDIR;
 			goto out;
 		}
-		if (!(flag & FAPPEND) &&
-		    (zp->z_phys->zp_flags & ZFS_IMMUTABLE) &&
-		    zfs_is_wormed(dzp)) {
-			imm_was_set = 1;
-			ZFS_ATTR_SET(zp, ZFS_IMMUTABLE, 0);
-		}
 		/*
 		 * Verify requested access to file.
 		 */
 		if (mode && (error = zfs_zaccess_rwx(zp, mode, aflags, cr))) {
-			if (imm_was_set)
-				ZFS_ATTR_SET(zp, ZFS_IMMUTABLE, 1);
 			goto out;
 		}
-
-		if (imm_was_set)
-			ZFS_ATTR_SET(zp, ZFS_IMMUTABLE, 1);
 
 		mutex_enter(&dzp->z_lock);
 		dzp->z_seq++;
@@ -1753,7 +1696,6 @@ static int
 zfs_mkdir(vnode_t *dvp, char *dirname, vattr_t *vap, vnode_t **vpp, cred_t *cr,
     caller_context_t *ct, int flags, vsecattr_t *vsecp)
 {
-	int             imm_was_set = 0;
 	znode_t		*zp, *dzp = VTOZ(dvp);
 	zfsvfs_t	*zfsvfs = dzp->z_zfsvfs;
 	zilog_t		*zilog;
@@ -1769,9 +1711,6 @@ zfs_mkdir(vnode_t *dvp, char *dirname, vattr_t *vap, vnode_t **vpp, cred_t *cr,
 	boolean_t	fuid_dirtied;
 
 	ASSERT(vap->va_type == VDIR);
-
-	if (imm_was_set)
-		ZFS_ATTR_SET(zp, ZFS_IMMUTABLE, 1);
 
 	/*
 	 * If we have an ephemeral id, ACL, or XVATTR then
@@ -1824,22 +1763,10 @@ top:
 		return (error);
 	}
 
-	if ((dzp->z_phys->zp_flags & ZFS_IMMUTABLE) &&
-	    zfs_is_wormed(dzp)) {
-		imm_was_set = 1;
-		ZFS_ATTR_SET(dzp, ZFS_IMMUTABLE, 0);
-	}
-
 	if (error = zfs_zaccess(dzp, ACE_ADD_SUBDIRECTORY, 0, B_FALSE, cr)) {
-		if (imm_was_set)
-			ZFS_ATTR_SET(dzp, ZFS_IMMUTABLE, 1);
 		zfs_dirent_unlock(dl);
 		ZFS_EXIT(zfsvfs);
 		return (error);
-	}
-
-	if (imm_was_set) {
-		ZFS_ATTR_SET(dzp, ZFS_IMMUTABLE, 1);
 	}
 
 	if ((error = zfs_acl_ids_create(dzp, 0, vap, cr, vsecp,
@@ -2628,25 +2555,13 @@ zfs_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	xva_init(&tmpxvattr);
 
 	/*
-	 * Do not allow to alter immutable bit after it is set
-	 */
-	if ((pzp->zp_flags & ZFS_IMMUTABLE) &&
-	    XVA_ISSET_REQ(xvap, XAT_IMMUTABLE) &&
-	    zfs_is_wormed(zp)) {
-		ZFS_EXIT(zfsvfs);
-		return (EPERM);
-	}
-
-	/*
-	 * Immutable files can only alter atime
+	 * Immutable files can only alter immutable bit and atime
 	 */
 	if ((pzp->zp_flags & ZFS_IMMUTABLE) &&
 	    ((mask & (AT_SIZE|AT_UID|AT_GID|AT_MTIME|AT_MODE)) ||
 	    ((mask & AT_XVATTR) && XVA_ISSET_REQ(xvap, XAT_CREATETIME)))) {
-		if (!zfs_is_wormed(zp) || !zfs_worm_in_trans(zp)) {
-			ZFS_EXIT(zfsvfs);
-			return (EPERM);
-		}
+		ZFS_EXIT(zfsvfs);
+		return (EPERM);
 	}
 
 	if ((mask & AT_SIZE) && (pzp->zp_flags & ZFS_READONLY)) {
@@ -3547,7 +3462,6 @@ zfs_symlink(vnode_t *dvp, char *name, vattr_t *vap, char *link, cred_t *cr,
 	dmu_tx_t	*tx;
 	zfsvfs_t	*zfsvfs = dzp->z_zfsvfs;
 	zilog_t		*zilog;
-	int		imm_was_set = 0;
 	int		len = strlen(link);
 	int		error;
 	int		zflg = ZNEW;
@@ -3568,22 +3482,10 @@ zfs_symlink(vnode_t *dvp, char *name, vattr_t *vap, char *link, cred_t *cr,
 	if (flags & FIGNORECASE)
 		zflg |= ZCILOOK;
 top:
-
-	if ((dzp->z_phys->zp_flags & ZFS_IMMUTABLE) &&
-	    zfs_is_wormed(dzp)) {
-		imm_was_set = 1;
-		ZFS_ATTR_SET(dzp, ZFS_IMMUTABLE, 0);
-	}
-
 	if (error = zfs_zaccess(dzp, ACE_ADD_FILE, 0, B_FALSE, cr)) {
-		if (imm_was_set)
-			ZFS_ATTR_SET(dzp, ZFS_IMMUTABLE, 1);
 		ZFS_EXIT(zfsvfs);
 		return (error);
 	}
-
-	if (imm_was_set)
-		ZFS_ATTR_SET(dzp, ZFS_IMMUTABLE, 1);
 
 	if (len > MAXPATHLEN) {
 		ZFS_EXIT(zfsvfs);
@@ -3767,7 +3669,6 @@ zfs_link(vnode_t *tdvp, vnode_t *svp, char *name, cred_t *cr,
 	int		error;
 	int		zf = ZNEW;
 	uid_t		owner;
-	int		imm_was_set = 0;
 
 	ASSERT(tdvp->v_type == VDIR);
 
@@ -3822,21 +3723,10 @@ top:
 		return (EPERM);
 	}
 
-	if ((dzp->z_phys->zp_flags & ZFS_IMMUTABLE) &&
-	    zfs_is_wormed(dzp)) {
-		imm_was_set = 1;
-		ZFS_ATTR_SET(dzp, ZFS_IMMUTABLE, 0);
-	}
-
 	if (error = zfs_zaccess(dzp, ACE_ADD_FILE, 0, B_FALSE, cr)) {
-		if (imm_was_set)
-			ZFS_ATTR_SET(dzp, ZFS_IMMUTABLE, 1);
 		ZFS_EXIT(zfsvfs);
 		return (error);
 	}
-
-	if (imm_was_set)
-		ZFS_ATTR_SET(dzp, ZFS_IMMUTABLE, 1);
 
 	/*
 	 * Attempt to lock directory; fail if entry already exists.

@@ -20,7 +20,8 @@
  */
 
 /*
- * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_ADINFO_H
@@ -123,12 +124,6 @@ ad_disc_set_GlobalCatalog(ad_disc_t ctx,
  * on request
  */
 void ad_disc_refresh(ad_disc_t);
-
-/*
- * This routine marks the end of a discovery cycle and sets
- * the sanity limits on the time before the next cycle.
- */
-void ad_disc_done(ad_disc_t);
 
 /* This routine unsets all overridden values */
 int ad_disc_unset(ad_disc_t ctx);

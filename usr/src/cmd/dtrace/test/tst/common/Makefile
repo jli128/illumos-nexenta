@@ -47,7 +47,7 @@ sysevent/tst.post_chan.exe := LDLIBS += -lsysevent
 
 ustack/tst.bigstack.exe := COPTFLAG += -xO1
 
-GCC = /usr/bin/gcc
+GCC = $(ONBLD_TOOLS)/bin/$(MACH)/cw -_gcc
 
 nfs/%.o: $(SNOOPDIR)/%.c
 	$(COMPILE.c) -o $@ $< -I$(SNOOPDIR)

@@ -19,7 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef _ISCSI_IF_H
@@ -143,7 +144,6 @@ extern "C" {
 #define	ISCSI_SMF_GET			(ISCSI_IOCTL | 50)
 #define	ISCSI_TUNABLE_PARAM_GET		(ISCSI_IOCTL | 51)
 #define	ISCSI_TUNABLE_PARAM_SET		(ISCSI_IOCTL | 52)
-#define	ISCSI_TARGET_REENUM		(ISCSI_IOCTL | 53)
 #define	ISCSI_DB_DUMP			(ISCSI_IOCTL | 100) /* DBG */
 
 /*
@@ -626,14 +626,8 @@ typedef struct iscsi_config_sess {
 	iscsi_ipaddr_t	ics_bindings[1];
 } iscsi_config_sess_t;
 
-/* iscsi re-enumeration */
-typedef struct iscsi_reen {
-	uint32_t	re_ver;
-	uint32_t	re_oid;
-} iscsi_reen_t;
-
 /* iscsi booting prop */
-typedef struct iscsi_boot_property {
+typedef struct _iSCSIBootProperties {
 	node_name_t	ini_name;
 	node_name_t	tgt_name;
 	iscsi_auth_props_t	auth;

@@ -50,13 +50,11 @@ i386)
 	fi
 	
 	rem_drv -b "${BASEDIR}" dnet
-#	rem_drv -b "${BASEDIR}" pcn
+	rem_drv -b "${BASEDIR}" pcn
 	rem_drv -b "${BASEDIR}" ncrs
 	rem_drv -b "${BASEDIR}" iprb
 	rem_drv -b "${BASEDIR}" sd
-#	rem_drv -b "${BASEDIR}" spwr
+	rem_drv -b "${BASEDIR}" spwr
 	rem_drv -b "${BASEDIR}" elxl
 	;;
 esac
-
-exit 0

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,7 +28,6 @@
 #include <sys/dsl_pool.h>
 #include <sys/dsl_dir.h>
 #include <sys/dsl_synctask.h>
-#include <sys/metaslab.h>
 #include <sys/cred.h>
 
 #define	DST_AVG_BLKSHIFT 14
@@ -111,12 +110,7 @@ top:
 		return (dstg->dstg_err);
 	}
 
-	/*
-	 * We don't generally have many sync tasks, so pay the price of
-	 * add_tail to get the tasks executed in the right order.
-	 */
-	VERIFY(0 == txg_list_add_tail(&dstg->dstg_pool->dp_sync_tasks,
-	    dstg, txg));
+	VERIFY(0 == txg_list_add(&dstg->dstg_pool->dp_sync_tasks, dstg, txg));
 
 	dmu_tx_commit(tx);
 
@@ -136,14 +130,8 @@ dsl_sync_task_group_nowait(dsl_sync_task_group_t *dstg, dmu_tx_t *tx)
 	uint64_t txg;
 
 	dstg->dstg_nowaiter = B_TRUE;
-	dstg->dstg_cr = NULL; /* it won't be valid by the time we sync */
 	txg = dmu_tx_get_txg(tx);
-	/*
-	 * We don't generally have many sync tasks, so pay the price of
-	 * add_tail to get the tasks executed in the right order.
-	 */
-	VERIFY(0 == txg_list_add_tail(&dstg->dstg_pool->dp_sync_tasks,
-	    dstg, txg));
+	VERIFY(0 == txg_list_add(&dstg->dstg_pool->dp_sync_tasks, dstg, txg));
 }
 
 void
@@ -162,30 +150,25 @@ void
 dsl_sync_task_group_sync(dsl_sync_task_group_t *dstg, dmu_tx_t *tx)
 {
 	dsl_sync_task_t *dst;
-	dsl_pool_t *dp = dstg->dstg_pool;
-	uint64_t quota, used;
+	void *tr_cookie;
 
 	ASSERT3U(dstg->dstg_err, ==, 0);
 
 	/*
-	 * Check for sufficient space.  We just check against what's
-	 * on-disk; we don't want any in-flight accounting to get in our
-	 * way, because open context may have already used up various
-	 * in-core limits (arc_tempreserve, dsl_pool_tempreserve).
+	 * Check for sufficient space.
 	 */
-	quota = dsl_pool_adjustedsize(dp, B_FALSE) -
-	    metaslab_class_get_deferred(spa_normal_class(dp->dp_spa));
-	used = dp->dp_root_dir->dd_phys->dd_used_bytes;
-	/* MOS space is triple-dittoed, so we multiply by 3. */
-	if (dstg->dstg_space > 0 && used + dstg->dstg_space * 3 > quota) {
-		dstg->dstg_err = ENOSPC;
+	dstg->dstg_err = dsl_dir_tempreserve_space(dstg->dstg_pool->dp_mos_dir,
+	    dstg->dstg_space, dstg->dstg_space * 3, 0, 0, &tr_cookie, tx);
+	/* don't bother trying again */
+	if (dstg->dstg_err == ERESTART)
+		dstg->dstg_err = EAGAIN;
+	if (dstg->dstg_err)
 		return;
-	}
 
 	/*
 	 * Check for errors by calling checkfuncs.
 	 */
-	rw_enter(&dp->dp_config_rwlock, RW_WRITER);
+	rw_enter(&dstg->dstg_pool->dp_config_rwlock, RW_WRITER);
 	for (dst = list_head(&dstg->dstg_tasks); dst;
 	    dst = list_next(&dstg->dstg_tasks, dst)) {
 		dst->dst_err =
@@ -204,7 +187,9 @@ dsl_sync_task_group_sync(dsl_sync_task_group_t *dstg, dmu_tx_t *tx)
 			    dstg->dstg_cr, tx);
 		}
 	}
-	rw_exit(&dp->dp_config_rwlock);
+	rw_exit(&dstg->dstg_pool->dp_config_rwlock);
+
+	dsl_dir_tempreserve_clear(tr_cookie, tx);
 
 	if (dstg->dstg_nowaiter)
 		dsl_sync_task_group_destroy(dstg);

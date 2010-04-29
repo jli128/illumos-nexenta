@@ -1246,7 +1246,6 @@ do_refresh(int argc)
 static int
 do_start(int argc)
 {
-	int attempts = 0;
 	int ret;
 
 	if (argc != 2) {
@@ -1254,13 +1253,7 @@ do_start(int argc)
 		return (ERROR_USAGE);
 	}
 
-	do {
-		ret = do_refresh(argc);
-		/* don't bail out immediately - give it some time */
-		if (ret != SUCCESS)
-			sleep(10);
-	} while (ret != SUCCESS && attempts++ < 5);
-
+	ret = do_refresh(argc);
 	if (ret != SUCCESS)
 		return (ret);
 

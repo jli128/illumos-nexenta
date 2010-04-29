@@ -20,11 +20,12 @@
  */
 
 /*
- * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*
- * Copyright (c) 2000 to 2010, LSI Corporation.
+ * Copyright (c) 2000 to 2009, LSI Corporation.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms of all code within
@@ -58,8 +59,6 @@
 #include <sys/sunmdi.h>
 #include <sys/mdi_impldefs.h>
 #include <sys/scsi/adapters/mpt_sas/mptsas_ioctl.h>
-#include <sys/scsi/adapters/mpt_sas/mpi/mpi2_tool.h>
-#include <sys/scsi/adapters/mpt_sas/mpi/mpi2_cnfg.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -76,16 +75,9 @@ extern "C" {
 
 #define	MAX_MPI_PORTS		16
 
-/*
- * Note below macro definition and data type definition
- * are used for phy mask handling, it should be changed
- * simultaneously.
- */
-#define	MPTSAS_MAX_PHYS		16
-typedef uint16_t		mptsas_phymask_t;
+#define	MPTSAS_MAX_PHYS		8
 
 #define	MPTSAS_INVALID_DEVHDL	0xffff
-#define	MPTSAS_SATA_GUID	"sata-guid"
 
 /*
  * MPT HW defines
@@ -98,9 +90,9 @@ typedef uint16_t		mptsas_phymask_t;
 
 /*
  * 64-bit SAS WWN is displayed as 16 characters as HEX characters,
- * plus two means the prefix 'w' and end of the string '\0'.
+ * plus one means the end of the string '\0'.
  */
-#define	MPTSAS_WWN_STRLEN	(16 + 2)
+#define	MPTSAS_WWN_STRLEN 16 + 1
 #define	MPTSAS_MAX_GUID_LEN	64
 
 /*
@@ -185,7 +177,7 @@ typedef	struct NcrTableIndirect {	/* Table Indirect entries */
 
 typedef	struct mptsas_target {
 		uint64_t		m_sas_wwn;	/* hash key1 */
-		mptsas_phymask_t	m_phymask;	/* hash key2 */
+		uint8_t			m_phymask;	/* hash key2 */
 		/*
 		 * m_dr_flag is a flag for DR, make sure the member
 		 * take the place of dr_flag of mptsas_hash_data.
@@ -204,25 +196,20 @@ typedef	struct mptsas_target {
 
 		uint16_t		m_qfull_retry_interval;
 		uint8_t			m_qfull_retries;
-		uint16_t		m_enclosure;
-		uint16_t		m_slot_num;
-		uint32_t		m_tgt_unconfigured;
 
 } mptsas_target_t;
 
 typedef struct mptsas_smp {
 	uint64_t	m_sasaddr;	/* hash key1 */
-	mptsas_phymask_t m_phymask;	/* hash key2 */
+	uint8_t		m_phymask;	/* hash key2 */
 	uint8_t		reserved1;
 	uint16_t	m_devhdl;
 	uint32_t	m_deviceinfo;
-	uint16_t	m_pdevhdl;
-	uint32_t	m_pdevinfo;
 } mptsas_smp_t;
 
 typedef struct mptsas_hash_data {
 	uint64_t	key1;
-	mptsas_phymask_t key2;
+	uint8_t		key2;
 	uint8_t		dr_flag;
 	uint16_t	devhdl;
 	uint32_t	device_info;
@@ -506,7 +493,7 @@ typedef struct mptsas_topo_change_list {
 	uint_t  event;
 	union {
 		uint8_t physport;
-		mptsas_phymask_t phymask;
+		uint8_t phymask;
 	} un;
 	uint16_t devhdl;
 	void *object;
@@ -595,40 +582,14 @@ typedef struct mptsas_tgt_private {
 /*
  * Macro for phy_flags
  */
-
-typedef struct smhba_info {
-	kmutex_t	phy_mutex;
-	uint8_t		phy_id;
-	uint64_t	sas_addr;
-	char		path[8];
-	uint16_t	owner_devhdl;
-	uint16_t	attached_devhdl;
-	uint8_t		attached_phy_identify;
-	uint32_t	attached_phy_info;
-	uint8_t		programmed_link_rate;
-	uint8_t		hw_link_rate;
-	uint8_t		change_count;
-	uint32_t	phy_info;
-	uint8_t		negotiated_link_rate;
-	uint8_t		port_num;
-	kstat_t		*phy_stats;
-	uint32_t	invalid_dword_count;
-	uint32_t	running_disparity_error_count;
-	uint32_t	loss_of_dword_sync_count;
-	uint32_t	phy_reset_problem_count;
-	void		*mpt;
-} smhba_info_t;
-
 typedef struct mptsas_phy_info {
 	uint8_t			port_num;
 	uint8_t			port_flags;
 	uint16_t		ctrl_devhdl;
 	uint32_t		phy_device_type;
 	uint16_t		attached_devhdl;
-	mptsas_phymask_t	phy_mask;
-	smhba_info_t		smhba_info;
+	uint8_t			phy_mask;
 } mptsas_phy_info_t;
-
 
 typedef struct mptsas_doneq_thread_arg {
 	void		*mpt;
@@ -849,8 +810,6 @@ typedef struct mptsas {
 	uint8_t			m_num_phys;		/* # of PHYs */
 	mptsas_phy_info_t	m_phy_info[MPTSAS_MAX_PHYS];
 	uint8_t			m_port_chng;	/* initiator port changes */
-	MPI2_CONFIG_PAGE_MAN_0   m_MANU_page0;   /* Manufactor page 0 info */
-	MPI2_CONFIG_PAGE_MAN_1   m_MANU_page1;   /* Manufactor page 1 info */
 
 	/* FMA Capabilities */
 	int			m_fm_capabilities;
@@ -886,11 +845,6 @@ typedef struct mptsas {
 	 * IR Capable flag
 	 */
 	uint8_t			m_ir_capable;
-
-	/*
-	 * Is HBA processing a diag reset?
-	 */
-	uint8_t			m_in_reset;
 
 	/*
 	 * per instance cmd data structures for task management cmds
@@ -1254,7 +1208,8 @@ int mptsas_download_firmware();
 int mptsas_can_download_firmware();
 int mptsas_dma_alloc(mptsas_t *mpt, mptsas_dma_alloc_state_t *dma_statep);
 void mptsas_dma_free(mptsas_dma_alloc_state_t *dma_statep);
-mptsas_phymask_t mptsas_physport_to_phymask(mptsas_t *mpt, uint8_t physport);
+uint8_t mptsas_physport_to_phymask(mptsas_t *mpt, uint8_t physport);
+uint8_t mptsas_phymask_to_physport(mptsas_t *mpt, uint8_t phymask);
 void mptsas_fma_check(mptsas_t *mpt, mptsas_cmd_t *cmd);
 int mptsas_check_acc_handle(ddi_acc_handle_t handle);
 int mptsas_check_dma_handle(ddi_dma_handle_t handle);
@@ -1289,8 +1244,7 @@ int mptsas_access_config_page(mptsas_t *mpt, uint8_t action, uint8_t page_type,
     caddr_t, ddi_acc_handle_t, uint16_t, uint32_t, va_list), ...);
 
 int mptsas_ioc_task_management(mptsas_t *mpt, int task_type,
-    uint16_t dev_handle, int lun, uint8_t *reply, uint32_t reply_size,
-    int mode);
+    uint16_t dev_handle, int lun);
 int mptsas_send_event_ack(mptsas_t *mpt, uint32_t event, uint32_t eventcntx);
 void mptsas_send_pending_event_ack(mptsas_t *mpt);
 void mptsas_set_throttle(struct mptsas *mpt, mptsas_target_t *ptgt, int what);
@@ -1312,29 +1266,18 @@ int mptsas_ioc_init(mptsas_t *mpt);
  */
 int mptsas_get_sas_device_page0(mptsas_t *mpt, uint32_t page_address,
     uint16_t *dev_handle, uint64_t *sas_wwn, uint32_t *dev_info,
-    uint8_t *physport, uint8_t *phynum, uint16_t *pdevhandle,
-    uint16_t *slot_num, uint16_t *enclosure);
+    uint8_t *physport, uint8_t *phynum);
 int mptsas_get_sas_io_unit_page(mptsas_t *mpt);
 int mptsas_get_sas_io_unit_page_hndshk(mptsas_t *mpt);
 int mptsas_get_sas_expander_page0(mptsas_t *mpt, uint32_t page_address,
     mptsas_smp_t *info);
+int mptsas_set_initiator_mode(mptsas_t *mpt);
 int mptsas_set_ioc_params(mptsas_t *mpt);
 int mptsas_get_manufacture_page5(mptsas_t *mpt);
 int mptsas_get_sas_port_page0(mptsas_t *mpt, uint32_t page_address,
     uint64_t *sas_wwn, uint8_t *portwidth);
 int mptsas_get_bios_page3(mptsas_t *mpt,  uint32_t *bios_version);
-int
-mptsas_get_sas_phy_page0(mptsas_t *mpt, uint32_t page_address,
-    smhba_info_t *info);
-int
-mptsas_get_sas_phy_page1(mptsas_t *mpt, uint32_t page_address,
-    smhba_info_t *info);
-int
-mptsas_get_manufacture_page0(mptsas_t *mpt);
-void
-mptsas_create_phy_stats(mptsas_t *mpt, char *iport, dev_info_t *dip);
-void mptsas_destroy_phy_stats(mptsas_t *mpt);
-int mptsas_smhba_phy_init(mptsas_t *mpt);
+
 /*
  * RAID functions
  */
@@ -1377,7 +1320,7 @@ void mptsas_printf(char *fmt, ...);
 
 #define	NDBG12(args)	MPTSAS_DBGPR(0x1000, args)	/* enumeration */
 #define	NDBG13(args)	MPTSAS_DBGPR(0x2000, args)	/* configuration page */
-#define	NDBG14(args)	MPTSAS_DBGPR(0x4000, args)	/* LED control */
+#define	NDBG14(args)	MPTSAS_DBGPR(0x4000, args)
 #define	NDBG15(args)	MPTSAS_DBGPR(0x8000, args)
 
 #define	NDBG16(args)	MPTSAS_DBGPR(0x010000, args)

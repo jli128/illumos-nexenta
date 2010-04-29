@@ -19,7 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /* This file is the main module for the pcitool. */
@@ -475,7 +476,7 @@ supports_ari(int fd, uint8_t bus_no)
 	cfg_prg.func_no = func_no;
 	cfg_prg.barnum = 0;
 	cfg_prg.user_version = PCITOOL_VERSION;
-	cfg_prg.offset = 0;
+	cfg_prg.offset = PCI_CONF_COMM;
 	cfg_prg.acc_attr = PCITOOL_ACC_ATTR_SIZE_4 + PCITOOL_ACC_ATTR_ENDN_LTL;
 
 	if (ioctl(fd, PCITOOL_DEVICE_GET_REG, &cfg_prg) != SUCCESS) {
@@ -483,15 +484,7 @@ supports_ari(int fd, uint8_t bus_no)
 	}
 
 	data = (uint32_t)cfg_prg.data;
-	if (data == (uint32_t)(-1))
-		return (FAILURE);
 
-	cfg_prg.offset = PCI_CONF_COMM;
-	if (ioctl(fd, PCITOOL_DEVICE_GET_REG, &cfg_prg) != SUCCESS) {
-		return (FAILURE);
-	}
-
-	data = (uint32_t)cfg_prg.data;
 	if (!((data >> 16) & PCI_STAT_CAP))
 		return (FAILURE);
 

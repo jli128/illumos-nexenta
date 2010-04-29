@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*
@@ -35,8 +36,6 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-/* Copyright (c) 2007, The Storage Networking Industry Association. */
-/* Copyright (c) 1996, 1997 PDC, Network Appliance. All Rights Reserved */
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/time.h>
@@ -622,6 +621,39 @@ voliswr(char *path)
 	NDMP_LOG(LOG_DEBUG, "%d path \"%s\"", rv, path);
 	return (rv);
 
+}
+
+
+/*
+ * get_bk_path_v3
+ *
+ * Get the backup path from the NDMP environment variables.
+ *
+ * Parameters:
+ *   params (input) - pointer to the parameters structure.
+ *
+ * Returns:
+ *   The backup path: if anything is specified
+ *   NULL: Otherwise
+ */
+char *
+get_bk_path_v3(ndmpd_module_params_t *params)
+{
+	char *bkpath;
+
+	bkpath = MOD_GETENV(params, "PREFIX");
+	if (!bkpath)
+		bkpath = MOD_GETENV(params, "FILESYSTEM");
+
+
+	if (!bkpath) {
+		MOD_LOGV3(params, NDMP_LOG_ERROR,
+		    "Backup path not defined.\n");
+	} else {
+		NDMP_LOG(LOG_DEBUG, "bkpath: \"%s\"", bkpath);
+	}
+
+	return (bkpath);
 }
 
 
@@ -2238,8 +2270,6 @@ backup_reader_v3(backup_reader_arg_t *argp)
 	char *jname;
 	ndmp_lbr_params_t *nlp;
 	tlm_commands_t *cmds;
-	char temp_name[PATH_MAX+1];
-	int str_len;
 
 	if (!argp)
 		return (-1);
@@ -2296,14 +2326,6 @@ backup_reader_v3(backup_reader_arg_t *argp)
 	/* set traversing arguments */
 	ft.ft_path = nlp->nlp_backup_path;
 	ft.ft_lpath = bp.bp_chkpnm;
-
-	if(strstr(ft.ft_lpath,"legacy")  == ft.ft_lpath) { // if word legacy at beginning
-		str_len = strlen(ft.ft_lpath)-7;
-		strncpy(temp_name,ft.ft_lpath+6,str_len);
-		temp_name[str_len+1] = '\0';
-		strcat(temp_name,ft.ft_path);
-		strcpy(ft.ft_lpath,temp_name);
-	}
 
 	NDMP_LOG(LOG_DEBUG, "path %s lpath %s", ft.ft_path, ft.ft_lpath);
 	if (NLP_ISSET(nlp, NLPF_TOKENBK) || NLP_ISSET(nlp, NLPF_LEVELBK)) {
@@ -2432,7 +2454,6 @@ tar_backup_v3(ndmpd_session_t *session, ndmpd_module_params_t *params,
 			nctx.nc_plname = ndmpd_get_prop(NDMP_PLUGIN_PATH);
 			nctx.nc_cmds = cmds;
 			nctx.nc_params = params;
-			nctx.nc_ddata = (void *) session;
 			if ((err = ndmp_pl->np_pre_backup(ndmp_pl, &nctx,
 			    nlp->nlp_backup_path)) != 0) {
 				NDMP_LOG(LOG_ERR, "Pre-backup plug-in: %m");
@@ -2710,27 +2731,19 @@ fix_nlist_v3(ndmpd_session_t *session, ndmpd_module_params_t *params,
 		 * the last component of the original path, if any
 		 * (except in V4).
 		 */
-		if (ISDEFINED(ep->nm3_newnm)) {
+		if (session->ns_protocol_version == NDMPV4) {
 			nm = ep->nm3_newnm;
 		} else {
-			char *p, *q;
-
-			/*
-			 * Find the last component of nm3_opath.
-			 * nm3_opath has no trailing '/'.
-			 */
-			p = strrchr(ep->nm3_opath, '/');
-			nm = p ? p + 1 : ep->nm3_opath;
-
-			/*
-			 * In DDAR the last component could
-			 * be repeated in nm3_dpath
-			 */
-			q = strrchr(ep->nm3_dpath, '/');
-			q = q ? q + 1 : ep->nm3_dpath;
-			if (strcmp(nm, q) == 0)
-				nm = NULL;
-
+			if (ISDEFINED(ep->nm3_newnm)) {
+				nm = ep->nm3_newnm;
+			} else {
+				/*
+				 * Find the last component of nm3_opath.
+				 * nm3_opath has no trailing '/'.
+				 */
+				char *p = strrchr(ep->nm3_opath, '/');
+				nm = p? p : ep->nm3_opath;
+			}
 		}
 
 		bp = joinpath(buf, dp, nm);
@@ -3210,10 +3223,8 @@ ndmpd_dar_tar_v3(ndmpd_session_t *session, ndmpd_module_params_t *params,
 		/* Plug-in module */
 		if (ndmp_pl != NULL &&
 		    ndmp_pl->np_pre_restore != NULL) {
-			(void) memset(&nctx, 0, sizeof (ndmp_context_t));
 			nctx.nc_cmds = cmds;
 			nctx.nc_params = params;
-			nctx.nc_ddata = (void *) session;
 			ep = (mem_ndmp_name_v3_t *)MOD_GETNAME(params,
 			    dar_index - 1);
 
@@ -3233,8 +3244,7 @@ ndmpd_dar_tar_v3(ndmpd_session_t *session, ndmpd_module_params_t *params,
 		if (tm_tar_ops.tm_getdir != NULL) {
 			err = (tm_tar_ops.tm_getdir)(cmds, cmds->tcs_command,
 			    nlp->nlp_jstat, &rn, 1, 1, sels, &excl, flags,
-			    dar_index, nlp->nlp_backup_path,
-			    session->hardlink_q);
+			    dar_index, session->hardlink_q);
 		}
 
 		cmds->tcs_writer_count--;
@@ -3436,39 +3446,6 @@ ndmp_plugin_pre_restore(ndmp_context_t *ctxp, ndmpd_module_params_t *params,
 }
 
 /*
- * get_absolute_path
- *
- * Get resolved path name which does not involve ".", ".." or extra
- * "/" or symbolic links.
- *
- * e.g.
- *
- * /backup/path/ -> /backup/path
- * /backup/path/. -> /backup/path
- * /backup/path/../path/ -> /backup/path
- * /link-to-backup-path -> /backup/path
- *
- * Returns:
- * 	Pointer to the new path (allocated)
- * 	NULL if the path doesnt exist
- */
-static char *
-get_absolute_path(const char *bkpath)
-{
-	char *pbuf;
-	char *rv;
-
-	if (!(pbuf = ndmp_malloc(TLM_MAX_PATH_NAME)))
-		return (NULL);
-
-	if ((rv = realpath(bkpath, pbuf)) == NULL) {
-		NDMP_LOG(LOG_DEBUG, "Invalid path [%s] err=%d",
-		    bkpath, errno);
-	}
-	return (rv);
-}
-
-/*
  * Expands the format string and logs the resulting message to the
  * remote DMA
  */
@@ -3571,10 +3548,8 @@ ndmpd_rs_sar_tar_v3(ndmpd_session_t *session, ndmpd_module_params_t *params,
 		/* Plug-in module */
 		if (ndmp_pl != NULL &&
 		    ndmp_pl->np_pre_restore != NULL) {
-			(void) memset(&nctx, 0, sizeof (ndmp_context_t));
 			nctx.nc_cmds = cmds;
 			nctx.nc_params = params;
-			nctx.nc_ddata = (void *) session;
 			if ((err = ndmp_plugin_pre_restore(&nctx, params,
 			    nlp->nlp_nfiles))
 			    != 0) {
@@ -3594,7 +3569,7 @@ ndmpd_rs_sar_tar_v3(ndmpd_session_t *session, ndmpd_module_params_t *params,
 		if (tm_tar_ops.tm_getdir != NULL)
 			err = (tm_tar_ops.tm_getdir)(cmds, cmds->tcs_command,
 			    nlp->nlp_jstat, &rn, 1, 1, sels, &excl, flags, 0,
-			    nlp->nlp_backup_path, session->hardlink_q);
+			    session->hardlink_q);
 
 		cmds->tcs_writer_count--;
 		cmds->tcs_command->tc_ref--;
@@ -3685,15 +3660,11 @@ ndmp_backup_get_params_v3(ndmpd_session_t *session,
 		    "Internal error: NULL nlp.\n");
 		rv = NDMP_ILLEGAL_ARGS_ERR;
 	} else {
-		if (!(nlp->nlp_backup_path = get_backup_path_v3(params)))
+		if (!(nlp->nlp_backup_path = get_bk_path_v3(params)))
 			rv = NDMP_FILE_NOT_FOUND_ERR;
 		else if (!is_valid_backup_dir_v3(params, nlp->nlp_backup_path))
 			rv = NDMP_ILLEGAL_ARGS_ERR;
 	}
-
-	nlp->nlp_backup_path = get_absolute_path(nlp->nlp_backup_path);
-	if (!nlp->nlp_backup_path)
-		rv = NDMP_FILE_NOT_FOUND_ERR;
 
 	if (rv != NDMP_NO_ERR)
 		return (rv);
@@ -3748,9 +3719,8 @@ ndmp_backup_get_params_v3(ndmpd_session_t *session,
  *   != 0: otherwise
  */
 int
-ndmpd_tar_backup_starter_v3(void *arg)
+ndmpd_tar_backup_starter_v3(ndmpd_module_params_t *params)
 {
-	ndmpd_module_params_t *params = arg;
 	int err;
 	ndmpd_session_t *session;
 	ndmp_lbr_params_t *nlp;
@@ -3807,7 +3777,6 @@ ndmpd_tar_backup_starter_v3(void *arg)
 
 	/* nlp_params is allocated in start_backup_v3() */
 	NDMP_FREE(nlp->nlp_params);
-	NDMP_FREE(nlp->nlp_backup_path);
 
 	NS_DEC(nbk);
 	ndmp_session_unref(session);
@@ -3871,7 +3840,7 @@ ndmp_restore_get_params_v3(ndmpd_session_t *session,
 	if (!(nlp = ndmp_get_nlp(session))) {
 		NDMP_LOG(LOG_DEBUG, "nlp is NULL");
 		rv = NDMP_ILLEGAL_ARGS_ERR;
-	} else if (!(nlp->nlp_backup_path = get_backup_path_v3(params)))
+	} else if (!(nlp->nlp_backup_path = get_bk_path_v3(params)))
 		rv = NDMP_ILLEGAL_ARGS_ERR;
 	else if ((nlp->nlp_nfiles = session->ns_data.dd_nlist_len) == 0) {
 		NDMP_LOG(LOG_DEBUG, "nfiles: %d", nlp->nlp_nfiles);
@@ -3926,9 +3895,8 @@ ndmp_restore_get_params_v3(ndmpd_session_t *session,
  *   != NDMP_NO_ERR: otherwise
  */
 int
-ndmpd_tar_restore_starter_v3(void *arg)
+ndmpd_tar_restore_starter_v3(ndmpd_module_params_t *params)
 {
-	ndmpd_module_params_t *params = arg;
 	int err;
 	ndmpd_session_t *session;
 	ndmp_lbr_params_t *nlp;

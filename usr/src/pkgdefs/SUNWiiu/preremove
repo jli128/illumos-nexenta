@@ -104,8 +104,8 @@ then
 	modunload -i ${MODID}
 	if [ $? != 0 ]
 	then
-		echo "Warning: Failed to unload $MODULE module."
-		exit 0
+		echo "Error: Failed to unload $MODULE module."
+		exit 1
 	fi
 fi
 fi

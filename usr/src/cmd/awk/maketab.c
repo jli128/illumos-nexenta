@@ -122,7 +122,7 @@ main()
 	printf("#include \"y.tab.h\"\n\n");
 
 	if ((fp = fopen("y.tab.h", "r")) == NULL) {
-		fprintf(stderr, "maketab can't open y.tab.h!\n");
+		fprintf(stderr, gettext("maketab can't open y.tab.h!\n"));
 		exit(1);
 	}
 	printf("static uchar *printname[%d] = {\n", SIZE);
@@ -133,7 +133,7 @@ main()
 		if (c != '#' || n != 4 && strcmp(def, "define") != 0)
 			continue;
 		if (tok < FIRSTTOKEN || tok > LASTTOKEN) {
-			fprintf(stderr, "maketab funny token %d %s\n",
+			fprintf(stderr, gettext("maketab funny token %d %s\n"),
 			    tok, buf);
 			exit(1);
 		}

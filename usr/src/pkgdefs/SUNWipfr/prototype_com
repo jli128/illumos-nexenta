@@ -38,7 +38,6 @@ i copyright
 i depend
 i preremove
 i postinstall
-i preinstall
 i i.manifest
 i i.preserve
 #

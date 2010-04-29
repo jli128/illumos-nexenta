@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*
@@ -662,7 +663,7 @@ tlm_get_chkpnt_time(char *path, int auto_checkpoint, time_t *tp, char *jname)
 
 	if (auto_checkpoint) {
 		NDMP_LOG(LOG_DEBUG, "volname [%s]", volname);
-		(void) snprintf(chk_name, PATH_MAX, "%s", jname);
+		(void) snprintf(chk_name, PATH_MAX, "bk-%s", jname);
 		return (chkpnt_creationtime_bypattern(volname, chk_name, tp));
 	}
 	cp_nm = strchr(volname, '@');
@@ -709,13 +710,13 @@ tlm_log_list(char *title, char **lpp)
  * Insert the backup snapshot name into the path.
  *
  * Input:
- * 	name: Original path name.
+ * 	name: Origional path name.
  *
  * Output:
- * 	name: Original name modified to include a snapshot.
+ * 	name: Origional name modified to include a snapshot.
  *
  * Returns:
- * 	Original name modified to include a snapshot.
+ * 	Origional name modified to include a snapshot.
  */
 char *
 tlm_build_snapshot_name(char *name, char *sname, char *jname)
@@ -746,7 +747,7 @@ tlm_build_snapshot_name(char *name, char *sname, char *jname)
 	(void) mutex_unlock(&zlib_mtx);
 
 	rest = name + strlen(mountpoint);
-	(void) snprintf(sname, TLM_MAX_PATH_NAME, "%s/%s/%s%s", mountpoint,
+	(void) snprintf(sname, TLM_MAX_PATH_NAME, "%s/%s/bk-%s%s", mountpoint,
 	    TLM_SNAPSHOT_DIR, jname, rest);
 
 	return (sname);
@@ -1173,7 +1174,7 @@ tlm_ioctl(int fd, int cmd, void *data)
  * Create a snapshot on the volume
  */
 int
-chkpnt_backup_prepare(char *volname, char *jname, boolean_t recursive)
+chkpnt_backup_prepare(char *volname, char *jname)
 {
 	char chk_name[PATH_MAX];
 	char *p;
@@ -1189,18 +1190,17 @@ chkpnt_backup_prepare(char *volname, char *jname, boolean_t recursive)
 	while (*p == '/')
 		p++;
 
-	(void) snprintf(chk_name, PATH_MAX, "%s@%s", p, jname);
+	(void) snprintf(chk_name, PATH_MAX, "%s@bk-%s", p, jname);
 
 	(void) mutex_lock(&zlib_mtx);
-	if ((rv = zfs_snapshot(zlibh, chk_name, recursive, NULL))
-	    == -1) {
+	if ((rv = zfs_snapshot(zlibh, chk_name, 0, NULL)) == -1) {
 		if (errno == EEXIST) {
 			(void) mutex_unlock(&zlib_mtx);
 			return (0);
 		}
 		NDMP_LOG(LOG_DEBUG,
-		    "chkpnt_backup_prepare: %s failed (err=%d): %s",
-		    chk_name, errno, libzfs_error_description(zlibh));
+		    "chkpnt_backup_prepare: %s failed (err=%d)",
+		    chk_name, errno);
 		(void) mutex_unlock(&zlib_mtx);
 		return (rv);
 	}
@@ -1212,17 +1212,11 @@ chkpnt_backup_prepare(char *volname, char *jname, boolean_t recursive)
  * Remove the 'backup' snapshot if backup was successful
  */
 int
-chkpnt_backup_successful(char *volname, char *jname, boolean_t recursive,
-    int *zfs_err)
+chkpnt_backup_successful(char *volname, char *jname)
 {
 	char chk_name[PATH_MAX];
 	zfs_handle_t *zhp;
-	zfs_type_t ztype;
-	int err;
 	char *p;
-
-	if (zfs_err)
-		*zfs_err = 0;
 
 	if (!volname || !*volname)
 		return (-1);
@@ -1234,40 +1228,16 @@ chkpnt_backup_successful(char *volname, char *jname, boolean_t recursive,
 	while (*p == '/')
 		p++;
 
-	if (recursive) {
-		ztype = ZFS_TYPE_VOLUME | ZFS_TYPE_FILESYSTEM;
-	} else {
-		(void) snprintf(chk_name, PATH_MAX, "%s@%s", p, jname);
-		p = chk_name;
-		ztype = ZFS_TYPE_SNAPSHOT;
-	}
+	(void) snprintf(chk_name, PATH_MAX, "%s@bk-%s", p, jname);
 
 	(void) mutex_lock(&zlib_mtx);
-	if ((zhp = zfs_open(zlibh, p, ztype)) == NULL) {
+	if ((zhp = zfs_open(zlibh, chk_name, ZFS_TYPE_SNAPSHOT)) == NULL) {
 		NDMP_LOG(LOG_DEBUG, "chkpnt_backup_successful: open %s failed",
-		    p);
+		    chk_name);
 		(void) mutex_unlock(&zlib_mtx);
 		return (-1);
 	}
-
-	if (recursive) {
-		err = zfs_destroy_snaps(zhp, jname, B_FALSE);
-	} else {
-		err = zfs_destroy(zhp, B_FALSE);
-	}
-
-	if (err) {
-		NDMP_LOG(LOG_ERR, "%s (recursive destroy: %d): %d; %s; %s",
-		    p,
-		    recursive,
-		    libzfs_errno(zlibh),
-		    libzfs_error_action(zlibh),
-		    libzfs_error_description(zlibh));
-
-		if (zfs_err)
-			*zfs_err = err;
-	}
-
+	(void) zfs_destroy(zhp, B_FALSE);
 	zfs_close(zhp);
 	(void) mutex_unlock(&zlib_mtx);
 

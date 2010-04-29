@@ -22,15 +22,8 @@ static char sccsic[] = "@(#) misc.c 1.2 96/02/11 17:01:29";
 #include <string.h>
 #include <ctype.h>
 #include <netdb.h>
-#include <syslog.h>
 
 #include "tcpd.h"
-
-#pragma weak allow_severity
-#pragma weak deny_severity
-
-int deny_severity = LOG_NOTICE;
-int allow_severity = LOG_WARNING;
 
 extern char *fgets();
 

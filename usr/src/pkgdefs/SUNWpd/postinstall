@@ -283,7 +283,7 @@ if [ "${ISA_TYPE}" = "${ISA_TYPE_I386}" ]; then
 
 	# Remove references to symhisl if any in /etc/driver_aliases to
 	# avoid confusion.
-	grep -v "symhisl \"${DRVALIAS}\"" $DRIVERALS > $DRIVERALS.new
+	grep -v "symhisl \"${DRVALIAS}\"\>" $DRIVERALS > $DRIVERALS.new
 	mv $DRIVERALS.new $DRIVERALS
 
 	# Remove references to symhisl if any in /etc/path_to_inst to

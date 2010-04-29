@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,7 +64,6 @@ typedef struct smb_hostinfo {
 	int		hi_interval;
 	uint8_t		hi_updatecnt;
 	uint32_t	hi_type;
-	smb_version_t	hi_version;
 } smb_hostinfo_t;
 
 typedef struct smb_browserinfo {
@@ -834,8 +833,8 @@ smb_browser_send_HostAnnouncement(smb_hostinfo_t *hinfo,
 	    ++hinfo->hi_updatecnt,
 	    next_announcement * 60000,	/* Periodicity in MilliSeconds */
 	    hinfo->hi_nbname,
-	    hinfo->hi_version.sv_major,
-	    hinfo->hi_version.sv_minor,
+	    SMB_VERSION_MAJOR,
+	    SMB_VERSION_MINOR,
 	    type,
 	    SMB_SERVER_SIGNATURE,
 	    hinfo->hi_nic.nic_cmnt);
@@ -1121,14 +1120,11 @@ smb_browser_init(void)
 	smb_hostinfo_t *hinfo;
 	smb_niciter_t ni;
 	uint32_t type;
-	smb_version_t version;
-
-	smb_config_get_version(&version);
 
 	(void) rw_wrlock(&smb_binfo.bi_hlist_rwl);
 	smb_browser_infofree();
 
-	if (smb_nic_getfirst(&ni) != SMB_NIC_SUCCESS) {
+	if (smb_nic_getfirst(&ni) != 0) {
 		(void) rw_unlock(&smb_binfo.bi_hlist_rwl);
 		return (-1);
 	}
@@ -1156,7 +1152,6 @@ smb_browser_init(void)
 		hinfo->hi_reps = 5;
 		hinfo->hi_updatecnt = 0;
 		hinfo->hi_type = type;
-		hinfo->hi_version = version;
 
 		/* This is the name used for HostAnnouncement */
 		(void) strlcpy(hinfo->hi_nbname, hinfo->hi_nic.nic_host,
@@ -1171,7 +1166,7 @@ smb_browser_init(void)
 
 		list_insert_tail(&smb_binfo.bi_hlist, hinfo);
 		smb_binfo.bi_hcnt++;
-	} while (smb_nic_getnext(&ni) == SMB_NIC_SUCCESS);
+	} while (smb_nic_getnext(&ni) == 0);
 
 	(void) rw_unlock(&smb_binfo.bi_hlist_rwl);
 	return (0);

@@ -48,7 +48,7 @@ update_header ()
     -e "s:#ident[ 	].*SMI.:$ident_str:" \
     -e "/#ident/y/\~/\"/" \
     -e "s:# Copyright (C) QLogic Corporation.*:$qlogic_copyright:" \
-    $dest > $tmpfile 2>/dev/null
+    $dest > $tmpfile	
     if [ $? -eq 0 ] ; then
        mv $tmpfile $dest
     fi

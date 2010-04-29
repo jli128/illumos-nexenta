@@ -431,15 +431,7 @@ wordexp(const char *word, wordexp_t *wp, int flags)
 	int error;
 	int cancel_state;
 
-#if 0
-	/*
-	 * XXX: mac@gnusolaris.org: use XPG4 sh for now, until
-	 *	Sun updates its ksh to a newer version which can
-	 *	be open-sourced.
-	 */
 	static const char *sun_path = "/bin/ksh";
-#endif
-	static const char *sun_path = "/usr/xpg4/bin/sh";
 	static const char *xpg4_path = "/usr/xpg4/bin/sh";
 
 	/*

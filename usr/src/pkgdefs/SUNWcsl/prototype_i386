@@ -210,7 +210,7 @@ s none usr/lib/amd64/libnls.so=libnls.so.1
 f none usr/lib/amd64/libpanel.so.1 755 root bin
 s none usr/lib/amd64/libpanel.so=libpanel.so.1
 f none usr/lib/amd64/libplot.so.1 755 root bin
-#s none usr/lib/amd64/libplot.so=./libplot.so.1
+s none usr/lib/amd64/libplot.so=./libplot.so.1
 f none usr/lib/amd64/libproject.so.1 755 root bin
 s none usr/lib/amd64/libproject.so=libproject.so.1
 f none usr/lib/amd64/libpkcs11.so.1 755 root bin
@@ -266,8 +266,8 @@ s none usr/lib/amd64/libelf.so.1=../../../lib/amd64/libelf.so.1
 s none usr/lib/amd64/libelf.so=../../../lib/amd64/libelf.so.1
 f none usr/lib/amd64/libexacct.so.1 755 root bin
 s none usr/lib/amd64/libexacct.so=libexacct.so.1
-#s none usr/lib/amd64/libintl.so.1=../../../lib/amd64/libintl.so.1
-#s none usr/lib/amd64/libintl.so=../../../lib/amd64/libintl.so.1
+s none usr/lib/amd64/libintl.so.1=../../../lib/amd64/libintl.so.1
+s none usr/lib/amd64/libintl.so=../../../lib/amd64/libintl.so.1
 s none usr/lib/amd64/libkstat.so.1=../../../lib/amd64/libkstat.so.1
 s none usr/lib/amd64/libkstat.so=../../../lib/amd64/libkstat.so.1
 f none usr/lib/amd64/libkvm.so.1 755 root bin

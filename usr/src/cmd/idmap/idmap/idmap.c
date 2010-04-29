@@ -19,7 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 
@@ -30,12 +31,9 @@
 #include <errno.h>
 #include <limits.h>
 #include <syslog.h>
-#include <stdarg.h>
-#include <note.h>
+#include <sys/varargs.h>
 #include "idmap_engine.h"
 #include "idmap_priv.h"
-#include "namemaps.h"
-#include "libadutils.h"
 
 /* Initialization values for pids/rids: */
 
@@ -242,7 +240,6 @@ static int do_add_name_mapping(flag_t *f, int argc, char **argv,
     cmd_pos_t *pos);
 static int do_remove_name_mapping(flag_t *f, int argc, char **argv,
     cmd_pos_t *pos);
-static int do_flush(flag_t *f, int argc, char **argv, cmd_pos_t *pos);
 static int do_exit(flag_t *f, int argc, char **argv, cmd_pos_t *pos);
 static int do_export(flag_t *f, int argc, char **argv, cmd_pos_t *pos);
 static int do_help(flag_t *f, int argc, char **argv, cmd_pos_t *pos);
@@ -251,7 +248,7 @@ static int do_unset_namemap(flag_t *f, int argc, char **argv, cmd_pos_t *pos);
 static int do_get_namemap(flag_t *f, int argc, char **argv, cmd_pos_t *pos);
 
 
-/* Command names and their handlers to be passed to idmap_engine */
+/* Command names and their hanlers to be passed to idmap_engine */
 
 static cmd_ops_t commands[] = {
 	{
@@ -288,11 +285,6 @@ static cmd_ops_t commands[] = {
 		"remove",
 		"a(all)t(to)f(from)d(directional)",
 		do_remove_name_mapping
-	},
-	{
-		"flush",
-		"a(all)",
-		do_flush
 	},
 	{
 		"exit",
@@ -447,7 +439,6 @@ help()
 	    "idmap add [-d] name1 name2\n"
 	    "idmap dump [-n] [-v]\n"
 	    "idmap export [-f file] format\n"
-	    "idmap flush [-a]\n"
 	    "idmap get-namemap name\n"
 	    "idmap help\n"
 	    "idmap import [-F] [-f file] format\n"
@@ -2822,40 +2813,6 @@ cleanup:
 	return (rc);
 }
 
-/* flush command handler */
-static int
-do_flush(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
-{
-	NOTE(ARGUNUSED(argv))
-	idmap_flush_op op;
-	idmap_stat stat;
-	int rc = 0;
-
-	if (argc > 0) {
-		print_error(pos,
-		    gettext("Too many arguments.\n"));
-		return (-1);
-	}
-	if (f[a_FLAG] != NULL)
-		op = IDMAP_FLUSH_DELETE;
-	else
-		op = IDMAP_FLUSH_EXPIRE;
-
-	if (init_command())
-		return (-1);
-
-	stat = idmap_flush(handle, op);
-	if (stat != IDMAP_SUCCESS) {
-		print_error(pos,
-		    gettext("%s\n"),
-		    idmap_stat2string(handle, stat));
-		rc = -1;
-	}
-
-	fini_command();
-	return (rc);
-}
-
 
 /* exit command handler */
 static int
@@ -3542,15 +3499,11 @@ cleanup:
 
 
 /* printflike */
-static
 void
-idmap_cli_logger(int pri, const char *format, ...)
+/* LINTED E_FUNC_ARG_UNUSED */
+logger(int pri, const char *format, ...)
 {
-	NOTE(ARGUNUSED(pri))
 	va_list args;
-
-	if (pri == LOG_DEBUG)
-		return;
 
 	va_start(args, format);
 
@@ -3572,8 +3525,7 @@ main(int argc, char *argv[])
 	(void) textdomain(TEXT_DOMAIN);
 
 	/* Redirect logging */
-	idmap_set_logger(idmap_cli_logger);
-	adutils_set_logger(idmap_cli_logger);
+	idmap_set_logger(logger);
 
 	/* idmap_engine determines the batch_mode: */
 	rc = engine_init(sizeof (commands) / sizeof (cmd_ops_t),

@@ -23,20 +23,12 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-[ "${BASEDIR}" = "/" ] && BASEDIR=""
+[ "${BASERDIR}" = "/" ] && BASEDIR=""
 
 CONF_FILE=${BASEDIR}/etc/mpapi.conf
 
 COMMON_PKGS='SUNWmpapir, SUNWmpapi'
 COMMON_URL="http://sourceforge.net/projects/mp-mgmt-api/"
-
-#
-# Checking for config file here is useless since this package has
-# a dependency on sunwimacr to begin with; unlike SVR4 PKG, Debian
-# packaging will enforce dependency checks, so there is no need to
-# do anything here.
-#
-exit 0
 
 if [ ! -f ${CONF_FILE} ]; then
   echo ""

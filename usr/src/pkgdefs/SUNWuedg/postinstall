@@ -94,7 +94,8 @@ if installed usbser_edge ; then
 	update_driver usbser_edge "${USBSER_EDGE_ALIASES}" || EXIT=1
 else
 	add_drv ${BASEDIR_OPT} -m '* 0666 root sys' \
-	    -i "${USBSER_EDGE_ALIASES}" -n usbser_edge
+	    -i "${USBSER_EDGE_ALIASES}" -n usbser_edge || \
+	    EXIT=1
 fi
 
 exit $EXIT

@@ -30,7 +30,6 @@ CFLAGS += $(CCVERBOSE)
 LINTFLAGS += -ux
 
 include ../Makefile.tools
-LDLIBS += -lasprintf
 
 $(ROOTONBLDMAN1FILES) := FILEMODE=      644
 

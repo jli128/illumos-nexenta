@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,11 +35,13 @@
 #include <smbsrv/smb_xdr.h>
 #include <smbsrv/smb_token.h>
 
-static bool_t smb_privset_xdr(XDR *, smb_privset_t *);
-static bool_t smb_sid_xdr(XDR *, smb_sid_t *);
+static bool_t xdr_smb_privset_t(XDR *, smb_privset_t *);
+static bool_t xdr_smb_sid_t(XDR *, smb_sid_t *);
 
 static bool_t
-smb_privset_helper_xdr(XDR *xdrs, char **privs)
+xdr_smb_privset_helper(xdrs, privs)
+	XDR *xdrs;
+	char **privs;
 {
 	uint32_t pos, len;
 	uint32_t cnt;
@@ -71,14 +73,16 @@ smb_privset_helper_xdr(XDR *xdrs, char **privs)
 	    - sizeof (smb_luid_attrs_t)
 	    + (cnt * sizeof (smb_luid_attrs_t));
 
-	if (!xdr_pointer(xdrs, privs, len, (xdrproc_t)smb_privset_xdr))
+	if (!xdr_pointer(xdrs, privs, len, (xdrproc_t)xdr_smb_privset_t))
 		return (FALSE);
 
 	return (TRUE);
 }
 
 static bool_t
-smb_id_xdr(XDR *xdrs, smb_id_t *objp)
+xdr_smb_id_t(xdrs, objp)
+	XDR *xdrs;
+	smb_id_t *objp;
 {
 	uint8_t len;
 
@@ -92,7 +96,7 @@ smb_id_xdr(XDR *xdrs, smb_id_t *objp)
 		return (FALSE);
 
 	if (!xdr_pointer(xdrs, (char **)&objp->i_sid, len,
-	    (xdrproc_t)smb_sid_xdr))
+	    (xdrproc_t)xdr_smb_sid_t))
 		return (FALSE);
 
 	if (!xdr_uint32_t(xdrs, (uint32_t *)&objp->i_id))
@@ -102,28 +106,34 @@ smb_id_xdr(XDR *xdrs, smb_id_t *objp)
 }
 
 static bool_t
-smb_ids_xdr(XDR *xdrs, smb_ids_t *objp)
+xdr_smb_ids_t(xdrs, objp)
+	XDR *xdrs;
+	smb_ids_t *objp;
 {
 	if (!xdr_array(xdrs, (char **)&objp->i_ids, (uint32_t *)&objp->i_cnt,
-	    ~0, sizeof (smb_id_t), (xdrproc_t)smb_id_xdr))
+	    ~0, sizeof (smb_id_t), (xdrproc_t)xdr_smb_id_t))
 		return (FALSE);
 
 	return (TRUE);
 }
 
 static bool_t
-smb_posix_grps_xdr(XDR *xdrs, smb_posix_grps_t *objp)
+xdr_smb_posix_grps_t(xdrs, objp)
+	XDR *xdrs;
+	smb_posix_grps_t *objp;
 {
 	if (!xdr_uint32_t(xdrs, &objp->pg_ngrps))
 		return (FALSE);
 	if (!xdr_vector(xdrs, (char *)objp->pg_grps, objp->pg_ngrps,
-	    sizeof (uint32_t), (xdrproc_t)xdr_uint32_t))
+		sizeof (uint32_t), (xdrproc_t)xdr_uint32_t))
 		return (FALSE);
 	return (TRUE);
 }
 
 static bool_t
-smb_posix_grps_helper_xdr(XDR *xdrs, char **identity)
+xdr_smb_posix_grps_helper(xdrs, identity)
+	XDR *xdrs;
+	char **identity;
 {
 	uint32_t pos, len;
 	uint32_t cnt;
@@ -149,13 +159,15 @@ smb_posix_grps_helper_xdr(XDR *xdrs, char **identity)
 
 	len = SMB_POSIX_GRPS_SIZE(cnt);
 
-	if (!xdr_pointer(xdrs, identity, len, (xdrproc_t)smb_posix_grps_xdr))
+	if (!xdr_pointer(xdrs, identity, len, (xdrproc_t)xdr_smb_posix_grps_t))
 		return (FALSE);
 	return (TRUE);
 }
 
 static bool_t
-smb_session_key_xdr(XDR *xdrs, smb_session_key_t *objp)
+xdr_smb_session_key_t(xdrs, objp)
+	XDR *xdrs;
+	smb_session_key_t *objp;
 {
 	if (!xdr_vector(xdrs, (char *)objp->data, 16,
 	    sizeof (uint8_t), (xdrproc_t)xdr_uint8_t))
@@ -164,51 +176,53 @@ smb_session_key_xdr(XDR *xdrs, smb_session_key_t *objp)
 }
 
 bool_t
-smb_logon_xdr(XDR *xdrs, smb_logon_t *objp)
+xdr_netr_client_t(xdrs, objp)
+	XDR *xdrs;
+	netr_client_t *objp;
 {
-	if (!xdr_uint16_t(xdrs, &objp->lg_level))
+	if (!xdr_uint16_t(xdrs, &objp->logon_level))
 		return (FALSE);
-	if (!xdr_string(xdrs, &objp->lg_username, ~0))
+	if (!xdr_string(xdrs, &objp->username, ~0))
 		return (FALSE);
-	if (!xdr_string(xdrs, &objp->lg_domain, ~0))
+	if (!xdr_string(xdrs, &objp->domain, ~0))
 		return (FALSE);
-	if (!xdr_string(xdrs, &objp->lg_e_username, ~0))
+	if (!xdr_string(xdrs, &objp->e_username, ~0))
 		return (FALSE);
-	if (!xdr_string(xdrs, &objp->lg_e_domain, ~0))
+	if (!xdr_string(xdrs, &objp->e_domain, ~0))
 		return (FALSE);
-	if (!xdr_string(xdrs, &objp->lg_workstation, ~0))
+	if (!xdr_string(xdrs, &objp->workstation, ~0))
 		return (FALSE);
-	if (!smb_inaddr_xdr(xdrs, &objp->lg_clnt_ipaddr))
+	if (!xdr_smb_inaddr_t(xdrs, &objp->ipaddr))
 		return (FALSE);
-	if (!smb_inaddr_xdr(xdrs, &objp->lg_local_ipaddr))
+	if (!xdr_array(xdrs, (char **)&objp->challenge_key.challenge_key_val,
+	    (uint32_t *)&objp->challenge_key.challenge_key_len, ~0,
+	    sizeof (uint8_t), (xdrproc_t)xdr_uint8_t))
 		return (FALSE);
-	if (!xdr_uint16_t(xdrs, &objp->lg_local_port))
+	if (!xdr_array(xdrs, (char **)&objp->nt_password.nt_password_val,
+	    (uint32_t *)&objp->nt_password.nt_password_len, ~0,
+	    sizeof (uint8_t), (xdrproc_t)xdr_uint8_t))
 		return (FALSE);
-	if (!smb_buf32_xdr(xdrs, &objp->lg_challenge_key))
+	if (!xdr_array(xdrs, (char **)&objp->lm_password.lm_password_val,
+	    (uint32_t *)&objp->lm_password.lm_password_len, ~0,
+	    sizeof (uint8_t), (xdrproc_t)xdr_uint8_t))
 		return (FALSE);
-	if (!smb_buf32_xdr(xdrs, &objp->lg_nt_password))
+	if (!xdr_uint32_t(xdrs, &objp->logon_id))
 		return (FALSE);
-	if (!smb_buf32_xdr(xdrs, &objp->lg_lm_password))
+	if (!xdr_int(xdrs, &objp->native_os))
 		return (FALSE);
-	if (!xdr_int(xdrs, &objp->lg_native_os))
+	if (!xdr_int(xdrs, &objp->native_lm))
 		return (FALSE);
-	if (!xdr_int(xdrs, &objp->lg_native_lm))
+	if (!xdr_smb_inaddr_t(xdrs, &objp->local_ipaddr))
 		return (FALSE);
-	if (!xdr_uint32_t(xdrs, &objp->lg_flags))
-		return (FALSE);
-	if (!xdr_uint32_t(xdrs, &objp->lg_logon_id))
-		return (FALSE);
-	if (!xdr_uint32_t(xdrs, &objp->lg_domain_type))
-		return (FALSE);
-	if (!xdr_uint32_t(xdrs, &objp->lg_secmode))
-		return (FALSE);
-	if (!xdr_uint32_t(xdrs, &objp->lg_status))
+	if (!xdr_uint16_t(xdrs, &objp->local_port))
 		return (FALSE);
 	return (TRUE);
 }
 
 static bool_t
-smb_sid_xdr(XDR *xdrs, smb_sid_t *objp)
+xdr_smb_sid_t(xdrs, objp)
+	XDR *xdrs;
+	smb_sid_t *objp;
 {
 	if (!xdr_uint8_t(xdrs, &objp->sid_revision))
 		return (FALSE);
@@ -224,7 +238,9 @@ smb_sid_xdr(XDR *xdrs, smb_sid_t *objp)
 }
 
 static bool_t
-smb_luid_xdr(XDR *xdrs, smb_luid_t *objp)
+xdr_smb_luid_t(xdrs, objp)
+	XDR *xdrs;
+	smb_luid_t *objp;
 {
 	if (!xdr_uint32_t(xdrs, &objp->lo_part))
 		return (FALSE);
@@ -234,9 +250,11 @@ smb_luid_xdr(XDR *xdrs, smb_luid_t *objp)
 }
 
 static bool_t
-smb_luid_attrs_xdr(XDR *xdrs, smb_luid_attrs_t *objp)
+xdr_smb_luid_attrs_t(xdrs, objp)
+	XDR *xdrs;
+	smb_luid_attrs_t *objp;
 {
-	if (!smb_luid_xdr(xdrs, &objp->luid))
+	if (!xdr_smb_luid_t(xdrs, &objp->luid))
 		return (FALSE);
 	if (!xdr_uint32_t(xdrs, &objp->attrs))
 		return (FALSE);
@@ -244,7 +262,9 @@ smb_luid_attrs_xdr(XDR *xdrs, smb_luid_attrs_t *objp)
 }
 
 static bool_t
-smb_privset_xdr(XDR *xdrs, smb_privset_t *objp)
+xdr_smb_privset_t(xdrs, objp)
+	XDR *xdrs;
+	smb_privset_t *objp;
 {
 	if (!xdr_uint32_t(xdrs, &objp->priv_cnt))
 		return (FALSE);
@@ -252,23 +272,25 @@ smb_privset_xdr(XDR *xdrs, smb_privset_t *objp)
 		return (FALSE);
 	if (!xdr_vector(xdrs, (char *)objp->priv, objp->priv_cnt,
 	    sizeof (smb_luid_attrs_t),
-	    (xdrproc_t)smb_luid_attrs_xdr))
+	    (xdrproc_t)xdr_smb_luid_attrs_t))
 		return (FALSE);
 	return (TRUE);
 }
 
 bool_t
-smb_token_xdr(XDR *xdrs, smb_token_t *objp)
+xdr_smb_token_t(xdrs, objp)
+	XDR *xdrs;
+	smb_token_t *objp;
 {
-	if (!smb_id_xdr(xdrs, &objp->tkn_user))
+	if (!xdr_smb_id_t(xdrs, &objp->tkn_user))
 		return (FALSE);
-	if (!smb_id_xdr(xdrs, &objp->tkn_owner))
+	if (!xdr_smb_id_t(xdrs, &objp->tkn_owner))
 		return (FALSE);
-	if (!smb_id_xdr(xdrs, &objp->tkn_primary_grp))
+	if (!xdr_smb_id_t(xdrs, &objp->tkn_primary_grp))
 		return (FALSE);
-	if (!smb_ids_xdr(xdrs, &objp->tkn_win_grps))
+	if (!xdr_smb_ids_t(xdrs, &objp->tkn_win_grps))
 		return (FALSE);
-	if (!smb_privset_helper_xdr(xdrs, (char **)&objp->tkn_privileges))
+	if (!xdr_smb_privset_helper(xdrs, (char **)&objp->tkn_privileges))
 		return (FALSE);
 	if (!xdr_string(xdrs, &objp->tkn_account_name, ~0))
 		return (FALSE);
@@ -279,9 +301,9 @@ smb_token_xdr(XDR *xdrs, smb_token_t *objp)
 	if (!xdr_uint32_t(xdrs, &objp->tkn_audit_sid))
 		return (FALSE);
 	if (!xdr_pointer(xdrs, (char **)&objp->tkn_session_key,
-	    sizeof (smb_session_key_t), (xdrproc_t)smb_session_key_xdr))
+	    sizeof (smb_session_key_t), (xdrproc_t)xdr_smb_session_key_t))
 		return (FALSE);
-	if (!smb_posix_grps_helper_xdr(xdrs, (char **)&objp->tkn_posix_grps))
+	if (!xdr_smb_posix_grps_helper(xdrs, (char **)&objp->tkn_posix_grps))
 		return (FALSE);
 	return (TRUE);
 }

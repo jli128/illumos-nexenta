@@ -19,7 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*
@@ -36,43 +37,44 @@
 #include <string.h>
 #include <strings.h>
 #include <pthread.h>
+
 #include <smbsrv/libsmb.h>
+
 #include <smbsrv/smb_share.h>
 #include <smbsrv/smbinfo.h>
-#include "smbd.h"
 
 #define	SMB_SHARE_DSRV_VERSION	1
 #define	SMB_SHARE_DSRV_COOKIE	((void*)(0xdeadbeef^SMB_SHARE_DSRV_VERSION))
 
 static int smb_share_dsrv_fd = -1;
 static pthread_mutex_t smb_share_dsrv_mtx = PTHREAD_MUTEX_INITIALIZER;
-static smbd_door_t smb_share_sdh;
 
-static void smbd_share_dispatch(void *, char *, size_t, door_desc_t *, uint_t);
-static int smbd_share_enum(smb_enumshare_info_t *esi);
+static void smb_share_dsrv_dispatch(void *, char *, size_t, door_desc_t *,
+    uint_t);
+static int smb_share_dsrv_enum(smb_enumshare_info_t *esi);
 
 /*
+ * smb_share_dsrv_start
+ *
  * Start the LanMan share door service.
  * Returns 0 on success. Otherwise, -1.
  */
 int
-smbd_share_start(void)
+smb_share_dsrv_start(void)
 {
 	int	newfd;
 
 	(void) pthread_mutex_lock(&smb_share_dsrv_mtx);
 
 	if (smb_share_dsrv_fd != -1) {
-		syslog(LOG_ERR, "smbd_share_start: duplicate");
+		syslog(LOG_ERR, "smb_share_dsrv_start: duplicate");
 		(void) pthread_mutex_unlock(&smb_share_dsrv_mtx);
 		return (smb_share_dsrv_fd);
 	}
 
-	smbd_door_init(&smb_share_sdh, "share");
-
-	if ((smb_share_dsrv_fd = door_create(smbd_share_dispatch,
+	if ((smb_share_dsrv_fd = door_create(smb_share_dsrv_dispatch,
 	    SMB_SHARE_DSRV_COOKIE, (DOOR_UNREF | DOOR_REFUSE_DESC))) < 0) {
-		syslog(LOG_ERR, "smbd_share_start: door_create: %s",
+		syslog(LOG_ERR, "smb_share_dsrv_start: door_create: %s",
 		    strerror(errno));
 		(void) pthread_mutex_unlock(&smb_share_dsrv_mtx);
 		return (-1);
@@ -81,7 +83,7 @@ smbd_share_start(void)
 	(void) unlink(SMB_SHARE_DNAME);
 
 	if ((newfd = creat(SMB_SHARE_DNAME, 0644)) < 0) {
-		syslog(LOG_ERR, "smbd_share_start: open: %s",
+		syslog(LOG_ERR, "smb_share_dsrv_start: open: %s",
 		    strerror(errno));
 		(void) door_revoke(smb_share_dsrv_fd);
 		smb_share_dsrv_fd = -1;
@@ -93,7 +95,7 @@ smbd_share_start(void)
 	(void) fdetach(SMB_SHARE_DNAME);
 
 	if (fattach(smb_share_dsrv_fd, SMB_SHARE_DNAME) < 0) {
-		syslog(LOG_ERR, "smbd_share_start: fattach: %s",
+		syslog(LOG_ERR, "smb_share_dsrv_start: fattach: %s",
 		    strerror(errno));
 		(void) door_revoke(smb_share_dsrv_fd);
 		smb_share_dsrv_fd = -1;
@@ -106,14 +108,14 @@ smbd_share_start(void)
 }
 
 /*
+ * smb_share_dsrv_stop
+ *
  * Stop the LanMan share door service.
  */
 void
-smbd_share_stop(void)
+smb_share_dsrv_stop(void)
 {
 	(void) pthread_mutex_lock(&smb_share_dsrv_mtx);
-
-	smbd_door_fini(&smb_share_sdh);
 
 	if (smb_share_dsrv_fd != -1) {
 		(void) fdetach(SMB_SHARE_DNAME);
@@ -125,13 +127,15 @@ smbd_share_stop(void)
 }
 
 /*
+ * smb_share_dsrv_dispatch
+ *
  * This function with which the LMSHARE door is associated
  * will invoke the appropriate CIFS share management function
  * based on the request type of the door call.
  */
 /*ARGSUSED*/
 static void
-smbd_share_dispatch(void *cookie, char *ptr, size_t size, door_desc_t *dp,
+smb_share_dsrv_dispatch(void *cookie, char *ptr, size_t size, door_desc_t *dp,
     uint_t n_desc)
 {
 	uint32_t rc;
@@ -151,11 +155,9 @@ smbd_share_dispatch(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 	int exec_type;
 	smb_execsub_info_t subs;
 
-	smbd_door_enter(&smb_share_sdh);
-
 	if ((cookie != SMB_SHARE_DSRV_COOKIE) || (ptr == NULL) ||
 	    (size < sizeof (uint32_t))) {
-		smbd_door_return(&smb_share_sdh, NULL, 0, NULL, 0);
+		(void) door_return(NULL, 0, NULL, 0);
 	}
 
 	dec_ctx = smb_dr_decode_start(ptr, size);
@@ -212,8 +214,7 @@ smbd_share_dispatch(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 			goto decode_error;
 		}
 		rc = smb_shr_get(sharename, &lmshr_info);
-		if (rc == NERR_Success)
-			smb_shr_hostaccess(&lmshr_info, &ipaddr);
+		smb_shr_hostaccess(&lmshr_info, &ipaddr);
 		smb_dr_put_int32(enc_ctx, SMB_SHARE_DSUCCESS);
 		smb_dr_put_uint32(enc_ctx, rc);
 		smb_dr_put_share(enc_ctx, &lmshr_info);
@@ -256,11 +257,15 @@ smbd_share_dispatch(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 
 	case SMB_SHROP_ENUM:
 		esi.es_bufsize = smb_dr_get_ushort(dec_ctx);
-		esi.es_posix_uid = smb_dr_get_uint32(dec_ctx);
-		if ((dec_status = smb_dr_decode_finish(dec_ctx)) != 0)
+		esi.es_username = smb_dr_get_string(dec_ctx);
+		if ((dec_status = smb_dr_decode_finish(dec_ctx)) != 0) {
+			smb_dr_free_string(esi.es_username);
 			goto decode_error;
+		}
 
-		rc = smbd_share_enum(&esi);
+		rc = smb_share_dsrv_enum(&esi);
+
+		smb_dr_free_string(esi.es_username);
 
 		smb_dr_put_int32(enc_ctx, SMB_SHARE_DSUCCESS);
 		smb_dr_put_uint32(enc_ctx, rc);
@@ -296,7 +301,8 @@ smbd_share_dispatch(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 		rc = smb_shr_exec(sharename, &subs, exec_type);
 
 		if (rc != 0)
-			syslog(LOG_NOTICE, "Failed to execute %s command",
+			syslog(LOG_NOTICE, "Failed to execute %s" \
+			    " command.\n",
 			    (exec_type == SMB_SHR_UNMAP) ? "unmap" : "map");
 
 		smb_dr_put_int32(enc_ctx, SMB_SHARE_DSUCCESS);
@@ -319,17 +325,19 @@ smbd_share_dispatch(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 		(void) smb_dr_encode_finish(enc_ctx, &used);
 	}
 
-	smbd_door_return(&smb_share_sdh, buf, used, NULL, 0);
+	(void) door_return(buf, used, NULL, 0);
 	return;
 
 decode_error:
 	smb_dr_put_int32(enc_ctx, SMB_SHARE_DERROR);
 	smb_dr_put_uint32(enc_ctx, dec_status);
 	(void) smb_dr_encode_finish(enc_ctx, &used);
-	smbd_door_return(&smb_share_sdh, buf, used, NULL, 0);
+	(void) door_return(buf, used, NULL, 0);
 }
 
 /*
+ * smb_share_dsrv_enum
+ *
  * This function builds a response for a NetShareEnum RAP request which
  * originates from smbsrv kernel module. A response buffer is allocated
  * with the specified size in esi->es_bufsize. List of shares is scanned
@@ -345,7 +353,7 @@ decode_error:
  * encoded in one round without unnecessarily complicating the code.
  */
 static int
-smbd_share_enum(smb_enumshare_info_t *esi)
+smb_share_dsrv_enum(smb_enumshare_info_t *esi)
 {
 	smb_shriter_t shi;
 	smb_share_t *si;
@@ -375,7 +383,7 @@ smbd_share_enum(smb_enumshare_info_t *esi)
 			continue;
 
 		if ((si->shr_flags & SMB_SHRF_AUTOHOME) && !autohome_added) {
-			if (esi->es_posix_uid == si->shr_uid)
+			if (strcasecmp(esi->es_username, si->shr_name) == 0)
 				autohome_added = B_TRUE;
 			else
 				continue;
@@ -412,7 +420,7 @@ smbd_share_enum(smb_enumshare_info_t *esi)
 			continue;
 
 		if ((si->shr_flags & SMB_SHRF_AUTOHOME) && !autohome_added) {
-			if (esi->es_posix_uid == si->shr_uid)
+			if (strcasecmp(esi->es_username, si->shr_name) == 0)
 				autohome_added = B_TRUE;
 			else
 				continue;

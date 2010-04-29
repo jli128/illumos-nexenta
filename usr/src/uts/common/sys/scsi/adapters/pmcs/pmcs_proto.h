@@ -17,9 +17,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-/*
- * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ *
+ *
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 /*
  * This file provides prototype function definitions.
@@ -53,7 +54,7 @@ typedef enum {
 	int lvl = level;					\
 	if (((pwp->debug_mask & (1 << lvl)) != 0) ||		\
 	    (lvl > PMCS_PRT_DEBUG_DEVEL)) {			\
-		pmcs_prt_impl(pwp, lvl, phy, tgt, fmt);		\
+		pmcs_prt_impl(pwp, lvl, phy, tgt, fmt);	\
 	}							\
 }
 
@@ -224,6 +225,11 @@ int pmcs_get_diag_report(pmcs_hw_t *, uint32_t, uint8_t);
 int pmcs_clear_diag_counters(pmcs_hw_t *, uint8_t);
 
 /*
+ * Get current firmware timestamp
+ */
+int pmcs_get_time_stamp(pmcs_hw_t *, uint64_t *);
+
+/*
  * Register Dump (including "internal" registers)
  */
 void pmcs_register_dump(pmcs_hw_t *);
@@ -239,11 +245,6 @@ int pmcs_dump_feregs(pmcs_hw_t *, uint32_t *, uint8_t,
  * Hard reset is platform specific.
  */
 int pmcs_soft_reset(pmcs_hw_t *, boolean_t);
-
-/*
- * This is a hot reset which will attempt reconfiguration after reset.
- */
-int pmcs_hot_reset(pmcs_hw_t *);
 
 /*
  * Some more reset functions
@@ -283,7 +284,7 @@ void pmcs_set_intr_coal_timer(pmcs_hw_t *pwp, pmcs_coal_timer_adj_t adj);
  */
 void pmcs_check_iomb_status(pmcs_hw_t *pwp, uint32_t *iomb);
 void pmcs_clear_xp(pmcs_hw_t *, pmcs_xscsi_t *);
-void pmcs_create_one_phy_stats(pmcs_iport_t *, pmcs_phy_t *);
+
 int pmcs_run_sata_cmd(pmcs_hw_t *, pmcs_phy_t *, fis_t, uint32_t,
     uint32_t, uint32_t);
 int pmcs_sata_identify(pmcs_hw_t *, pmcs_phy_t *);
@@ -339,7 +340,7 @@ void pmcs_dec_phy_ref_count(pmcs_phy_t *);
 void pmcs_worker(void *);
 
 pmcs_phy_t *pmcs_get_root_phy(pmcs_phy_t *);
-pmcs_xscsi_t *pmcs_get_target(pmcs_iport_t *, char *, boolean_t);
+pmcs_xscsi_t *pmcs_get_target(pmcs_iport_t *, char *);
 
 void pmcs_fatal_handler(pmcs_hw_t *);
 
@@ -363,11 +364,6 @@ void pmcs_update_phy_pm_props(pmcs_phy_t *, uint64_t, uint64_t, boolean_t);
  * Determine whether it's worth retrying enumeration
  */
 void pmcs_status_disposition(pmcs_phy_t *, uint32_t);
-
-/*
- * Write out firmware event log (if configured to do so) if it's filled up
- */
-void pmcs_gather_fwlog(pmcs_hw_t *);
 
 #ifdef	__cplusplus
 }

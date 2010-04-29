@@ -80,7 +80,7 @@ $(ROOTVARADMF) :=	FILEMODE =	0666
 spellin1 hashmk1 := CC = $(NATIVECC)
 spellin1 hashmk1 := POST_PROCESS =
 spellin1 hashmk1 := CPPFLAGS =
-spellin1 hashmk1 := LDFLAGS = -lintl
+spellin1 hashmk1 := LDFLAGS =
 
 $(ROOTSPELLD)/% $(ROOTVARADMD)/% : %
 	$(INS.file)

@@ -19,11 +19,12 @@
 # CDDL HEADER END
 #
 #
-# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 
 PROG =		idmap
-CLIENTOBJS =	idmap.o idmap_engine.o namemaps.o
+CLIENTOBJS =	idmap.o idmap_engine.o
 # idmap_clnt.o
 CLIENTSRCS =	$(CLIENTOBJS:%.o=%.c)
 POFILES = 	$(CLIENTOBJS:.o=.po)
@@ -34,16 +35,11 @@ IDMAP_PROT_DIR =        $(SRC)/head/rpcsvc
 include ../../Makefile.cmd
 
 POFILE = 	$(PROG)_all.po
-LDLIBS +=	-lidmap -ladutils -lsldap -lldap
+LDLIBS +=	-lidmap
 FILEMODE =	0555
 
-INCS += -I. \
-	-I../../../lib/libidmap/common \
-	-I../../../lib/libadutils/common \
-	-I../../../lib/libsldap/common \
-	-I$(IDMAP_PROT_DIR)
+INCS += -I. -I../../../lib/libidmap/common -I$(IDMAP_PROT_DIR)
 
-CFLAGS += $(CCVERBOSE)
 $(OBJS) :=	CPPFLAGS += $(INCS) -D_REENTRANT
 $(POFILE) :=	CPPFLAGS += $(INCS)
 

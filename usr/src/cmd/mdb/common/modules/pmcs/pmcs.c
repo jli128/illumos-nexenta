@@ -19,7 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #include <limits.h>
@@ -31,12 +32,6 @@
 #include <sys/damap.h>
 #include <sys/scsi/scsi.h>
 #include <sys/scsi/adapters/pmcs/pmcs.h>
-#ifndef _KMDB
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
-#endif	/* _KMDB */
 
 /*
  * We need use this to pass the settings when display_iport
@@ -45,16 +40,6 @@ typedef struct per_iport_setting {
 	uint_t  pis_damap_info; /* -m: DAM/damap */
 	uint_t  pis_dtc_info; /* -d: device tree children: dev_info/path_info */
 } per_iport_setting_t;
-
-/*
- * This structure is used for sorting work structures by the wserno
- */
-typedef struct wserno_list {
-	int serno;
-	int idx;
-	struct wserno_list *next;
-	struct wserno_list *prev;
-} wserno_list_t;
 
 #define	MDB_RD(a, b, c)		mdb_vread(a, b, (uintptr_t)c)
 #define	NOREAD(a, b)		mdb_warn("could not read " #a " at 0x%p", b)
@@ -75,52 +60,6 @@ print_sas_address(pmcs_phy_t *phy)
 
 	for (idx = 0; idx < 8; idx++) {
 		mdb_printf("%02x", phy->sas_address[idx]);
-	}
-}
-
-static void
-pmcs_fwtime_to_systime(struct pmcs_hw ss, uint32_t fw_hi, uint32_t fw_lo,
-    struct timespec *stime)
-{
-	uint64_t fwtime;
-	time_t secs;
-	long nsecs;
-	boolean_t backward_time = B_FALSE;
-
-	fwtime = ((uint64_t)fw_hi << 32) | fw_lo;
-
-	/*
-	 * If fwtime < ss.fw_timestamp, then we need to adjust the clock
-	 * time backwards from ss.sys_timestamp.  Otherwise, the adjustment
-	 * goes forward in time
-	 */
-	if (fwtime >= ss.fw_timestamp) {
-		fwtime -= ss.fw_timestamp;
-	} else {
-		fwtime = ss.fw_timestamp - fwtime;
-		backward_time = B_TRUE;
-	}
-
-	secs = ((time_t)fwtime / NSECS_PER_SEC);
-	nsecs = ((long)fwtime % NSECS_PER_SEC);
-
-	stime->tv_sec = ss.sys_timestamp.tv_sec;
-	stime->tv_nsec = ss.sys_timestamp.tv_nsec;
-
-	if (backward_time) {
-		if (stime->tv_nsec < nsecs) {
-			stime->tv_sec--;
-			stime->tv_nsec = stime->tv_nsec + NSECS_PER_SEC - nsecs;
-		} else {
-			stime->tv_nsec -= nsecs;
-		}
-		stime->tv_sec -= secs;
-	} else {
-		if (stime->tv_nsec + nsecs > NSECS_PER_SEC) {
-			stime->tv_sec++;
-		}
-		stime->tv_nsec = (stime->tv_nsec + nsecs) % NSECS_PER_SEC;
-		stime->tv_sec += secs;
 	}
 }
 
@@ -555,102 +494,6 @@ display_completion_queue(struct pmcs_hw ss)
 	}
 }
 
-static void
-display_event_log(struct pmcs_hw ss)
-{
-	pmcs_fw_event_hdr_t fwhdr;
-	char *header_id, *entry, *fwlogp;
-	uint32_t total_size = PMCS_FWLOG_SIZE, log_size, index, *swapp, sidx;
-	pmcs_fw_event_entry_t *fw_entryp;
-	struct timespec systime;
-
-	if (ss.fwlogp == NULL) {
-		mdb_printf("There is no firmware event log.\n");
-		return;
-	}
-
-	fwlogp = (char *)ss.fwlogp;
-
-	while (total_size != 0) {
-		if (mdb_vread(&fwhdr, sizeof (pmcs_fw_event_hdr_t),
-		    (uintptr_t)fwlogp) != sizeof (pmcs_fw_event_hdr_t)) {
-			mdb_warn("Unable to read firmware event log header\n");
-			return;
-		}
-
-		/*
-		 * Firmware event log is little-endian
-		 */
-		swapp = (uint32_t *)&fwhdr;
-		for (sidx = 0; sidx < (sizeof (pmcs_fw_event_hdr_t) /
-		    sizeof (uint32_t)); sidx++) {
-			*swapp = LE_32(*swapp);
-			swapp++;
-		}
-
-		if (fwhdr.fw_el_signature == PMCS_FWLOG_AAP1_SIG) {
-			header_id = "AAP1";
-		} else if (fwhdr.fw_el_signature == PMCS_FWLOG_IOP_SIG) {
-			header_id = "IOP";
-		} else {
-			mdb_warn("Invalid firmware event log signature\n");
-			return;
-		}
-
-		mdb_printf("Event Log:    %s\n", header_id);
-		mdb_printf("Oldest entry: %d\n", fwhdr.fw_el_oldest_idx);
-		mdb_printf("Latest entry: %d\n", fwhdr.fw_el_latest_idx);
-
-		entry = mdb_alloc(fwhdr.fw_el_entry_size, UM_SLEEP);
-		fw_entryp = (pmcs_fw_event_entry_t *)((void *)entry);
-		total_size -= sizeof (pmcs_fw_event_hdr_t);
-		log_size = fwhdr.fw_el_buf_size;
-		fwlogp += fwhdr.fw_el_entry_start_offset;
-		swapp = (uint32_t *)((void *)entry);
-		index = 0;
-
-		mdb_printf("%8s %16s %32s %8s %3s %8s %8s %8s %8s",
-		    "Index", "Timestamp", "Time", "Seq Num", "Sev", "Word 0",
-		    "Word 1", "Word 2", "Word 3");
-		mdb_printf("\n");
-
-		while (log_size != 0) {
-			if (mdb_vread(entry, fwhdr.fw_el_entry_size,
-			    (uintptr_t)fwlogp) != fwhdr.fw_el_entry_size) {
-				mdb_warn("Unable to read event log entry\n");
-				goto bail_out;
-			}
-
-			for (sidx = 0; sidx < (fwhdr.fw_el_entry_size /
-			    sizeof (uint32_t)); sidx++) {
-				*(swapp + sidx) = LE_32(*(swapp + sidx));
-			}
-
-			if (fw_entryp->ts_upper || fw_entryp->ts_lower) {
-				pmcs_fwtime_to_systime(ss, fw_entryp->ts_upper,
-				    fw_entryp->ts_lower, &systime);
-				mdb_printf("%8d %08x%08x [%Y.%09ld] %8d %3d "
-				    "%08x %08x %08x %08x\n", index,
-				    fw_entryp->ts_upper, fw_entryp->ts_lower,
-				    systime, fw_entryp->seq_num,
-				    fw_entryp->severity, fw_entryp->logw0,
-				    fw_entryp->logw1, fw_entryp->logw2,
-				    fw_entryp->logw3);
-			}
-
-			fwlogp += fwhdr.fw_el_entry_size;
-			total_size -= fwhdr.fw_el_entry_size;
-			log_size -= fwhdr.fw_el_entry_size;
-			index++;
-		}
-
-		mdb_printf("\n");
-	}
-
-bail_out:
-	mdb_free(entry, fwhdr.fw_el_entry_size);
-}
-
 /*ARGSUSED*/
 static void
 display_hwinfo(struct pmcs_hw m, int verbose)
@@ -684,27 +527,15 @@ display_hwinfo(struct pmcs_hw m, int verbose)
 	mdb_printf("Firmware version: %x.%x.%x (%s)\n",
 	    PMCS_FW_MAJOR(mp), PMCS_FW_MINOR(mp), PMCS_FW_MICRO(mp),
 	    fwsupport);
-	mdb_printf("ILA version:      %08x\n", m.ila_ver);
-	mdb_printf("Active f/w img:   %c\n", (m.fw_active_img) ? 'A' : 'B');
 
 	mdb_printf("Number of PHYs:   %d\n", m.nphy);
 	mdb_printf("Maximum commands: %d\n", m.max_cmd);
 	mdb_printf("Maximum devices:  %d\n", m.max_dev);
 	mdb_printf("I/O queue depth:  %d\n", m.ioq_depth);
-	mdb_printf("Open retry intvl: %d usecs\n", m.open_retry_interval);
 	if (m.fwlog == 0) {
 		mdb_printf("Firmware logging: Disabled\n");
 	} else {
 		mdb_printf("Firmware logging: Enabled (%d)\n", m.fwlog);
-	}
-	if (m.fwlog_file == 0) {
-		mdb_printf("Firmware logfile: Not configured\n");
-	} else {
-		mdb_printf("Firmware logfile: Configured\n");
-		mdb_inc_indent(2);
-		mdb_printf("AAP1 log file:  %s\n", m.fwlogfile_aap1);
-		mdb_printf("IOP logfile:    %s\n", m.fwlogfile_iop);
-		mdb_dec_indent(2);
 	}
 }
 
@@ -929,112 +760,25 @@ display_one_work(pmcwork_t *wp, int verbose, int idx)
 }
 
 static void
-display_work(struct pmcs_hw m, int verbose, int wserno)
+display_work(struct pmcs_hw m, int verbose)
 {
 	int		idx;
 	boolean_t	header_printed = B_FALSE;
-	pmcwork_t	*wp;
-	wserno_list_t	*sernop, *sp, *newsp, *sphead = NULL;
+	pmcwork_t	work, *wp = &work;
 	uintptr_t	_wp;
-	int		serno;
-
-	wp = mdb_alloc(sizeof (pmcwork_t) * m.max_cmd, UM_SLEEP);
-	_wp = (uintptr_t)m.work;
-	sernop = mdb_alloc(sizeof (wserno_list_t) * m.max_cmd, UM_SLEEP);
-	bzero(sernop, sizeof (wserno_list_t) * m.max_cmd);
 
 	mdb_printf("\nActive Work structure information:\n");
 	mdb_printf("----------------------------------\n");
 
-	/*
-	 * Read in all the work structures
-	 */
+	_wp = (uintptr_t)m.work;
+
 	for (idx = 0; idx < m.max_cmd; idx++, _wp += sizeof (pmcwork_t)) {
-		if (MDB_RD(wp + idx, sizeof (pmcwork_t), _wp) == -1) {
+		if (MDB_RD(&work, sizeof (pmcwork_t), _wp) == -1) {
 			NOREAD(pmcwork_t, _wp);
 			continue;
 		}
-	}
 
-	/*
-	 * Sort by serial number?
-	 */
-	if (wserno) {
-		for (idx = 0; idx < m.max_cmd; idx++) {
-			if ((wp + idx)->htag == 0) {
-				serno = PMCS_TAG_SERNO((wp + idx)->last_htag);
-			} else {
-				serno = PMCS_TAG_SERNO((wp + idx)->htag);
-			}
-
-			/* Start at the beginning of the list */
-			sp = sphead;
-			newsp = sernop + idx;
-			/* If this is the first entry, just add it */
-			if (sphead == NULL) {
-				sphead = sernop;
-				sphead->serno = serno;
-				sphead->idx = idx;
-				sphead->next = NULL;
-				sphead->prev = NULL;
-				continue;
-			}
-
-			newsp->serno = serno;
-			newsp->idx = idx;
-
-			/* Find out where in the list this goes */
-			while (sp) {
-				/* This item goes before sp */
-				if (serno < sp->serno) {
-					newsp->next = sp;
-					newsp->prev = sp->prev;
-					if (newsp->prev == NULL) {
-						sphead = newsp;
-					} else {
-						newsp->prev->next = newsp;
-					}
-					sp->prev = newsp;
-					break;
-				}
-
-				/*
-				 * If sp->next is NULL, this entry goes at the
-				 * end of the list
-				 */
-				if (sp->next == NULL) {
-					sp->next = newsp;
-					newsp->next = NULL;
-					newsp->prev = sp;
-					break;
-				}
-
-				sp = sp->next;
-			}
-		}
-
-		/*
-		 * Now print the sorted list
-		 */
-		mdb_printf(" Idx %8s %10s %20s %8s %8s O D ",
-		    "HTag", "State", "Phy Path", "Target", "Timer");
-		mdb_printf("%8s %10s %18s %18s %18s\n", "LastHTAG",
-		    "LastState", "LastPHY", "LastTgt", "LastArg");
-
-		sp = sphead;
-		while (sp) {
-			display_one_work(wp + sp->idx, 1, sp->idx);
-			sp = sp->next;
-		}
-
-		goto out;
-	}
-
-	/*
-	 * Now print the list, sorted by index
-	 */
-	for (idx = 0; idx < m.max_cmd; idx++) {
-		if (!verbose && ((wp + idx)->htag == PMCS_TAG_TYPE_FREE)) {
+		if (!verbose && (wp->htag == PMCS_TAG_TYPE_FREE)) {
 			continue;
 		}
 
@@ -1054,12 +798,8 @@ display_work(struct pmcs_hw m, int verbose, int wserno)
 			header_printed = B_TRUE;
 		}
 
-		display_one_work(wp + idx, verbose, idx);
+		display_one_work(wp, verbose, idx);
 	}
-
-out:
-	mdb_free(wp, sizeof (pmcwork_t) * m.max_cmd);
-	mdb_free(sernop, sizeof (wserno_list_t) * m.max_cmd);
 }
 
 static void
@@ -2102,7 +1842,7 @@ display_phys(struct pmcs_hw ss, int verbose, struct pmcs_phy *parent, int level,
 
 static int
 pmcs_dump_tracelog(boolean_t filter, int instance, uint64_t tail_lines,
-    const char *phy_path, uint64_t sas_address, uint64_t verbose)
+    const char *phy_path, uint64_t sas_address)
 {
 	pmcs_tbuf_t *tbuf_addr;
 	uint_t tbuf_idx;
@@ -2251,16 +1991,7 @@ pmcs_dump_tracelog(boolean_t filter, int instance, uint64_t tail_lines,
 		}
 
 		if (!elem_filtered) {
-			/*
-			 * If the -v flag was given, print the firmware
-			 * timestamp along with the clock time
-			 */
-			mdb_printf("%Y.%09ld ", tbuf.timestamp);
-			if (verbose) {
-				mdb_printf("(0x%" PRIx64 ") ",
-				    tbuf.fw_timestamp);
-			}
-			mdb_printf("%s\n", tbuf.buf);
+			mdb_printf("%Y.%09ld %s\n", tbuf.timestamp, tbuf.buf);
 		}
 
 		--elems_to_print;
@@ -2370,14 +2101,6 @@ pmcs_next_sibling(pmcs_phy_t *phyp)
 
 		if (parent.sibling != NULL) {
 			break;
-		}
-
-		/*
-		 * If this PHY's sibling is NULL and it's a root phy,
-		 * we're done.
-		 */
-		if (parent.level == 0) {
-			return (NULL);
 		}
 
 		phyp = phyp->parent;
@@ -2640,9 +2363,6 @@ pmcs_tag(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	case STATE_DEAD:
 		state_str = "Dead";
 		break;
-	case STATE_IN_RESET:
-		state_str = "In Reset";
-		break;
 	}
 
 	mdb_printf("%16p %9s %4d %1d %1d 0x%08x 0x%04x 0x%04x %16p\n", addr,
@@ -2658,108 +2378,6 @@ pmcs_tag(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
-#ifndef _KMDB
-static int
-pmcs_dump_fwlog(struct pmcs_hw *ss, int instance, const char *ofile)
-{
-	uint8_t *fwlogp;
-	int	ofilefd = -1;
-	char	ofilename[MAXPATHLEN];
-	int	rval = DCMD_OK;
-
-	if (ss->fwlogp == NULL) {
-		mdb_warn("Firmware event log disabled for instance %d",
-		    instance);
-		return (DCMD_OK);
-	}
-
-	if (snprintf(ofilename, MAXPATHLEN, "%s%d", ofile, instance) >
-	    MAXPATHLEN) {
-		mdb_warn("Output filename is too long for instance %d",
-		    instance);
-		return (DCMD_ERR);
-	}
-
-	fwlogp = mdb_alloc(PMCS_FWLOG_SIZE, UM_SLEEP);
-
-	if (MDB_RD(fwlogp, PMCS_FWLOG_SIZE, ss->fwlogp) == -1) {
-		NOREAD(fwlogp, ss->fwlogp);
-		rval = DCMD_ERR;
-		goto cleanup;
-	}
-
-	ofilefd = open(ofilename, O_WRONLY | O_CREAT,
-	    S_IRUSR | S_IRGRP | S_IROTH);
-	if (ofilefd < 0) {
-		mdb_warn("Unable to open '%s' to dump instance %d event log",
-		    ofilename, instance);
-		rval = DCMD_ERR;
-		goto cleanup;
-	}
-
-	if (write(ofilefd, fwlogp, PMCS_FWLOG_SIZE) != PMCS_FWLOG_SIZE) {
-		mdb_warn("Failed to write %d bytes to output file: instance %d",
-		    PMCS_FWLOG_SIZE, instance);
-		rval = DCMD_ERR;
-		goto cleanup;
-	}
-
-	mdb_printf("Event log for instance %d written to %s\n", instance,
-	    ofilename);
-
-cleanup:
-	if (ofilefd >= 0) {
-		close(ofilefd);
-	}
-	mdb_free(fwlogp, PMCS_FWLOG_SIZE);
-	return (rval);
-}
-
-static int
-pmcs_fwlog(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
-{
-	void		*pmcs_state;
-	const char	*ofile = NULL;
-	struct pmcs_hw	ss;
-	struct dev_info	dip;
-
-	if (mdb_getopts(argc, argv, 'o', MDB_OPT_STR, &ofile, NULL) != argc) {
-		return (DCMD_USAGE);
-	}
-
-	if (ofile == NULL) {
-		mdb_printf("No output file specified\n");
-		return (DCMD_USAGE);
-	}
-
-	if (!(flags & DCMD_ADDRSPEC)) {
-		pmcs_state = NULL;
-		if (mdb_readvar(&pmcs_state, "pmcs_softc_state") == -1) {
-			mdb_warn("can't read pmcs_softc_state");
-			return (DCMD_ERR);
-		}
-		if (mdb_pwalk_dcmd("genunix`softstate", "pmcs`pmcs_fwlog", argc,
-		    argv, (uintptr_t)pmcs_state) == -1) {
-			mdb_warn("mdb_pwalk_dcmd failed for pmcs_log");
-			return (DCMD_ERR);
-		}
-		return (DCMD_OK);
-	}
-
-	if (MDB_RD(&ss, sizeof (ss), addr) == -1) {
-		NOREAD(pmcs_hw_t, addr);
-		return (DCMD_ERR);
-	}
-
-	if (MDB_RD(&dip, sizeof (struct dev_info), ss.dip) == -1) {
-		NOREAD(pmcs_hw_t, addr);
-		return (DCMD_ERR);
-	}
-
-	return (pmcs_dump_fwlog(&ss, dip.devi_instance, ofile));
-}
-#endif	/* _KMDB */
-
 static int
 pmcs_log(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
@@ -2768,7 +2386,6 @@ pmcs_log(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	struct dev_info	dip;
 	const char	*match_phy_path = NULL;
 	uint64_t 	match_sas_address = 0, tail_lines = 0;
-	uint_t		verbose = 0;
 
 	if (!(flags & DCMD_ADDRSPEC)) {
 		pmcs_state = NULL;
@@ -2788,7 +2405,6 @@ pmcs_log(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    'l', MDB_OPT_UINT64, &tail_lines,
 	    'p', MDB_OPT_STR, &match_phy_path,
 	    's', MDB_OPT_UINT64, &match_sas_address,
-	    'v', MDB_OPT_SETBITS, TRUE, &verbose,
 	    NULL) != argc) {
 		return (DCMD_USAGE);
 	}
@@ -2805,10 +2421,10 @@ pmcs_log(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (!(flags & DCMD_LOOP)) {
 		return (pmcs_dump_tracelog(B_TRUE, dip.devi_instance,
-		    tail_lines, match_phy_path, match_sas_address, verbose));
+		    tail_lines, match_phy_path, match_sas_address));
 	} else if (flags & DCMD_LOOPFIRST) {
 		return (pmcs_dump_tracelog(B_FALSE, 0, tail_lines,
-		    match_phy_path, match_sas_address, verbose));
+		    match_phy_path, match_sas_address));
 	} else {
 		return (DCMD_OK);
 	}
@@ -2833,8 +2449,6 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	uint_t			unconfigured = FALSE;
 	uint_t			damap_info = FALSE;
 	uint_t			dtc_info = FALSE;
-	uint_t			wserno = FALSE;
-	uint_t			fwlog = FALSE;
 	int			rv = DCMD_OK;
 	void			*pmcs_state;
 	char			*state_str;
@@ -2858,7 +2472,6 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (mdb_getopts(argc, argv,
 	    'c', MDB_OPT_SETBITS, TRUE, &compq,
 	    'd', MDB_OPT_SETBITS, TRUE, &dtc_info,
-	    'e', MDB_OPT_SETBITS, TRUE, &fwlog,
 	    'h', MDB_OPT_SETBITS, TRUE, &hw_info,
 	    'i', MDB_OPT_SETBITS, TRUE, &ic_info,
 	    'I', MDB_OPT_SETBITS, TRUE, &iport_info,
@@ -2866,7 +2479,6 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    'p', MDB_OPT_SETBITS, TRUE, &phy_info,
 	    'q', MDB_OPT_SETBITS, TRUE, &ibq,
 	    'Q', MDB_OPT_SETBITS, TRUE, &obq,
-	    's', MDB_OPT_SETBITS, TRUE, &wserno,
 	    't', MDB_OPT_SETBITS, TRUE, &target_info,
 	    'T', MDB_OPT_SETBITS, TRUE, &tgt_phy_count,
 	    'u', MDB_OPT_SETBITS, TRUE, &unconfigured,
@@ -2900,7 +2512,7 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (((flags & DCMD_ADDRSPEC) && !(flags & DCMD_LOOP)) ||
 	    (flags & DCMD_LOOPFIRST) || phy_info || target_info || hw_info ||
 	    work_info || waitqs_info || ibq || obq || tgt_phy_count || compq ||
-	    unconfigured || fwlog) {
+	    unconfigured) {
 		if ((flags & DCMD_LOOP) && !(flags & DCMD_LOOPFIRST))
 			mdb_printf("\n");
 		mdb_printf("%16s %9s %4s B C  WorkFlags wserno DbgMsk %16s\n",
@@ -2925,9 +2537,6 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	case STATE_DEAD:
 		state_str = "Dead";
 		break;
-	case STATE_IN_RESET:
-		state_str = "In Reset";
-		break;
 	}
 
 	mdb_printf("%16p %9s %4d %1d %1d 0x%08x 0x%04x 0x%04x %16p\n", addr,
@@ -2949,8 +2558,8 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (target_info || tgt_phy_count)
 		display_targets(ss, verbose, tgt_phy_count);
 
-	if (work_info || wserno)
-		display_work(ss, verbose, wserno);
+	if (work_info)
+		display_work(ss, verbose);
 
 	if (ic_info)
 		display_ic(ss, verbose);
@@ -2970,9 +2579,6 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (unconfigured)
 		display_unconfigured_targets(addr);
 
-	if (fwlog)
-		display_event_log(ss);
-
 	mdb_dec_indent(4);
 
 	return (rv);
@@ -2984,7 +2590,6 @@ pmcs_help()
 	mdb_printf("Prints summary information about each pmcs instance.\n"
 	    "    -c: Dump the completion queue\n"
 	    "    -d: Print per-iport information about device tree children\n"
-	    "    -e: Display the in-memory firmware event log\n"
 	    "    -h: Print more detailed hardware information\n"
 	    "    -i: Print interrupt coalescing information\n"
 	    "    -I: Print information about each iport\n"
@@ -2992,7 +2597,6 @@ pmcs_help()
 	    "    -p: Print information about each attached PHY\n"
 	    "    -q: Dump inbound queues\n"
 	    "    -Q: Dump outbound queues\n"
-	    "    -s: Dump all work structures sorted by serial number\n"
 	    "    -t: Print information about each configured target\n"
 	    "    -T: Print target and PHY count summary\n"
 	    "    -u: Show SAS address of all unconfigured targets\n"
@@ -3023,23 +2627,17 @@ pmcs_tag_help()
 }
 
 static const mdb_dcmd_t dcmds[] = {
-	{ "pmcs", "?[-cdehiImpQqtTuwWv]", "print pmcs information",
+	{ "pmcs", "?[-cdhiImpQqtTuwWv]", "print pmcs information",
 	    pmcs_dcmd, pmcs_help
 	},
 	{ "pmcs_log",
-	    "?[-v] [-p PHY_PATH | -s SAS_ADDRESS | -l TAIL_LINES]",
+	    "?[-p PHY_PATH | -s SAS_ADDRESS | -l TAIL_LINES]",
 	    "dump pmcs log file", pmcs_log, pmcs_log_help
 	},
 	{ "pmcs_tag", "?[-t tagtype|-s serialnum|-i index]",
 	    "Find work structures by tag type, serial number or index",
 	    pmcs_tag, pmcs_tag_help
 	},
-#ifndef _KMDB
-	{ "pmcs_fwlog",
-	    "?-o output_file",
-	    "dump pmcs firmware event log to output_file", pmcs_fwlog, NULL
-	},
-#endif	/* _KMDB */
 	{ NULL }
 };
 

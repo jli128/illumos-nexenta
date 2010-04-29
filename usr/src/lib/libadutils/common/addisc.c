@@ -20,7 +20,8 @@
  */
 
 /*
- * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*
@@ -102,16 +103,6 @@
 #include "adutils_impl.h"
 #include "addisc.h"
 
-/*
- * These set some sanity policies for discovery.  After a discovery
- * cycle, we will consider the results (successful or unsuccessful)
- * to be valid for at least MINIMUM_TTL seconds, and for at most
- * MAXIMUM_TTL seconds.  Note that the caller is free to request
- * discovery cycles sooner than MINIMUM_TTL if it has reason to believe
- * that the situation has changed.
- */
-#define	MINIMUM_TTL	(5 * 60)
-#define	MAXIMUM_TTL	(20 * 60)
 
 enum ad_item_state {
 		AD_STATE_INVALID = 0,	/* The value is not valid */
@@ -136,7 +127,7 @@ typedef struct ad_item {
 	enum ad_item_state	state;
 	enum ad_data_type	type;
 	void 			*value;
-	time_t 			expires;
+	time_t 			ttl;
 	unsigned int 		version;	/* Version is only changed */
 						/* if the value changes */
 #define	PARAM1		0
@@ -153,8 +144,6 @@ typedef struct ad_disc {
 	ad_subnet_t	*subnets;
 	boolean_t	subnets_changed;
 	time_t		subnets_last_check;
-	time_t		expires_not_before;
-	time_t		expires_not_after;
 	ad_item_t	domain_name;		/* DNS hostname string */
 	ad_item_t	domain_controller;	/* Directory hostname and */
 						/* port array */
@@ -227,7 +216,7 @@ is_valid(ad_item_t *item)
 		if (item->state == AD_STATE_FIXED)
 			return (B_TRUE);
 		if (item->state == AD_STATE_AUTO &&
-		    (item->expires == 0 || item->expires > time(NULL)))
+		    (item->ttl == 0 || item->ttl > time(NULL)))
 			return (B_TRUE);
 	}
 	return (B_FALSE);
@@ -258,9 +247,9 @@ update_item(ad_item_t *item, void *value, enum ad_item_state state,
 	item->state = state;
 
 	if (ttl == 0)
-		item->expires = 0;
+		item->ttl = 0;
 	else
-		item->expires = time(NULL) + ttl;
+		item->ttl = time(NULL) + ttl;
 }
 
 
@@ -604,6 +593,26 @@ DN_to_DNS(const char *dn_name)
 }
 
 
+/* Format the DN of an AD LDAP subnet object for some subnet */
+static char *
+subnet_to_DN(const char *subnet, const char *baseDN)
+{
+	char *result;
+	int len;
+
+	len = snprintf(NULL, 0,
+	    "CN=%s,CN=Subnets,CN=Sites,%s",
+	    subnet, baseDN) + 1;
+
+	result = malloc(len);
+	if (result != NULL)
+		(void) snprintf(result, len,
+		    "CN=%s,CN=Subnets,CN=Sites,%s",
+		    subnet, baseDN);
+	return (result);
+}
+
+
 /* Make a list of subnet object DNs from a list of subnets */
 static char **
 subnets_to_DNs(ad_subnet_t *subnets, const char *base_dn)
@@ -619,9 +628,8 @@ subnets_to_DNs(ad_subnet_t *subnets, const char *base_dn)
 		return (NULL);
 
 	for (i = 0; subnets[i].subnet[0] != '\0'; i++) {
-		(void) asprintf(&results[i], "CN=%s,CN=Subnets,CN=Sites,%s",
-		    subnets[i].subnet, base_dn);
-		if (results[i] == NULL) {
+		if ((results[i] = subnet_to_DN(subnets[i].subnet, base_dn))
+		    == NULL) {
 			for (j = 0; j < i; j++)
 				free(results[j]);
 			free(results);
@@ -820,8 +828,7 @@ err:
  * A utility function to bind to a Directory server
  */
 
-static
-LDAP *
+static LDAP*
 ldap_lookup_init(idmap_ad_disc_ds_t *ds)
 {
 	int 	i;
@@ -981,17 +988,15 @@ ldap_lookup_trusted_domains(LDAP **ld, idmap_ad_disc_ds_t *globalCatalog,
 
 			if (partner != NULL && direction != NULL) {
 				num++;
-				void *tmp = realloc(trusted_domains,
+				trusted_domains = realloc(trusted_domains,
 				    (num + 1) *
 				    sizeof (ad_disc_trusteddomains_t));
-				if (tmp == NULL) {
-					free(trusted_domains);
+				if (trusted_domains == NULL) {
 					ldap_value_free(partner);
 					ldap_value_free(direction);
 					ldap_msgfree(results);
 					return (NULL);
 				}
-				trusted_domains = tmp;
 				/* Last element should be zero */
 				memset(&trusted_domains[num], 0,
 				    sizeof (ad_disc_trusteddomains_t));
@@ -1216,22 +1221,6 @@ ad_disc_refresh(ad_disc_t ctx)
 }
 
 
-/*
- * Called when the discovery cycle is done.  Sets a master TTL
- * that will avoid doing new time-based discoveries too soon after
- * the last discovery cycle.  Most interesting when the discovery
- * cycle failed, because then the TTLs on the individual items will
- * not be updated and may go stale.
- */
-void
-ad_disc_done(ad_disc_t ctx)
-{
-	time_t now = time(NULL);
-
-	ctx->expires_not_before = now + MINIMUM_TTL;
-	ctx->expires_not_after = now + MAXIMUM_TTL;
-}
-
 
 /* Discover joined Active Directory domainName */
 static ad_item_t *
@@ -1436,13 +1425,12 @@ validate_SiteName(ad_disc_t ctx)
 		return (NULL);
 
 	if (!is_valid(&ctx->site_name) ||
-	    is_changed(&ctx->site_name, PARAM1, domain_controller_item) ||
+	    is_changed(&ctx->site_name, PARAM1, &ctx->domain_controller) ||
 	    ctx->subnets == NULL || ctx->subnets_changed) {
 		subnets = find_subnets();
 		ctx->subnets_last_check = time(NULL);
 		update_required = B_TRUE;
 	} else if (ctx->subnets_last_check + 60 < time(NULL)) {
-		/* NEEDSWORK magic constant 60 above */
 		subnets = find_subnets();
 		ctx->subnets_last_check = time(NULL);
 		if (cmpsubnets(ctx->subnets, subnets) != 0)
@@ -1483,8 +1471,6 @@ validate_SiteName(ad_disc_t ctx)
 			forest_name = DN_to_DNS(config_naming_context + len);
 			update_item(&ctx->forest_name, forest_name,
 			    AD_STATE_AUTO, 0);
-			update_version(&ctx->forest_name, PARAM1,
-			    domain_controller_item);
 		}
 	}
 
@@ -1509,8 +1495,6 @@ validate_SiteName(ad_disc_t ctx)
 			site_name[len] = '\0';
 			update_item(&ctx->site_name, site_name,
 			    AD_STATE_AUTO, 0);
-			update_version(&ctx->site_name, PARAM1,
-			    domain_controller_item);
 		}
 	}
 
@@ -2013,33 +1997,17 @@ ad_disc_unset(ad_disc_t ctx)
 int
 ad_disc_get_TTL(ad_disc_t ctx)
 {
-	time_t expires;
 	int ttl;
 
-	expires = MIN_GT_ZERO(ctx->domain_controller.expires,
-	    ctx->global_catalog.expires);
-	expires = MIN_GT_ZERO(expires, ctx->site_domain_controller.expires);
-	expires = MIN_GT_ZERO(expires, ctx->site_global_catalog.expires);
+	ttl = MIN_GT_ZERO(ctx->domain_controller.ttl, ctx->global_catalog.ttl);
+	ttl = MIN_GT_ZERO(ttl, ctx->site_domain_controller.ttl);
+	ttl = MIN_GT_ZERO(ttl, ctx->site_global_catalog.ttl);
 
-	if (expires == -1) {
+	if (ttl == -1)
 		return (-1);
-	}
-
-	if (ctx->expires_not_before != 0 &&
-	    expires < ctx->expires_not_before) {
-		expires = ctx->expires_not_before;
-	}
-
-	if (ctx->expires_not_after != 0 &&
-	    expires > ctx->expires_not_after) {
-		expires = ctx->expires_not_after;
-	}
-
-	ttl = expires - time(NULL);
-
-	if (ttl < 0) {
+	ttl -= time(NULL);
+	if (ttl < 0)
 		return (0);
-	}
 	return (ttl);
 }
 

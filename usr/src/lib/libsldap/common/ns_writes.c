@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -675,7 +675,6 @@ write_state_machine(
 	int		len;
 	int		msgid;
 	int		Errno;
-	boolean_t	from_get_lderrno = B_FALSE;
 	int		always = 1;
 	char		*err, *errmsg = NULL;
 	/* referrals returned by the LDAP operation */
@@ -828,24 +827,13 @@ write_state_machine(
 				Errno = rc;
 				(void) ldap_get_lderrno(conp->ld,
 				    NULL, &errmsg);
-
 				/*
-				 * No need to deal with the error message if
-				 * it's an empty string.
+				 * free errmsg if it is an empty string
 				 */
-				if (errmsg != NULL && *errmsg == '\0')
+				if (errmsg && *errmsg == '\0') {
+					ldap_memfree(errmsg);
 					errmsg = NULL;
-
-				if (errmsg != NULL) {
-					/*
-					 * ldap_get_lderrno does not expect
-					 * errmsg to be freed after use, while
-					 * ldap_parse_result below does, so set
-					 * a flag to indicate source.
-					 */
-					from_get_lderrno = B_TRUE;
 				}
-
 				new_state = W_LDAP_ERROR;
 			} else {
 				return_rc = NS_LDAP_SUCCESS;
@@ -1051,13 +1039,8 @@ write_state_machine(
 						pwd_status =
 						    __s_api_set_passwd_status(
 						    Errno, errmsg);
-				/*
-				 * free only if not returned by ldap_get_lderrno
-				 */
-				if (!from_get_lderrno)
-					ldap_memfree(errmsg);
+				ldap_memfree(errmsg);
 				errmsg = NULL;
-				from_get_lderrno = B_FALSE;
 			}
 
 			(void) snprintf(errstr, sizeof (errstr),

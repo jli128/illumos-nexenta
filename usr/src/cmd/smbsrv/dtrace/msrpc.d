@@ -127,11 +127,11 @@ door_ki_upcall:return
 
 sdt:smbsrv::smb-sessionsetup-clntinfo
 {
-	user_info = (smb_logon_t *)arg0;
+	clnt = (netr_client_t *)arg0;
 
 	printf("domain\\username=%s\\%s\n\n",
-	    stringof(user_info->lg_domain),
-	    stringof(user_info->lg_username));
+	    stringof(clnt->domain),
+	    stringof(clnt->username));
 }
 
 smb_tree_connect:entry

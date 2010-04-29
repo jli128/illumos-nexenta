@@ -111,26 +111,6 @@ static int zfs_fill_zplprops_root(uint64_t, nvlist_t *, nvlist_t *,
     boolean_t *);
 int zfs_set_prop_nvlist(const char *, zprop_source_t, nvlist_t *, nvlist_t **);
 
-static int
-zfs_is_wormed(const char *name)
-{
-	char worminfo[13] = {0};
-	char cname[MAXNAMELEN];
-	char *end;
-
-	strcpy(cname, name);
-	end = strchr(cname, '@');
-	if (end)
-		*end = 0;
-
-	if (dsl_prop_get(cname, "nms:worm", 1, 12, &worminfo, NULL) == 0 &&
-	    worminfo[0] && strcmp(worminfo, "0") != 0 &&
-	    strcmp(worminfo, "off") != 0 && strcmp(worminfo, "-") != 0) {
-		return 1;
-	}
-	return 0;
-}
-
 /* _NOTE(PRINTFLIKE(4)) - this is printf-like, but lint is too whiney */
 void
 __dprintf(const char *file, const char *func, int line, const char *fmt, ...)
@@ -978,8 +958,8 @@ static int
 put_nvlist(zfs_cmd_t *zc, nvlist_t *nvl)
 {
 	char *packed = NULL;
-	int error = 0;
 	size_t size;
+	int error;
 
 	VERIFY(nvlist_size(nvl, &size, NV_ENCODE_NATIVE) == 0);
 
@@ -989,9 +969,8 @@ put_nvlist(zfs_cmd_t *zc, nvlist_t *nvl)
 		packed = kmem_alloc(size, KM_SLEEP);
 		VERIFY(nvlist_pack(nvl, &packed, &size, NV_ENCODE_NATIVE,
 		    KM_SLEEP) == 0);
-		if (ddi_copyout(packed, (void *)(uintptr_t)zc->zc_nvlist_dst,
-		    size, zc->zc_iflags) != 0)
-			error = EFAULT;
+		error = ddi_copyout(packed,
+		    (void *)(uintptr_t)zc->zc_nvlist_dst, size, zc->zc_iflags);
 		kmem_free(packed, size);
 	}
 
@@ -1891,7 +1870,6 @@ zfs_prop_set_userquota(const char *dsname, nvpair_t *pair)
 	uint64_t *valary;
 	unsigned int vallen;
 	const char *domain;
-	char *dash;
 	zfs_userquota_prop_t type;
 	uint64_t rid;
 	uint64_t quota;
@@ -1901,24 +1879,20 @@ zfs_prop_set_userquota(const char *dsname, nvpair_t *pair)
 	if (nvpair_type(pair) == DATA_TYPE_NVLIST) {
 		nvlist_t *attrs;
 		VERIFY(nvpair_value_nvlist(pair, &attrs) == 0);
-		if (nvlist_lookup_nvpair(attrs, ZPROP_VALUE,
-		    &pair) != 0)
-			return (EINVAL);
+		VERIFY(nvlist_lookup_nvpair(attrs, ZPROP_VALUE,
+		    &pair) == 0);
 	}
 
-	/*
-	 * A correctly constructed propname is encoded as
-	 * userquota@<rid>-<domain>.
-	 */
-	if ((dash = strchr(propname, '-')) == NULL ||
-	    nvpair_value_uint64_array(pair, &valary, &vallen) != 0 ||
-	    vallen != 3)
-		return (EINVAL);
-
-	domain = dash + 1;
+	VERIFY(nvpair_value_uint64_array(pair, &valary, &vallen) == 0);
+	VERIFY(vallen == 3);
 	type = valary[0];
 	rid = valary[1];
 	quota = valary[2];
+	/*
+	 * The propname is encoded as
+	 * userquota@<rid>-<domain>.
+	 */
+	domain = strchr(propname, '-') + 1;
 
 	err = zfsvfs_hold(dsname, FTAG, &zfsvfs);
 	if (err == 0) {
@@ -1934,7 +1908,7 @@ zfs_prop_set_userquota(const char *dsname, nvpair_t *pair)
  * return 0 on success and a positive error code on failure; otherwise if it is
  * not one of the special properties handled by this function, return -1.
  *
- * XXX: It would be better for callers of the property interface if we handled
+ * XXX: It would be better for callers of the properety interface if we handled
  * these special cases in dsl_prop.c (in the dsl layer).
  */
 static int
@@ -1984,19 +1958,9 @@ zfs_prop_set_special(const char *dsname, zprop_source_t source,
 	case ZFS_PROP_VERSION:
 	{
 		zfsvfs_t *zfsvfs;
-		uint64_t maxzplver = ZPL_VERSION;
 
 		if ((err = zfsvfs_hold(dsname, FTAG, &zfsvfs)) != 0)
 			break;
-
-		if (zfs_earlier_version(dsname, SPA_VERSION_USERSPACE))
-			maxzplver = ZPL_VERSION_USERSPACE - 1;
-		if (zfs_earlier_version(dsname, SPA_VERSION_FUID))
-			maxzplver = ZPL_VERSION_FUID - 1;
-		if (intval > maxzplver) {
-			zfsvfs_rele(zfsvfs, FTAG);
-			return (ENOTSUP);
-		}
 
 		err = zfs_set_version(zfsvfs, intval);
 		zfsvfs_rele(zfsvfs, FTAG);
@@ -2059,13 +2023,12 @@ retry:
 		if (nvpair_type(pair) == DATA_TYPE_NVLIST) {
 			nvlist_t *attrs;
 			VERIFY(nvpair_value_nvlist(pair, &attrs) == 0);
-			if (nvlist_lookup_nvpair(attrs, ZPROP_VALUE,
-			    &propval) != 0)
-				err = EINVAL;
+			VERIFY(nvlist_lookup_nvpair(attrs, ZPROP_VALUE,
+			    &propval) == 0);
 		}
 
 		/* Validate value type */
-		if (err == 0 && prop == ZPROP_INVAL) {
+		if (prop == ZPROP_INVAL) {
 			if (zfs_prop_user(propname)) {
 				if (nvpair_type(propval) != DATA_TYPE_STRING)
 					err = EINVAL;
@@ -2074,7 +2037,7 @@ retry:
 				    DATA_TYPE_UINT64_ARRAY)
 					err = EINVAL;
 			}
-		} else if (err == 0) {
+		} else {
 			if (nvpair_type(propval) == DATA_TYPE_STRING) {
 				if (zfs_prop_get_type(prop) != PROP_TYPE_STRING)
 					err = EINVAL;
@@ -2732,9 +2695,6 @@ zfs_fill_zplprops(const char *dataset, nvlist_t *createprops,
 		fuids_ok = B_FALSE;
 	}
 
-	if (zfs_is_wormed(dataset))
-		return EPERM;
-
 	/*
 	 * Open parent object set so we can inherit zplprop values.
 	 */
@@ -2833,17 +2793,11 @@ zfs_ioc_create(zfs_cmd_t *zc)
 			return (error);
 		}
 	} else {
-		char parent[MAXNAMELEN];
 		boolean_t is_insensitive = B_FALSE;
 
 		if (cbfunc == NULL) {
 			nvlist_free(nvprops);
 			return (EINVAL);
-		}
-
-		if (zfs_get_parent(zc->zc_name, parent, sizeof(parent)) == 0) {
-			if (zfs_is_wormed(parent))
-				return EPERM;
 		}
 
 		if (type == DMU_OST_ZVOL) {
@@ -3000,9 +2954,6 @@ zfs_ioc_destroy_snaps(zfs_cmd_t *zc)
 {
 	int err;
 
-	if (zfs_is_wormed(zc->zc_name))
-		return EPERM;
-
 	if (snapshot_namecheck(zc->zc_value, NULL, NULL) != 0)
 		return (EINVAL);
 	err = dmu_objset_find(zc->zc_name,
@@ -3025,10 +2976,6 @@ static int
 zfs_ioc_destroy(zfs_cmd_t *zc)
 {
 	int err;
-
-	if (zfs_is_wormed(zc->zc_name))
-		return EPERM;
-
 	if (strchr(zc->zc_name, '@') && zc->zc_objset_type == DMU_OST_ZFS) {
 		err = zfs_unmount_snap(zc->zc_name, NULL);
 		if (err)
@@ -3137,9 +3084,6 @@ static int
 zfs_ioc_rename(zfs_cmd_t *zc)
 {
 	boolean_t recursive = zc->zc_cookie & 1;
-
-	if (zfs_is_wormed(zc->zc_name))
-		return EPERM;
 
 	zc->zc_value[sizeof (zc->zc_value) - 1] = '\0';
 	if (dataset_namecheck(zc->zc_value, NULL, NULL) != 0 ||
@@ -3575,8 +3519,11 @@ zfs_ioc_recv(zfs_cmd_t *zc)
 			 * likely also fail, and clean up after itself.
 			 */
 			end_err = dmu_recv_end(&drc);
-			if (error == 0)
-				error = zfs_resume_fs(zfsvfs, tofs);
+			if (error == 0) {
+				int resume_err =
+				    zfs_resume_fs(zfsvfs, tofs);
+				error = error ? error : resume_err;
+			}
 			error = error ? error : end_err;
 			VFS_RELE(zfsvfs->z_vfs);
 		} else {
@@ -3912,15 +3859,13 @@ static int
 zfs_ioc_userspace_many(zfs_cmd_t *zc)
 {
 	zfsvfs_t *zfsvfs;
-	int bufsize = zc->zc_nvlist_dst_size;
+	int error;
 
-	if (bufsize <= 0)
-		return (ENOMEM);
-
-	int error = zfsvfs_hold(zc->zc_name, FTAG, &zfsvfs);
+	error = zfsvfs_hold(zc->zc_name, FTAG, &zfsvfs);
 	if (error)
 		return (error);
 
+	int bufsize = zc->zc_nvlist_dst_size;
 	void *buf = kmem_alloc(bufsize, KM_SLEEP);
 
 	error = zfs_userspace_many(zfsvfs, zc->zc_objset_type, &zc->zc_cookie,
@@ -4475,8 +4420,6 @@ zfsdev_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 	zc = kmem_zalloc(sizeof (zfs_cmd_t), KM_SLEEP);
 
 	error = ddi_copyin((void *)arg, zc, sizeof (zfs_cmd_t), flag);
-	if (error != 0)
-		error = EFAULT;
 
 	if ((error == 0) && !(flag & FKIOCTL))
 		error = zfs_ioc_vec[vec].zvec_secpolicy(zc, cr);
@@ -4515,8 +4458,7 @@ zfsdev_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 
 	rc = ddi_copyout(zc, (void *)arg, sizeof (zfs_cmd_t), flag);
 	if (error == 0) {
-		if (rc != 0)
-			error = EFAULT;
+		error = rc;
 		if (zfs_ioc_vec[vec].zvec_his_log)
 			zfs_log_history(zc);
 	}

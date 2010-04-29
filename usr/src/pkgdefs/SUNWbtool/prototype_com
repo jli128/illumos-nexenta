@@ -47,7 +47,8 @@ d none usr/bin 755 root bin
 f none usr/bin/rpcgen 555 root bin
 d none usr/ccs 0755 root bin
 d none usr/ccs/bin 0755 root bin
-m none usr/ccs/bin/ar 555 root bin usr/bin/ar
+f none usr/bin/ar 0555 root bin
+s none usr/ccs/bin/ar=../../bin/ar
 f none usr/bin/dis 0555 root bin
 s none usr/ccs/bin/dis=../../bin/dis
 f none usr/bin/dump 0555 root bin
@@ -57,7 +58,8 @@ s none usr/ccs/bin/elfdump=../../bin/elfdump
 f none usr/bin/elfedit 0555 root bin
 f none usr/bin/error 0555 root bin
 s none usr/ccs/bin/error=../../bin/error
-m none usr/ccs/bin/gprof 555 root bin usr/bin/gprof
+f none usr/bin/gprof 0555 root bin
+s none usr/ccs/bin/gprof=../../bin/gprof
 d none usr/share 755 root sys
 d none usr/share/lib 755 root sys
 d none usr/share/lib/ccs 755 root bin
@@ -65,25 +67,33 @@ f none usr/share/lib/ccs/gprof.flat.blurb 0444 root bin
 f none usr/share/lib/ccs/gprof.callg.blurb 0444 root bin
 f none usr/bin/lari 0555 root bin
 s none usr/ccs/bin/lari=../../bin/lari
-m none usr/ccs/bin/lex 555 root bin usr/bin/lex
+f none usr/bin/lex 0555 root bin
+s none usr/ccs/bin/lex=../../bin/lex
 f none usr/share/lib/ccs/ncform 0644 root bin
 f none usr/share/lib/ccs/nrform 0644 root bin
 f none usr/share/lib/ccs/nceucform 0644 root bin
-m none usr/ccs/bin/lorder 555 root bin usr/bin/lorder
+f none usr/bin/lorder 0555 root bin
+s none usr/ccs/bin/lorder=../../bin/lorder
 f none usr/bin/mcs 0555 root bin
 s none usr/ccs/bin/mcs=../../bin/mcs
-m none usr/ccs/bin/nm 555 root bin usr/bin/nm
+f none usr/bin/nm 0555 root bin
+s none usr/ccs/bin/nm=../../bin/nm
 f none usr/bin/prof 0555 root bin
 s none usr/ccs/bin/prof=../../bin/prof
-m none usr/ccs/bin/ranlib 555 root bin usr/bin/ranlib
-m none usr/ccs/bin/size 555 root bin usr/bin/size
-l none usr/ccs/bin/strip=../../bin/mcs
+f none usr/bin/ranlib 0555 root bin
+s none usr/ccs/bin/ranlib=../../bin/ranlib
+f none usr/bin/size 0555 root bin
+s none usr/ccs/bin/size=../../bin/size
+l none usr/bin/strip=../bin/mcs
+s none usr/ccs/bin/strip=../../bin/strip
 f none usr/bin/symorder 0555 root bin
 s none usr/ccs/bin/symorder=../../bin/symorder
-m none usr/ccs/bin/tsort 555 root bin usr/bin/tsort
+f none usr/bin/tsort 0555 root bin
+s none usr/ccs/bin/tsort=../../bin/tsort
 f none usr/bin/unifdef 0555 root bin
 s none usr/ccs/bin/unifdef=../../bin/unifdef
-m none usr/ccs/bin/yacc 555 root bin usr/bin/yacc
+f none usr/bin/yacc 0555 root bin
+s none usr/ccs/bin/yacc=../../bin/yacc
 f none usr/share/lib/ccs/yaccpar 0644 root bin
 s none usr/ccs/bin/yaccpar=../../share/lib/ccs/yaccpar
 d none usr/lib 755 root bin

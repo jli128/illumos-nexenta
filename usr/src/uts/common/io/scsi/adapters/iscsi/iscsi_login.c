@@ -20,7 +20,8 @@
  */
 /*
  * Copyright 2000 by Cisco Systems, Inc.  All rights reserved.
- * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  *
  * iSCSI protocol login and enumeration
  */
@@ -98,7 +99,6 @@ login_start:
 	    (icp->conn_state == ISCSI_CONN_STATE_POLLING));
 
 	icp->conn_state_ffp = B_FALSE;
-	icp->conn_login_status = ISCSI_INITIAL_LOGIN_STAGE;
 
 	/* reset connection statsn */
 	icp->conn_expstatsn = 0;
@@ -175,7 +175,6 @@ login_start:
 		case ISCSI_STATUS_INTERNAL_ERROR:
 		case ISCSI_STATUS_VERSION_MISMATCH:
 		case ISCSI_STATUS_NEGO_FAIL:
-		case ISCSI_STATUS_LOGIN_TPGT_NEGO_FAIL:
 			/* we don't want to retry this failure */
 			iscsi_login_end(icp, ISCSI_STATUS_LOGIN_FAILED, itp);
 			return (ISCSI_STATUS_LOGIN_FAILED);
@@ -234,7 +233,7 @@ login_retry:
 		if (itp->t_blocking == B_TRUE) {
 			goto login_start;
 		} else {
-			if (ddi_taskq_dispatch(isp->sess_login_taskq,
+			if (ddi_taskq_dispatch(isp->sess_taskq,
 			    (void(*)())iscsi_login_start, itp, DDI_SLEEP) !=
 			    DDI_SUCCESS) {
 				iscsi_login_end(icp,
@@ -254,7 +253,6 @@ static void
 iscsi_login_end(iscsi_conn_t *icp, iscsi_status_t status, iscsi_task_t *itp)
 {
 	iscsi_sess_t	*isp;
-	uint32_t	event_count;
 
 	ASSERT(icp != NULL);
 	isp = icp->conn_sess;
@@ -279,10 +277,9 @@ iscsi_login_end(iscsi_conn_t *icp, iscsi_status_t status, iscsi_task_t *itp)
 		iscsi_login_update_state(icp, LOGIN_FFP);
 
 		/* Notify the session that a connection is logged in */
-		event_count = atomic_inc_32_nv(&isp->sess_state_event_count);
-		iscsi_sess_enter_state_zone(isp);
-		iscsi_sess_state_machine(isp, ISCSI_SESS_EVENT_N1, event_count);
-		iscsi_sess_exit_state_zone(isp);
+		mutex_enter(&isp->sess_state_mutex);
+		iscsi_sess_state_machine(isp, ISCSI_SESS_EVENT_N1);
+		mutex_exit(&isp->sess_state_mutex);
 	} else {
 		/* If login failed reset nego tpgt */
 		isp->sess_tpgt_nego = ISCSI_DEFAULT_TPGT;
@@ -304,12 +301,10 @@ iscsi_login_end(iscsi_conn_t *icp, iscsi_status_t status, iscsi_task_t *itp)
 				    ISCSI_CONN_STATE_POLLING);
 			}
 			mutex_exit(&icp->conn_state_mutex);
-			event_count = atomic_inc_32_nv(
-			    &isp->sess_state_event_count);
-			iscsi_sess_enter_state_zone(isp);
-			iscsi_sess_state_machine(isp, ISCSI_SESS_EVENT_N6,
-			    event_count);
-			iscsi_sess_exit_state_zone(isp);
+
+			mutex_enter(&isp->sess_state_mutex);
+			iscsi_sess_state_machine(isp, ISCSI_SESS_EVENT_N6);
+			mutex_exit(&isp->sess_state_mutex);
 
 			if (status == ISCSI_STATUS_LOGIN_TIMED_OUT) {
 				iscsi_conn_retry(isp, icp);
@@ -320,14 +315,11 @@ iscsi_login_end(iscsi_conn_t *icp, iscsi_status_t status, iscsi_task_t *itp)
 				iscsi_conn_update_state_locked(icp,
 				    ISCSI_CONN_STATE_FREE);
 				mutex_exit(&icp->conn_state_mutex);
-				event_count = atomic_inc_32_nv(
-				    &isp->sess_state_event_count);
-				iscsi_sess_enter_state_zone(isp);
 
+				mutex_enter(&isp->sess_state_mutex);
 				iscsi_sess_state_machine(isp,
-				    ISCSI_SESS_EVENT_N6, event_count);
-
-				iscsi_sess_exit_state_zone(isp);
+				    ISCSI_SESS_EVENT_N6);
+				mutex_exit(&isp->sess_state_mutex);
 			} else {
 				/* ISCSI_STATUS_LOGIN_TIMED_OUT */
 				if (isp->sess_type == ISCSI_SESS_TYPE_NORMAL) {
@@ -418,7 +410,6 @@ iscsi_login(iscsi_conn_t *icp, uint8_t *status_class, uint8_t *status_detail)
 			cmn_err(CE_WARN, "iscsi connection(%u) login failed - "
 			    "unable to initialize authentication",
 			    icp->conn_oid);
-			icp->conn_login_status = ISCSI_STATUS_INTERNAL_ERROR;
 			iscsi_login_disconnect(icp);
 			iscsi_login_update_state(icp, LOGIN_DONE);
 			return (ISCSI_STATUS_INTERNAL_ERROR);
@@ -636,7 +627,6 @@ iscsi_login_done:
 		}
 	}
 
-	icp->conn_login_status = rval;
 	if (ISCSI_SUCCESS(rval) &&
 	    (*status_class == ISCSI_STATUS_CLASS_SUCCESS)) {
 		mutex_enter(&icp->conn_state_mutex);
@@ -1211,7 +1201,7 @@ more_text:
 	cmn_err(CE_WARN, "iscsi connection(%u) login failed - target "
 	    "protocol group tag mismatch, expected %d, received %lu",
 	    icp->conn_oid, isp->sess_tpgt_conf, tmp);
-	return (ISCSI_STATUS_LOGIN_TPGT_NEGO_FAIL);
+	return (ISCSI_STATUS_PROTOCOL_ERROR);
 
 					}
 				}
@@ -1302,7 +1292,7 @@ more_text:
 	cmn_err(CE_WARN, "iscsi connection(%u) login failed - target portal "
 	    "tag mismatch, expected:%d received:%lu", icp->conn_oid,
 	    isp->sess_tpgt_conf, tmp);
-	return (ISCSI_STATUS_LOGIN_TPGT_NEGO_FAIL);
+	return (ISCSI_STATUS_PROTOCOL_ERROR);
 
 					}
 				}

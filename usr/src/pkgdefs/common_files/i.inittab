@@ -101,10 +101,10 @@ ttymonopts() {
 updatettymon() {
 	SEDCMD='s+\`+\\\`+g;s+\$+\\\$+g;'
 	TTYMONLINE="^co:234:respawn:/usr/lib/saf/ttymon"
-	tmp=`grep $TTYMONLINE $dest | /usr/sun/bin/sed "s+$TTYMONLINE+ttymonopts+;$SEDCMD"`
+	tmp=`grep $TTYMONLINE $dest | sed "s+$TTYMONLINE+ttymonopts+;$SEDCMD"`
 	eval $tmp
 
-	ttymon_prompt=`echo $ttymon_prompt | /usr/sun/bin/sed $SEDCMD`
+	ttymon_prompt=`echo $ttymon_prompt | sed $SEDCMD`
 
 	cat >> $PKG_INSTALL_ROOT/var/svc/profile/upgrade <<-EOFA
 

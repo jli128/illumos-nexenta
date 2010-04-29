@@ -167,7 +167,7 @@ dict2nvl(PyObject *d)
 			uint64_t valint = PyInt_AsUnsignedLongLongMask(value);
 			err = nvlist_add_uint64(nvl, keystr, valint);
 		} else if (PyBool_Check(value)) {
-			boolean_t valbool = value == Py_True;
+			boolean_t valbool = value == Py_True ? B_TRUE : B_FALSE;
 			err = nvlist_add_boolean_value(nvl, keystr, valbool);
 		} else {
 			PyErr_SetObject(PyExc_ValueError, value);

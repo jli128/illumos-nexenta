@@ -35,7 +35,8 @@ if [ "${PKG_INSTALL_ROOT:-/}" = "/" ]; then
 	do
 		/usr/bin/pgrep -x -u 0 "$i" >/dev/null
 		if [ $? -ne 1 ]; then
-			echo "Warning: $i is still running"
+			echo "$i running; unable to remove package"
+			exit 1
 		fi
 	done
 fi

@@ -42,7 +42,6 @@
 #include <unistd.h>
 #include <wait.h>
 #include <libcontract.h>
-#include <libcontract_priv.h>
 #include <sys/contract/process.h>
 #include "dlmgmt_impl.h"
 
@@ -199,7 +198,6 @@ dlmgmt_zfop(const char *filename, zoneid_t zoneid, zfcb_t *zfcb,
 	pid_t		childpid;
 	siginfo_t	info;
 	zfarg_t		zfarg;
-	ctid_t		ct;
 
 	if (zoneid != GLOBAL_ZONEID) {
 		/*
@@ -222,18 +220,15 @@ dlmgmt_zfop(const char *filename, zoneid_t zoneid, zfcb_t *zfcb,
 		    (err = ct_pr_tmpl_set_fatal(ctfd, CT_PR_EV_HWERR)) != 0 ||
 		    (err = ct_pr_tmpl_set_param(ctfd, CT_PR_PGRPONLY)) != 0 ||
 		    (err = ct_tmpl_activate(ctfd)) != 0) {
-			(void) close(ctfd);
 			return (err);
 		}
 		childpid = fork();
+		(void) ct_tmpl_clear(ctfd);
+		(void) close(ctfd);
 		switch (childpid) {
 		case -1:
-			(void) ct_tmpl_clear(ctfd);
-			(void) close(ctfd);
 			return (err);
 		case 0:
-			(void) ct_tmpl_clear(ctfd);
-			(void) close(ctfd);
 			/*
 			 * Elevate our privileges as zone_enter() requires all
 			 * privileges.
@@ -246,15 +241,8 @@ dlmgmt_zfop(const char *filename, zoneid_t zoneid, zfcb_t *zfcb,
 				_exit(err);
 			break;
 		default:
-			if (contract_latest(&ct) == -1)
-				ct = -1;
-			(void) ct_tmpl_clear(ctfd);
-			(void) close(ctfd);
-			if (waitid(P_PID, childpid, &info, WEXITED) == -1) {
-				(void) contract_abandon_id(ct);
+			if (waitid(P_PID, childpid, &info, WEXITED) == -1)
 				return (errno);
-			}
-			(void) contract_abandon_id(ct);
 			if (info.si_status != 0)
 				return (info.si_status);
 		}

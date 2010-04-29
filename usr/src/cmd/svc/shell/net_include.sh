@@ -630,7 +630,7 @@ net_reconfigure ()
 	# loop to explicitly wait for the service to come online.
 	#
 	i=0
-	while [ $i -lt 120 ]; do
+	while [ $i -lt 30 ]; do
 		i=`expr $i + 1`
 		sleep 1
 		state=`svcprop -p restarter/state \

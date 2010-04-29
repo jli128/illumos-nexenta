@@ -10,7 +10,7 @@ export PATH
 
 if [ "${BASEDIR:=/}" != "/" ]
 then
-	BASEDIR="-b $BASEDIR"
+	BASEDIR_OPT="-b $BASEDIR"
 fi
 
 # Remove Drivers

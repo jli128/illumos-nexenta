@@ -19,7 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 
@@ -39,7 +40,6 @@
 #include <dlfcn.h>
 #include <libintl.h>
 #include <ucontext.h>
-#include <syslog.h>
 #include "idmap_impl.h"
 #include "idmap_cache.h"
 
@@ -2560,39 +2560,4 @@ idmap_stat
 idmap_getwinnamebygid(gid_t gid, int flag, char **name, char **domain)
 {
 	return (idmap_getwinnamebypid(gid, 0, flag, name, domain));
-}
-
-idmap_stat
-idmap_flush(idmap_handle_t *handle, idmap_flush_op op)
-{
-	CLIENT			*clnt;
-	enum clnt_stat		clntstat;
-	idmap_retcode		res;
-
-	res = IDMAP_SUCCESS;
-	_IDMAP_GET_CLIENT_HANDLE(handle, clnt);
-
-	clntstat = clnt_call(clnt, IDMAP_FLUSH,
-	    (xdrproc_t)xdr_idmap_flush_op, (caddr_t)&op,
-	    (xdrproc_t)xdr_idmap_retcode, (caddr_t)&res, TIMEOUT);
-
-	if (clntstat != RPC_SUCCESS) {
-		return (_idmap_rpc2stat(clnt));
-	}
-	return (res);
-}
-
-
-/*
- * syslog is the default logger.
- * It can be overwritten by supplying a logger
- * with  idmap_set_logger()
- */
-idmap_logger_t logger = syslog;
-
-
-void
-idmap_set_logger(idmap_logger_t funct)
-{
-	logger = funct;
 }

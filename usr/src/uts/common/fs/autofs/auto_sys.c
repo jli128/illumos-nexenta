@@ -19,8 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -61,7 +64,7 @@ autofssys(enum autofssys_op opcode, uintptr_t arg)
 			return (0);
 		}
 		mutex_exit(&autofs_minor_lock);
-		unmount_tree(fngp, B_TRUE);
+		unmount_tree(fngp, 1);
 		zone_rele(zone);
 		break;
 	}
@@ -77,7 +80,7 @@ autofssys(enum autofssys_op opcode, uintptr_t arg)
 		if (fngp == NULL) {
 			fngp = autofs_zone_init();
 			(void) zone_setspecific(autofs_key,
-			    curproc->p_zone, fngp);
+						curproc->p_zone, fngp);
 		}
 		mutex_exit(&autofs_minor_lock);
 		ASSERT(fngp != NULL);

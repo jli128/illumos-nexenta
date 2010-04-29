@@ -27,7 +27,7 @@ PROG = latencytop
 include ../Makefile.cmd
 
 $(64ONLY)SUBDIRS= $(MACH)
-#$(BUILD64)SUBDIRS += $(MACH64)
+$(BUILD64)SUBDIRS += $(MACH64)
 
 all	:=	TARGET = all
 install	:=	TARGET = install

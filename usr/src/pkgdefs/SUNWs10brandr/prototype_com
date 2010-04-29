@@ -28,7 +28,6 @@
 i pkginfo
 i copyright
 i depend
-i i.preserve
 
 # solaris10 brand template
 d none etc 755 root sys

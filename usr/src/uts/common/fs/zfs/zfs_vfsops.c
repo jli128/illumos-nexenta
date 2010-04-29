@@ -1533,7 +1533,8 @@ zfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	 */
 	error = secpolicy_fs_mount(cr, mvp, vfsp);
 	if (error) {
-		if (dsl_deleg_access(osname, ZFS_DELEG_PERM_MOUNT, cr) == 0) {
+		error = dsl_deleg_access(osname, ZFS_DELEG_PERM_MOUNT, cr);
+		if (error == 0) {
 			vattr_t		vattr;
 
 			/*
@@ -1543,14 +1544,16 @@ zfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 
 			vattr.va_mask = AT_UID;
 
-			if (VOP_GETATTR(mvp, &vattr, 0, cr, NULL)) {
+			if (error = VOP_GETATTR(mvp, &vattr, 0, cr, NULL)) {
 				goto out;
 			}
 
 			if (secpolicy_vnode_owner(cr, vattr.va_uid) != 0 &&
 			    VOP_ACCESS(mvp, VWRITE, 0, cr, NULL) != 0) {
+				error = EPERM;
 				goto out;
 			}
+
 			secpolicy_fs_mount_clearopts(cr, vfsp);
 		} else {
 			goto out;
@@ -1783,8 +1786,9 @@ zfs_umount(vfs_t *vfsp, int fflag, cred_t *cr)
 
 	ret = secpolicy_fs_unmount(cr, vfsp);
 	if (ret) {
-		if (dsl_deleg_access((char *)refstr_value(vfsp->vfs_resource),
-		    ZFS_DELEG_PERM_MOUNT, cr))
+		ret = dsl_deleg_access((char *)refstr_value(vfsp->vfs_resource),
+		    ZFS_DELEG_PERM_MOUNT, cr);
+		if (ret)
 			return (ret);
 	}
 
@@ -2017,11 +2021,9 @@ zfs_freevfs(vfs_t *vfsp)
 
 	/*
 	 * If this is a snapshot, we have an extra VFS_HOLD on our parent
-	 * from zfs_mount().  Release it here.  If we came through
-	 * zfs_mountroot() instead, we didn't grab an extra hold, so
-	 * skip the VFS_RELE for rootvfs.
+	 * from zfs_mount().  Release it here.
 	 */
-	if (zfsvfs->z_issnap && (vfsp != rootvfs))
+	if (zfsvfs->z_issnap)
 		VFS_RELE(zfsvfs->z_parent->z_vfs);
 
 	zfsvfs_free(zfsvfs);

@@ -19,9 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+#pragma ident	"@(#)smb_nic.c	1.6	08/07/24 SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -111,7 +113,7 @@ static int smb_nic_hlist_dbget(smb_hosts_t *);
 static int smb_nic_hlist_sysget(smb_hosts_t *);
 
 static void smb_nic_iflist_destroy(smb_hostifs_t *);
-static smb_hostifs_t *smb_nic_iflist_decode(const char **, int *);
+static smb_hostifs_t *smb_nic_iflist_decode(const char **);
 
 static int smb_nic_dbcreate(void);
 static sqlite *smb_nic_dbopen(int);
@@ -201,17 +203,16 @@ smb_nic_getnum(char *nb_hostname)
  * initializes the given iterator. To get the rest of
  * NICs smb_nic_getnext() must be called.
  *
- * Returns SMB_NIC_SUCCESS upon success or the following:
- *	SMB_NIC_NOT_FOUND - there's no interface available
- *	SMB_NIC_INVALID_ARG - 'ni' is NULL
+ * Returns 0 upon success and -1 if there's no interface
+ * available or if 'ni' is NULL.
  */
 int
 smb_nic_getfirst(smb_niciter_t *ni)
 {
-	int rc = SMB_NIC_SUCCESS;
+	int rc = 0;
 
 	if (ni == NULL)
-		return (SMB_NIC_INVALID_ARG);
+		return (-1);
 
 	(void) rw_rdlock(&smb_niclist.nl_rwl);
 
@@ -220,7 +221,7 @@ smb_nic_getfirst(smb_niciter_t *ni)
 		ni->ni_cookie = 1;
 		ni->ni_seqnum = smb_niclist.nl_seqnum;
 	} else {
-		rc = SMB_NIC_NOT_FOUND;
+		rc = -1;
 	}
 
 	(void) rw_unlock(&smb_niclist.nl_rwl);
@@ -235,11 +236,11 @@ smb_nic_getfirst(smb_niciter_t *ni)
  * iterator (ni). The iterator must have previously been
  * initialized by calling smb_nic_getfirst().
  *
- * Returns SMB_NIC_SUCCESS upon successfully finding the specified NIC
- * or the following:
- * 	SMB_NIC_INVALID_ARG - the specified iterator is invalid
- * 	SMB_NIC_NO_MORE - reaches the end of the NIC list
- * 	SMB_NIC_CHANGED - sequence number in the iterator is different from
+ * Returns 0 upon successfully finding the specified NIC.
+ * Returns -1 if:
+ * 	- the specified iterator is invalid
+ * 	- reaches the end of the NIC list
+ * 	- sequence number in the iterator is different from
  *	  the sequence number in the NIC list which means
  *	  the list has been changed between getfirst/getnext
  *	  calls.
@@ -247,10 +248,10 @@ smb_nic_getfirst(smb_niciter_t *ni)
 int
 smb_nic_getnext(smb_niciter_t *ni)
 {
-	int rc = SMB_NIC_SUCCESS;
+	int rc = 0;
 
 	if ((ni == NULL) || (ni->ni_cookie < 1))
-		return (SMB_NIC_INVALID_ARG);
+		return (-1);
 
 	(void) rw_rdlock(&smb_niclist.nl_rwl);
 
@@ -259,10 +260,7 @@ smb_nic_getnext(smb_niciter_t *ni)
 		ni->ni_nic = smb_niclist.nl_nics[ni->ni_cookie];
 		ni->ni_cookie++;
 	} else {
-		if (smb_niclist.nl_seqnum != ni->ni_seqnum)
-			rc = SMB_NIC_CHANGED;
-		else
-			rc = SMB_NIC_NO_MORE;
+		rc = -1;
 	}
 
 	(void) rw_unlock(&smb_niclist.nl_rwl);
@@ -323,7 +321,7 @@ smb_nic_is_same_subnet(smb_inaddr_t *ipaddr)
  * if_num: number of interface names in if_names arg
  * if_names: array of interface names in string format
  *
- * Returns SMB_NIC_SUCCESS upon success, a nonzero value otherwise.
+ * Returns 0 upon success and -1 when fails
  */
 int
 smb_nic_addhost(const char *host, const char *cmnt,
@@ -335,22 +333,22 @@ smb_nic_addhost(const char *host, const char *cmnt,
 	int rc, i;
 
 	if ((host == NULL) || (if_num <= 0) || (if_names == NULL))
-		return (SMB_NIC_INVALID_ARG);
+		return (-1);
 
 	if (!smb_nic_dbexists() || !smb_nic_dbvalidate()) {
-		if ((rc = smb_nic_dbcreate()) != SMB_NIC_SUCCESS)
-			return (rc);
+		if (smb_nic_dbcreate() != SQLITE_OK)
+			return (-1);
 	}
 
 	for (i = 0; i < if_num; i++) {
 		ifname = (char *)if_names[i];
 		if ((ifname == NULL) || (*ifname == '\0'))
-			return (SMB_NIC_INVALID_ARG);
+			return (-1);
 		buflen += strlen(ifname) + 1;
 	}
 
 	if ((if_list = malloc(buflen)) == NULL)
-		return (SMB_NIC_NO_MEMORY);
+		return (-1);
 
 	ifname = if_list;
 	for (i = 0; i < if_num - 1; i++)
@@ -361,7 +359,7 @@ smb_nic_addhost(const char *host, const char *cmnt,
 	rc = smb_nic_dbaddhost(host, cmnt, if_list);
 	free(if_list);
 
-	return (rc);
+	return ((rc == SQLITE_OK) ? 0 : -1);
 }
 
 /*
@@ -373,17 +371,20 @@ int
 smb_nic_delhost(const char *host)
 {
 	if ((host == NULL) || (*host == '\0'))
-		return (SMB_NIC_INVALID_ARG);
+		return (-1);
 
 	if (!smb_nic_dbexists())
-		return (SMB_NIC_SUCCESS);
+		return (0);
 
 	if (!smb_nic_dbvalidate()) {
 		(void) unlink(SMB_NIC_DB_NAME);
-		return (SMB_NIC_SUCCESS);
+		return (0);
 	}
 
-	return (smb_nic_dbdelhost(host));
+	if (smb_nic_dbdelhost(host) != SQLITE_OK)
+		return (-1);
+
+	return (0);
 }
 
 /*
@@ -405,10 +406,10 @@ smb_nic_list_create(void)
 	char excludestr[SMB_NIC_MAXEXCLLIST_LEN];
 	char *exclude[SMB_PI_MAX_NETWORKS];
 	int nexclude = 0;
-	int i, rc;
+	int i;
 
-	if ((rc = smb_nic_hlist_create(&hlist)) !=  SMB_NIC_SUCCESS)
-		return (rc);
+	if (smb_nic_hlist_create(&hlist) < 0)
+		return (-1);
 
 	smb_niclist.nl_cnt = 0;
 	smb_niclist.nl_seqnum = random();
@@ -417,7 +418,7 @@ smb_nic_list_create(void)
 	smb_niclist.nl_nics = calloc(hlist.h_ifnum, sizeof (smb_nic_t));
 	if (smb_niclist.nl_nics == NULL) {
 		smb_nic_hlist_destroy(&hlist);
-		return (SMB_NIC_NO_MEMORY);
+		return (-1);
 	}
 
 	*excludestr = '\0';
@@ -433,10 +434,9 @@ smb_nic_list_create(void)
 	do {
 		for (i = 0; i < iflist->if_num; i++) {
 			ifname = iflist->if_names[i];
-			if (smb_nic_getinfo(ifname, nc, AF_INET) !=
-			    SMB_NIC_SUCCESS) {
+			if (smb_nic_getinfo(ifname, nc, AF_INET) < 0) {
 				if (smb_nic_getinfo(ifname, nc,
-				    AF_INET6) != SMB_NIC_SUCCESS) {
+				    AF_INET6) < 0) {
 					continue;
 				}
 			}
@@ -462,7 +462,7 @@ smb_nic_list_create(void)
 
 	smb_nic_hlist_destroy(&hlist);
 
-	return (SMB_NIC_SUCCESS);
+	return (0);
 }
 
 static void
@@ -483,13 +483,13 @@ smb_nic_getinfo(char *interface, smb_nic_t *nc, int family)
 	struct sockaddr_in *sin;
 
 	if ((s = socket(family, SOCK_DGRAM, IPPROTO_IP)) < 0) {
-		return (SMB_NIC_SOCK);
+		return (-1);
 	}
 
 	(void) strlcpy(lifrr.lifr_name, interface, sizeof (lifrr.lifr_name));
 	if (ioctl(s, SIOCGLIFADDR, &lifrr) < 0) {
 		(void) close(s);
-		return (SMB_NIC_IOCTL);
+		return (-1);
 	}
 	isv6 = (lifrr.lifr_addr.ss_family == AF_INET6);
 	if (isv6) {
@@ -503,34 +503,34 @@ smb_nic_getinfo(char *interface, smb_nic_t *nc, int family)
 	}
 	if (smb_inet_iszero(&nc->nic_ip)) {
 		(void) close(s);
-		return (SMB_NIC_BAD_DATA);
+		return (-1);
 	}
 	/* there is no broadcast or netmask for v6 */
 	if (!isv6) {
 		if (ioctl(s, SIOCGLIFBRDADDR, &lifrr) < 0) {
 			(void) close(s);
-			return (SMB_NIC_IOCTL);
+			return (-1);
 		}
 		sin = (struct sockaddr_in *)&lifrr.lifr_broadaddr;
 		nc->nic_bcast = (uint32_t)sin->sin_addr.s_addr;
 
 		if (ioctl(s, SIOCGLIFNETMASK, &lifrr) < 0) {
 			(void) close(s);
-			return (SMB_NIC_IOCTL);
+			return (-1);
 		}
 		sin = (struct sockaddr_in *)&lifrr.lifr_addr;
 		nc->nic_mask = (uint32_t)sin->sin_addr.s_addr;
 	}
 	if (ioctl(s, SIOCGLIFFLAGS, &lifrr) < 0) {
 		(void) close(s);
-		return (SMB_NIC_IOCTL);
+		return (-1);
 	}
 	nc->nic_sysflags = lifrr.lifr_flags;
 
 	(void) strlcpy(nc->nic_ifname, interface, sizeof (nc->nic_ifname));
 
 	(void) close(s);
-	return (SMB_NIC_SUCCESS);
+	return (0);
 }
 
 /*
@@ -560,7 +560,7 @@ smb_nic_hlist_create(smb_hosts_t *hlist)
 		rc = smb_nic_hlist_sysget(hlist);
 	}
 
-	if (rc != SMB_NIC_SUCCESS)
+	if (rc != 0)
 		smb_nic_hlist_destroy(hlist);
 
 	return (rc);
@@ -612,14 +612,13 @@ smb_nic_hlist_sysget(smb_hosts_t *hlist)
 
 	iflist = malloc(sizeof (smb_hostifs_t));
 	if (iflist == NULL)
-		return (SMB_NIC_NO_MEMORY);
+		return (-1);
 
 	bzero(iflist, sizeof (smb_hostifs_t));
 
-	if (smb_gethostname(iflist->if_host, sizeof (iflist->if_host),
-	    SMB_CASE_PRESERVE) < 0) {
+	if (smb_gethostname(iflist->if_host, sizeof (iflist->if_host), 0) < 0) {
 		free(iflist);
-		return (SMB_NIC_NO_HOST);
+		return (-1);
 	}
 
 	(void) smb_config_getstr(SMB_CI_SYS_CMNT, iflist->if_cmnt,
@@ -627,7 +626,7 @@ smb_nic_hlist_sysget(smb_hosts_t *hlist)
 
 	if ((s4 = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
 		free(iflist);
-		return (SMB_NIC_SOCK);
+		return (-1);
 	}
 	s6 = socket(AF_INET6, SOCK_DGRAM, 0);
 
@@ -637,7 +636,7 @@ smb_nic_hlist_sysget(smb_hosts_t *hlist)
 		smb_close_sockets(s4, s6);
 		free(iflist);
 		syslog(LOG_ERR, "hlist_sysget: SIOCGLIFNUM errno=%d", errno);
-		return (SMB_NIC_IOCTL);
+		return (-1);
 	}
 
 	lifc.lifc_len = lifn.lifn_count * sizeof (struct lifreq);
@@ -645,7 +644,7 @@ smb_nic_hlist_sysget(smb_hosts_t *hlist)
 	if (lifc.lifc_buf == NULL) {
 		smb_close_sockets(s4, s6);
 		free(iflist);
-		return (SMB_NIC_NO_MEMORY);
+		return (-1);
 	}
 	bzero(lifc.lifc_buf, lifc.lifc_len);
 	lifc.lifc_family = AF_UNSPEC;
@@ -655,7 +654,7 @@ smb_nic_hlist_sysget(smb_hosts_t *hlist)
 		smb_close_sockets(s4, s6);
 		free(iflist);
 		free(lifc.lifc_buf);
-		return (SMB_NIC_IOCTL);
+		return (-1);
 	}
 
 	lifrp = lifc.lifc_req;
@@ -678,7 +677,7 @@ smb_nic_hlist_sysget(smb_hosts_t *hlist)
 				smb_close_sockets(s4, s6);
 				free(lifc.lifc_buf);
 				smb_nic_iflist_destroy(iflist);
-				return (SMB_NIC_IOCTL);
+				return (-1);
 			}
 		}
 		if (lifrl.lifr_flags & IFF_LOOPBACK) {
@@ -693,7 +692,7 @@ smb_nic_hlist_sysget(smb_hosts_t *hlist)
 			smb_close_sockets(s4, s6);
 			free(lifc.lifc_buf);
 			smb_nic_iflist_destroy(iflist);
-			return (SMB_NIC_NO_MEMORY);
+			return (-1);
 		}
 		iflist->if_names[iflist->if_num++] = ifname;
 	}
@@ -703,7 +702,7 @@ smb_nic_hlist_sysget(smb_hosts_t *hlist)
 	free(lifc.lifc_buf);
 	list_insert_tail(&hlist->h_list, iflist);
 
-	return (SMB_NIC_SUCCESS);
+	return (0);
 }
 
 static boolean_t
@@ -727,7 +726,7 @@ smb_nic_hlist_dbget(smb_hosts_t *hlist)
 	smb_hostifs_t *iflist;
 	sqlite *db;
 	sqlite_vm *vm;
-	int err = SMB_NIC_SUCCESS;
+	boolean_t error = B_FALSE;
 	const char **values;
 	char *sql;
 	char *errmsg = NULL;
@@ -735,12 +734,12 @@ smb_nic_hlist_dbget(smb_hosts_t *hlist)
 
 	sql = sqlite_mprintf("SELECT * FROM hosts");
 	if (sql == NULL)
-		return (SMB_NIC_NO_MEMORY);
+		return (-1);
 
 	db = smb_nic_dbopen(SMB_NIC_DB_ORD);
 	if (db == NULL) {
 		sqlite_freemem(sql);
-		return (SMB_NIC_DBOPEN_FAILED);
+		return (-1);
 	}
 
 	rc = sqlite_compile(db, sql, NULL, &vm, &errmsg);
@@ -748,22 +747,21 @@ smb_nic_hlist_dbget(smb_hosts_t *hlist)
 
 	if (rc != SQLITE_OK) {
 		smb_nic_dbclose(db);
-		syslog(LOG_ERR, "Failed to query hosts info from host " \
-		    "database.  Unable to create virtual machine (%s).",
-		    NULL_MSGCHK(errmsg));
-		return (SMB_NIC_DB_ERROR);
+		syslog(LOG_DEBUG, "smb_nic_hlist_dbget: failed to create"
+		    " VM (%s)", NULL_MSGCHK(errmsg));
+		return (-1);
 	}
 
 	do {
 		rc = sqlite_step(vm, &ncol, &values, NULL);
 		if (rc == SQLITE_ROW) {
 			if (ncol != SMB_NIC_HTBL_NCOL) {
-				err = SMB_NIC_DB_ERROR;
+				error = B_TRUE;
 				break;
 			}
 
-			if ((iflist = smb_nic_iflist_decode(values, &err)) ==
-			    NULL) {
+			if ((iflist = smb_nic_iflist_decode(values)) == NULL) {
+				error = B_TRUE;
 				break;
 			}
 
@@ -773,29 +771,23 @@ smb_nic_hlist_dbget(smb_hosts_t *hlist)
 		}
 	} while (rc == SQLITE_ROW);
 
-	if (rc != SQLITE_DONE && err == SMB_NIC_SUCCESS) {
-		/* set this error if no previous error */
-		err = SMB_LGRP_DBEXEC_FAILED;
-	}
+	if (rc != SQLITE_DONE)
+		error = B_TRUE;
 
 	rc = sqlite_finalize(vm, &errmsg);
 	if (rc != SQLITE_OK) {
-		syslog(LOG_ERR, "Failed to query hosts info from host " \
-		    "database.  Unable to destroy virtual machine (%s).",
-		    NULL_MSGCHK(errmsg));
-		if (err == SMB_NIC_SUCCESS) {
-			/* set this error if no previous error */
-			err = SMB_NIC_DB_ERROR;
-		}
+		syslog(LOG_DEBUG, "smb_nic_hlist_dbget: failed to destroy"
+		    "VM (%s)", NULL_MSGCHK(errmsg));
+		error = B_TRUE;
 	}
 
 	smb_nic_dbclose(db);
 
-	return (err);
+	return ((error) ? -1 : 0);
 }
 
 static smb_hostifs_t *
-smb_nic_iflist_decode(const char **values, int *err)
+smb_nic_iflist_decode(const char **values)
 {
 	smb_hostifs_t *iflist;
 	char *host;
@@ -809,16 +801,12 @@ smb_nic_iflist_decode(const char **values, int *err)
 	cmnt = (char *)values[SMB_NIC_HTBL_CMNT];
 	ifnames = (char *)values[SMB_NIC_HTBL_IFS];
 
-	if ((host == NULL) || (ifnames == NULL)) {
-		*err = SMB_NIC_INVALID_ARG;
+	if ((host == NULL) || (ifnames == NULL))
 		return (NULL);
-	}
 
 	iflist = malloc(sizeof (smb_hostifs_t));
-	if (iflist == NULL) {
-		*err = SMB_NIC_NO_MEMORY;
+	if (iflist == NULL)
 		return (NULL);
-	}
 
 	bzero(iflist, sizeof (smb_hostifs_t));
 
@@ -826,10 +814,8 @@ smb_nic_iflist_decode(const char **values, int *err)
 	(void) strlcpy(iflist->if_cmnt, (cmnt) ? cmnt : "",
 	    sizeof (iflist->if_cmnt));
 
-	if ((ifname = strtok_r(ifnames, ",", &lasts)) == NULL) {
-		*err = SMB_NIC_BAD_DATA;
+	if ((ifname = strtok_r(ifnames, ",", &lasts)) == NULL)
 		return (NULL);
-	}
 
 	iflist->if_names[if_num++] = strdup(ifname);
 
@@ -841,12 +827,10 @@ smb_nic_iflist_decode(const char **values, int *err)
 	for (if_num = 0; if_num < iflist->if_num; if_num++) {
 		if (iflist->if_names[if_num] == NULL) {
 			smb_nic_iflist_destroy(iflist);
-			*err = SMB_NIC_NO_MEMORY;
 			return (NULL);
 		}
 	}
 
-	*err = SMB_NIC_SUCCESS;
 	return (iflist);
 }
 
@@ -891,39 +875,39 @@ smb_nic_dbcreate(void)
 {
 	sqlite *db = NULL;
 	char *errmsg = NULL;
-	int rc, err = SMB_NIC_SUCCESS;
+	int rc;
 
 	(void) unlink(SMB_NIC_DB_NAME);
 
 	db = sqlite_open(SMB_NIC_DB_NAME, 0600, &errmsg);
 	if (db == NULL) {
-		syslog(LOG_ERR, "Failed to create host database (%s).",
+		syslog(LOG_DEBUG, "failed to create host database (%s)",
 		    NULL_MSGCHK(errmsg));
 		sqlite_freemem(errmsg);
-		return (SMB_NIC_DBOPEN_FAILED);
+		return (SQLITE_CANTOPEN);
 	}
 
 	sqlite_busy_timeout(db, SMB_NIC_DB_TIMEOUT);
 	rc = sqlite_exec(db, "BEGIN TRANSACTION", NULL, NULL, &errmsg);
 	if (rc != SQLITE_OK) {
-		syslog(LOG_ERR, "Failed to create host database.  Unable to " \
-		    "begin database transaction (%s).", NULL_MSGCHK(errmsg));
+		syslog(LOG_DEBUG, "failed to begin database transaction (%s)",
+		    NULL_MSGCHK(errmsg));
 		sqlite_freemem(errmsg);
 		sqlite_close(db);
-		return (SMB_NIC_DBEXEC_FAILED);
+		return (rc);
 	}
 
 	if (sqlite_exec(db, SMB_NIC_DB_SQL, NULL, NULL, &errmsg) == SQLITE_OK) {
 		rc = sqlite_exec(db, "COMMIT TRANSACTION", NULL, NULL,
 		    &errmsg);
 		if (rc == SQLITE_OK)
-			err = smb_nic_dbsetinfo(db);
-		if (err != SMB_NIC_SUCCESS)
+			rc = smb_nic_dbsetinfo(db);
+		if (rc != SQLITE_OK)
 			rc = sqlite_exec(db, "ROLLBACK TRANSACTION", NULL, NULL,
 			    &errmsg);
 	} else {
-		syslog(LOG_ERR, "Failed to create host database.  Unable to " \
-		    "initialize host database (%s).", NULL_MSGCHK(errmsg));
+		syslog(LOG_ERR, "failed to initialize host database (%s)",
+		    errmsg);
 		sqlite_freemem(errmsg);
 		rc = sqlite_exec(db, "ROLLBACK TRANSACTION", NULL, NULL,
 		    &errmsg);
@@ -931,14 +915,13 @@ smb_nic_dbcreate(void)
 
 	if (rc != SQLITE_OK) {
 		/* this is bad - database may be left in a locked state */
-		syslog(LOG_ERR, "Failed to create host database.  Unable to " \
-		    "close a transaction (%s).", NULL_MSGCHK(errmsg));
+		syslog(LOG_DEBUG, "failed to close a transaction (%s)",
+		    NULL_MSGCHK(errmsg));
 		sqlite_freemem(errmsg);
-		err = SMB_NIC_DBINIT_FAILED;
 	}
 
 	(void) sqlite_close(db);
-	return (err);
+	return (rc);
 }
 
 /*
@@ -954,8 +937,8 @@ smb_nic_dbopen(int mode)
 
 	db = sqlite_open(SMB_NIC_DB_NAME, mode, &errmsg);
 	if (db == NULL) {
-		syslog(LOG_ERR, "Failed to open host database: %s (%s).",
-		    SMB_NIC_DB_NAME, NULL_MSGCHK(errmsg));
+		syslog(LOG_ERR, "failed to open group database (%s)",
+		    NULL_MSGCHK(errmsg));
 		sqlite_freemem(errmsg);
 	}
 
@@ -1006,16 +989,15 @@ smb_nic_dbvalidate(void)
 	sqlite_freemem(sql);
 
 	if (rc != SQLITE_OK) {
-		syslog(LOG_ERR, "Failed to validate host database.  Unable " \
-		    "to get database information (%s).", NULL_MSGCHK(errmsg));
+		syslog(LOG_DEBUG, "smb_nic_dbvalidate: failed to get db_info"
+		    " (%s)", NULL_MSGCHK(errmsg));
 		sqlite_freemem(errmsg);
 		smb_nic_dbclose(db);
 		return (B_FALSE);
 	}
 
 	if (nrow != 1 || ncol != 3) {
-		syslog(LOG_ERR, "Failed to validate host database:  bad " \
-		    "db_info table.");
+		syslog(LOG_DEBUG, "smb_nic_dbvalidate: bad db_info table");
 		sqlite_free_table(result);
 		smb_nic_dbclose(db);
 		return (B_FALSE);
@@ -1024,8 +1006,7 @@ smb_nic_dbvalidate(void)
 	if ((atoi(result[3]) != SMB_NIC_DB_VERMAJOR) ||
 	    (atoi(result[4]) != SMB_NIC_DB_VERMINOR) ||
 	    (atoi(result[5]) != SMB_NIC_DB_MAGIC)) {
-		syslog(LOG_ERR, "Failed to validate host database: bad " \
-		    "db_info content.");
+		syslog(LOG_DEBUG, "smb_nic_dbvalidate: bad db_info content");
 		sqlite_free_table(result);
 		smb_nic_dbclose(db);
 		return (B_FALSE);
@@ -1042,8 +1023,8 @@ smb_nic_dbvalidate(void)
 	sqlite_freemem(sql);
 
 	if (rc != SQLITE_OK) {
-		syslog(LOG_ERR, "Failed to validate host database.  Unable " \
-		"to query for host (%s).", NULL_MSGCHK(errmsg));
+		syslog(LOG_DEBUG, "smb_nic_dbvalidate: failed to count (%s)",
+		    NULL_MSGCHK(errmsg));
 		sqlite_freemem(errmsg);
 		smb_nic_dbclose(db);
 		return (B_FALSE);
@@ -1065,17 +1046,17 @@ smb_nic_dbaddhost(const char *host, const char *cmnt, char *if_list)
 	sqlite *db;
 	char *sql;
 	char *errmsg;
-	int rc, err = SMB_NIC_SUCCESS;
+	int rc;
 
 	sql = sqlite_mprintf("REPLACE INTO hosts (hostname, comment, ifnames)"
 	    "VALUES ('%s', '%q', '%s')", host, (cmnt) ? cmnt : "", if_list);
 	if (sql == NULL)
-		return (SMB_NIC_NO_MEMORY);
+		return (SQLITE_NOMEM);
 
 	db = smb_nic_dbopen(SMB_NIC_DB_ORW);
 	if (db == NULL) {
 		sqlite_freemem(sql);
-		return (SMB_NIC_DBOPEN_FAILED);
+		return (SQLITE_CANTOPEN);
 	}
 
 	rc = sqlite_exec(db, sql, NULL, NULL, &errmsg);
@@ -1083,13 +1064,12 @@ smb_nic_dbaddhost(const char *host, const char *cmnt, char *if_list)
 	smb_nic_dbclose(db);
 
 	if (rc != SQLITE_OK) {
-		syslog(LOG_ERR, "Failed to add host %s to host database (%s).",
+		syslog(LOG_DEBUG, "smb_nic_dbaddhost: failed to insert %s (%s)",
 		    host, NULL_MSGCHK(errmsg));
 		sqlite_freemem(errmsg);
-		err = SMB_NIC_INSERT_FAILED;
 	}
 
-	return (err);
+	return (rc);
 }
 
 static int
@@ -1098,16 +1078,16 @@ smb_nic_dbdelhost(const char *host)
 	sqlite *db;
 	char *sql;
 	char *errmsg;
-	int rc, err = SMB_NIC_SUCCESS;
+	int rc;
 
 	sql = sqlite_mprintf("DELETE FROM hosts WHERE hostname = '%s'", host);
 	if (sql == NULL)
-		return (SMB_NIC_NO_MEMORY);
+		return (SQLITE_NOMEM);
 
 	db = smb_nic_dbopen(SMB_NIC_DB_ORW);
 	if (db == NULL) {
 		sqlite_freemem(sql);
-		return (SMB_NIC_DBOPEN_FAILED);
+		return (SQLITE_CANTOPEN);
 	}
 
 	rc = sqlite_exec(db, sql, NULL, NULL, &errmsg);
@@ -1115,13 +1095,12 @@ smb_nic_dbdelhost(const char *host)
 	smb_nic_dbclose(db);
 
 	if (rc != SQLITE_OK) {
-		syslog(LOG_ERR, "Failed to delete host %s from host " \
-		    "database (%s).", host, NULL_MSGCHK(errmsg));
+		syslog(LOG_DEBUG, "smb_nic_dbdelhost: failed to delete %s (%s)",
+		    host, NULL_MSGCHK(errmsg));
 		sqlite_freemem(errmsg);
-		err = SMB_NIC_DELETE_FAILED;
 	}
 
-	return (err);
+	return (rc);
 }
 
 /*
@@ -1134,25 +1113,24 @@ smb_nic_dbsetinfo(sqlite *db)
 {
 	char *errmsg = NULL;
 	char *sql;
-	int rc, err = SMB_NIC_SUCCESS;
+	int rc;
 
 	sql = sqlite_mprintf("INSERT INTO db_info (ver_major, ver_minor,"
 	    " magic) VALUES (%d, %d, %d)", SMB_NIC_DB_VERMAJOR,
 	    SMB_NIC_DB_VERMINOR, SMB_NIC_DB_MAGIC);
 
 	if (sql == NULL)
-		return (SMB_NIC_NO_MEMORY);
+		return (SQLITE_NOMEM);
 
 	rc = sqlite_exec(db, sql, NULL, NULL, &errmsg);
 	sqlite_freemem(sql);
 	if (rc != SQLITE_OK) {
-		syslog(LOG_ERR, "Failed to add database information to " \
-		    "host database (%s).", NULL_MSGCHK(errmsg));
+		syslog(LOG_DEBUG, "smb_nic_dbsetinfo: failed to insert database"
+		    " information (%s)", NULL_MSGCHK(errmsg));
 		sqlite_freemem(errmsg);
-		err = SMB_NIC_DBINIT_ERROR;
 	}
 
-	return (err);
+	return (rc);
 }
 
 /*

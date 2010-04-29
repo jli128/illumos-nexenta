@@ -26,7 +26,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <synch.h>
+
 #include <smbsrv/libsmb.h>
+
+static int wk_init = 0;
+static rwlock_t wk_rwlock;
 
 static char *wka_nbdomain[] = {
 	"",
@@ -131,9 +135,6 @@ static smb_wka_t wka_tbl[] = {
 
 #define	SMB_WKA_NUM	(sizeof (wka_tbl)/sizeof (wka_tbl[0]))
 
-static int smb_wka_init(void);
-static void smb_wka_fini(void);
-
 /*
  * Looks up well known accounts table for the given SID.
  * Upon success returns a pointer to the account entry in
@@ -145,21 +146,20 @@ smb_wka_lookup_sid(smb_sid_t *sid)
 	smb_wka_t *entry;
 	int i;
 
-	if (!smb_wka_init())
-		return (NULL);
+	(void) rw_rdlock(&wk_rwlock);
 
 	for (i = 0; i < SMB_WKA_NUM; ++i) {
 		entry = &wka_tbl[i];
-
-		if (entry->wka_binsid == NULL)
-			return (NULL);
-
-		if (smb_sid_cmp(sid, entry->wka_binsid))
+		if (smb_sid_cmp(sid, entry->wka_binsid)) {
+			(void) rw_unlock(&wk_rwlock);
 			return (entry);
+		}
 	}
 
+	(void) rw_unlock(&wk_rwlock);
 	return (NULL);
 }
+
 
 /*
  * Looks up well known accounts table for the given name.
@@ -171,9 +171,6 @@ smb_wka_get_sid(const char *name)
 {
 	smb_wka_t *entry;
 	smb_sid_t *sid = NULL;
-
-	if (!smb_wka_init())
-		return (NULL);
 
 	if ((entry = smb_wka_lookup_name(name)) != NULL)
 		sid = entry->wka_binsid;
@@ -192,13 +189,16 @@ smb_wka_lookup_name(const char *name)
 	smb_wka_t *entry;
 	int i;
 
+	(void) rw_rdlock(&wk_rwlock);
 	for (i = 0; i < SMB_WKA_NUM; ++i) {
 		entry = &wka_tbl[i];
-
-		if (!smb_strcasecmp(name, entry->wka_name, 0))
+		if (!smb_strcasecmp(name, entry->wka_name, 0)) {
+			(void) rw_unlock(&wk_rwlock);
 			return (entry);
+		}
 	}
 
+	(void) rw_unlock(&wk_rwlock);
 	return (NULL);
 }
 
@@ -211,16 +211,20 @@ smb_wka_lookup_builtin(const char *name)
 	smb_wka_t	*entry;
 	int		i;
 
+	(void) rw_rdlock(&wk_rwlock);
 	for (i = 0; i < SMB_WKA_NUM; ++i) {
 		entry = &wka_tbl[i];
 
 		if (entry->wka_domidx != 3)
 			continue;
 
-		if (!smb_strcasecmp(name, entry->wka_name, 0))
+		if (!smb_strcasecmp(name, entry->wka_name, 0)) {
+			(void) rw_unlock(&wk_rwlock);
 			return (entry);
+		}
 	}
 
+	(void) rw_unlock(&wk_rwlock);
 	return (NULL);
 }
 
@@ -293,46 +297,53 @@ smb_wka_token_groups(uint32_t flags, smb_ids_t *gids)
 }
 
 /*
- * Generate binary SIDs from the string SIDs for the well-known
- * accounts table.  Callers MUST not free the binary SID pointer.
+ * smb_wka_init
+ *
+ * Generate binary SIDs from the string SIDs in the table
+ * and set the proper field.
+ *
+ * Caller MUST not store the binary SID pointer anywhere that
+ * could lead to freeing it.
+ *
+ * This function should only be called once.
  */
-static int
+int
 smb_wka_init(void)
 {
-	static boolean_t wka_init = B_FALSE;
-	static mutex_t	wka_mutex;
-	smb_wka_t	*entry;
-	int		i;
+	smb_wka_t *entry;
+	int i;
 
-	(void) mutex_lock(&wka_mutex);
-	if (wka_init) {
-		(void) mutex_unlock(&wka_mutex);
-		return (B_TRUE);
+	(void) rw_wrlock(&wk_rwlock);
+	if (wk_init) {
+		(void) rw_unlock(&wk_rwlock);
+		return (1);
 	}
 
 	for (i = 0; i < SMB_WKA_NUM; ++i) {
 		entry = &wka_tbl[i];
-
 		entry->wka_binsid = smb_sid_fromstr(entry->wka_sid);
 		if (entry->wka_binsid == NULL) {
+			(void) rw_unlock(&wk_rwlock);
 			smb_wka_fini();
-			(void) mutex_unlock(&wka_mutex);
-			return (B_FALSE);
+			return (0);
 		}
 	}
 
-	wka_init = B_TRUE;
-	(void) mutex_unlock(&wka_mutex);
-	return (B_TRUE);
+	wk_init = 1;
+	(void) rw_unlock(&wk_rwlock);
+	return (1);
 }
 
-/*
- * Private cleanup for smb_wka_init.
- */
-static void
+void
 smb_wka_fini(void)
 {
 	int i;
+
+	(void) rw_wrlock(&wk_rwlock);
+	if (wk_init == 0) {
+		(void) rw_unlock(&wk_rwlock);
+		return;
+	}
 
 	for (i = 0; i < SMB_WKA_NUM; ++i) {
 		if (wka_tbl[i].wka_binsid) {
@@ -340,4 +351,7 @@ smb_wka_fini(void)
 			wka_tbl[i].wka_binsid = NULL;
 		}
 	}
+
+	wk_init = 0;
+	(void) rw_unlock(&wk_rwlock);
 }

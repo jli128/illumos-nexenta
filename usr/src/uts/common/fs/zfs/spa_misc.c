@@ -19,7 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #include <sys/zfs_context.h>
@@ -475,7 +476,7 @@ spa_add(const char *name, nvlist_t *config, const char *altroot)
 	    offsetof(spa_config_dirent_t, scd_link));
 
 	dp = kmem_zalloc(sizeof (spa_config_dirent_t), KM_SLEEP);
-	dp->scd_path = altroot ? NULL : spa_strdup(spa_config_path);
+	dp->scd_path = spa_strdup(spa_config_path);
 	list_insert_head(&spa->spa_config_list, dp);
 
 	if (config != NULL)
@@ -958,25 +959,7 @@ spa_vdev_state_enter(spa_t *spa, int oplocks)
 {
 	int locks = SCL_STATE_ALL | oplocks;
 
-	/*
-	 * Root pools may need to read of the underlying devfs filesystem
-	 * when opening up a vdev.  Unfortunately if we're holding the
-	 * SCL_ZIO lock it will result in a deadlock when we try to issue
-	 * the read from the root filesystem.  Instead we "prefetch"
-	 * the associated vnodes that we need prior to opening the
-	 * underlying devices and cache them so that we can prevent
-	 * any I/O when we are doing the actual open.
-	 */
-	if (spa_is_root(spa)) {
-		int low = locks & ~(SCL_ZIO - 1);
-		int high = locks & ~low;
-
-		spa_config_enter(spa, high, spa, RW_WRITER);
-		vdev_hold(spa->spa_root_vdev);
-		spa_config_enter(spa, low, spa, RW_WRITER);
-	} else {
-		spa_config_enter(spa, locks, spa, RW_WRITER);
-	}
+	spa_config_enter(spa, locks, spa, RW_WRITER);
 	spa->spa_vdev_locks = locks;
 }
 
@@ -991,9 +974,6 @@ spa_vdev_state_exit(spa_t *spa, vdev_t *vd, int error)
 		vdev_state_dirty(vd->vdev_top);
 		spa->spa_config_generation++;
 	}
-
-	if (spa_is_root(spa))
-		vdev_rele(spa->spa_root_vdev);
 
 	ASSERT3U(spa->spa_vdev_locks, >=, SCL_STATE_ALL);
 	spa_config_exit(spa, spa->spa_vdev_locks, spa);
@@ -1158,15 +1138,9 @@ spa_generate_guid(spa_t *spa)
 void
 sprintf_blkptr(char *buf, const blkptr_t *bp)
 {
-	char *type = NULL;
-	char *checksum = NULL;
-	char *compress = NULL;
-
-	if (bp != NULL) {
-		type = dmu_ot[BP_GET_TYPE(bp)].ot_name;
-		checksum = zio_checksum_table[BP_GET_CHECKSUM(bp)].ci_name;
-		compress = zio_compress_table[BP_GET_COMPRESS(bp)].ci_name;
-	}
+	char *type = dmu_ot[BP_GET_TYPE(bp)].ot_name;
+	char *checksum = zio_checksum_table[BP_GET_CHECKSUM(bp)].ci_name;
+	char *compress = zio_compress_table[BP_GET_COMPRESS(bp)].ci_name;
 
 	SPRINTF_BLKPTR(snprintf, ' ', buf, bp, type, checksum, compress);
 }

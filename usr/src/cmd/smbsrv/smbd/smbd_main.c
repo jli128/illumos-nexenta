@@ -50,7 +50,7 @@
 #include <pwd.h>
 #include <grp.h>
 
-#include <smbsrv/smb_door.h>
+#include <smbsrv/smb_door_svc.h>
 #include <smbsrv/smb_ioctl.h>
 #include <smbsrv/string.h>
 #include <smbsrv/libsmb.h>
@@ -110,21 +110,11 @@ static pthread_t refresh_thr;
 static pthread_cond_t refresh_cond;
 static pthread_mutex_t refresh_mutex;
 
-static cond_t listener_cv;
-static mutex_t listener_mutex;
-
-/*
- * Mutex to ensure that smbd_service_fini() and smbd_service_init()
- * are atomic w.r.t. one another.  Otherwise, if a shutdown begins
- * before initialization is complete, resources can get deallocated
- * while initialization threads are still using them.
- */
-static mutex_t smbd_service_mutex;
-static cond_t smbd_service_cv;
-
 smbd_t smbd;
 
 /*
+ * smbd user land daemon
+ *
  * Use SMF error codes only on return or exit.
  */
 int
@@ -167,7 +157,6 @@ main(int argc, char *argv[])
 	act.sa_handler = smbd_sig_handler;
 	act.sa_flags = 0;
 
-	(void) sigaction(SIGABRT, &act, NULL);
 	(void) sigaction(SIGTERM, &act, NULL);
 	(void) sigaction(SIGHUP, &act, NULL);
 	(void) sigaction(SIGINT, &act, NULL);
@@ -204,7 +193,7 @@ main(int argc, char *argv[])
 		smbd_daemonize_fini(pfd, SMF_EXIT_OK);
 	}
 
-	(void) atexit(smb_kmod_stop);
+	(void) atexit(smbd_service_fini);
 
 	while (!smbd.s_shutting_down) {
 		if (smbd.s_sigval == 0 && smbd.s_refreshes == 0)
@@ -215,7 +204,6 @@ main(int argc, char *argv[])
 		switch (sigval) {
 		case 0:
 		case SIGPIPE:
-		case SIGABRT:
 			break;
 
 		case SIGHUP:
@@ -411,7 +399,6 @@ smbd_daemonize_fini(int fd, int exit_status)
 	(void) priv_addset(pset, PRIV_PROC_AUDIT);
 	(void) priv_addset(pset, PRIV_SYS_DEVICES);
 	(void) priv_addset(pset, PRIV_SYS_SMB);
-	(void) priv_addset(pset, PRIV_SYS_MOUNT);
 
 	priv_inverse(pset);
 
@@ -430,29 +417,12 @@ smbd_daemonize_fini(int fd, int exit_status)
 static int
 smbd_service_init(void)
 {
-	static struct dir {
-		char	*name;
-		int	perm;
-	} dir[] = {
-		{ SMB_DBDIR,	0700 },
-		{ SMB_CVOL,	0755 },
-		{ SMB_SYSROOT,	0755 },
-		{ SMB_SYSTEM32,	0755 },
-		{ SMB_VSS,	0755 }
-	};
-	int	rc, i;
-
-	(void) mutex_lock(&smbd_service_mutex);
+	int	rc;
 
 	smbd.s_pid = getpid();
-	for (i = 0; i < sizeof (dir)/sizeof (dir[0]); ++i) {
-		if ((mkdir(dir[i].name, dir[i].perm) < 0) &&
-		    (errno != EEXIST)) {
-			smbd_report("mkdir %s: %s", dir[i].name,
-			    strerror(errno));
-			(void) mutex_unlock(&smbd_service_mutex);
-			return (-1);
-		}
+	if ((mkdir(SMB_DBDIR, 0700) < 0) && (errno != EEXIST)) {
+		smbd_report("mkdir %s: %s", SMB_DBDIR, strerror(errno));
+		return (1);
 	}
 
 	if ((rc = smb_ccache_init(SMB_VARRUN_DIR, SMB_CCACHE_FILE)) != 0) {
@@ -461,11 +431,15 @@ smbd_service_init(void)
 			    strerror(errno));
 		else
 			smbd_report("unable to set KRB5CCNAME");
-		(void) mutex_unlock(&smbd_service_mutex);
-		return (-1);
+		return (1);
 	}
 
 	smb_codepage_init();
+
+	if (!smb_wka_init()) {
+		smbd_report("out of memory");
+		return (1);
+	}
 
 	if (smb_nicmon_start(SMBD_DEFAULT_INSTANCE_FMRI) != 0)
 		smbd_report("NIC monitoring failed to start");
@@ -478,124 +452,104 @@ smbd_service_init(void)
 	else
 		smbd_report("NetBIOS services started");
 
+	/* Get the ID map client handle */
+	if ((rc = smb_idmap_start()) != 0) {
+		smbd_report("no idmap handle");
+		return (rc);
+	}
+
 	smbd.s_secmode = smb_config_get_secmode();
 	if ((rc = smb_domain_init(smbd.s_secmode)) != 0) {
 		if (rc == SMB_DOMAIN_NOMACHINE_SID) {
 			smbd_report(
 			    "no machine SID: check idmap configuration");
-			(void) mutex_unlock(&smbd_service_mutex);
-			return (-1);
+			return (rc);
 		}
 	}
 
 	smb_ads_init();
-	if (mlsvc_init() != 0) {
+	if ((rc = mlsvc_init()) != 0) {
 		smbd_report("msrpc initialization failed");
-		(void) mutex_unlock(&smbd_service_mutex);
-		return (-1);
+		return (rc);
 	}
 
 	if (smbd.s_secmode == SMB_SECMODE_DOMAIN)
 		if (smbd_locate_dc_start() != 0)
 			smbd_report("dc discovery failed %s", strerror(errno));
 
-	smbd.s_door_srv = smbd_door_start();
-	smbd.s_door_opipe = smbd_opipe_start();
-	if (smbd.s_door_srv < 0 || smbd.s_door_opipe < 0) {
-		smbd_report("door initialization failed %s", strerror(errno));
-		(void) mutex_unlock(&smbd_service_mutex);
-		return (-1);
-	}
+	smbd.s_door_srv = smb_door_srv_start();
+	if (smbd.s_door_srv < 0)
+		return (rc);
 
-	if (smbd_refresh_init() != 0) {
-		(void) mutex_unlock(&smbd_service_mutex);
-		return (-1);
-	}
+	if ((rc = smbd_refresh_init()) != 0)
+		return (rc);
 
 	dyndns_update_zones();
+
 	(void) smbd_localtime_init();
+
+	smbd.s_door_opipe = smbd_opipe_dsrv_start();
+	if (smbd.s_door_opipe < 0) {
+		smbd_report("opipe initialization failed %s",
+		    strerror(errno));
+		return (rc);
+	}
+
 	(void) smb_lgrp_start();
+
 	smb_pwd_init(B_TRUE);
 
-	if (smb_shr_start() != 0) {
+	if ((rc = smb_shr_start()) != 0) {
 		smbd_report("share initialization failed: %s", strerror(errno));
-		(void) mutex_unlock(&smbd_service_mutex);
-		return (-1);
+		return (rc);
 	}
 
-	smbd.s_door_lmshr = smbd_share_start();
-	if (smbd.s_door_lmshr < 0)
+	smbd.s_door_lmshr = smb_share_dsrv_start();
+	if (smbd.s_door_lmshr < 0) {
 		smbd_report("share initialization failed");
-
-	if (smbd_kernel_bind() != 0) {
-		(void) mutex_unlock(&smbd_service_mutex);
-		return (-1);
 	}
 
-	if (smb_shr_load() != 0) {
+	if ((rc = smbd_kernel_bind()) != 0) {
+		smbd_report("kernel bind error: %s", strerror(errno));
+		return (rc);
+	}
+
+	if ((rc = smb_shr_load()) != 0) {
 		smbd_report("failed to start loading shares: %s",
 		    strerror(errno));
-		(void) mutex_unlock(&smbd_service_mutex);
-		return (-1);
+		return (rc);
 	}
 
-	smbd.s_initialized = B_TRUE;
-	smbd_report("service initialized");
-	(void) cond_signal(&smbd_service_cv);
-	(void) mutex_unlock(&smbd_service_mutex);
 	return (0);
 }
 
 /*
- * Shutdown smbd and smbsrv kernel services.
- *
- * Shutdown will not begin until initialization has completed.
- * Only one thread is allowed to perform the shutdown.  Other
- * threads will be blocked on fini_in_progress until the process
- * has exited.
+ * Close the kernel service and shutdown smbd services.
+ * This function is registered with atexit(): ensure that anything
+ * called from here is safe to be called multiple times.
  */
 static void
 smbd_service_fini(void)
 {
-	static uint_t	fini_in_progress;
-
-	(void) mutex_lock(&smbd_service_mutex);
-
-	while (!smbd.s_initialized)
-		(void) cond_wait(&smbd_service_cv, &smbd_service_mutex);
-
-	if (atomic_swap_uint(&fini_in_progress, 1) != 0) {
-		while (fini_in_progress)
-			(void) cond_wait(&smbd_service_cv, &smbd_service_mutex);
-		/*NOTREACHED*/
-	}
-
-	smbd.s_shutting_down = B_TRUE;
-	smbd_report("service shutting down");
-
-	smb_kmod_stop();
-	smb_logon_abort();
-	smb_lgrp_stop();
-	smbd_opipe_stop();
-	smbd_door_stop();
+	smbd_opipe_dsrv_stop();
+	smb_wka_fini();
 	smbd_refresh_fini();
 	smbd_kernel_unbind();
-	smbd_share_stop();
+	smb_door_srv_stop();
+	smb_share_dsrv_stop();
 	smb_shr_stop();
 	dyndns_stop();
 	smb_nicmon_stop();
+	smb_idmap_stop();
+	smb_lgrp_stop();
 	smb_ccache_remove(SMB_CCACHE_PATH);
 	smb_pwd_fini();
 	smb_domain_fini();
 	mlsvc_fini();
 	smb_ads_fini();
 	smb_netbios_stop();
-
-	smbd.s_initialized = B_FALSE;
-	smbd_report("service terminated");
-	(void) mutex_unlock(&smbd_service_mutex);
-	exit((smbd.s_fatal_error) ? SMF_EXIT_ERR_FATAL : SMF_EXIT_OK);
 }
+
 
 /*
  * smbd_refresh_init()
@@ -633,11 +587,10 @@ smbd_refresh_init()
 static void
 smbd_refresh_fini()
 {
-	if (pthread_self() != refresh_thr) {
-		(void) pthread_cancel(refresh_thr);
-		(void) pthread_cond_destroy(&refresh_cond);
-		(void) pthread_mutex_destroy(&refresh_mutex);
-	}
+	(void) pthread_cancel(refresh_thr);
+
+	(void) pthread_cond_destroy(&refresh_cond);
+	(void) pthread_mutex_destroy(&refresh_mutex);
 }
 
 /*
@@ -662,11 +615,10 @@ smbd_refresh_monitor(void *arg)
 		(void) pthread_mutex_unlock(&refresh_mutex);
 
 		if (smbd.s_shutting_down) {
-			smbd_service_fini();
-			/*NOTREACHED*/
+			syslog(LOG_DEBUG, "shutting down");
+			exit((smbd.s_fatal_error) ? SMF_EXIT_ERR_FATAL :
+			    SMF_EXIT_OK);
 		}
-
-		(void) mutex_lock(&smbd_service_mutex);
 
 		/*
 		 * We've been woken up by a refresh event so go do
@@ -684,14 +636,12 @@ smbd_refresh_monitor(void *arg)
 		dyndns_clear_zones();
 
 		/* re-initialize NIC table */
-		if (smb_nic_init() != SMB_NIC_SUCCESS)
+		if (smb_nic_init() != 0)
 			smbd_report("failed to get NIC information");
 		smb_netbios_name_reconfig();
 		smb_browser_reconfig();
 		smbd_refresh_dc();
 		dyndns_update_zones();
-
-		(void) mutex_unlock(&smbd_service_mutex);
 
 		if (smbd_set_netlogon_cred()) {
 			/*
@@ -700,18 +650,22 @@ smbd_refresh_monitor(void *arg)
 			 */
 			if (smb_smf_restart_service() != 0) {
 				syslog(LOG_ERR,
-				    "unable to restart smb/server. "
+				    "unable to restart smb service. "
 				    "Run 'svcs -xv smb/server' for more "
 				    "information.");
-				smbd_service_fini();
-				/*NOTREACHED*/
+				smbd.s_shutting_down = B_TRUE;
+				exit(SMF_EXIT_OK);
 			}
 
 			break;
 		}
 
 		if (!smbd.s_kbound) {
-			if ((error = smbd_kernel_bind()) == 0)
+			error = smbd_kernel_bind();
+			if (error != 0)
+				smbd_report("kernel bind error: %s",
+				    strerror(error));
+			else
 				(void) smb_shr_load();
 
 			continue;
@@ -764,16 +718,6 @@ smbd_set_secmode(int secmode)
 }
 
 /*
- * The service is online if initialization is complete and shutdown
- * has not begun.
- */
-boolean_t
-smbd_online(void)
-{
-	return (smbd.s_initialized && !smbd.s_shutting_down);
-}
-
-/*
  * If the door has already been opened by another process (non-zero pid
  * in target), we assume that another smbd is already running.  If there
  * is a race here, it will be caught later when smbsrv is opened because
@@ -785,7 +729,7 @@ smbd_already_running(void)
 	door_info_t info;
 	int door;
 
-	if ((door = open(SMBD_DOOR_NAME, O_RDONLY)) < 0)
+	if ((door = open(SMB_DR_SVC_NAME, O_RDONLY)) < 0)
 		return (0);
 
 	if (door_info(door, &info) < 0)
@@ -813,16 +757,14 @@ smbd_kernel_bind(void)
 
 	smbd_kernel_unbind();
 
-	if ((rc = smb_kmod_bind()) == 0) {
+	rc = smb_kmod_bind();
+	if (rc == 0) {
 		rc = smbd_kernel_start();
 		if (rc != 0)
 			smb_kmod_unbind();
 		else
 			smbd.s_kbound = B_TRUE;
 	}
-
-	if (rc != 0)
-		smbd_report("kernel bind error: %s", strerror(errno));
 	return (rc);
 }
 
@@ -1068,47 +1010,18 @@ smbd_start_listeners(void)
 	return (rc2);
 }
 
-/*
- * Stop the listener threads.  In an attempt to ensure that the listener
- * threads get the signal, we use the timed wait loop to harass the
- * threads into terminating.  Then, if they are still running, we make
- * one final attempt to deliver the signal before calling thread join
- * to wait for them.  Note: if these threads don't terminate, smbd will
- * hang here and SMF will probably end up killing the contract.
- */
 static void
 smbd_stop_listeners(void)
 {
-	void		*status;
-	timestruc_t	delay;
-	int		rc = 0;
-
-	(void) mutex_lock(&listener_mutex);
-
-	while ((smbd.s_nbt_listener_running || smbd.s_tcp_listener_running) &&
-	    (rc != ETIME)) {
-		if (smbd.s_nbt_listener_running)
-			(void) pthread_kill(smbd.s_nbt_listener_id, SIGTERM);
-
-		if (smbd.s_tcp_listener_running)
-			(void) pthread_kill(smbd.s_tcp_listener_id, SIGTERM);
-
-		delay.tv_sec = 3;
-		delay.tv_nsec = 0;
-		rc = cond_reltimedwait(&listener_cv, &listener_mutex, &delay);
-	}
-
-	(void) mutex_unlock(&listener_mutex);
+	void	*status;
 
 	if (smbd.s_nbt_listener_running) {
-		syslog(LOG_WARNING, "NBT listener still running");
 		(void) pthread_kill(smbd.s_nbt_listener_id, SIGTERM);
 		(void) pthread_join(smbd.s_nbt_listener_id, &status);
 		smbd.s_nbt_listener_running = B_FALSE;
 	}
 
 	if (smbd.s_tcp_listener_running) {
-		syslog(LOG_WARNING, "TCP listener still running");
 		(void) pthread_kill(smbd.s_tcp_listener_id, SIGTERM);
 		(void) pthread_join(smbd.s_tcp_listener_id, &status);
 		smbd.s_tcp_listener_running = B_FALSE;
@@ -1162,10 +1075,6 @@ smbd_nbt_listener(void *arg)
 	if (!smbd.s_shutting_down)
 		smbd_fatal_error("NBT listener thread terminated unexpectedly");
 
-	(void) mutex_lock(&listener_mutex);
-	smbd.s_nbt_listener_running = B_FALSE;
-	(void) cond_broadcast(&listener_cv);
-	(void) mutex_unlock(&listener_mutex);
 	return (NULL);
 }
 
@@ -1202,10 +1111,6 @@ smbd_tcp_listener(void *arg)
 	if (!smbd.s_shutting_down)
 		smbd_fatal_error("TCP listener thread terminated unexpectedly");
 
-	(void) mutex_lock(&listener_mutex);
-	smbd.s_tcp_listener_running = B_FALSE;
-	(void) cond_broadcast(&listener_cv);
-	(void) mutex_unlock(&listener_mutex);
 	return (NULL);
 }
 

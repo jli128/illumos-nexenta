@@ -32,92 +32,15 @@
 #!default <mode> <owner> <group>	# default used if not specified on entry
 #!<param>=<value>			# puts parameter in pkg environment
 
-# usr/bin/basename conflicts with GNU: coreutils: /usr/bin/basename
-# usr/bin/cat conflicts with GNU: coreutils: /usr/bin/cat
-# usr/bin/chgrp conflicts with GNU: coreutils: /usr/bin/chgrp
-# usr/bin/chmod conflicts with GNU: coreutils: /usr/bin/chmod
-# usr/bin/chown conflicts with GNU: coreutils: /usr/bin/chown
-# usr/bin/cksum conflicts with GNU: coreutils: /usr/bin/cksum
-# usr/bin/cmp conflicts with GNU: diff: /usr/bin/cmp
-# usr/bin/cp conflicts with GNU: coreutils: /usr/bin/cp
-# usr/bin/cut conflicts with GNU: coreutils: /usr/bin/cut
-# usr/bin/date conflicts with GNU: coreutils: /usr/bin/date
-# usr/bin/date conflicts with GNU: coreutils: /bin/date
-# usr/bin/dd conflicts with GNU: coreutils: /usr/bin/dd
-# usr/bin/df conflicts with GNU: coreutils: /usr/bin/df
-# usr/bin/dirname conflicts with GNU: coreutils: /usr/bin/dirname
-# usr/bin/du conflicts with GNU: coreutils: /usr/bin/du
-# usr/bin/echo conflicts with GNU: coreutils: /usr/bin/echo
-# usr/bin/ed conflicts with GNU: ed: /bin/ed
-# usr/bin/egrep conflicts with GNU: grep: /bin/egrep
-# usr/bin/env conflicts with GNU: coreutils: /usr/bin/env
-# usr/bin/expr conflicts with GNU: coreutils: /usr/bin/expr
-# usr/bin/false conflicts with GNU: coreutils: /usr/bin/false
-# usr/bin/fgrep conflicts with GNU: grep: /bin/fgrep
-# usr/bin/find conflicts with GNU: findutils: /usr/bin/find
-# usr/bin/fmt conflicts with GNU: coreutils: /usr/bin/fmt
-# usr/bin/fold conflicts with GNU: coreutils: /usr/bin/fold
-# usr/bin/grep conflicts with GNU: grep: /bin/grep
-# usr/bin/groups conflicts with GNU: coreutils: /usr/bin/groups
-# usr/bin/head conflicts with GNU: coreutils: /usr/bin/head
-# usr/bin/hostid conflicts with GNU: coreutils: /usr/bin/hostid
-# usr/bin/id conflicts with GNU: coreutils: /usr/bin/id
-# usr/bin/join conflicts with GNU: coreutils: /usr/bin/join
-# usr/bin/kill conflicts with GNU: coreutils: /usr/bin/kill
-# usr/bin/ln conflicts with GNU: coreutils: /usr/bin/ln
-# usr/bin/ls conflicts with GNU: coreutils: /usr/bin/ls
-# usr/bin/mkdir conflicts with GNU: coreutils: /usr/bin/mkdir
-# usr/bin/mktemp conflicts with GNU: debianutils: /bin/mktemp
-# usr/bin/mv conflicts with GNU: coreutils: /usr/bin/mv
-# usr/bin/nice conflicts with GNU: coreutils: /usr/bin/nice
-# usr/bin/nohup conflicts with GNU: coreutils: /usr/bin/nohup
-# usr/bin/pathchk conflicts with GNU: coreutils: /usr/bin/pathchk
-# usr/bin/pr conflicts with GNU: coreutils: /usr/bin/pr
-# usr/bin/pwd conflicts with GNU: coreutils: /usr/bin/pwd
-# usr/bin/red conflicts with GNU: ed: /usr/bin/red
-# usr/bin/rm conflicts with GNU: coreutils: /usr/bin/rm
-# usr/bin/rmdir conflicts with GNU: coreutils: /usr/bin/rmdir
-# usr/bin/sed conflicts with GNU: sed: /bin/sed
-# usr/bin/sleep conflicts with GNU: coreutils: /usr/bin/sleep
-# usr/bin/stty conflicts with GNU: coreutils: /usr/bin/stty
-# usr/bin/sync conflicts with GNU: coreutils: /usr/bin/sync
-# usr/bin/tail conflicts with GNU: coreutils: /usr/bin/tail
-# usr/bin/tar conflicts with GNU: tar: /bin/tar
-# usr/bin/tee conflicts with GNU: coreutils: /usr/bin/tee
-# usr/bin/test conflicts with GNU: coreutils: /usr/bin/test
-# usr/bin/touch conflicts with GNU: coreutils: /usr/bin/touch
-# usr/bin/tr conflicts with GNU: coreutils: /usr/bin/tr
-# usr/bin/true conflicts with GNU: coreutils: /usr/bin/true
-# usr/bin/tty conflicts with GNU: coreutils: /usr/bin/tty
-# usr/bin/uname conflicts with GNU: coreutils: /usr/bin/uname
-# usr/bin/wc conflicts with GNU: coreutils: /usr/bin/wc
-# usr/bin/which conflicts with GNU: debianutils: /usr/bin/which
-# usr/bin/who conflicts with GNU: coreutils: /usr/bin/who
-# usr/bin/xargs conflicts with GNU: findutils: /usr/bin/xargs
-# usr/bin/rev conflicts with GNU: util-linux: /usr/bin/rev
-# usr/bin/sum conflicts with GNU: coreutils: /usr/bin/sum
-# usr/sbin/chroot conflicts with GNU: coreutils: /usr/sbin/chroot
-# usr/sbin/df conflicts with GNU: coreutils: /usr/bin/df
-# usr/sbin/install conflicts with GNU: coreutils: /usr/bin/install
-# usr/sbin/link conflicts with GNU: coreutils: /usr/bin/link
-# usr/sbin/mknod conflicts with GNU: coreutils: /usr/bin/mknod
-# usr/sbin/sync conflicts with GNU: coreutils: /usr/bin/sync
-# usr/sbin/tar conflicts with GNU: tar: /bin/tar
-# usr/sbin/unlink conflicts with GNU: coreutils: /usr/bin/unlink
-# sbin/sync conflicts with GNU: coreutils: /usr/bin/sync
-# sbin/uname conflicts with GNU: coreutils: /usr/bin/uname
-
 # packaging files
 i pkginfo
 i copyright
 i postinstall
-i preinstall
 #
 # source locations relative to the prototype file
 #
 # SUNWcsu
 #
-d none bin 755 root sys
 d none usr 755 root sys
 s none usr/adm=../var/adm
 d none usr/bin 755 root bin
@@ -128,18 +51,17 @@ f none usr/bin/at 4755 root sys
 f none usr/bin/atq 4755 root sys
 f none usr/bin/atrm 4755 root sys
 f none usr/bin/auths 555 root bin
-d none usr/sun/bin 755 root bin
-m none usr/sun/bin/basename 555 root bin usr/bin/basename
+f none usr/bin/basename 555 root bin
 l none usr/bin/bg=../../usr/bin/alias
 f none usr/bin/busstat 555 root bin
 s none usr/bin/cachefspack=../lib/fs/cachefs/cachefspack
 s none usr/bin/cachefsstat=../lib/fs/cachefs/cachefsstat
-m none usr/sun/bin/captoinfo 555 root bin usr/bin/captoinfo
-m none usr/sun/bin/cat 555 root bin usr/bin/cat
+f none usr/bin/captoinfo 555 root bin
+f none usr/bin/cat 555 root bin
 l none usr/bin/cd=../../usr/bin/alias
-m none usr/sun/bin/chgrp 555 root bin usr/bin/chgrp
-m none usr/sun/bin/chmod 555 root bin usr/bin/chmod
-m none usr/sun/bin/chown 555 root bin usr/bin/chown
+f none usr/bin/chgrp 555 root bin
+f none usr/bin/chmod 555 root bin
+f none usr/bin/chown 555 root bin
 f none usr/bin/ckdate 555 root bin
 f none usr/bin/ckgid 555 root bin
 f none usr/bin/ckint 555 root bin
@@ -148,17 +70,17 @@ f none usr/bin/ckkeywd 555 root bin
 f none usr/bin/ckpath 555 root bin
 f none usr/bin/ckrange 555 root bin
 f none usr/bin/ckstr 555 root bin
-l none usr/sun/bin/cksum=../../../usr/bin/alias
+l none usr/bin/cksum=../../usr/bin/alias
 f none usr/bin/cktime 555 root bin
 f none usr/bin/ckuid 555 root bin
 f none usr/bin/ckyorn 555 root bin
-m none usr/sun/bin/clear 555 root bin usr/bin/clear
-l none usr/sun/bin/cmp=../../../usr/bin/alias
-l none usr/sun/bin/comm=../../../usr/bin/alias
+f none usr/bin/clear 555 root bin
+l none usr/bin/cmp=../../usr/bin/alias
+l none usr/bin/comm=../../usr/bin/alias
 l none usr/bin/command=../../usr/bin/alias
 f none usr/bin/coreadm 555 root bin
-m none usr/sun/bin/cp 555 root bin usr/bin/cp
-m none usr/sun/bin/cpio 555 root bin usr/bin/cpio
+f none usr/bin/cp 555 root bin
+f none usr/bin/cpio 555 root bin
 f none usr/bin/crle 555 root bin
 f none usr/bin/crontab 4555 root bin
 f none usr/bin/crypt 555 root bin
@@ -166,92 +88,94 @@ f none usr/bin/csh 555 root bin
 f none usr/bin/ctrun 555 root bin
 f none usr/bin/ctstat 555 root bin
 f none usr/bin/ctwatch 555 root bin
-l none usr/sun/bin/cut=../../../usr/bin/alias
-m none usr/sun/bin/date 555 root bin usr/bin/date
-m none usr/sun/bin/dd 555 root bin usr/bin/dd
+l none usr/bin/cut=../../usr/bin/alias
+f none usr/bin/date 555 root bin
+f none usr/bin/dd 555 root bin
 l none usr/bin/decrypt=../../usr/lib/isaexec
 f none usr/bin/devattr 555 root bin
 f none usr/bin/devfree 555 root bin
 f none usr/bin/devreserv 555 root bin
+s none usr/bin/df=../sbin/df
 l none usr/bin/digest=../../usr/lib/isaexec
-m none usr/sun/bin/dirname 555 root bin usr/bin/dirname
+f none usr/bin/dirname 555 root bin
 l none usr/bin/dispgid=../../usr/bin/ckgid
 l none usr/bin/dispuid=../../usr/bin/ckuid
 f none usr/bin/domainname 555 root bin
 f none usr/bin/du 555 root bin
 f none usr/bin/dumpcs 555 root bin
 f none usr/bin/dumpkeys 555 root bin
-m none usr/sun/bin/echo 555 root bin usr/bin/echo
-m none usr/sun/bin/ed 555 root bin usr/bin/ed
-m none usr/sun/bin/edit 555 root bin usr/bin/edit
-m none usr/sun/bin/egrep 555 root bin usr/bin/egrep
+f none usr/bin/echo 555 root bin
+f none usr/bin/ed 555 root bin
+f none usr/bin/edit 555 root bin
+f none usr/bin/egrep 555 root bin
 f none usr/bin/eject 555 root bin
 l none usr/bin/encrypt=../../usr/lib/isaexec
-m none usr/sun/bin/env 555 root bin usr/bin/env
-l none usr/bin/ex=../../usr/sun/bin/edit
-m none usr/sun/bin/expr 555 root bin usr/bin/expr
-m none usr/sun/bin/false 555 root bin usr/bin/false
+f none usr/bin/env 555 root bin
+l none usr/bin/ex=../../usr/bin/edit
+f none usr/bin/expr 555 root bin
+f none usr/bin/false 555 root bin
 l none usr/bin/fc=../../usr/bin/alias
 f none usr/bin/fdetach 555 root bin
 f none usr/bin/fdformat 4555 root bin
 l none usr/bin/fg=../../usr/bin/alias
-m none usr/sun/bin/fgrep 555 root bin usr/bin/fgrep
-m none usr/sun/bin/file 555 root bin usr/bin/file
-m none usr/sun/bin/find 555 root bin usr/bin/find
+f none usr/bin/fgrep 555 root bin
+f none usr/bin/file 555 root bin
+f none usr/bin/find 555 root bin
 f none usr/bin/fmli 755 root bin
-m none usr/sun/bin/fmt 555 root bin usr/bin/fmt
+f none usr/bin/fmt 555 root bin
 f none usr/bin/fmtmsg 555 root bin
-m none usr/sun/bin/fold 555 root bin usr/bin/fold
+f none usr/bin/fold 555 root bin
 f none usr/bin/fsstat 555 root bin
+f none usr/bin/geniconvtbl 555 root bin
 f none usr/bin/getconf 555 root bin
 f none usr/bin/getdev 555 root bin
 f none usr/bin/getdgrp 555 root bin
 f none usr/bin/getent 555 root bin
 f none usr/bin/getfacl 555 root bin
-m none usr/sun/bin/getopt 555 root bin usr/bin/getopt
+f none usr/bin/getopt 555 root bin
 l none usr/bin/getopts=../../usr/bin/alias
-m none usr/sun/bin/gettext 555 root bin usr/bin/gettext
+f none usr/bin/gettext 555 root bin
 f none usr/bin/getvol 555 root bin
-m none usr/sun/bin/grep 555 root bin usr/bin/grep
-m none usr/sun/bin/groups 555 root bin usr/bin/groups
+f none usr/bin/grep 555 root bin
+f none usr/bin/groups 555 root bin
 l none usr/bin/hash=../../usr/bin/alias
-m none usr/sun/bin/head 555 root bin usr/bin/head
-m none usr/sun/bin/hostid 555 root bin usr/bin/hostid
-m none usr/sun/bin/hostname 555 root bin usr/bin/hostname
+f none usr/bin/head 555 root bin
+f none usr/bin/hostid 555 root bin
+f none usr/bin/hostname 555 root bin
 f none usr/bin/i286 555 root bin
 l none usr/bin/i386=../../usr/bin/i286
 l none usr/bin/i486=../../usr/bin/i286
 l none usr/bin/i860=../../usr/bin/i286
 l none usr/bin/i86pc=../../usr/bin/i286
 l none usr/bin/iAPX286=../../usr/bin/i286
-m none usr/sun/bin/iconv 555 root bin usr/bin/iconv
-m none usr/sun/bin/id 555 root bin usr/bin/id
-m none usr/sun/bin/infocmp 555 root bin usr/bin/infocmp
+f none usr/bin/iconv 555 root bin
+f none usr/bin/id 555 root bin
+f none usr/bin/infocmp 555 root bin
 f none usr/bin/iostat 555 root bin
 f none usr/bin/isainfo 555 root bin
 f none usr/bin/isalist 555 root bin
 f none usr/bin/itu 555 root bin
 l none usr/bin/jobs=../../usr/bin/alias
-l none usr/sun/bin/join=../../../usr/bin/alias
+l none usr/bin/join=../../usr/bin/alias
 s none usr/bin/jsh=../../sbin/sh
 f none usr/bin/kbd 555 root bin
 f none usr/bin/keylogin 555 root bin
 f none usr/bin/keylogout 555 root bin
-l none usr/sun/bin/kill=../../../usr/bin/alias
+l none usr/bin/kill=../../usr/bin/alias
 f none usr/bin/kmfcfg 555 root bin
-s none usr/bin/ksh=../../usr/bin/ksh93
+f none usr/bin/ksh 555 root bin
 l none usr/bin/ksh93=../../usr/lib/isaexec
 f none usr/bin/line 555 root bin
 f none usr/bin/listdgrp 555 root bin
 f none usr/bin/listusers 555 root bin
-l none usr/sun/bin/ln=./cp
+l none usr/bin/ln=../../usr/bin/cp
 f none usr/bin/loadkeys 555 root bin
 f none usr/bin/localedef 555 root bin
 f none usr/bin/logger 555 root bin
-f none bin/login 4555 root bin
+f none usr/bin/login 4555 root bin
 f none usr/bin/logins 750 root bin
-l none usr/sun/bin/logname=../../../usr/bin/alias
-m none usr/sun/bin/ls 555 root bin usr/bin/ls
+l none usr/bin/logname=../../usr/bin/alias
+f none usr/bin/ls 555 root bin
 l none usr/bin/m68k=../../usr/bin/i286
 l none usr/bin/mac=../../usr/lib/isaexec
 f none usr/bin/mach 555 root bin
@@ -265,41 +189,41 @@ l none usr/bin/mc68030=../../usr/bin/i286
 l none usr/bin/mc68040=../../usr/bin/i286
 f none usr/bin/mesg 555 root bin
 f none usr/bin/mkbootmedia 555 root bin
-m none usr/sun/bin/mkdir 555 root bin usr/bin/mkdir
+f none usr/bin/mkdir 555 root bin
 f none usr/bin/mkpwdict 555 root bin
-m none usr/sun/bin/mktemp 555 root bin usr/bin/mktemp
+f none usr/bin/mktemp 555 root bin
 f none usr/bin/moe 555 root bin
 f none usr/bin/more 555 root bin
 f none usr/bin/mpstat 555 root bin
 f none usr/bin/mt 555 root bin
-l none usr/sun/bin/mv=./cp
+l none usr/bin/mv=../../usr/bin/cp
 f none usr/bin/netstat 555 root bin
 f none usr/bin/newgrp 4755 root sys
 l none usr/bin/newtask=../../usr/lib/isaexec
-m none usr/sun/bin/nice 555 root bin usr/bin/nice
-l none usr/sun/bin/nohup=../../../usr/lib/isaexec
+f none usr/bin/nice 555 root bin
+l none usr/bin/nohup=../../usr/lib/isaexec
 f none usr/bin/optisa 555 root bin
 l none usr/bin/page=../../usr/bin/more
 f none usr/bin/pagesize 555 root bin
 s none usr/bin/passmgmt=../sbin/passmgmt
 f none usr/bin/passwd 6555 root sys
-l none usr/sun/bin/paste=../../../usr/bin/alias
-m none usr/sun/bin/patch 555 root bin usr/bin/patch
-m none usr/sun/bin/pathchk 555 root bin usr/bin/pathchk
+l none usr/bin/paste=../../usr/bin/alias
+f none usr/bin/patch 555 root bin
+f none usr/bin/pathchk 555 root bin
 f none usr/bin/pax 555 root bin
 l none usr/bin/pdp11=../../usr/bin/i286
 l none usr/bin/pfcsh=../../usr/bin/csh
 f none usr/bin/pfexec 4555 root bin
-s none usr/bin/pfksh=../../usr/bin/ksh93
+l none usr/bin/pfksh=../../usr/bin/ksh
 s none usr/bin/pfsh=../../sbin/sh
 f none usr/bin/pg 555 root bin
 f none usr/bin/pgrep 555 root bin
 f none usr/bin/pkg2du 555 root bin
 l none usr/bin/pkill=../../usr/bin/pgrep
 f none usr/bin/pktool 555 root bin
-m none usr/sun/bin/pr 555 root bin usr/bin/pr
+f none usr/bin/pr 555 root bin
 l none usr/bin/prctl=../../usr/lib/isaexec
-l none usr/sun/bin/print=../../../usr/bin/alias
+l none usr/bin/print=../../usr/bin/alias
 f none usr/bin/priocntl 555 root bin
 f none usr/bin/profiles 555 root bin
 f none usr/bin/projects 555 root bin
@@ -308,38 +232,37 @@ l none usr/bin/ps=../../usr/lib/isaexec
 f none usr/bin/putdev 555 root bin
 f none usr/bin/putdgrp 555 root bin
 s none usr/bin/pwconv=../sbin/pwconv
-m none usr/sun/bin/pwd 555 root bin usr/bin/pwd
+f none usr/bin/pwd 555 root bin
 l none usr/bin/read=../../usr/bin/alias
-l none usr/sun/bin/red=./ed
+l none usr/bin/red=../../usr/bin/ed
 f none usr/bin/renice 555 root bin
-l none usr/sun/bin/rev=../../../usr/bin/alias
-s none usr/bin/rksh=../../usr/bin/rksh93
+l none usr/bin/rev=../../usr/bin/alias
+l none usr/bin/rksh=../../usr/bin/ksh
 l none usr/bin/rksh93=../../usr/lib/isaexec
-m none usr/sun/bin/rm 555 root bin usr/bin/rm
+f none usr/bin/rm 555 root bin
 s none usr/bin/rmail=./mail
-m none usr/sun/bin/rmdir 555 root bin usr/bin/rmdir
+f none usr/bin/rmdir 555 root bin
 f none usr/bin/roles 555 root bin
 f none usr/bin/rpcinfo 555 root bin
 f none usr/bin/runat 555 root bin
 l none usr/bin/savecore=../../usr/lib/isaexec
 f none usr/bin/script 555 root bin
-m none usr/sun/bin/sed 555 root bin usr/bin/sed
+f none usr/bin/sed 555 root bin
 f none usr/bin/setfacl 555 root bin
 f none usr/bin/setpgrp 555 root sys
 f none usr/bin/settime 555 root bin
 l none usr/bin/setuname=../../usr/lib/isaexec
-# execve() personality switch: bash => bsh
-s none usr/sun/bin/sh=../../../sbin/sh
+s none usr/bin/sh=../../sbin/sh
 f none usr/bin/shcomp 555 root bin
-m none usr/sun/bin/sleep 555 root bin usr/bin/sleep
+l none usr/bin/sleep=../../usr/bin/alias
 l none usr/bin/sparc=../../usr/bin/i286
 f none usr/bin/strchg 555 root root
 s none usr/bin/strclean=../sbin/strclean
 f none usr/bin/strconf 555 root root
 s none usr/bin/strerr=../sbin/strerr
-m none usr/sun/bin/stty 555 root bin usr/bin/stty
-m none usr/sun/bin/su 4555 root sys usr/bin/su
-#l none usr/sun/bin/sum=../../../usr/bin/alias
+f none usr/bin/stty 555 root bin
+f none usr/bin/su 4555 root sys
+l none usr/bin/sum=../../usr/bin/alias
 l none usr/bin/sun2=../../usr/bin/i286
 l none usr/bin/sun3=../../usr/bin/i286
 l none usr/bin/sun3x=../../usr/bin/i286
@@ -351,22 +274,22 @@ l none usr/bin/sun4m=../../usr/bin/i286
 l none usr/bin/sun=../../usr/bin/i286
 f none usr/bin/svcprop 0555 root bin
 f none usr/bin/svcs 0555 root bin
-s none usr/sun/bin/sync=../sbin/sync
+s none usr/bin/sync=../../sbin/sync
 f none usr/bin/tabs 555 root bin
-m none usr/sun/bin/tail 555 root bin usr/bin/tail
-s none usr/sun/bin/tar=../sbin/tar
-l none usr/sun/bin/tee=../../../usr/bin/alias
-l none usr/sun/bin/test=../../../usr/bin/alias
-m none usr/sun/bin/tic 555 root bin usr/bin/tic
-m none usr/sun/bin/time 555 root bin usr/bin/time
+f none usr/bin/tail 555 root bin
+s none usr/bin/tar=../sbin/tar
+l none usr/bin/tee=../../usr/bin/alias
+l none usr/bin/test=../../usr/bin/alias
+f none usr/bin/tic 555 root bin
+f none usr/bin/time 555 root bin
 f none usr/bin/tip 4511 uucp bin
-l none usr/sun/bin/touch=../../../usr/bin/settime
+l none usr/bin/touch=../../usr/bin/settime
 f none usr/bin/tplot 555 root bin
 f none usr/bin/tpmadm 555 root bin
-m none usr/sun/bin/tput 555 root bin usr/bin/tput
-m none usr/sun/bin/tr 555 root bin usr/bin/tr
-m none usr/sun/bin/true 555 root bin usr/bin/true
-m none usr/sun/bin/tty 555 root bin usr/bin/tty
+f none usr/bin/tput 555 root bin
+f none usr/bin/tr 555 root bin
+f none usr/bin/true 555 root bin
+f none usr/bin/tty 555 root bin
 l none usr/bin/type=../../usr/bin/alias
 f none usr/bin/tzselect 555 root bin
 l none usr/bin/u370=../../usr/bin/i286
@@ -377,27 +300,28 @@ l none usr/bin/u3b=../../usr/bin/i286
 l none usr/bin/ulimit=../../usr/bin/alias
 l none usr/bin/umask=../../usr/bin/alias
 l none usr/bin/unalias=../../usr/bin/alias
-s none usr/sun/bin/uname=../sbin/uname
-l none usr/sun/bin/uniq=../../../usr/bin/alias
+s none usr/bin/uname=../../sbin/uname
+l none usr/bin/uniq=../../usr/bin/alias
 f none usr/bin/updatemedia 555 root bin
 l none usr/bin/uptime=../../usr/lib/isaexec
 l none usr/bin/vax=../../usr/bin/i286
-l none usr/bin/vedit=../../usr/sun/bin/edit
-l none usr/bin/vi=../../usr/sun/bin/edit
-l none usr/bin/view=../../usr/sun/bin/edit
+l none usr/bin/vedit=../../usr/bin/edit
+l none usr/bin/vi=../../usr/bin/edit
+l none usr/bin/view=../../usr/bin/edit
 f none usr/bin/vmstat 555 root bin
 l none usr/bin/w=../../usr/lib/isaexec
 l none usr/bin/wait=../../usr/bin/alias
-m none usr/sun/bin/wc 555 root bin usr/bin/wc
-m none usr/sun/bin/which 555 root bin usr/bin/which
-m none usr/sun/bin/who 555 root bin usr/bin/who
+l none usr/bin/wc=../../usr/bin/alias
+f none usr/bin/which 555 root bin
+f none usr/bin/who 555 root bin
 f none usr/bin/wracct 555 root bin
 f none usr/bin/write 2555 root tty
-m none usr/sun/bin/xargs 555 root bin usr/bin/xargs
+f none usr/bin/xargs 555 root bin
 f none usr/bin/xstr 555 root bin
 d none usr/ccs 0755 root bin
 d none usr/ccs/bin 0755 root bin
-m none usr/ccs/bin/m4 555 root bin usr/bin/m4
+f none usr/bin/m4 0555 root bin
+s none usr/ccs/bin/m4=../../bin/m4
 d none usr/demo 755 root bin
 d none usr/games 755 root bin
 d none usr/kernel 755 root sys
@@ -456,7 +380,7 @@ f none usr/lib/devfsadm/linkmod/SUNW_smp_link.so 755 root sys
 f none usr/lib/devfsadm/linkmod/SUNW_tape_link.so 755 root sys
 f none usr/lib/devfsadm/linkmod/SUNW_usb_link.so 755 root sys
 f none usr/lib/diffh 555 root bin
-s none usr/lib/embedded_su=../sun/bin/su
+s none usr/lib/embedded_su=../bin/su
 f none usr/lib/expreserve 555 root bin
 f none usr/lib/exrecover 555 root bin
 d none usr/lib/fs 755 root sys
@@ -836,60 +760,60 @@ d none usr/openwin 755 root bin
 d none usr/platform 755 root sys
 s none usr/preserve=../var/preserve
 s none usr/pub=./share/lib/pub
-#d none usr/sadm 755 root bin
-#d none usr/sadm/bin 755 root bin
-#l none usr/sadm/bin/dispgid=../../../usr/bin/ckgid
-#l none usr/sadm/bin/dispuid=../../../usr/bin/ckuid
-#l none usr/sadm/bin/errange=../../../usr/bin/ckrange
-#l none usr/sadm/bin/errdate=../../../usr/bin/ckdate
-#l none usr/sadm/bin/errgid=../../../usr/bin/ckgid
-#l none usr/sadm/bin/errint=../../../usr/bin/ckint
-#l none usr/sadm/bin/erritem=../../../usr/bin/ckitem
-#l none usr/sadm/bin/errpath=../../../usr/bin/ckpath
-#l none usr/sadm/bin/errstr=../../../usr/bin/ckstr
-#l none usr/sadm/bin/errtime=../../../usr/bin/cktime
-#l none usr/sadm/bin/erruid=../../../usr/bin/ckuid
-#l none usr/sadm/bin/erryorn=../../../usr/bin/ckyorn
-#l none usr/sadm/bin/helpdate=../../../usr/bin/ckdate
-#l none usr/sadm/bin/helpgid=../../../usr/bin/ckgid
-#l none usr/sadm/bin/helpint=../../../usr/bin/ckint
-#l none usr/sadm/bin/helpitem=../../../usr/bin/ckitem
-#l none usr/sadm/bin/helppath=../../../usr/bin/ckpath
-#l none usr/sadm/bin/helprange=../../../usr/bin/ckrange
-#l none usr/sadm/bin/helpstr=../../../usr/bin/ckstr
-#l none usr/sadm/bin/helptime=../../../usr/bin/cktime
-#l none usr/sadm/bin/helpuid=../../../usr/bin/ckuid
-#l none usr/sadm/bin/helpyorn=../../../usr/bin/ckyorn
-#f none usr/sadm/bin/puttext 555 root bin
-#l none usr/sadm/bin/valdate=../../../usr/bin/ckdate
-#l none usr/sadm/bin/valgid=../../../usr/bin/ckgid
-#l none usr/sadm/bin/valint=../../../usr/bin/ckint
-#l none usr/sadm/bin/valpath=../../../usr/bin/ckpath
-#l none usr/sadm/bin/valrange=../../../usr/bin/ckrange
-#l none usr/sadm/bin/valstr=../../../usr/bin/ckstr
-#l none usr/sadm/bin/valtime=../../../usr/bin/cktime
-#l none usr/sadm/bin/valuid=../../../usr/bin/ckuid
-#l none usr/sadm/bin/valyorn=../../../usr/bin/ckyorn
-#d none usr/sadm/install 755 root bin
-#f none usr/sadm/install/miniroot.db 444 root sys
+d none usr/sadm 755 root bin
+d none usr/sadm/bin 755 root bin
+l none usr/sadm/bin/dispgid=../../../usr/bin/ckgid
+l none usr/sadm/bin/dispuid=../../../usr/bin/ckuid
+l none usr/sadm/bin/errange=../../../usr/bin/ckrange
+l none usr/sadm/bin/errdate=../../../usr/bin/ckdate
+l none usr/sadm/bin/errgid=../../../usr/bin/ckgid
+l none usr/sadm/bin/errint=../../../usr/bin/ckint
+l none usr/sadm/bin/erritem=../../../usr/bin/ckitem
+l none usr/sadm/bin/errpath=../../../usr/bin/ckpath
+l none usr/sadm/bin/errstr=../../../usr/bin/ckstr
+l none usr/sadm/bin/errtime=../../../usr/bin/cktime
+l none usr/sadm/bin/erruid=../../../usr/bin/ckuid
+l none usr/sadm/bin/erryorn=../../../usr/bin/ckyorn
+l none usr/sadm/bin/helpdate=../../../usr/bin/ckdate
+l none usr/sadm/bin/helpgid=../../../usr/bin/ckgid
+l none usr/sadm/bin/helpint=../../../usr/bin/ckint
+l none usr/sadm/bin/helpitem=../../../usr/bin/ckitem
+l none usr/sadm/bin/helppath=../../../usr/bin/ckpath
+l none usr/sadm/bin/helprange=../../../usr/bin/ckrange
+l none usr/sadm/bin/helpstr=../../../usr/bin/ckstr
+l none usr/sadm/bin/helptime=../../../usr/bin/cktime
+l none usr/sadm/bin/helpuid=../../../usr/bin/ckuid
+l none usr/sadm/bin/helpyorn=../../../usr/bin/ckyorn
+f none usr/sadm/bin/puttext 555 root bin
+l none usr/sadm/bin/valdate=../../../usr/bin/ckdate
+l none usr/sadm/bin/valgid=../../../usr/bin/ckgid
+l none usr/sadm/bin/valint=../../../usr/bin/ckint
+l none usr/sadm/bin/valpath=../../../usr/bin/ckpath
+l none usr/sadm/bin/valrange=../../../usr/bin/ckrange
+l none usr/sadm/bin/valstr=../../../usr/bin/ckstr
+l none usr/sadm/bin/valtime=../../../usr/bin/cktime
+l none usr/sadm/bin/valuid=../../../usr/bin/ckuid
+l none usr/sadm/bin/valyorn=../../../usr/bin/ckyorn
+d none usr/sadm/install 755 root bin
+f none usr/sadm/install/miniroot.db 444 root sys
 d none usr/sadm/install/scripts 755 root bin
-#f none usr/sadm/install/scripts/i.ipsecalgs 555 root sys
+f none usr/sadm/install/scripts/i.ipsecalgs 555 root sys
 f none usr/sadm/install/scripts/i.kcfconf 555 root sys
 f none usr/sadm/install/scripts/i.kmfconf 555 root sys
 f none usr/sadm/install/scripts/i.manifest 555 root sys
 f none usr/sadm/install/scripts/i.pkcs11conf 555 root sys
 f none usr/sadm/install/scripts/i.rbac 555 root sys
-#f none usr/sadm/install/scripts/r.ipsecalgs 555 root sys
+f none usr/sadm/install/scripts/r.ipsecalgs 555 root sys
 f none usr/sadm/install/scripts/r.kcfconf 555 root sys
 f none usr/sadm/install/scripts/r.kmfconf 555 root sys
 f none usr/sadm/install/scripts/r.manifest 555 root sys
 f none usr/sadm/install/scripts/r.pkcs11conf 555 root sys
 f none usr/sadm/install/scripts/r.rbac 555 root sys
-#d none usr/sadm/sysadm 755 root bin
-#d none usr/sadm/sysadm/add-ons 755 root bin
-#d none usr/sadm/sysadm/bin 755 root bin
-#f none usr/sadm/sysadm/bin/mkdtab 755 root bin
-#f none usr/sadm/ugdates 444 root bin
+d none usr/sadm/sysadm 755 root bin
+d none usr/sadm/sysadm/add-ons 755 root bin
+d none usr/sadm/sysadm/bin 755 root bin
+f none usr/sadm/sysadm/bin/mkdtab 755 root bin
+f none usr/sadm/ugdates 444 root bin
 d none usr/sbin 755 root bin
 f none usr/sbin/6to4relay 555 root bin
 f none usr/sbin/acctadm 555 root bin
@@ -909,7 +833,7 @@ s none usr/sbin/cachefslog=../lib/fs/cachefs/cachefslog
 s none usr/sbin/cachefswssize=../lib/fs/cachefs/cachefswssize
 f none usr/sbin/cfgadm 555 root bin
 s none usr/sbin/cfsadmin=../lib/fs/cachefs/cfsadmin
-m none usr/sun/sbin/chroot 555 root bin usr/sbin/chroot
+f none usr/sbin/chroot 555 root bin
 f none usr/sbin/clear_locks 555 root bin
 f none usr/sbin/clinfo 555 root bin
 f none usr/sbin/clri 555 root bin
@@ -922,9 +846,8 @@ l none usr/sbin/deallocate=../../usr/sbin/allocate
 f none usr/sbin/devfsadm 755 root sys
 f none usr/sbin/devinfo 555 root bin
 l none usr/sbin/devlinks=./devfsadm
-s none usr/sbin/devnm=../sbin/df
-m none usr/bin/df 555 root bin usr/sbin/df
-s none usr/sun/bin/df=../../sbin/df
+s none usr/sbin/devnm=./df
+f none usr/sbin/df 555 root bin
 f none usr/sbin/dfmounts 555 root bin
 l none usr/sbin/dfshares=../../usr/sbin/dfmounts
 l none usr/sbin/disks=./devfsadm
@@ -965,7 +888,7 @@ f none usr/sbin/inetadm 555 root bin
 f none usr/sbin/inetconv 555 root bin
 s none usr/sbin/inetd=../lib/inet/inetd
 s none usr/sbin/init=../../sbin/init
-m none usr/sun/sbin/install 555 root bin usr/sbin/install
+f none usr/sbin/install 555 root bin
 f none usr/sbin/installboot 555 root sys
 f none usr/sbin/ipaddrsel 555 root bin
 s none usr/sbin/ipmpstat=../../sbin/ipmpstat
@@ -976,7 +899,7 @@ f none usr/sbin/keyserv 555 root sys
 f none usr/sbin/killall 555 root bin
 f none usr/sbin/ksslcfg 555 root bin
 s none usr/sbin/labelit=./clri
-m none usr/sun/sbin/link 555 root bin usr/sbin/link
+f none usr/sbin/link 555 root bin
 l none usr/sbin/list_devices=../../usr/sbin/allocate
 f none usr/sbin/locator 555 root bin
 s none usr/sbin/lockfs=../lib/fs/ufs/lockfs
@@ -987,7 +910,7 @@ f none usr/sbin/mkdevalloc 555 root bin
 l none usr/sbin/mkdevmaps=../../usr/sbin/mkdevalloc
 f none usr/sbin/mkfile 555 root bin
 s none usr/sbin/mkfs=./clri
-m none usr/sun/sbin/mknod 555 root bin usr/sbin/mknod
+f none usr/sbin/mknod 555 root bin
 l none usr/sbin/modinfo=../../usr/lib/isaexec
 l none usr/sbin/modload=../../usr/lib/isaexec
 l none usr/sbin/modunload=../../usr/lib/isaexec
@@ -1045,6 +968,7 @@ f none usr/sbin/sttydefs 755 root sys
 f none usr/sbin/svcadm 0555 root bin
 f none usr/sbin/svccfg 0555 root bin
 l none usr/sbin/swap=../../usr/lib/isaexec
+s none usr/sbin/sync=../../sbin/sync
 f none usr/sbin/syncinit 555 root bin
 f none usr/sbin/syncloop 555 root bin
 f none usr/sbin/syncstat 555 root bin
@@ -1052,7 +976,7 @@ l none usr/sbin/sysdef=../../usr/lib/isaexec
 f none usr/sbin/syseventadm 555 root sys
 f none usr/sbin/syslogd 555 root sys
 l none usr/sbin/tapes=./devfsadm
-m none usr/sun/sbin/tar 555 root bin usr/sbin/tar
+f none usr/sbin/tar 555 root bin
 f none usr/sbin/traceroute 4555 root bin
 l none usr/sbin/trapstat=../../usr/lib/platexec
 f none usr/sbin/ttyadm 755 root sys
@@ -1063,7 +987,7 @@ s none usr/sbin/ufsdump=../lib/fs/ufs/ufsdump
 s none usr/sbin/ufsrestore=../lib/fs/ufs/ufsrestore
 s none usr/sbin/umount=../../sbin/umount
 f none usr/sbin/umountall 555 root sys
-m none usr/sun/sbin/unlink 555 root bin usr/sbin/unlink
+f none usr/sbin/unlink 555 root bin
 f none usr/sbin/sharectl 555 root bin
 f none usr/sbin/sharemgr 555 root bin
 f none usr/lib/libshare.so.1 755 root bin
@@ -1109,6 +1033,7 @@ f none usr/share/doc/ksh/images/tag_ksh.png 644 root bin
 f none usr/share/doc/ksh/images/tag_l10n.png 644 root bin
 f none usr/share/doc/ksh/images/tag_perf.png 644 root bin
 f none usr/share/doc/ksh/shell_styleguide.docbook 644 root bin
+f none usr/share/doc/ksh/shell_styleguide.html 644 root bin
 d none usr/share/lib 755 root sys
 d none usr/share/lib/mailx 755 root bin
 f none usr/share/lib/mailx/mailx.help 644 root bin
@@ -1160,8 +1085,8 @@ f none usr/share/lib/terminfo/a/ansi+tabs 644 root bin
 f none usr/share/lib/terminfo/a/at386 644 root bin
 f none usr/share/lib/terminfo/a/at386-m 644 root bin
 d none usr/share/lib/terminfo/s 755 root bin
-#f none usr/share/lib/terminfo/s/screen 644 root bin 
-#f none usr/share/lib/terminfo/s/screen-w 644 root bin
+f none usr/share/lib/terminfo/s/screen 644 root bin
+f none usr/share/lib/terminfo/s/screen-w 644 root bin
 f none usr/share/lib/terminfo/s/sun 644 root bin
 f none usr/share/lib/terminfo/s/sun-1 644 root bin
 f none usr/share/lib/terminfo/s/sun-12 644 root bin
@@ -1209,7 +1134,7 @@ f none usr/share/lib/terminfo/v/vt132 644 root bin
 f none usr/share/lib/terminfo/v/vt220 644 root bin
 d none usr/share/lib/terminfo/x 755 root bin
 l none usr/share/lib/terminfo/x/xterm=../../../../../usr/share/lib/terminfo/v/vs100
-#l none usr/share/lib/terminfo/x/xterm-color=../../../../../usr/share/lib/terminfo/x/xtermc
+l none usr/share/lib/terminfo/x/xterm-color=../../../../../usr/share/lib/terminfo/x/xtermc
 f none usr/share/lib/terminfo/x/xtermc 644 root bin
 f none usr/share/lib/terminfo/x/xtermm 644 root bin
 l none usr/share/lib/terminfo/x/xterms=../../../../../usr/share/lib/terminfo/v/vs100s
@@ -1222,7 +1147,6 @@ f none usr/share/lib/xml/dtd/service_bundle.dtd.1 0444 root sys
 d none usr/share/lib/xml/style 755 root sys
 f none usr/share/lib/xml/style/adt_record.xsl.1 444 root bin
 d none usr/share/lib/zoneinfo 755 root bin
-s none usr/share/zoneinfo=../../usr/share/lib/zoneinfo
 d none usr/share/lib/zoneinfo/Africa 755 root bin
 f none usr/share/lib/zoneinfo/Africa/Abidjan 644 root bin
 f none usr/share/lib/zoneinfo/Africa/Accra 644 root bin
@@ -1835,11 +1759,10 @@ d none usr/share/lib/zoneinfo/tab 755 root bin
 f none usr/share/lib/zoneinfo/tab/continent.tab 644 root bin
 f none usr/share/lib/zoneinfo/tab/country.tab 644 root bin
 f none usr/share/lib/zoneinfo/tab/zone_sun.tab 644 root bin
-#d none usr/share/src 755 root sys
+d none usr/share/src 755 root sys
 s none usr/spool=../var/spool
-#s none usr/src=./share/src
+s none usr/src=./share/src
 s none usr/tmp=../var/tmp
 d none usr/xpg4 755 root bin
 d none usr/xpg4/bin 755 root bin
 f none usr/xpg4/bin/sh 555 root bin
-s none var/log/messages=../../var/adm/messages

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,17 +46,15 @@
 #include <smbsrv/smb_token.h>
 #include <mlsvc.h>
 
-#define	NETLOGON_ATTEMPTS	2
-
-static uint32_t netlogon_logon(smb_logon_t *, smb_token_t *);
+static uint32_t netlogon_logon_private(netr_client_t *, smb_token_t *);
 static uint32_t netr_server_samlogon(mlsvc_handle_t *, netr_info_t *, char *,
-    smb_logon_t *, smb_token_t *);
+    netr_client_t *, smb_token_t *);
 static void netr_invalidate_chain(void);
-static void netr_interactive_samlogon(netr_info_t *, smb_logon_t *,
+static void netr_interactive_samlogon(netr_info_t *, netr_client_t *,
     struct netr_logon_info1 *);
 static void netr_network_samlogon(ndr_heap_t *, netr_info_t *,
-    smb_logon_t *, struct netr_logon_info2 *);
-static void netr_setup_identity(ndr_heap_t *, smb_logon_t *,
+    netr_client_t *, struct netr_logon_info2 *);
+static void netr_setup_identity(ndr_heap_t *, netr_client_t *,
     netr_logon_id_t *);
 static boolean_t netr_isadmin(struct netr_validation_info3 *);
 static uint32_t netr_setup_domain_groups(struct netr_validation_info3 *,
@@ -69,83 +67,38 @@ static uint32_t netr_setup_token_wingrps(struct netr_validation_info3 *,
  */
 extern netr_info_t netr_global_info;
 
-static mutex_t netlogon_mutex;
-static cond_t netlogon_cv;
-static boolean_t netlogon_busy = B_FALSE;
-static boolean_t netlogon_abort = B_FALSE;
+static mutex_t netlogon_logon_mutex;
 
 /*
- * Abort impending domain logon requests.
- */
-void
-smb_logon_abort(void)
-{
-	(void) mutex_lock(&netlogon_mutex);
-	if (netlogon_busy && !netlogon_abort)
-		syslog(LOG_DEBUG, "logon abort");
-	netlogon_abort = B_TRUE;
-	(void) cond_broadcast(&netlogon_cv);
-	(void) mutex_unlock(&netlogon_mutex);
-}
-
-/*
- * This is the entry point for authenticating domain users.
+ * netlogon_logon
  *
- * If we are not going to attempt to authenticate the user,
- * this function must return without updating the status.
+ * This is the entry point for authenticating a remote logon. The
+ * parameters here all refer to the remote user and workstation, i.e.
+ * the domain is the user's account domain, not our primary domain.
+ * In order to make it easy to track which domain is being used at
+ * each stage, and to reduce the number of things being pushed on the
+ * stack, the client information is bundled up in the clnt structure.
  *
- * If the user is successfully authenticated, we build an
- * access token and the status will be NT_STATUS_SUCCESS.
- * Otherwise, the token contents are invalid.
+ * If the user is successfully authenticated, an access token will be
+ * built and NT_STATUS_SUCCESS will be returned. Otherwise a non-zero
+ * NT status will be returned, in which case the token contents will
+ * be invalid.
  */
-void
-smb_logon_domain(smb_logon_t *user_info, smb_token_t *token)
+uint32_t
+netlogon_logon(netr_client_t *clnt, smb_token_t *token)
 {
-	uint32_t	status;
-	int		i;
+	uint32_t status;
 
-	if (user_info->lg_secmode != SMB_SECMODE_DOMAIN)
-		return;
+	(void) mutex_lock(&netlogon_logon_mutex);
 
-	if (user_info->lg_domain_type == SMB_DOMAIN_LOCAL)
-		return;
+	status = netlogon_logon_private(clnt, token);
 
-	for (i = 0; i < NETLOGON_ATTEMPTS; ++i) {
-		(void) mutex_lock(&netlogon_mutex);
-		while (netlogon_busy && !netlogon_abort)
-			(void) cond_wait(&netlogon_cv, &netlogon_mutex);
-
-		if (netlogon_abort) {
-			(void) mutex_unlock(&netlogon_mutex);
-			user_info->lg_status = NT_STATUS_REQUEST_ABORTED;
-			return;
-		}
-
-		netlogon_busy = B_TRUE;
-		(void) mutex_unlock(&netlogon_mutex);
-
-		status = netlogon_logon(user_info, token);
-
-		(void) mutex_lock(&netlogon_mutex);
-		netlogon_busy = B_FALSE;
-		if (netlogon_abort)
-			status = NT_STATUS_REQUEST_ABORTED;
-		(void) cond_signal(&netlogon_cv);
-		(void) mutex_unlock(&netlogon_mutex);
-
-		if (status != NT_STATUS_CANT_ACCESS_DOMAIN_INFO)
-			break;
-	}
-
-	if (status != NT_STATUS_SUCCESS)
-		syslog(LOG_INFO, "logon[%s\\%s]: %s", user_info->lg_e_domain,
-		    user_info->lg_e_username, xlate_nt_status(status));
-
-	user_info->lg_status = status;
+	(void) mutex_unlock(&netlogon_logon_mutex);
+	return (status);
 }
 
 static uint32_t
-netlogon_logon(smb_logon_t *user_info, smb_token_t *token)
+netlogon_logon_private(netr_client_t *clnt, smb_token_t *token)
 {
 	char resource_domain[SMB_PI_MAX_DOMAIN];
 	char server[NETBIOS_NAME_SZ * 2];
@@ -195,7 +148,7 @@ netlogon_logon(smb_logon_t *user_info, smb_token_t *token)
 		}
 
 		status = netr_server_samlogon(&netr_handle,
-		    &netr_global_info, di.d_dc, user_info, token);
+		    &netr_global_info, di.d_dc, clnt, token);
 
 		(void) netr_close(&netr_handle);
 	} while (status == NT_STATUS_INSUFFICIENT_LOGON_INFO && retries++ < 3);
@@ -207,7 +160,7 @@ netlogon_logon(smb_logon_t *user_info, smb_token_t *token)
 }
 
 static uint32_t
-netr_setup_token(struct netr_validation_info3 *info3, smb_logon_t *user_info,
+netr_setup_token(struct netr_validation_info3 *info3, netr_client_t *clnt,
     netr_info_t *netr_info, smb_token_t *token)
 {
 	char *username, *domain;
@@ -228,12 +181,12 @@ netr_setup_token(struct netr_validation_info3 *info3, smb_logon_t *user_info,
 		return (NT_STATUS_NO_MEMORY);
 
 	username = (info3->EffectiveName.str)
-	    ? (char *)info3->EffectiveName.str : user_info->lg_e_username;
+	    ? (char *)info3->EffectiveName.str : clnt->e_username;
 
 	if (info3->LogonDomainName.str) {
 		domain = (char *)info3->LogonDomainName.str;
-	} else if (*user_info->lg_e_domain != '\0') {
-		domain = user_info->lg_e_domain;
+	} else if (*clnt->e_domain != '\0') {
+		domain = clnt->e_domain;
 	} else {
 		(void) smb_getdomainname(nbdomain, sizeof (nbdomain));
 		domain = nbdomain;
@@ -297,7 +250,7 @@ netr_setup_token(struct netr_validation_info3 *info3, smb_logon_t *user_info,
  */
 uint32_t
 netr_server_samlogon(mlsvc_handle_t *netr_handle, netr_info_t *netr_info,
-    char *server, smb_logon_t *user_info, smb_token_t *token)
+    char *server, netr_client_t *clnt, smb_token_t *token)
 {
 	struct netr_SamLogon arg;
 	struct netr_authenticator auth;
@@ -340,21 +293,21 @@ netr_server_samlogon(mlsvc_handle_t *netr_handle, netr_info_t *netr_info,
 	arg.auth = &auth;
 	arg.ret_auth = &ret_auth;
 	arg.validation_level = NETR_VALIDATION_LEVEL3;
-	arg.logon_info.logon_level = user_info->lg_level;
-	arg.logon_info.switch_value = user_info->lg_level;
+	arg.logon_info.logon_level = clnt->logon_level;
+	arg.logon_info.switch_value = clnt->logon_level;
 
 	heap = ndr_rpc_get_heap(netr_handle);
 
-	switch (user_info->lg_level) {
+	switch (clnt->logon_level) {
 	case NETR_INTERACTIVE_LOGON:
-		netr_setup_identity(heap, user_info, &info1.identity);
-		netr_interactive_samlogon(netr_info, user_info, &info1);
+		netr_setup_identity(heap, clnt, &info1.identity);
+		netr_interactive_samlogon(netr_info, clnt, &info1);
 		arg.logon_info.ru.info1 = &info1;
 		break;
 
 	case NETR_NETWORK_LOGON:
-		netr_setup_identity(heap, user_info, &info2.identity);
-		netr_network_samlogon(heap, netr_info, user_info, &info2);
+		netr_setup_identity(heap, clnt, &info2.identity);
+		netr_network_samlogon(heap, netr_info, clnt, &info2);
 		arg.logon_info.ru.info2 = &info2;
 		break;
 
@@ -386,7 +339,7 @@ netr_server_samlogon(mlsvc_handle_t *netr_handle, netr_info_t *netr_info,
 		}
 
 		info3 = arg.ru.info3;
-		status = netr_setup_token(info3, user_info, netr_info, token);
+		status = netr_setup_token(info3, clnt, netr_info, token);
 	}
 
 	ndr_rpc_release(netr_handle);
@@ -401,16 +354,16 @@ netr_server_samlogon(mlsvc_handle_t *netr_handle, netr_info_t *netr_info,
  * key.
  */
 static void
-netr_interactive_samlogon(netr_info_t *netr_info, smb_logon_t *user_info,
+netr_interactive_samlogon(netr_info_t *netr_info, netr_client_t *clnt,
     struct netr_logon_info1 *info1)
 {
 	BYTE key[NETR_OWF_PASSWORD_SZ];
 
 	(void) memcpy(&info1->lm_owf_password,
-	    user_info->lg_lm_password.val, sizeof (netr_owf_password_t));
+	    clnt->lm_password.lm_password_val, sizeof (netr_owf_password_t));
 
 	(void) memcpy(&info1->nt_owf_password,
-	    user_info->lg_nt_password.val, sizeof (netr_owf_password_t));
+	    clnt->nt_password.nt_password_val, sizeof (netr_owf_password_t));
 
 	(void) memset(key, 0, NETR_OWF_PASSWORD_SZ);
 	(void) memcpy(key, netr_info->session_key.key,
@@ -434,21 +387,22 @@ netr_interactive_samlogon(netr_info_t *netr_info, smb_logon_t *user_info,
 /*ARGSUSED*/
 static void
 netr_network_samlogon(ndr_heap_t *heap, netr_info_t *netr_info,
-    smb_logon_t *user_info, struct netr_logon_info2 *info2)
+    netr_client_t *clnt, struct netr_logon_info2 *info2)
 {
 	uint32_t len;
 
-	bcopy(user_info->lg_challenge_key.val, info2->lm_challenge.data, 8);
+	bcopy(clnt->challenge_key.challenge_key_val, info2->lm_challenge.data,
+	    8);
 
-	if ((len = user_info->lg_nt_password.len) != 0) {
-		ndr_heap_mkvcb(heap, user_info->lg_nt_password.val, len,
+	if ((len = clnt->nt_password.nt_password_len) != 0) {
+		ndr_heap_mkvcb(heap, clnt->nt_password.nt_password_val, len,
 		    (ndr_vcbuf_t *)&info2->nt_response);
 	} else {
 		bzero(&info2->nt_response, sizeof (netr_vcbuf_t));
 	}
 
-	if ((len = user_info->lg_lm_password.len) != 0) {
-		ndr_heap_mkvcb(heap, user_info->lg_lm_password.val, len,
+	if ((len = clnt->lm_password.lm_password_len) != 0) {
+		ndr_heap_mkvcb(heap, clnt->lm_password.lm_password_val, len,
 		    (ndr_vcbuf_t *)&info2->lm_response);
 	} else {
 		bzero(&info2->lm_response, sizeof (netr_vcbuf_t));
@@ -581,7 +535,7 @@ netr_invalidate_chain(void)
  * Increment it before each use.
  */
 static void
-netr_setup_identity(ndr_heap_t *heap, smb_logon_t *user_info,
+netr_setup_identity(ndr_heap_t *heap, netr_client_t *clnt,
     netr_logon_id_t *identity)
 {
 	static mutex_t logon_id_mutex;
@@ -593,7 +547,7 @@ netr_setup_identity(ndr_heap_t *heap, smb_logon_t *user_info,
 		logon_id = 0xDCD0;
 
 	++logon_id;
-	user_info->lg_logon_id = logon_id;
+	clnt->logon_id = logon_id;
 
 	(void) mutex_unlock(&logon_id_mutex);
 
@@ -601,10 +555,10 @@ netr_setup_identity(ndr_heap_t *heap, smb_logon_t *user_info,
 	identity->logon_id.LowPart = logon_id;
 	identity->logon_id.HighPart = 0;
 
-	ndr_heap_mkvcs(heap, user_info->lg_domain,
+	ndr_heap_mkvcs(heap, clnt->domain,
 	    (ndr_vcstr_t *)&identity->domain_name);
 
-	ndr_heap_mkvcs(heap, user_info->lg_username,
+	ndr_heap_mkvcs(heap, clnt->username,
 	    (ndr_vcstr_t *)&identity->username);
 
 	/*
@@ -612,7 +566,7 @@ netr_setup_identity(ndr_heap_t *heap, smb_logon_t *user_info,
 	 * It doesn't seem to make any difference whether it's there
 	 * or not.
 	 */
-	ndr_heap_mkvcs(heap, user_info->lg_workstation,
+	ndr_heap_mkvcs(heap, clnt->workstation,
 	    (ndr_vcstr_t *)&identity->workstation);
 }
 

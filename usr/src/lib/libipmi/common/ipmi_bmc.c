@@ -19,9 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -63,9 +65,8 @@ ipmi_bmc_close(void *data)
 	ipmi_free(ibp->ib_ihp, ibp);
 }
 
-/*ARGSUSED*/
 static void *
-ipmi_bmc_open(ipmi_handle_t *ihp, nvlist_t *params)
+ipmi_bmc_open(ipmi_handle_t *ihp)
 {
 	ipmi_bmc_t *ibp;
 

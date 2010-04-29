@@ -19,7 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*
@@ -232,10 +233,10 @@ zvol_minor_lookup(const char *name)
 		if (zv == NULL)
 			continue;
 		if (strcmp(zv->zv_name, name) == 0)
-			return (zv);
+			break;
 	}
 
-	return (NULL);
+	return (zv);
 }
 
 /* extent mapping arg */
@@ -299,7 +300,6 @@ zvol_free_extents(zvol_state_t *zv)
 static int
 zvol_get_lbas(zvol_state_t *zv)
 {
-  objset_t *os = zv->zv_objset;
 	struct maparg	ma;
 	int		err;
 
@@ -307,9 +307,7 @@ zvol_get_lbas(zvol_state_t *zv)
 	ma.ma_blks = 0;
 	zvol_free_extents(zv);
 
-/* commit any in-flight changes before traversing the dataset */
-	txg_wait_synced(dmu_objset_pool(os), 0);
-	err = traverse_dataset(dmu_objset_ds(os), 0,
+	err = traverse_dataset(dmu_objset_ds(zv->zv_objset), 0,
 	    TRAVERSE_PRE | TRAVERSE_PREFETCH_METADATA, zvol_map_block, &ma);
 	if (err || ma.ma_blks != (zv->zv_volsize / zv->zv_volblocksize)) {
 		zvol_free_extents(zv);
@@ -1110,17 +1108,11 @@ zvol_dumpio(zvol_state_t *zv, void *addr, uint64_t offset, uint64_t size,
 		offset -= ze->ze_nblks * zv->zv_volblocksize;
 		ze = list_next(&zv->zv_extents, ze);
 	}
-
-	if (!ddi_in_panic())
-		spa_config_enter(spa, SCL_STATE, FTAG, RW_READER);
-
+	spa_config_enter(spa, SCL_STATE, FTAG, RW_READER);
 	vd = vdev_lookup_top(spa, DVA_GET_VDEV(&ze->ze_dva));
 	offset += DVA_GET_OFFSET(&ze->ze_dva);
 	error = zvol_dumpio_vdev(vd, addr, offset, size, doread, isdump);
-
-	if (!ddi_in_panic())
-		spa_config_exit(spa, SCL_STATE, FTAG);
-
+	spa_config_exit(spa, SCL_STATE, FTAG);
 	return (error);
 }
 
@@ -1135,7 +1127,7 @@ zvol_strategy(buf_t *bp)
 	rl_t *rl;
 	int error = 0;
 	boolean_t doread = bp->b_flags & B_READ;
-	boolean_t is_dump;
+	boolean_t is_dump = zv->zv_flags & ZVOL_DUMPIFIED;
 	boolean_t sync;
 
 	if (zv == NULL) {
@@ -1172,7 +1164,6 @@ zvol_strategy(buf_t *bp)
 		return (0);
 	}
 
-	is_dump = zv->zv_flags & ZVOL_DUMPIFIED;
 	sync = !(bp->b_flags & B_ASYNC) && !doread && !is_dump &&
 	    !(zv->zv_flags & ZVOL_WCE) && !zil_disable;
 
@@ -1474,7 +1465,6 @@ zvol_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 		(void) strcpy(dki.dki_cname, "zvol");
 		(void) strcpy(dki.dki_dname, "zvol");
 		dki.dki_ctype = DKC_UNKNOWN;
-		dki.dki_unit = getminor(dev);
 		dki.dki_maxtransfer = 1 << (SPA_MAXBLOCKSHIFT - zv->zv_min_bs);
 		mutex_exit(&zvol_state_lock);
 		if (ddi_copyout(&dki, (void *)arg, sizeof (dki), flag))

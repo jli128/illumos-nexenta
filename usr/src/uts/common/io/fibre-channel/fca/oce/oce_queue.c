@@ -33,35 +33,11 @@
 
 int oce_destroy_q(struct oce_dev  *oce, struct oce_mbx  *mbx, size_t req_size,
     enum qtype  qtype);
-/* MAil box Queue functions */
-struct oce_mq *
-oce_mq_create(struct oce_dev *dev, struct oce_eq *eq, uint32_t q_len);
+struct oce_cq *oce_cq_create(struct oce_dev *dev, struct oce_eq *eq,
+    uint32_t q_len, uint32_t entry_size, boolean_t sol_event,
+    boolean_t is_eventable, boolean_t nodelay, uint32_t ncoalesce);
 
-/* event queue handling */
-struct oce_eq *
-oce_eq_create(struct oce_dev *dev, uint32_t q_len, uint32_t item_size,
-    uint32_t eq_delay);
-
-/* completion queue handling */
-struct oce_cq *
-oce_cq_create(struct oce_dev *dev, struct oce_eq *eq, uint32_t q_len,
-    uint32_t item_size, boolean_t sol_event, boolean_t is_eventable,
-    boolean_t nodelay, uint32_t ncoalesce);
-
-
-/* Tx  WQ functions */
-static struct oce_wq *oce_wq_init(struct oce_dev *dev,  uint32_t q_len,
-    int wq_type);
-static void oce_wq_fini(struct oce_dev *dev, struct oce_wq *wq);
-static int oce_wq_create(struct oce_wq *wq, struct oce_eq *eq);
-static void oce_wq_del(struct oce_dev *dev, struct oce_wq *wq);
-/* Rx Queue functions */
-static struct oce_rq *oce_rq_init(struct oce_dev *dev, uint32_t q_len,
-    uint32_t frag_size, uint32_t mtu,
-    boolean_t rss);
-static void oce_rq_fini(struct oce_dev *dev, struct oce_rq *rq);
-static int oce_rq_create(struct oce_rq *rq, uint32_t if_id, struct oce_eq *eq);
-static void oce_rq_del(struct oce_dev *dev, struct oce_rq *rq);
+int oce_cq_del(struct oce_dev *dev, struct oce_cq *cq);
 
 /*
  * function to create an event queue
@@ -80,28 +56,31 @@ oce_eq_create(struct oce_dev *dev, uint32_t q_len, uint32_t item_size,
 	struct mbx_create_common_eq *fwcmd;
 	int ret = 0;
 
-	/* allocate an eq */
-	eq = kmem_zalloc(sizeof (struct oce_eq), KM_NOSLEEP);
-
-	if (eq == NULL) {
-		return (NULL);
-	}
-
 	bzero(&mbx, sizeof (struct oce_mbx));
+
 	/* allocate mbx */
 	fwcmd = (struct mbx_create_common_eq *)&mbx.payload;
 
+	/* allocate an eq */
+	eq = kmem_zalloc(sizeof (struct oce_eq), KM_NOSLEEP);
+	if (eq == NULL) {
+		oce_log(dev, CE_NOTE, MOD_CONFIG, "%s",
+		    "EQ allocation failed");
+		return (NULL);
+	}
+
 	eq->ring = create_ring_buffer(dev, q_len,
 	    item_size, DDI_DMA_CONSISTENT);
-
 	if (eq->ring == NULL) {
 		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "EQ ring alloc failed:0x%p",
+		    "EQ	ring alloc failed:0x%p",
 		    (void *)eq->ring);
 		kmem_free(eq, sizeof (struct oce_eq));
 		return (NULL);
 	}
 
+	/* now send the mbx using the MQ mailbox */
+	bzero(fwcmd, sizeof (struct mbx_create_common_eq));
 	mbx_common_req_hdr_init(&fwcmd->hdr, 0, 0,
 	    MBX_SUBSYSTEM_COMMON,
 	    OPCODE_CREATE_COMMON_EQ, MBX_TIMEOUT_SEC,
@@ -149,9 +128,10 @@ oce_eq_create(struct oce_dev *dev, uint32_t q_len, uint32_t item_size,
 	eq->eq_cfg.cur_eqd = (uint8_t)eq_delay;
 	eq->parent = (void *)dev;
 	atomic_inc_32(&dev->neqs);
+	mutex_init(&eq->lock, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(dev->intr_pri));
 	oce_log(dev, CE_NOTE, MOD_CONFIG,
 	    "EQ created, eq=0x%p eq_id=0x%x", (void *)eq, eq->eq_id);
-	/* Save the eq pointer */
 	return (eq);
 } /* oce_eq_create */
 
@@ -163,28 +143,20 @@ oce_eq_create(struct oce_dev *dev, uint32_t q_len, uint32_t item_size,
  *
  * return 0=>success, failure otherwise
  */
-void
+int
 oce_eq_del(struct oce_dev *dev, struct oce_eq *eq)
 {
-	struct oce_mbx mbx;
-	struct mbx_destroy_common_eq *fwcmd;
-
-	/* drain the residual events */
-	oce_drain_eq(eq);
-
 	/* destroy the ring */
 	destroy_ring_buffer(dev, eq->ring);
 	eq->ring = NULL;
 
-	/* send a command to delete the EQ */
-	fwcmd = (struct mbx_destroy_common_eq *)&mbx.payload;
-	fwcmd->params.req.id = eq->eq_id;
-	(void) oce_destroy_q(dev, &mbx,
-	    sizeof (struct mbx_destroy_common_eq),
-	    QTYPE_EQ);
+	mutex_destroy(&eq->lock);
+	/* release the eq */
 	kmem_free(eq, sizeof (struct oce_eq));
 	atomic_dec_32(&dev->neqs);
-}
+
+	return (DDI_SUCCESS);
+} /* oce_eq_del */
 
 /*
  * function to create a completion queue
@@ -205,6 +177,7 @@ oce_cq_create(struct oce_dev *dev, struct oce_eq *eq, uint32_t q_len,
 	struct mbx_create_common_cq *fwcmd;
 	int ret = 0;
 
+	bzero(&mbx, sizeof (struct oce_mbx));
 	/* create cq */
 	cq = kmem_zalloc(sizeof (struct oce_cq), KM_NOSLEEP);
 	if (cq == NULL) {
@@ -223,8 +196,8 @@ oce_cq_create(struct oce_dev *dev, struct oce_eq *eq, uint32_t q_len,
 		kmem_free(cq, sizeof (struct oce_cq));
 		return (NULL);
 	}
-	/* initialize mailbox */
-	bzero(&mbx, sizeof (struct oce_mbx));
+
+	/* allocate mbx */
 	fwcmd = (struct mbx_create_common_cq *)&mbx.payload;
 
 	/* fill the command header */
@@ -243,9 +216,10 @@ oce_cq_create(struct oce_dev *dev, struct oce_eq *eq, uint32_t q_len,
 	fwcmd->params.req.cq_ctx.coalesce_wm = ncoalesce;
 
 	/* dw1 */
-	fwcmd->params.req.cq_ctx.armed = B_FALSE;
+	fwcmd->params.req.cq_ctx.armed = 1;
 	fwcmd->params.req.cq_ctx.eq_id = eq->eq_id;
 	fwcmd->params.req.cq_ctx.pd = 0;
+
 	/* dw2 */
 	fwcmd->params.req.cq_ctx.function = dev->fn;
 
@@ -280,6 +254,9 @@ oce_cq_create(struct oce_dev *dev, struct oce_eq *eq, uint32_t q_len,
 	cq->cq_id = LE_16(fwcmd->params.rsp.cq_id);
 	dev->cq[cq->cq_id] = cq;
 	atomic_inc_32(&eq->ref_count);
+	mutex_init(&cq->lock, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(dev->intr_pri));
+
 	return (cq);
 } /* oce_cq_create */
 
@@ -289,34 +266,25 @@ oce_cq_create(struct oce_dev *dev, struct oce_eq *eq, uint32_t q_len,
  * dev - software handle to the device
  * cq - handle to the CQ to delete
  *
- * return none
+ * return 0 => success, failure otherwise
  */
-static void
+int
 oce_cq_del(struct oce_dev *dev, struct oce_cq *cq)
 {
-	struct oce_mbx mbx;
-	struct mbx_destroy_common_cq *fwcmd;
-
+	/* Reset the handler */
+	cq->cq_handler = NULL;
 	/* destroy the ring */
 	destroy_ring_buffer(dev, cq->ring);
 	cq->ring = NULL;
 
-	bzero(&mbx, sizeof (struct oce_mbx));
-	/* send a command to delete the CQ */
-	fwcmd = (struct mbx_destroy_common_cq *)&mbx.payload;
-	fwcmd->params.req.id = cq->cq_id;
-	(void) oce_destroy_q(dev, &mbx,
-	    sizeof (struct mbx_destroy_common_cq),
-	    QTYPE_CQ);
-
-	/* Reset the handler */
-	cq->cq_handler = NULL;
-	dev->cq[cq->cq_id] = NULL;
+	/* decrement eq ref count */
 	atomic_dec_32(&cq->eq->ref_count);
 	mutex_destroy(&cq->lock);
 
 	/* release the eq */
 	kmem_free(cq, sizeof (struct oce_cq));
+
+	return (0);
 } /* oce_cq_del */
 
 /*
@@ -337,25 +305,25 @@ oce_mq_create(struct oce_dev *dev, struct oce_eq *eq, uint32_t q_len)
 	int ret = 0;
 	struct oce_cq  *cq;
 
+	bzero(&mbx, sizeof (struct oce_mbx));
+
+	/* allocate mbx */
+	fwcmd = (struct mbx_create_common_mq *)&mbx.payload;
+
 	/* Create the Completion Q */
+
 	cq = oce_cq_create(dev, eq, CQ_LEN_256,
 	    sizeof (struct oce_mq_cqe),
 	    B_FALSE, B_TRUE, B_TRUE, 0);
 	if (cq == NULL) {
 		return (NULL);
 	}
-
-
 	/* allocate the mq */
 	mq = kmem_zalloc(sizeof (struct oce_mq), KM_NOSLEEP);
-
 	if (mq == NULL) {
-		goto mq_alloc_fail;
+		oce_log(dev, CE_NOTE, MOD_CONFIG, "%s",
+		    "MQ allocation failed");
 	}
-
-	bzero(&mbx, sizeof (struct oce_mbx));
-	/* allocate mbx */
-	fwcmd = (struct mbx_create_common_mq *)&mbx.payload;
 
 	/* create the ring buffer for this queue */
 	mq->ring = create_ring_buffer(dev, q_len,
@@ -406,16 +374,13 @@ oce_mq_create(struct oce_dev *dev, struct oce_eq *eq, uint32_t q_len)
 	/* set the MQCQ handlers */
 	cq->cq_handler = oce_drain_mq_cq;
 	cq->cb_arg = (void *)mq;
-	mutex_init(&mq->lock, NULL, MUTEX_DRIVER,
-	    DDI_INTR_PRI(dev->intr_pri));
 	return (mq);
 
 mq_fail:
 	destroy_ring_buffer(dev, mq->ring);
 mq_ring_alloc:
 	kmem_free(mq, sizeof (struct oce_mq));
-mq_alloc_fail:
-	oce_cq_del(dev, cq);
+	(void) oce_cq_del(dev, cq);
 	return (NULL);
 } /* oce_mq_create */
 
@@ -425,27 +390,27 @@ mq_alloc_fail:
  * dev - software handle to the device
  * mq - pointer to the MQ to delete
  *
- * return none
+ * return 0 => success, failure otherwise
  */
-static void
+int
 oce_mq_del(struct oce_dev *dev, struct oce_mq *mq)
 {
-	struct oce_mbx mbx;
-	struct mbx_destroy_common_mq *fwcmd;
+	int ret = 0;
 
 	/* destroy the ring */
 	destroy_ring_buffer(dev, mq->ring);
 	mq->ring = NULL;
-	bzero(&mbx, sizeof (struct oce_mbx));
-	fwcmd = (struct mbx_destroy_common_mq *)&mbx.payload;
-	fwcmd->params.req.id = mq->mq_id;
-	(void) oce_destroy_q(dev, &mbx,
-	    sizeof (struct mbx_destroy_common_mq),
-	    QTYPE_MQ);
-	oce_cq_del(dev, mq->cq);
-	mq->cq = NULL;
-	mutex_destroy(&mq->lock);
+
+	/* destroy the CQ */
+	ret = oce_cq_del(dev, mq->cq);
+	if (ret != DDI_SUCCESS) {
+		oce_log(dev, CE_WARN, MOD_CONFIG, "%s",
+		    "MQCQ destroy Failed ");
+	}
+
+	/* release the eq */
 	kmem_free(mq, sizeof (struct oce_mq));
+	return (DDI_SUCCESS);
 } /* oce_mq_del */
 
 /*
@@ -456,14 +421,21 @@ oce_mq_del(struct oce_dev *dev, struct oce_mq *mq)
  *
  * return pointer to the WQ created. NULL on failure
  */
-static struct oce_wq *
-oce_wq_init(struct oce_dev *dev,  uint32_t q_len, int wq_type)
+struct oce_wq *
+oce_wq_create(struct oce_dev *dev, struct oce_eq *eq,
+    uint32_t q_len, int wq_type)
 {
+	struct oce_mbx mbx;
+	struct mbx_create_nic_wq *fwcmd;
 	struct oce_wq *wq;
+	struct oce_cq *cq;
 	char str[MAX_POOL_NAME];
 	int ret;
 
 	ASSERT(dev != NULL);
+
+	bzero(&mbx, sizeof (struct oce_mbx));
+
 	/* q_len must be min 256 and max 2k */
 	if (q_len < 256 || q_len > 2048) {
 		oce_log(dev, CE_WARN, MOD_CONFIG,
@@ -490,7 +462,7 @@ oce_wq_init(struct oce_dev *dev,  uint32_t q_len, int wq_type)
 	wq->parent = (void *)dev;
 
 	/* Create the WQ Buffer pool */
-	ret  = oce_wqb_cache_create(wq, dev->tx_bcopy_limit);
+	ret  = oce_wqb_cache_create(wq, dev->bcopy_limit);
 	if (ret != DDI_SUCCESS) {
 		oce_log(dev, CE_WARN, MOD_CONFIG, "%s",
 		    "WQ Buffer Pool create failed ");
@@ -515,6 +487,16 @@ oce_wq_init(struct oce_dev *dev,  uint32_t q_len, int wq_type)
 		goto wqed_fail;
 	}
 
+	/* create the CQ */
+	cq = oce_cq_create(dev, eq, CQ_LEN_1024,
+	    sizeof (struct oce_nic_tx_cqe),
+	    B_FALSE, B_TRUE, B_FALSE, 3);
+	if (cq == NULL) {
+		oce_log(dev, CE_WARN, MOD_CONFIG, "%s",
+		    "WCCQ create failed ");
+		goto wccq_fail;
+	}
+
 	/* create the ring buffer */
 	wq->ring = create_ring_buffer(dev, q_len,
 	    NIC_WQE_SIZE, DDI_DMA_CONSISTENT);
@@ -524,86 +506,15 @@ oce_wq_init(struct oce_dev *dev,  uint32_t q_len, int wq_type)
 		goto wq_ringfail;
 	}
 
-	/* Initialize WQ lock */
-	mutex_init(&wq->tx_lock, NULL, MUTEX_DRIVER,
-	    DDI_INTR_PRI(dev->intr_pri));
-	/* Initialize WQ lock */
-	mutex_init(&wq->txc_lock, NULL, MUTEX_DRIVER,
-	    DDI_INTR_PRI(dev->intr_pri));
-	atomic_inc_32(&dev->nwqs);
-
-	OCE_LIST_CREATE(&wq->wqe_desc_list, DDI_INTR_PRI(dev->intr_pri));
-	return (wq);
-
-wqcq_fail:
-	destroy_ring_buffer(dev, wq->ring);
-wq_ringfail:
-	kmem_cache_destroy(wq->wqed_cache);
-wqed_fail:
-	oce_wqm_cache_destroy(wq);
-wqm_fail:
-	oce_wqb_cache_destroy(wq);
-wqb_fail:
-	kmem_free(wq, sizeof (struct oce_wq));
-	return (NULL);
-} /* oce_wq_create */
-
-/*
- * function to delete a WQ
- *
- * dev - software handle to the device
- * wq - WQ to delete
- *
- * return 0 => success, failure otherwise
- */
-static void
-oce_wq_fini(struct oce_dev *dev, struct oce_wq *wq)
-{
-	/* destroy cq */
-	oce_wqb_cache_destroy(wq);
-	oce_wqm_cache_destroy(wq);
-	kmem_cache_destroy(wq->wqed_cache);
-
-	/* Free the packet descriptor list */
-	OCE_LIST_DESTROY(&wq->wqe_desc_list);
-	destroy_ring_buffer(dev, wq->ring);
-	wq->ring = NULL;
-	/* Destroy the Mutex */
-	mutex_destroy(&wq->tx_lock);
-	mutex_destroy(&wq->txc_lock);
-	kmem_free(wq, sizeof (struct oce_wq));
-	atomic_dec_32(&dev->nwqs);
-} /* oce_wq_del */
-
-
-static int
-oce_wq_create(struct oce_wq *wq, struct oce_eq *eq)
-{
-
-	struct oce_mbx mbx;
-	struct mbx_create_nic_wq *fwcmd;
-	struct oce_dev *dev = wq->parent;
-	struct oce_cq *cq;
-	int ret;
-
-	/* create the CQ */
-	cq = oce_cq_create(dev, eq, CQ_LEN_1024,
-	    sizeof (struct oce_nic_tx_cqe),
-	    B_FALSE, B_TRUE, B_FALSE, 3);
-	if (cq == NULL) {
-		oce_log(dev, CE_WARN, MOD_CONFIG, "%s",
-		    "WCCQ create failed ");
-		return (DDI_FAILURE);
-	}
 	/* now fill the command */
-	bzero(&mbx, sizeof (struct oce_mbx));
 	fwcmd = (struct mbx_create_nic_wq *)&mbx.payload;
+	bzero(fwcmd, sizeof (struct mbx_create_nic_wq));
 	mbx_common_req_hdr_init(&fwcmd->hdr, 0, 0,
 	    MBX_SUBSYSTEM_NIC,
 	    OPCODE_CREATE_NIC_WQ, MBX_TIMEOUT_SEC,
 	    sizeof (struct mbx_create_nic_wq));
 
-	fwcmd->params.req.nic_wq_type = (uint8_t)wq->cfg.wq_type;
+	fwcmd->params.req.nic_wq_type = (uint8_t)wq_type;
 	fwcmd->params.req.num_pages = wq->ring->dbuf->num_pages;
 	oce_log(dev, CE_NOTE, MOD_CONFIG, "NUM_PAGES = 0x%d size = %lu",
 	    (uint32_t)wq->ring->dbuf->num_pages,
@@ -611,7 +522,7 @@ oce_wq_create(struct oce_wq *wq, struct oce_eq *eq)
 
 	/* workaround: fill 0x01 for ulp_mask in rsvd0 */
 	fwcmd->params.req.rsvd0 = 0x01;
-	fwcmd->params.req.wq_size = OCE_LOG2(wq->cfg.q_len) + 1;
+	fwcmd->params.req.wq_size = OCE_LOG2(q_len) + 1;
 	fwcmd->params.req.valid = 1;
 	fwcmd->params.req.pd_id = 0;
 	fwcmd->params.req.pci_function_id = dev->fn;
@@ -630,25 +541,47 @@ oce_wq_create(struct oce_wq *wq, struct oce_eq *eq)
 	if (ret != DDI_SUCCESS) {
 		oce_log(dev, CE_WARN, MOD_CONFIG,
 		    "WQ create failed: %d", ret);
-		oce_cq_del(dev, cq);
-		return (ret);
+		goto wq_fail;
 
 	}
 
 	/* interpret the response */
 	wq->wq_id = LE_16(fwcmd->params.rsp.wq_id);
-	wq->qstate = QCREATED;
-	wq->cq = cq;
-	/* set the WQCQ handlers */
-	wq->cq->cq_handler = oce_drain_wq_cq;
-	wq->cq->cb_arg = (void *)wq;
+
 	/* All are free to start with */
-	wq->wq_free = wq->cfg.q_len;
-	/* reset indicies */
-	wq->ring->cidx = 0;
-	wq->ring->pidx = 0;
-	return (0);
-}
+	wq->wq_free = q_len;
+	wq->cq = cq;
+
+	/* set the WQCQ handlers */
+	cq->cq_handler = oce_drain_wq_cq;
+	cq->cb_arg = (void *)wq;
+
+	/* set the default eq delay for the eq associated with this wq */
+	(void) oce_set_eq_delay(dev, &eq->eq_id, 1, wq->cfg.eqd);
+
+	/* Initialize WQ lock */
+	mutex_init(&wq->lock, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(dev->intr_pri));
+	atomic_inc_32(&dev->nwqs);
+
+	OCE_LIST_CREATE(&wq->wqe_desc_list, DDI_INTR_PRI(dev->intr_pri));
+
+	return (wq);
+
+wq_fail:
+	destroy_ring_buffer(dev, wq->ring);
+wq_ringfail:
+	(void) oce_cq_del(dev, cq);
+wccq_fail:
+	kmem_cache_destroy(wq->wqed_cache);
+wqed_fail:
+	oce_wqm_cache_destroy(wq);
+wqm_fail:
+	oce_wqb_cache_destroy(wq);
+wqb_fail:
+	kmem_free(wq, sizeof (struct oce_wq));
+	return (NULL);
+} /* oce_wq_create */
 
 /*
  * function to delete a WQ
@@ -656,48 +589,56 @@ oce_wq_create(struct oce_wq *wq, struct oce_eq *eq)
  * dev - software handle to the device
  * wq - WQ to delete
  *
- * return none
+ * return 0 => success, failure otherwise
  */
-static void
+int
 oce_wq_del(struct oce_dev *dev, struct oce_wq *wq)
 {
-	struct oce_mbx mbx;
-	struct mbx_delete_nic_wq *fwcmd;
-
-
 	ASSERT(dev != NULL);
 	ASSERT(wq != NULL);
-	if (wq->qstate == QCREATED) {
-		bzero(&mbx, sizeof (struct oce_mbx));
-		/* now fill the command */
-		fwcmd = (struct mbx_delete_nic_wq *)&mbx.payload;
-		fwcmd->params.req.wq_id = wq->wq_id;
-		(void) oce_destroy_q(dev, &mbx,
-		    sizeof (struct mbx_delete_nic_wq),
-		    QTYPE_WQ);
-		wq->qstate = QDELETED;
-		oce_cq_del(dev, wq->cq);
-		wq->cq = NULL;
-	}
+
+	/* destroy the ring buffer */
+	destroy_ring_buffer(dev, wq->ring);
+	wq->ring = NULL;
+
+	/* destroy cq */
+	(void) oce_cq_del(dev, wq->cq);
+	wq->cq = NULL;
+
+	kmem_cache_destroy(wq->wqed_cache);
+	oce_wqm_cache_destroy(wq);
+	oce_wqb_cache_destroy(wq);
+
+	/* Free the packet descriptor list */
+	OCE_LIST_DESTROY(&wq->wqe_desc_list);
+
+	/* Destroy the Mutex */
+	mutex_destroy(&wq->lock);
+	kmem_free(wq, sizeof (struct oce_wq));
+	atomic_dec_32(&dev->nwqs);
+	return (DDI_SUCCESS);
 } /* oce_wq_del */
 
 /*
- * function to allocate RQ resources
+ * function to create a RQ
  *
  * dev - software handle to the device
  * rqcfg - configuration structure providing RQ config parameters
  *
  * return pointer to the RQ created. NULL on failure
  */
-/* ARGSUSED */
-static struct oce_rq *
-oce_rq_init(struct oce_dev *dev, uint32_t q_len,
-    uint32_t frag_size, uint32_t mtu,
+struct oce_rq *
+oce_rq_create(struct oce_dev *dev, struct oce_eq *eq, uint32_t q_len,
+    uint32_t frag_size, uint32_t mtu, int16_t if_id,
     boolean_t rss)
 {
-
+	struct oce_mbx mbx;
+	struct mbx_create_nic_rq *fwcmd;
 	struct oce_rq *rq;
 	int ret;
+	struct oce_cq *cq;
+
+	bzero(&mbx, sizeof (struct oce_mbx));
 
 	/* validate q creation parameters */
 	if (!OCE_LOG2(frag_size))
@@ -715,6 +656,7 @@ oce_rq_init(struct oce_dev *dev, uint32_t q_len,
 
 	rq->cfg.q_len = q_len;
 	rq->cfg.frag_size = frag_size;
+	rq->cfg.if_id = if_id;
 	rq->cfg.mtu = mtu;
 	rq->cfg.eqd = 0;
 	rq->cfg.nbufs = 8 * 1024;
@@ -727,6 +669,11 @@ oce_rq_init(struct oce_dev *dev, uint32_t q_len,
 	    OCE_RQE_BUF_HEADROOM);
 	if (ret != DDI_SUCCESS) {
 		goto rqb_fail;
+	}
+	cq = oce_cq_create(dev, eq, CQ_LEN_1024, sizeof (struct oce_nic_rx_cqe),
+	    B_FALSE, B_TRUE, B_FALSE, 3);
+	if (cq == NULL) {
+		goto rccq_fail;
 	}
 
 	/* create the ring buffer */
@@ -742,20 +689,62 @@ oce_rq_init(struct oce_dev *dev, uint32_t q_len,
 	rq->shadow_ring = kmem_zalloc(sizeof (struct rq_shadow_entry) *
 	    q_len, KM_SLEEP);
 
+	/* now fill the command */
+	fwcmd = (struct mbx_create_nic_rq *)&mbx.payload;
+
+	mbx_common_req_hdr_init(&fwcmd->hdr, 0, 0,
+	    MBX_SUBSYSTEM_NIC,
+	    OPCODE_CREATE_NIC_RQ, MBX_TIMEOUT_SEC,
+	    sizeof (struct mbx_create_nic_rq));
+
+	fwcmd->params.req.num_pages = rq->ring->dbuf->num_pages;
+
+	fwcmd->params.req.frag_size = OCE_LOG2(frag_size);
+	fwcmd->params.req.cq_id = cq->cq_id;
+
+	oce_page_list(rq->ring->dbuf, fwcmd->params.req.pages,
+	    rq->ring->dbuf->num_pages);
+
+	fwcmd->params.req.if_id = if_id;
+
+	fwcmd->params.req.max_frame_size = (uint16_t)mtu;
+	fwcmd->params.req.is_rss_queue = rss;
+
+	/* fill rest of mbx */
+	mbx.u0.s.embedded = 1;
+	mbx.payload_length = sizeof (struct mbx_create_nic_rq);
+	DW_SWAP(u32ptr(&mbx), mbx.payload_length + OCE_BMBX_RHDR_SZ);
+
+	/* now post the command */
+	ret = oce_mbox_post(dev, &mbx, NULL);
+	if (ret != 0) {
+		oce_log(dev, CE_WARN, MOD_CONFIG,
+		    "RQ create failed: %d", ret);
+		goto rq_fail;
+	}
+
+	/* interpret the response */
+	rq->rq_id = LE_16(fwcmd->params.rsp.u0.s.rq_id);
+	rq->rss_cpuid = fwcmd->params.rsp.u0.s.rss_cpuid;
+	rq->cq = cq;
+
 	/* Initialize the RQ lock */
-	mutex_init(&rq->rx_lock, NULL, MUTEX_DRIVER,
-	    DDI_INTR_PRI(dev->intr_pri));
-	/* Initialize the recharge  lock */
-	mutex_init(&rq->rc_lock, NULL, MUTEX_DRIVER,
+	mutex_init(&rq->lock, NULL, MUTEX_DRIVER,
 	    DDI_INTR_PRI(dev->intr_pri));
 	atomic_inc_32(&dev->nrqs);
+
+	/* set the Completion Handler */
+	cq->cq_handler = oce_drain_rq_cq;
+	cq->cb_arg  = (void *)rq;
 	return (rq);
 
-rqcq_fail:
+rq_fail:
 	kmem_free(rq->shadow_ring,
 	    sizeof (struct rq_shadow_entry) * q_len);
 	destroy_ring_buffer(dev, rq->ring);
 rq_ringfail:
+	(void) oce_cq_del(dev, cq);
+rccq_fail:
 	oce_rqb_cache_destroy(rq);
 rqb_fail:
 	kmem_free(rq, sizeof (struct oce_rq));
@@ -768,124 +757,32 @@ rqb_fail:
  * dev - software handle to the device
  * rq - RQ to delete
  *
- * return none
+ * return 0 => success, failure otherwise
  */
-static void
-oce_rq_fini(struct oce_dev *dev, struct oce_rq *rq)
-{
-	/* Destroy buffer cache */
-	oce_rqb_cache_destroy(rq);
-	destroy_ring_buffer(dev, rq->ring);
-	rq->ring = NULL;
-	kmem_free(rq->shadow_ring,
-	    sizeof (struct rq_shadow_entry) * rq->cfg.q_len);
-	rq->shadow_ring = NULL;
-	mutex_destroy(&rq->rx_lock);
-	mutex_destroy(&rq->rc_lock);
-	kmem_free(rq, sizeof (struct oce_rq));
-	atomic_dec_32(&dev->nrqs);
-} /* oce_rq_del */
-
-
-static int
-oce_rq_create(struct oce_rq *rq, uint32_t if_id, struct oce_eq *eq)
-{
-	struct oce_mbx mbx;
-	struct mbx_create_nic_rq *fwcmd;
-	struct oce_dev *dev = rq->parent;
-	struct oce_cq *cq;
-	int ret;
-
-	cq = oce_cq_create(dev, eq, CQ_LEN_1024, sizeof (struct oce_nic_rx_cqe),
-	    B_FALSE, B_TRUE, B_FALSE, 3);
-
-	if (cq == NULL) {
-		return (DDI_FAILURE);
-	}
-
-	/* now fill the command */
-	bzero(&mbx, sizeof (struct oce_mbx));
-	fwcmd = (struct mbx_create_nic_rq *)&mbx.payload;
-	mbx_common_req_hdr_init(&fwcmd->hdr, 0, 0,
-	    MBX_SUBSYSTEM_NIC,
-	    OPCODE_CREATE_NIC_RQ, MBX_TIMEOUT_SEC,
-	    sizeof (struct mbx_create_nic_rq));
-
-	fwcmd->params.req.num_pages = rq->ring->dbuf->num_pages;
-	fwcmd->params.req.frag_size = OCE_LOG2(rq->cfg.frag_size);
-	fwcmd->params.req.cq_id = cq->cq_id;
-	oce_page_list(rq->ring->dbuf, fwcmd->params.req.pages,
-	    rq->ring->dbuf->num_pages);
-
-	fwcmd->params.req.if_id = if_id;
-	fwcmd->params.req.max_frame_size = (uint16_t)rq->cfg.mtu;
-	fwcmd->params.req.is_rss_queue = rq->cfg.is_rss_queue;
-
-	/* fill rest of mbx */
-	mbx.u0.s.embedded = 1;
-	mbx.payload_length = sizeof (struct mbx_create_nic_rq);
-	DW_SWAP(u32ptr(&mbx), mbx.payload_length + OCE_BMBX_RHDR_SZ);
-
-	/* now post the command */
-	ret = oce_mbox_post(dev, &mbx, NULL);
-	if (ret != 0) {
-		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "RQ create failed: %d", ret);
-		oce_cq_del(dev, cq);
-		return (ret);
-	}
-
-	/* interpret the response */
-	rq->rq_id = LE_16(fwcmd->params.rsp.u0.s.rq_id);
-	/* rq->rss_cpuid = fwcmd->params.rsp.u0.bits.rss_cpuid; */
-	rq->cfg.if_id = if_id;
-	rq->qstate = QCREATED;
-	rq->cq = cq;
-
-	/* set the Completion Handler */
-	rq->cq->cq_handler = oce_drain_rq_cq;
-	rq->cq->cb_arg  = (void *)rq;
-	/* reset the indicies */
-	rq->ring->cidx = 0;
-	rq->ring->pidx = 0;
-	rq->buf_avail = 0;
-	return (0);
-
-}
-
-/*
- * function to delete an RQ
- *
- * dev - software handle to the device
- * rq - RQ to delete
- *
- * return none
- */
-static void
+int
 oce_rq_del(struct oce_dev *dev, struct oce_rq *rq)
 {
-	struct oce_mbx mbx;
-	struct mbx_delete_nic_rq *fwcmd;
 
 	ASSERT(dev != NULL);
 	ASSERT(rq != NULL);
 
-	bzero(&mbx, sizeof (struct oce_mbx));
+	(void) oce_cq_del(dev, rq->cq);
+	rq->cq = NULL;
 
-	/* delete the Queue  */
-	if (rq->qstate == QCREATED) {
-		fwcmd = (struct mbx_delete_nic_rq *)&mbx.payload;
-		fwcmd->params.req.rq_id = rq->rq_id;
-		(void) oce_destroy_q(dev, &mbx,
-		    sizeof (struct mbx_delete_nic_rq), QTYPE_RQ);
-		rq->qstate = QDELETED;
-		oce_clean_rq(rq);
-		/* Delete the associated CQ */
-		oce_cq_del(dev, rq->cq);
-		rq->cq = NULL;
-		/* free up the posted buffers */
-		oce_rq_discharge(dev->rq[0]);
-	}
+	/* Free any outstanding buffers with hardware */
+	oce_rq_discharge(rq);
+
+	/* Destroy buffer cache */
+	oce_rqb_cache_destroy(rq);
+	destroy_ring_buffer(dev, rq->ring);
+	rq->ring = NULL;
+
+	kmem_free(rq->shadow_ring,
+	    sizeof (struct rq_shadow_entry) * rq->cfg.q_len);
+	mutex_destroy(&rq->lock);
+	kmem_free(rq, sizeof (struct oce_rq));
+	atomic_dec_32(&dev->nrqs);
+	return (DDI_SUCCESS);
 } /* oce_rq_del */
 
 /*
@@ -1072,9 +969,7 @@ oce_drain_eq(struct oce_eq *eq)
 {
 	struct oce_eqe *eqe;
 	uint16_t num_eqe = 0;
-	struct oce_dev *dev;
 
-	dev = eq->parent;
 	/* get the first item in eq to process */
 	eqe = RING_GET_CONSUMER_ITEM_VA(eq->ring, struct oce_eqe);
 
@@ -1090,95 +985,4 @@ oce_drain_eq(struct oce_eq *eq)
 		eqe = RING_GET_CONSUMER_ITEM_VA(eq->ring, struct oce_eqe);
 		num_eqe++;
 	} /* for all EQEs */
-	if (num_eqe) {
-		oce_arm_eq(dev, eq->eq_id, num_eqe, B_FALSE, B_TRUE);
-	}
 } /* oce_drain_eq */
-
-
-int
-oce_init_txrx(struct oce_dev  *dev)
-{
-	dev->wq[0] = oce_wq_init(dev, dev->tx_ring_size, NIC_WQ_TYPE_STANDARD);
-
-	if (dev->wq[0] == NULL) {
-		goto queue_fail;
-	}
-
-	dev->rq[0] = oce_rq_init(dev, dev->rx_ring_size, OCE_RQ_BUF_SIZE,
-	    OCE_RQ_MAX_FRAME_SZ, B_FALSE);
-	if (dev->rq[0] == NULL) {
-		goto queue_fail;
-	}
-	return (DDI_SUCCESS);
-queue_fail:
-	oce_fini_txrx(dev);
-	return (DDI_FAILURE);
-}
-void
-oce_fini_txrx(struct oce_dev *dev)
-{
-	if (dev->wq[0] != NULL) {
-		oce_wq_fini(dev, dev->wq[0]);
-		dev->wq[0] = NULL;
-	}
-	if (dev->rq[0] != NULL) {
-		oce_rq_fini(dev, dev->rq[0]);
-		dev->rq[0] = NULL;
-	}
-	return;
-
-}
-
-int
-oce_create_queues(struct oce_dev *dev)
-{
-
-	int i;
-	struct oce_eq *eq;
-	struct oce_mq *mq;
-
-	for (i = 0; i < dev->num_vectors; i++) {
-		eq = oce_eq_create(dev, EQ_LEN_1024, EQE_SIZE_4, 0);
-		if (eq == NULL) {
-			goto rings_fail;
-		}
-		dev->eq[i] = eq;
-	}
-	if (oce_wq_create(dev->wq[0], dev->eq[0]) != 0)
-		goto rings_fail;
-	if (oce_rq_create(dev->rq[0], dev->if_id,
-	    dev->neqs > 1 ? dev->eq[1] : dev->eq[0]) != 0)
-		goto rings_fail;
-	mq = oce_mq_create(dev, dev->eq[0], 64);
-	if (mq == NULL)
-		goto rings_fail;
-	dev->mq = mq;
-	return (DDI_SUCCESS);
-rings_fail:
-	oce_delete_queues(dev);
-	return (DDI_FAILURE);
-
-}
-
-void
-oce_delete_queues(struct oce_dev *dev)
-{
-	int i;
-	if (dev->mq != NULL) {
-		oce_mq_del(dev, dev->mq);
-		dev->mq = NULL;
-	}
-
-	for (i = 0; i < dev->nrqs; i++) {
-		oce_rq_del(dev, dev->rq[i]);
-	}
-	for (i = 0; i < dev->nwqs; i++) {
-		oce_wq_del(dev, dev->wq[i]);
-	}
-	/* create as many eqs as the number of vectors */
-	for (i = 0; i < dev->num_vectors; i++) {
-		oce_eq_del(dev, dev->eq[i]);
-		dev->eq[i] = NULL;
-	}
-}

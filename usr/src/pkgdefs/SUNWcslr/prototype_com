@@ -42,7 +42,7 @@ i copyright
 d none lib 755 root bin
 s none lib/32=.
 f none lib/c_synonyms.so.1 755 root bin
-#f none lib/ld.so.1 755 root bin
+f none lib/ld.so.1 755 root bin
 f none lib/libadm.so.1 755 root bin
 s none lib/libadm.so=libadm.so.1
 f none lib/libaio.so.1 755 root  bin
@@ -93,7 +93,7 @@ s none lib/libgen.so=libgen.so.1
 f none lib/libgen.so.1 755 root bin
 f none lib/libinetcfg.so.1 755 root bin
 f none lib/libinetutil.so.1 755 root bin
-s none usr/sun/lib/libintl.so=../../../lib/libintl.so.1
+s none lib/libintl.so=libintl.so.1
 f none lib/libintl.so.1 755 root bin
 s none lib/libipmp.so=./libipmp.so.1
 f none lib/libipmp.so.1 755 root bin
@@ -110,7 +110,7 @@ s none lib/libmd.so=libmd.so.1
 f none lib/libmd.so.1 755 root bin
 s none lib/libmd5.so=libmd5.so.1
 f none lib/libmd5.so.1 755 root bin
-s none usr/sun/lib/libmp.so=../../../lib/libmp.so.2
+s none lib/libmp.so=libmp.so.2
 f none lib/libmp.so.1 755 root bin
 f none lib/libmp.so.2 755 root bin
 s none lib/libnsl.so=libnsl.so.1
@@ -180,13 +180,3 @@ d none lib/mpxio 755 root bin
 f none lib/mpxio/stmsboot_util 555 root bin
 d none lib/secure 755 root bin
 s none lib/secure/32=.
-
-# Conflict resolutions and compatibility fixups:
-s none usr/sbin/df=/bin/df
-s none usr/sbin/mknod=/bin/mknod
-s none sbin/uname=/bin/uname
-s none usr/sbin/sync=/bin/sync
-s none sbin/sync=/bin/sync
-s none usr/sbin/link=/usr/bin/link
-s none usr/sbin/unlink=/usr/bin/unlink
-s none usr/sbin/tar=/bin/tar

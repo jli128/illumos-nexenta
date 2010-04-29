@@ -17,9 +17,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-/*
- * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ *
+ *
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #ifndef	_PMCS_DEF_H
 #define	_PMCS_DEF_H
@@ -281,7 +282,6 @@ typedef struct {
 #define	PMCS_WORK_DS_ERR_RECOVERY	9
 #define	PMCS_WORK_SSP_EVT_RECOVERY	10
 #define	PMCS_WORK_DEREGISTER_DEV	11
-#define	PMCS_WORK_DUMP_REGS		12
 
 /*
  * The actual values as they appear in work_flags
@@ -296,7 +296,6 @@ typedef struct {
 #define	PMCS_WORK_FLAG_DS_ERR_RECOVERY	(1 << 9)
 #define	PMCS_WORK_FLAG_SSP_EVT_RECOVERY (1 << 10)
 #define	PMCS_WORK_FLAG_DEREGISTER_DEV   (1 << 11)
-#define	PMCS_WORK_FLAG_DUMP_REGS	(1 << 12)
 
 /*
  * This structure is used by this function to test MPI (and interrupts)
@@ -441,12 +440,12 @@ typedef struct {
 	((atomic_and_ulong_nv(&hwp->work_flags, (ulong_t)-1) & (1 << wrk)) != 0)
 
 #define	WAIT_FOR(p, t, r)					\
-	clock_t	_lb = ddi_get_lbolt();				\
 	r = 0;							\
 	while (!PMCS_COMMAND_DONE(p)) {				\
-		clock_t _ret = cv_timedwait(&p->sleep_cv,	\
-		    &p->lock, _lb + drv_usectohz(t * 1000));	\
-		if (!PMCS_COMMAND_DONE(p) && _ret < 0) {		\
+		clock_t tmp = cv_timedwait(&p->sleep_cv,	\
+		    &p->lock, ddi_get_lbolt() +			\
+		    drv_usectohz(t * 1000));			\
+		if (!PMCS_COMMAND_DONE(p) && tmp < 0) {		\
 			r = 1;					\
 			break;					\
 		}						\
@@ -514,8 +513,6 @@ typedef struct {
 #define	HEXDIGIT(x)	(((x) >= '0' && (x) <= '9') || \
 	((x) >= 'a' && (x) <= 'f') || ((x) >= 'A' && (x) <= 'F'))
 
-#define	NSECS_PER_SEC	1000000000UL
-
 
 typedef void (*pmcs_cb_t) (pmcs_hw_t *, pmcwork_t *, uint32_t *);
 
@@ -524,7 +521,12 @@ typedef void (*pmcs_cb_t) (pmcs_hw_t *, pmcwork_t *, uint32_t *);
  */
 
 #define	PMCS_TBUF_ELEM_SIZE	120
+
+#ifdef DEBUG
 #define	PMCS_TBUF_NUM_ELEMS_DEF	100000
+#else
+#define	PMCS_TBUF_NUM_ELEMS_DEF	15000
+#endif
 
 #define	PMCS_TBUF_UA_MAX_SIZE	32
 typedef struct {
@@ -537,13 +539,13 @@ typedef struct {
 	pmcs_dtype_t	phy_dtype;
 	/* Log data */
 	timespec_t	timestamp;
-	uint64_t	fw_timestamp;
 	char		buf[PMCS_TBUF_ELEM_SIZE];
 } pmcs_tbuf_t;
 
 /*
  * Firmware event log header format
  */
+
 typedef struct pmcs_fw_event_hdr_s {
 	uint32_t	fw_el_signature;
 	uint32_t	fw_el_entry_start_offset;
@@ -554,37 +556,6 @@ typedef struct pmcs_fw_event_hdr_s {
 	uint32_t	fw_el_latest_idx;
 	uint32_t	fw_el_entry_size;
 } pmcs_fw_event_hdr_t;
-
-/*
- * Firmware event log entry format
- */
-typedef struct pmcs_fw_event_entry_s {
-	uint32_t	num_words : 3,
-			reserved : 25,
-			severity: 4;
-	uint32_t	ts_upper;
-	uint32_t	ts_lower;
-	uint32_t	seq_num;
-	uint32_t	logw0;
-	uint32_t	logw1;
-	uint32_t	logw2;
-	uint32_t	logw3;
-} pmcs_fw_event_entry_t;
-
-#define	PMCS_FWLOG_TIMER_DIV	8	/* fw timer has 8ns granularity */
-#define	PMCS_FWLOG_AAP1_SIG	0x1234AAAA
-#define	PMCS_FWLOG_IOP_SIG	0x5678CCCC
-
-/*
- * Receptacle information
- */
-#define	PMCS_NUM_RECEPTACLES	2
-
-#define	PMCS_RECEPT_LABEL_0	"SAS0"
-#define	PMCS_RECEPT_LABEL_1	"SAS1"
-
-#define	PMCS_RECEPT_PM_0	"f0"
-#define	PMCS_RECEPT_PM_1	"f"
 
 #ifdef	__cplusplus
 }

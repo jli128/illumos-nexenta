@@ -19,7 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -29,6 +30,8 @@
 #include <smbsrv/nmpipes.h>
 #include <smbsrv/mailslot.h>
 #include <smbsrv/lmerr.h>
+
+#define	SMB_QUOTA_UNLIMITED	0xFFFFFFFFFFFFFFFF;
 
 /*
  * count of bytes in server response packet
@@ -46,9 +49,11 @@
  * be applied to its peer.
  */
 
-static int smb_trans_ready(smb_xa_t *);
-static smb_sdrc_t smb_trans_dispatch(smb_request_t *, smb_xa_t *);
-static smb_sdrc_t smb_trans2_dispatch(smb_request_t *, smb_xa_t *);
+static int smb_trans_ready(struct smb_xa *);
+static smb_sdrc_t smb_trans_dispatch(struct smb_request *, struct smb_xa *);
+static smb_sdrc_t smb_trans2_dispatch(struct smb_request *, struct smb_xa *);
+static smb_sdrc_t smb_nt_transact_query_quota(struct smb_request *,
+    struct smb_xa *);
 
 smb_sdrc_t
 smb_pre_transaction(smb_request_t *sr)
@@ -100,7 +105,7 @@ smb_com_transaction(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
-	xa->xa_pipe_name = smb_mem_strdup(stn);
+	xa->xa_pipe_name = smb_strdup(stn);
 	xa->smb_flags  = flags;
 	xa->smb_timeout = timeo;
 	xa->req_disp_param = pscnt;
@@ -445,12 +450,15 @@ smb_nt_trans_dispatch(struct smb_request *sr, struct smb_xa *xa)
 	case NT_TRANSACT_IOCTL:
 		rc = smb_nt_transact_ioctl(sr, xa);
 		break;
+
 	case NT_TRANSACT_QUERY_QUOTA:
-		rc = smb_nt_transact_query_quota(sr, xa);
+		(void) smb_nt_transact_query_quota(sr, xa);
 		break;
+
 	case NT_TRANSACT_SET_QUOTA:
-		rc = smb_nt_transact_set_quota(sr, xa);
-		break;
+		smbsr_error(sr, 0, ERRSRV, ERRaccess);
+		return (SDRC_ERROR);
+
 	case NT_TRANSACT_RENAME:
 		rc = smb_nt_transact_rename(sr, xa);
 		break;
@@ -517,6 +525,81 @@ smb_nt_trans_dispatch(struct smb_request *sr, struct smb_xa *xa)
 	    data_pad,
 	    &xa->rep_data_mb);
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
+}
+
+/*
+ * smb_nt_transact_query_quota
+ *
+ * Request                    Description
+ * ========================== ==================================
+ * WORD fid
+ * BYTE ReturnSingleEntry     A boolean indicating whether to return
+ *                            a single entry or multiple entries.
+ * BYTE RestartScan           A boolean indicating whether to continue from
+ *                            the previous request or restart a new sequence.
+ * DWORD SidListLength        The length in bytes of the SidList or 0 if
+ *                            there is no SidList.
+ * DWORD StartSidLength       The length in bytes of the StartSid or 0 if
+ *                            there is no StartSid.  The server must ignore
+ *                            StartSidLength if SidListLength is non-zero.
+ * DWORD StartSidOffset       The offset, in bytes, to the StartSid in the
+ *                            parameter block.
+ *
+ * If SidListLength is non-zero, the request contains a list of SIDs
+ * for which information is requested.  If StartSidLength is nonzero,
+ * the request contains the SID at which the enumeration should start.
+ *
+ * One of SidListLength and StartSidLength must be 0.  If both are 0,
+ * all SIDs are to be enumerated by the server as if they were passed
+ * the SidList.
+ */
+static smb_sdrc_t
+smb_nt_transact_query_quota(struct smb_request *sr, struct smb_xa *xa)
+{
+	smb_sid_t	*sid;
+	uint8_t		single, restart;
+	uint16_t	fid;
+	uint32_t	sidlen, listlen, startlen, startoff;
+	uint64_t	limit, used, mtime;
+
+	if (smb_mbc_decodef(&xa->req_param_mb, "%wbblll", sr,
+	    &fid, &single, &restart, &listlen, &startlen, &startoff))
+		return (SDRC_ERROR);
+
+	if (restart == 0) {
+		(void) smb_mbc_encodef(&xa->rep_param_mb, "l", 0);
+		return (SDRC_SUCCESS);
+	}
+
+	/*
+	 * BUILTIN\Administrators
+	 */
+	if ((sid = smb_sid_fromstr("S-1-5-32-544")) == NULL) {
+		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, 0, 0);
+		return (SDRC_ERROR);
+	}
+
+	sidlen = smb_sid_len(sid);
+	used = 0;
+	mtime = 0xBA7ADAAC0436C601; /* canned dummy timestamp */
+	limit = SMB_QUOTA_UNLIMITED;
+
+	/*
+	 * The encoded length of "llqqqq" is 40 bytes.
+	 */
+	(void) smb_mbc_encodef(&xa->rep_param_mb, "l", 40 + sidlen);
+
+	(void) smb_mbc_encodef(&xa->rep_data_mb, "llqqqq",
+	    0,		/* next offset */
+	    sidlen,	/* sid length */
+	    mtime,	/* change time */
+	    used,	/* quota used */
+	    limit,	/* soft limit */
+	    limit);	/* hard limit */
+
+	smb_encode_sid(xa, sid);
+	smb_sid_free(sid);
+	return (SDRC_SUCCESS);
 }
 
 smb_sdrc_t
@@ -680,7 +763,7 @@ smb_com_nt_transact_secondary(struct smb_request *sr)
 }
 
 static int
-smb_trans_ready(smb_xa_t *xa)
+smb_trans_ready(struct smb_xa *xa)
 {
 	int rc;
 
@@ -797,7 +880,7 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 	}
 
 	esi.es_buf = kmem_zalloc(esi.es_bufsize, KM_SLEEP);
-	esi.es_posix_uid = crgetuid(sr->uid_user->u_cred);
+	esi.es_username = sr->uid_user->u_name;
 	(void) smb_kshare_enum(dhdl, &esi);
 
 	/* client buffer size is not big enough to hold any shares */
@@ -1008,8 +1091,7 @@ smb_trans_net_workstation_getinfo(struct smb_request *sr, struct smb_xa *xa)
 	(void) smb_mbc_encodef(&xa->rep_data_mb, "l", MBC_LENGTH(&str_mb));
 	(void) smb_mbc_encodef(&str_mb, "s", domain);
 	(void) smb_mbc_encodef(&xa->rep_data_mb, "bbl",
-	    sr->sr_cfg->skc_version.sv_major, sr->sr_cfg->skc_version.sv_minor,
-	    MBC_LENGTH(&str_mb));
+	    SMB_VERSION_MAJOR, SMB_VERSION_MINOR, MBC_LENGTH(&str_mb));
 	(void) smb_mbc_encodef(&str_mb, "s", domain);
 	(void) smb_mbc_encodef(&xa->rep_data_mb, "l", MBC_LENGTH(&str_mb));
 	(void) smb_mbc_encodef(&str_mb, "s", domain);
@@ -1071,8 +1153,7 @@ smb_trans_net_server_getinfo(struct smb_request *sr, struct smb_xa *xa)
 		(void) smb_mbc_encodef(&str_mb, "s",
 		    sr->sr_cfg->skc_system_comment);
 		(void) smb_mbc_encodef(&xa->rep_data_mb, "16cbbll", server_name,
-		    sr->sr_cfg->skc_version.sv_major,
-		    sr->sr_cfg->skc_version.sv_minor,
+		    SMB_VERSION_MAJOR, SMB_VERSION_MINOR,
 		    MY_SERVER_TYPE, max_data - MBC_LENGTH(&str_mb));
 		break;
 
@@ -1316,8 +1397,7 @@ smb_trans_net_server_enum2(struct smb_request *sr, struct smb_xa *xa)
 	(void) smb_mbc_encodef(&xa->rep_data_mb, "16c", hostname);
 	if (level == 1) {
 		(void) smb_mbc_encodef(&xa->rep_data_mb, "bbll",
-		    sr->sr_cfg->skc_version.sv_major,
-		    sr->sr_cfg->skc_version.sv_minor,
+		    SMB_VERSION_MAJOR, SMB_VERSION_MINOR,
 		    MY_SERVER_TYPE, MBC_LENGTH(&str_mb));
 		(void) smb_mbc_encodef(&str_mb, "s", si->skc_system_comment);
 	}
@@ -1361,7 +1441,7 @@ is_supported_pipe(const char *pname)
 }
 
 static smb_sdrc_t
-smb_trans_dispatch(smb_request_t *sr, smb_xa_t *xa)
+smb_trans_dispatch(struct smb_request *sr, struct smb_xa *xa)
 {
 	int		rc, pos;
 	int		total_bytes, n_setup, n_param, n_data;
@@ -1543,7 +1623,7 @@ trans_err:
 }
 
 static smb_sdrc_t
-smb_trans2_dispatch(smb_request_t *sr, smb_xa_t *xa)
+smb_trans2_dispatch(struct smb_request *sr, struct smb_xa *xa)
 {
 	int		rc, pos;
 	int		total_bytes, n_setup, n_param, n_data;
@@ -1622,10 +1702,6 @@ smb_trans2_dispatch(smb_request_t *sr, smb_xa_t *xa)
 		rc = smb_com_trans2_query_fs_information(sr, xa);
 		break;
 
-	case TRANS2_SET_FS_INFORMATION:
-		rc = smb_com_trans2_set_fs_information(sr, xa);
-		break;
-
 	case TRANS2_QUERY_PATH_INFORMATION:
 		/*
 		 * Should have enough room to send the response
@@ -1659,11 +1735,6 @@ smb_trans2_dispatch(smb_request_t *sr, smb_xa_t *xa)
 	case TRANS2_SET_FILE_INFORMATION:
 		rc = smb_com_trans2_set_file_information(sr, xa);
 		break;
-
-	case TRANS2_GET_DFS_REFERRAL:
-		rc = smb_com_trans2_get_dfs_referral(sr, xa);
-		break;
-
 	default:
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
 		goto trans_err_not_supported;
@@ -1831,7 +1902,7 @@ smb_xa_delete(smb_xa_t *xa)
 	ASSERT(SMB_XA_CLOSED(xa));
 
 	if (xa->xa_pipe_name)
-		smb_mem_free(xa->xa_pipe_name);
+		smb_mfree(xa->xa_pipe_name);
 
 	if (xa->rep_setup_mb.chain != NULL)
 		m_freem(xa->rep_setup_mb.chain);

@@ -32,15 +32,14 @@ OBJECTS=	nss_spi.o
 
 include	$(SRC)/lib/Makefile.lib
 
-NSSHDRS=	/usr/include/nss
-NSPRHDRS=	/usr/include/nspr
+MPSDIR=		/usr/lib/mps
 KMFINC=		-I../../../include -I../../../ber_der/inc
-NSSINC=		-I$(NSSHDRS) -I$(NSPRHDRS)
+NSSINC=		-I/usr/include/mps
 BERLIB=		-lkmf -lkmfberder
 BERLIB64=	$(BERLIB)
 
-NSSLIBS=	$(BERLIB) -L$(NSSHDRS) -R/usr/lib -R/lib -lnss3 -lnspr4 -lsmime3 -lc
-NSSLIBS64=	$(BERLIB64) -L$(NSSHDRS) -R/usr/lib/amd64 -R/lib/amd64  -lnss3 -lnspr4 -lsmime3 -lc
+NSSLIBS=	$(BERLIB) -L$(MPSDIR) -R$(MPSDIR) -lnss3 -lnspr4 -lsmime3 -lc
+NSSLIBS64=	$(BERLIB64) -L$(MPSDIR)/$(MACH64) -R$(MPSDIR)/$(MACH64) -lnss3 -lnspr4 -lsmime3 -lc
 
 SRCDIR=		../common
 INCDIR=		../../include

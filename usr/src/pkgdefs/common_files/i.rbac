@@ -142,14 +142,14 @@ dbmerge() {
 #	which will appear first in the output.
 #
 #
-	$nawk_cmd '
+	$nawk_cmd  '
 
 BEGIN {
 	FS=":"
 }
 
 /^#/ || /^$/ {
-	next;
+	continue;
 }
 
 type == "auth" {

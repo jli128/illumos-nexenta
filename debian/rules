@@ -76,14 +76,16 @@ upload-packages: build-packages upload-packages-stamp
 upload-packages-stamp:
 	rm -rf $(APTDIR)
 	ndmkrepo $(APTDIR) $(APTDIR)/upload
+	@rm -f /etc/apt/sources.list.d/nexenta-on-local.list
 	cp $(PKGDIR)/*.{deb,changes} $(APTDIR)/incoming/hardy-unstable
 	$(APTDIR)/upload
 	@echo
 	@echo "Packages uploaded into local APT repository $(APTDIR)"
 	@echo
 	@echo "Local APT preconfigured. Development upgrades are ready now."
-	@echo "Run the following command to upgrade:"
+	@echo "Run the following commands to upgrade:"
 	@echo
+	@echo "echo 'deb file://$(APTDIR)/ hardy-unstable main contrib non-free' > /etc/apt/sources.list.d/nexenta-on-local.list"
 	@echo "apt-clone dist-upgrade"
 	@echo
 	touch $@

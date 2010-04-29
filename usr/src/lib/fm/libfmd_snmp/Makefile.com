@@ -50,7 +50,7 @@ CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
 CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
 
 # No lint libraries are delivered for Net-SNMP yet
-SNMPLIBS = -lnetsnmp -lnetsnmphelpers -lnetsnmpagent -lnetsnmpmibs -lkvm -ladm
+SNMPLIBS = -lnetsnmp -lnetsnmphelpers -lnetsnmpagent
 lint := SNMPLIBS=
 
 LDLIBS += $(MACH_LDLIBS)

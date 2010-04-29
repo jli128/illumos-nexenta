@@ -31,7 +31,7 @@ HDRDIR =	common
 ROOTHDRDIR =	$(ROOT)/usr/include/hal
 
 SUBDIRS=	$(MACH)
-#$(BUILD64)SUBDIRS += $(MACH64)
+$(BUILD64)SUBDIRS += $(MACH64)
 
 all :=		TARGET= all
 clean :=	TARGET= clean

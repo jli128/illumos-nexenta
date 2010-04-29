@@ -286,7 +286,7 @@ zfs_prop_init(void)
 	register_string(ZFS_PROP_SHARENFS, "sharenfs", "off", PROP_INHERIT,
 	    ZFS_TYPE_FILESYSTEM, "on | off | share(1M) options", "SHARENFS");
 	register_string(ZFS_PROP_SHAREISCSI, "shareiscsi", "off", PROP_INHERIT,
-	    ZFS_TYPE_DATASET, "on | off | type=<type>", "SHAREISCSI"); 
+	    ZFS_TYPE_DATASET, "on | off | type=<type>", "SHAREISCSI");
 	register_string(ZFS_PROP_TYPE, "type", NULL, PROP_READONLY,
 	    ZFS_TYPE_DATASET, "filesystem | volume | snapshot", "TYPE");
 	register_string(ZFS_PROP_SHARESMB, "sharesmb", "off", PROP_INHERIT,

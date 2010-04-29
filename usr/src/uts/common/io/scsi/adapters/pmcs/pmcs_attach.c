@@ -17,9 +17,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-/*
- * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ *
+ *
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #include <sys/scsi/adapters/pmcs/pmcs.h>
 
@@ -46,7 +47,7 @@ uint32_t pmcs_tbuf_num_elems = 0;
 pmcs_tbuf_t *pmcs_tbuf_ptr;
 uint32_t pmcs_tbuf_idx = 0;
 boolean_t pmcs_tbuf_wrap = B_FALSE;
-kmutex_t pmcs_trace_lock;
+static kmutex_t pmcs_trace_lock;
 
 /*
  * If pmcs_force_syslog value is non-zero, all messages put in the trace log
@@ -111,7 +112,7 @@ static uint_t pmcs_all_intr(caddr_t, caddr_t);
 static int pmcs_quiesce(dev_info_t *dip);
 static boolean_t pmcs_fabricate_wwid(pmcs_hw_t *);
 
-static void pmcs_create_all_phy_stats(pmcs_iport_t *);
+static void pmcs_create_phy_stats(pmcs_iport_t *);
 int pmcs_update_phy_stats(kstat_t *, int);
 static void pmcs_destroy_phy_stats(pmcs_iport_t *);
 
@@ -262,7 +263,8 @@ pmcs_iport_attach(dev_info_t *dip)
 
 	pwp = ddi_get_soft_state(pmcs_softc_state, hba_inst);
 	if (pwp == NULL) {
-		cmn_err(CE_WARN, "%s: No HBA softstate for instance %d",
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: iport%d attach invoked with NULL parent (HBA) node)",
 		    __func__, inst);
 		return (DDI_FAILURE);
 	}
@@ -374,7 +376,7 @@ pmcs_iport_attach(dev_info_t *dip)
 	mutex_exit(&iport->lock);
 
 	/* Create kstats for each of the phys in this port */
-	pmcs_create_all_phy_stats(iport);
+	pmcs_create_phy_stats(iport);
 
 	/*
 	 * Insert this iport handle into our list and set
@@ -422,7 +424,6 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	pmcs_phy_t *phyp;
 	uint32_t num_threads;
 	char buf[64];
-	char *fwl_file;
 
 	switch (cmd) {
 	case DDI_ATTACH:
@@ -501,13 +502,11 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	STAILQ_INIT(&pwp->cq);
 	STAILQ_INIT(&pwp->wf);
 	STAILQ_INIT(&pwp->pf);
-
 	/*
-	 * Create the list for iports and init its lock.
+	 * Create the list for iports
 	 */
 	list_create(&pwp->iports, sizeof (pmcs_iport_t),
 	    offsetof(pmcs_iport_t, list_node));
-	rw_init(&pwp->iports_lock, NULL, RW_DRIVER, NULL);
 
 	pwp->state = STATE_PROBING;
 
@@ -529,30 +528,6 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (pwp->fwlog > PMCS_FWLOG_MAX) {
 		pwp->fwlog = PMCS_FWLOG_MAX;
 	}
-	if ((ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, 0, "pmcs-fwlogfile",
-	    &fwl_file) == DDI_SUCCESS)) {
-		if (snprintf(pwp->fwlogfile_aap1, MAXPATHLEN, "%s%d-aap1.0",
-		    fwl_file, ddi_get_instance(dip)) > MAXPATHLEN) {
-			pwp->fwlogfile_aap1[0] = '\0';
-			pwp->fwlogfile_iop[0] = '\0';
-		} else if (snprintf(pwp->fwlogfile_iop, MAXPATHLEN,
-		    "%s%d-iop.0", fwl_file,
-		    ddi_get_instance(dip)) > MAXPATHLEN) {
-			pwp->fwlogfile_aap1[0] = '\0';
-			pwp->fwlogfile_iop[0] = '\0';
-		}
-		ddi_prop_free(fwl_file);
-	} else {
-		pwp->fwlogfile_aap1[0] = '\0';
-		pwp->fwlogfile_iop[0] = '\0';
-	}
-
-	pwp->open_retry_interval = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "pmcs-open-retry-interval",
-	    OPEN_RETRY_INTERVAL_DEF);
-	if (pwp->open_retry_interval > OPEN_RETRY_INTERVAL_MAX) {
-		pwp->open_retry_interval = OPEN_RETRY_INTERVAL_MAX;
-	}
 
 	mutex_enter(&pmcs_trace_lock);
 	if (pmcs_tbuf == NULL) {
@@ -571,24 +546,6 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		pmcs_tbuf_idx = 0;
 	}
 	mutex_exit(&pmcs_trace_lock);
-
-	if (pwp->fwlog && strlen(pwp->fwlogfile_aap1) > 0) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
-		    "%s: firmware event log files: %s, %s", __func__,
-		    pwp->fwlogfile_aap1, pwp->fwlogfile_iop);
-		pwp->fwlog_file = 1;
-	} else {
-		if (pwp->fwlog == 0) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
-			    "%s: No firmware event log will be written "
-			    "(event log disabled)", __func__);
-		} else {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
-			    "%s: No firmware event log will be written "
-			    "(no filename configured - too long?)", __func__);
-		}
-		pwp->fwlog_file = 0;
-	}
 
 	disable_msix = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
 	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "pmcs-disable-msix",
@@ -751,9 +708,6 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			pwp->fwlog = 0;
 		} else {
 			bzero(pwp->fwlogp, PMCS_FWLOG_SIZE);
-			pwp->fwlogp_aap1 = (pmcs_fw_event_hdr_t *)pwp->fwlogp;
-			pwp->fwlogp_iop = (pmcs_fw_event_hdr_t *)((void *)
-			    ((caddr_t)pwp->fwlogp + (PMCS_FWLOG_SIZE / 2)));
 		}
 	}
 
@@ -941,7 +895,6 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if (pmcs_soft_reset(pwp, B_FALSE)) {
 			goto failure;
 		}
-		pwp->last_reset_reason = PMCS_LAST_RST_ATTACH;
 	}
 
 	/*
@@ -1011,6 +964,11 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto failure;
 	}
 	pwp->hba_attached = 1;
+
+	/*
+	 * Initialize the rwlock for the iport elements.
+	 */
+	rw_init(&pwp->iports_lock, NULL, RW_DRIVER, NULL);
 
 	/* Check all acc & dma handles allocated in attach */
 	if (pmcs_check_acc_dma_handle(pwp)) {
@@ -1100,26 +1058,6 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	protocol = SAS_SSP_SUPPORT | SAS_SATA_SUPPORT | SAS_SMP_SUPPORT;
 	pmcs_smhba_add_hba_prop(pwp, DATA_TYPE_INT32, PMCS_SUPPORTED_PROTOCOL,
 	    &protocol);
-
-	/* Receptacle properties (FMA) */
-	pwp->recept_labels[0] = PMCS_RECEPT_LABEL_0;
-	pwp->recept_pm[0] = PMCS_RECEPT_PM_0;
-	pwp->recept_labels[1] = PMCS_RECEPT_LABEL_1;
-	pwp->recept_pm[1] = PMCS_RECEPT_PM_1;
-	if (ddi_prop_update_string_array(DDI_DEV_T_NONE, dip,
-	    SCSI_HBA_PROP_RECEPTACLE_LABEL, &pwp->recept_labels[0],
-	    PMCS_NUM_RECEPTACLES) != DDI_PROP_SUCCESS) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
-		    "%s: failed to create %s property", __func__,
-		    "receptacle-label");
-	}
-	if (ddi_prop_update_string_array(DDI_DEV_T_NONE, dip,
-	    SCSI_HBA_PROP_RECEPTACLE_PM, &pwp->recept_pm[0],
-	    PMCS_NUM_RECEPTACLES) != DDI_PROP_SUCCESS) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
-		    "%s: failed to create %s property", __func__,
-		    "receptacle-pm");
-	}
 
 	return (DDI_SUCCESS);
 
@@ -1367,6 +1305,24 @@ pmcs_unattach(pmcs_hw_t *pwp)
 		curstate = pwp->state;
 	}
 
+	if (&pwp->iports != NULL) {
+		/* Destroy the iports lock */
+		rw_destroy(&pwp->iports_lock);
+		/* Destroy the iports list */
+		ASSERT(list_is_empty(&pwp->iports));
+		list_destroy(&pwp->iports);
+	}
+
+	if (pwp->hss_iportmap != NULL) {
+		/* Destroy the iportmap */
+		scsi_hba_iportmap_destroy(pwp->hss_iportmap);
+	}
+
+	if (pwp->hss_phymap != NULL) {
+		/* Destroy the phymap */
+		sas_phymap_destroy(pwp->hss_phymap);
+	}
+
 	/*
 	 * Make sure that any pending watchdog won't
 	 * be called from this point on out.
@@ -1419,7 +1375,6 @@ pmcs_unattach(pmcs_hw_t *pwp)
 		 * Reset chip
 		 */
 		(void) pmcs_soft_reset(pwp, B_FALSE);
-		pwp->last_reset_reason = PMCS_LAST_RST_DETACH;
 	}
 
 	/*
@@ -1428,21 +1383,6 @@ pmcs_unattach(pmcs_hw_t *pwp)
 	if (pwp->mpi_acc_handle) {
 		pmcs_wr_msgunit(pwp, PMCS_MSGU_OBDB_MASK, 0xffffffff);
 	}
-
-	if (pwp->hss_iportmap != NULL) {
-		/* Destroy the iportmap */
-		scsi_hba_iportmap_destroy(pwp->hss_iportmap);
-	}
-
-	if (pwp->hss_phymap != NULL) {
-		/* Destroy the phymap */
-		sas_phymap_destroy(pwp->hss_phymap);
-	}
-
-	/* Destroy the iports lock and list */
-	rw_destroy(&pwp->iports_lock);
-	ASSERT(list_is_empty(&pwp->iports));
-	list_destroy(&pwp->iports);
 
 	/* Destroy pwp's lock */
 	if (pwp->locks_initted) {
@@ -1458,7 +1398,6 @@ pmcs_unattach(pmcs_hw_t *pwp)
 #ifdef	DEBUG
 		mutex_destroy(&pwp->dbglock);
 #endif
-		cv_destroy(&pwp->config_cv);
 		cv_destroy(&pwp->ict_cv);
 		cv_destroy(&pwp->drain_cv);
 		pwp->locks_initted = 0;
@@ -1672,7 +1611,6 @@ pmcs_quiesce(dev_info_t *dip)
 	/* Stop MPI & Reset chip (no need to re-initialize) */
 	(void) pmcs_stop_mpi(pwp);
 	(void) pmcs_soft_reset(pwp, B_TRUE);
-	pwp->last_reset_reason = PMCS_LAST_RST_QUIESCE;
 
 	return (DDI_SUCCESS);
 }
@@ -1898,96 +1836,6 @@ pmcs_add_more_chunks(pmcs_hw_t *pwp, unsigned long nsize)
 	return (0);
 }
 
-static void
-pmcs_check_forward_progress(pmcs_hw_t *pwp)
-{
-	pmcwork_t	*wrkp;
-	uint32_t	*iqp;
-	uint32_t	cur_iqci;
-	uint32_t	cur_work_idx;
-	uint32_t	cur_msgu_tick;
-	uint32_t	cur_iop_tick;
-	int 		i;
-
-	mutex_enter(&pwp->lock);
-
-	if (pwp->state == STATE_IN_RESET) {
-		mutex_exit(&pwp->lock);
-		return;
-	}
-
-	/*
-	 * Ensure that inbound work is getting picked up.  First, check to
-	 * see if new work has been posted.  If it has, ensure that the
-	 * work is moving forward by checking the consumer index and the
-	 * last_htag for the work being processed against what we saw last
-	 * time.  Note: we use the work structure's 'last_htag' because at
-	 * any given moment it could be freed back, thus clearing 'htag'
-	 * and setting 'last_htag' (see pmcs_pwork).
-	 */
-	for (i = 0; i < PMCS_NIQ; i++) {
-		cur_iqci = pmcs_rd_iqci(pwp, i);
-		iqp = &pwp->iqp[i][cur_iqci * (PMCS_QENTRY_SIZE >> 2)];
-		cur_work_idx = PMCS_TAG_INDEX(LE_32(*(iqp+1)));
-		wrkp = &pwp->work[cur_work_idx];
-		if (cur_iqci == pwp->shadow_iqpi[i]) {
-			pwp->last_iqci[i] = cur_iqci;
-			pwp->last_htag[i] = wrkp->last_htag;
-			continue;
-		}
-		if ((cur_iqci == pwp->last_iqci[i]) &&
-		    (wrkp->last_htag == pwp->last_htag[i])) {
-			pmcs_prt(pwp, PMCS_PRT_WARN, NULL, NULL,
-			    "Inbound Queue stall detected, issuing reset");
-			goto hot_reset;
-		}
-		pwp->last_iqci[i] = cur_iqci;
-		pwp->last_htag[i] = wrkp->last_htag;
-	}
-
-	/*
-	 * Check heartbeat on both the MSGU and IOP.  It is unlikely that
-	 * we'd ever fail here, as the inbound queue monitoring code above
-	 * would detect a stall due to either of these elements being
-	 * stalled, but we might as well keep an eye on them.
-	 */
-	cur_msgu_tick = pmcs_rd_gst_tbl(pwp, PMCS_GST_MSGU_TICK);
-	if (cur_msgu_tick == pwp->last_msgu_tick) {
-		pmcs_prt(pwp, PMCS_PRT_WARN, NULL, NULL,
-		    "Stall detected on MSGU, issuing reset");
-		goto hot_reset;
-	}
-	pwp->last_msgu_tick = cur_msgu_tick;
-
-	cur_iop_tick  = pmcs_rd_gst_tbl(pwp, PMCS_GST_IOP_TICK);
-	if (cur_iop_tick == pwp->last_iop_tick) {
-		pmcs_prt(pwp, PMCS_PRT_WARN, NULL, NULL,
-		    "Stall detected on IOP, issuing reset");
-		goto hot_reset;
-	}
-	pwp->last_iop_tick = cur_iop_tick;
-
-	mutex_exit(&pwp->lock);
-	return;
-
-hot_reset:
-	pwp->state = STATE_DEAD;
-	/*
-	 * We've detected a stall. Attempt to recover service via hot
-	 * reset. In case of failure, pmcs_hot_reset() will handle the
-	 * failure and issue any required FM notifications.
-	 * See pmcs_subr.c for more details.
-	 */
-	if (pmcs_hot_reset(pwp)) {
-		pmcs_prt(pwp, PMCS_PRT_ERR, NULL, NULL,
-		    "%s: hot reset failure", __func__);
-	} else {
-		pmcs_prt(pwp, PMCS_PRT_ERR, NULL, NULL,
-		    "%s: hot reset complete", __func__);
-		pwp->last_reset_reason = PMCS_LAST_RST_STALL;
-	}
-	mutex_exit(&pwp->lock);
-}
 
 static void
 pmcs_check_commands(pmcs_hw_t *pwp)
@@ -2170,14 +2018,6 @@ pmcs_watchdog(void *arg)
 	    pwp->config_changed);
 
 	/*
-	 * Check forward progress on the chip
-	 */
-	if (++pwp->watchdog_count == PMCS_FWD_PROG_TRIGGER) {
-		pwp->watchdog_count = 0;
-		pmcs_check_forward_progress(pwp);
-	}
-
-	/*
 	 * Check to see if we need to kick discovery off again
 	 */
 	mutex_enter(&pwp->config_lock);
@@ -2192,6 +2032,7 @@ pmcs_watchdog(void *arg)
 	mutex_exit(&pwp->config_lock);
 
 	mutex_enter(&pwp->lock);
+
 	if (pwp->state != STATE_RUNNING) {
 		mutex_exit(&pwp->lock);
 		return;
@@ -2206,9 +2047,7 @@ pmcs_watchdog(void *arg)
 	}
 	pwp->wdhandle = timeout(pmcs_watchdog, pwp,
 	    drv_usectohz(PMCS_WATCH_INTERVAL));
-
 	mutex_exit(&pwp->lock);
-
 	pmcs_check_commands(pwp);
 	pmcs_handle_dead_phys(pwp);
 }
@@ -2538,7 +2377,6 @@ pmcs_setup_intr(pmcs_hw_t *pwp)
 #endif
 	cv_init(&pwp->ict_cv, NULL, CV_DRIVER, NULL);
 	cv_init(&pwp->drain_cv, NULL, CV_DRIVER, NULL);
-	cv_init(&pwp->config_cv, NULL, CV_DRIVER, NULL);
 	for (i = 0; i < PMCS_NIQ; i++) {
 		mutex_init(&pwp->iqp_lock[i], NULL,
 		    MUTEX_DRIVER, DDI_INTR_PRI(pwp->intr_pri));
@@ -2732,24 +2570,18 @@ void
 pmcs_fatal_handler(pmcs_hw_t *pwp)
 {
 	pmcs_prt(pwp, PMCS_PRT_ERR, NULL, NULL, "Fatal Interrupt caught");
-
 	mutex_enter(&pwp->lock);
 	pwp->state = STATE_DEAD;
-
-	/*
-	 * Attempt a hot reset. In case of failure, pmcs_hot_reset() will
-	 * handle the failure and issue any required FM notifications.
-	 * See pmcs_subr.c for more details.
-	 */
-	if (pmcs_hot_reset(pwp)) {
-		pmcs_prt(pwp, PMCS_PRT_ERR, NULL, NULL,
-		    "%s: hot reset failure", __func__);
-	} else {
-		pmcs_prt(pwp, PMCS_PRT_ERR, NULL, NULL,
-		    "%s: hot reset complete", __func__);
-		pwp->last_reset_reason = PMCS_LAST_RST_FATAL_ERROR;
-	}
+	pmcs_register_dump_int(pwp);
+	pmcs_wr_msgunit(pwp, PMCS_MSGU_OBDB_MASK, 0xffffffff);
+	pmcs_wr_msgunit(pwp, PMCS_MSGU_OBDB_CLEAR, 0xffffffff);
 	mutex_exit(&pwp->lock);
+	pmcs_fm_ereport(pwp, DDI_FM_DEVICE_NO_RESPONSE);
+	ddi_fm_service_impact(pwp->dip, DDI_SERVICE_LOST);
+
+#ifdef	DEBUG
+	cmn_err(CE_PANIC, "PMCS Fatal Firmware Error");
+#endif
 }
 
 /*
@@ -2841,7 +2673,6 @@ pmcs_prt_impl(pmcs_hw_t *pwp, pmcs_prt_level_t level,
 	uint32_t elem_size = PMCS_TBUF_ELEM_SIZE - 1;
 	boolean_t system_log;
 	int system_log_level;
-	hrtime_t hrtimestamp;
 
 	switch (level) {
 	case PMCS_PRT_DEBUG_DEVEL:
@@ -2875,17 +2706,7 @@ pmcs_prt_impl(pmcs_hw_t *pwp, pmcs_prt_level_t level,
 	}
 
 	mutex_enter(&pmcs_trace_lock);
-	hrtimestamp = gethrtime();
 	gethrestime(&pmcs_tbuf_ptr->timestamp);
-
-	if (pwp->fw_timestamp != 0) {
-		/* Calculate the approximate firmware time stamp... */
-		pmcs_tbuf_ptr->fw_timestamp = pwp->fw_timestamp +
-		    ((hrtimestamp - pwp->hrtimestamp) / PMCS_FWLOG_TIMER_DIV);
-	} else {
-		pmcs_tbuf_ptr->fw_timestamp = 0;
-	}
-
 	ptr = pmcs_tbuf_ptr->buf;
 
 	/*
@@ -3009,77 +2830,14 @@ pmcs_release_scratch(pmcs_hw_t *pwp)
 	pwp->scratch_locked = 0;
 }
 
-/* Called with iport_lock and phy lock held */
-void
-pmcs_create_one_phy_stats(pmcs_iport_t *iport, pmcs_phy_t *phyp)
+static void
+pmcs_create_phy_stats(pmcs_iport_t *iport)
 {
 	sas_phy_stats_t		*ps;
 	pmcs_hw_t		*pwp;
+	pmcs_phy_t		*phyp;
 	int			ndata;
 	char			ks_name[KSTAT_STRLEN];
-
-	ASSERT(mutex_owned(&iport->lock));
-	pwp = iport->pwp;
-	ASSERT(pwp != NULL);
-	ASSERT(mutex_owned(&phyp->phy_lock));
-
-	if (phyp->phy_stats != NULL) {
-		/*
-		 * Delete existing kstats with name containing
-		 * old iport instance# and allow creation of
-		 * new kstats with new iport instance# in the name.
-		 */
-		kstat_delete(phyp->phy_stats);
-	}
-
-	ndata = (sizeof (sas_phy_stats_t)/sizeof (kstat_named_t));
-
-	(void) snprintf(ks_name, sizeof (ks_name),
-	    "%s.%llx.%d.%d", ddi_driver_name(iport->dip),
-	    (longlong_t)pwp->sas_wwns[0],
-	    ddi_get_instance(iport->dip), phyp->phynum);
-
-	phyp->phy_stats = kstat_create("pmcs",
-	    ddi_get_instance(iport->dip), ks_name, KSTAT_SAS_PHY_CLASS,
-	    KSTAT_TYPE_NAMED, ndata, 0);
-
-	if (phyp->phy_stats == NULL) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, phyp, NULL,
-		    "%s: Failed to create %s kstats for PHY(0x%p) at %s",
-		    __func__, ks_name, (void *)phyp, phyp->path);
-	}
-
-	ps = (sas_phy_stats_t *)phyp->phy_stats->ks_data;
-
-	kstat_named_init(&ps->seconds_since_last_reset,
-	    "SecondsSinceLastReset", KSTAT_DATA_ULONGLONG);
-	kstat_named_init(&ps->tx_frames,
-	    "TxFrames", KSTAT_DATA_ULONGLONG);
-	kstat_named_init(&ps->rx_frames,
-	    "RxFrames", KSTAT_DATA_ULONGLONG);
-	kstat_named_init(&ps->tx_words,
-	    "TxWords", KSTAT_DATA_ULONGLONG);
-	kstat_named_init(&ps->rx_words,
-	    "RxWords", KSTAT_DATA_ULONGLONG);
-	kstat_named_init(&ps->invalid_dword_count,
-	    "InvalidDwordCount", KSTAT_DATA_ULONGLONG);
-	kstat_named_init(&ps->running_disparity_error_count,
-	    "RunningDisparityErrorCount", KSTAT_DATA_ULONGLONG);
-	kstat_named_init(&ps->loss_of_dword_sync_count,
-	    "LossofDwordSyncCount", KSTAT_DATA_ULONGLONG);
-	kstat_named_init(&ps->phy_reset_problem_count,
-	    "PhyResetProblemCount", KSTAT_DATA_ULONGLONG);
-
-	phyp->phy_stats->ks_private = phyp;
-	phyp->phy_stats->ks_update = pmcs_update_phy_stats;
-	kstat_install(phyp->phy_stats);
-}
-
-static void
-pmcs_create_all_phy_stats(pmcs_iport_t *iport)
-{
-	pmcs_hw_t		*pwp;
-	pmcs_phy_t		*phyp;
 
 	ASSERT(iport != NULL);
 	pwp = iport->pwp;
@@ -3091,9 +2849,58 @@ pmcs_create_all_phy_stats(pmcs_iport_t *iport)
 	    phyp != NULL;
 	    phyp = list_next(&iport->phys, phyp)) {
 
-		mutex_enter(&phyp->phy_lock);
-		pmcs_create_one_phy_stats(iport, phyp);
-		mutex_exit(&phyp->phy_lock);
+		pmcs_lock_phy(phyp);
+
+		if (phyp->phy_stats != NULL) {
+			pmcs_unlock_phy(phyp);
+			/* We've already created this kstat instance */
+			continue;
+		}
+
+		ndata = (sizeof (sas_phy_stats_t)/sizeof (kstat_named_t));
+
+		(void) snprintf(ks_name, sizeof (ks_name),
+		    "%s.%llx.%d.%d", ddi_driver_name(iport->dip),
+		    (longlong_t)pwp->sas_wwns[0],
+		    ddi_get_instance(iport->dip), phyp->phynum);
+
+		phyp->phy_stats = kstat_create("pmcs",
+		    ddi_get_instance(iport->dip), ks_name, KSTAT_SAS_PHY_CLASS,
+		    KSTAT_TYPE_NAMED, ndata, 0);
+
+		if (phyp->phy_stats == NULL) {
+			pmcs_unlock_phy(phyp);
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, phyp, NULL,
+			    "%s: Failed to create %s kstats", __func__,
+			    ks_name);
+			continue;
+		}
+
+		ps = (sas_phy_stats_t *)phyp->phy_stats->ks_data;
+
+		kstat_named_init(&ps->seconds_since_last_reset,
+		    "SecondsSinceLastReset", KSTAT_DATA_ULONGLONG);
+		kstat_named_init(&ps->tx_frames,
+		    "TxFrames", KSTAT_DATA_ULONGLONG);
+		kstat_named_init(&ps->rx_frames,
+		    "RxFrames", KSTAT_DATA_ULONGLONG);
+		kstat_named_init(&ps->tx_words,
+		    "TxWords", KSTAT_DATA_ULONGLONG);
+		kstat_named_init(&ps->rx_words,
+		    "RxWords", KSTAT_DATA_ULONGLONG);
+		kstat_named_init(&ps->invalid_dword_count,
+		    "InvalidDwordCount", KSTAT_DATA_ULONGLONG);
+		kstat_named_init(&ps->running_disparity_error_count,
+		    "RunningDisparityErrorCount", KSTAT_DATA_ULONGLONG);
+		kstat_named_init(&ps->loss_of_dword_sync_count,
+		    "LossofDwordSyncCount", KSTAT_DATA_ULONGLONG);
+		kstat_named_init(&ps->phy_reset_problem_count,
+		    "PhyResetProblemCount", KSTAT_DATA_ULONGLONG);
+
+		phyp->phy_stats->ks_private = phyp;
+		phyp->phy_stats->ks_update = pmcs_update_phy_stats;
+		kstat_install(phyp->phy_stats);
+		pmcs_unlock_phy(phyp);
 	}
 
 	mutex_exit(&iport->lock);
@@ -3156,17 +2963,12 @@ pmcs_destroy_phy_stats(pmcs_iport_t *iport)
 		return;
 	}
 
-	for (phyp = list_head(&iport->phys);
-	    phyp != NULL;
-	    phyp = list_next(&iport->phys, phyp)) {
-
-		mutex_enter(&phyp->phy_lock);
-		if (phyp->phy_stats != NULL) {
-			kstat_delete(phyp->phy_stats);
-			phyp->phy_stats = NULL;
-		}
-		mutex_exit(&phyp->phy_lock);
+	pmcs_lock_phy(phyp);
+	if (phyp->phy_stats != NULL) {
+		kstat_delete(phyp->phy_stats);
+		phyp->phy_stats = NULL;
 	}
+	pmcs_unlock_phy(phyp);
 
 	mutex_exit(&iport->lock);
 }

@@ -146,7 +146,7 @@ extern "C" {
 
 /* xauth for X11 forwarding */
 #ifndef _PATH_XAUTH
-#define _PATH_XAUTH			"/usr/bin/xauth"
+#define _PATH_XAUTH			"/usr/openwin/bin/xauth"
 #endif
 
 /* UNIX domain socket for X11 server; displaynum will replace %u */

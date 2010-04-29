@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#include <syslog.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <limits.h>

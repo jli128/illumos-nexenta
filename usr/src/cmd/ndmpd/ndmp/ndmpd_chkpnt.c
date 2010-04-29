@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*
@@ -110,7 +111,7 @@ ndmp_has_backup_chkpnt(char *volname, char *jobname)
 	}
 
 	chkp.chp_found = 0;
-	(void) snprintf(chname, ZFS_MAXNAMELEN, "@%s", jobname);
+	(void) snprintf(chname, ZFS_MAXNAMELEN, "@bk-%s", jobname);
 	chkp.chp_name = chname;
 
 	(void) zfs_iter_snapshots(zhp, ndmp_has_backup, &chkp);
@@ -254,10 +255,8 @@ ndmp_start_check_point(char *vol_name, char *jname)
 		 * removed before using it.
 		 */
 		if (ndmp_has_backup_chkpnt(vol, jname))
-			(void) chkpnt_backup_successful(vol, jname, B_FALSE,
-			    NULL);
-		if ((erc = chkpnt_backup_prepare(vol, jname, B_FALSE))
-		    < 0)
+			(void) chkpnt_backup_successful(vol, jname);
+		if ((erc = chkpnt_backup_prepare(vol, jname)) < 0)
 			(void) ndmp_remove_chk_pnt_vol(vol);
 	}
 
@@ -290,7 +289,7 @@ ndmp_release_check_point(char *vol_name, char *jname)
 		return (0);
 
 	if (ndmp_remove_chk_pnt_vol(vol) == 0)
-		erc = chkpnt_backup_successful(vol, jname, B_FALSE, NULL);
+		erc = chkpnt_backup_successful(vol, jname);
 
 	return (erc);
 }

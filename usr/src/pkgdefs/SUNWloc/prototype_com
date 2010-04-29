@@ -52,10 +52,10 @@ f none usr/bin/gettxt 555 root bin
 f none usr/bin/kbdcomp 555 root bin
 f none usr/bin/locale 555 root bin
 f none usr/bin/mkmsgs 555 root root
-m none usr/sun/bin/msgfmt 555 root bin usr/bin/msgfmt
-m none usr/sun/bin/printf 555 root bin usr/bin/printf
+f none usr/bin/msgfmt 555 root bin
+f none usr/bin/printf 555 root bin
 f none usr/bin/srchtxt 555 root bin
-m none usr/sun/bin/xgettext 555 root bin usr/bin/xgettext
+f none usr/bin/xgettext 555 root bin
 d none usr/lib 755 root bin
 f none usr/lib/gmsgfmt 555 root bin
 d none usr/lib/iconv 755 root bin

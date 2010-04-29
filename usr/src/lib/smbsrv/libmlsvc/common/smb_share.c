@@ -19,7 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*
@@ -42,7 +43,6 @@
 #include <unistd.h>
 #include <pwd.h>
 #include <signal.h>
-#include <dirent.h>
 
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libsmbns.h>
@@ -50,24 +50,10 @@
 #include <smbsrv/smb_share.h>
 #include <smbsrv/smb.h>
 #include <mlsvc.h>
-#include <dfs.h>
 
 #define	SMB_SHR_ERROR_THRESHOLD		3
+
 #define	SMB_SHR_CSC_BUFSZ		64
-
-typedef struct smb_transient {
-	char		*name;
-	char		*cmnt;
-	char		*path;
-	char		drive;
-	boolean_t	check;
-} smb_transient_t;
-
-static smb_transient_t tshare[] = {
-	{ "IPC$", "Remote IPC",		NULL,		'\0', B_FALSE },
-	{ "c$",   "Default Share",	SMB_CVOL,	'C',  B_FALSE },
-	{ "vss$", "VSS",		SMB_VSS,	'V',  B_TRUE }
-};
 
 static struct {
 	char *value;
@@ -131,9 +117,6 @@ static uint32_t smb_shr_cache_addent(smb_share_t *);
 static void smb_shr_cache_delent(char *);
 static void smb_shr_cache_freent(HT_ITEM *);
 
-static boolean_t smb_shr_is_empty(const char *);
-static boolean_t smb_shr_is_dot_or_dotdot(const char *);
-
 /*
  * sharemgr functions
  */
@@ -196,7 +179,7 @@ static void smb_shr_unpublish(const char *, const char *);
  * Utility/helper functions
  */
 static uint32_t smb_shr_lookup(char *, smb_share_t *);
-static uint32_t smb_shr_add_transient(char *, char *, char *);
+static uint32_t smb_shr_addipc(void);
 static void smb_shr_set_oemname(smb_share_t *);
 static int smb_shr_enable_all_privs(void);
 static int smb_shr_expand_subs(char **, smb_share_t *, smb_execsub_info_t *);
@@ -205,6 +188,8 @@ static void smb_shr_sig_abnormal_term(int);
 static void smb_shr_sig_child(int);
 static void smb_shr_get_exec_info(void);
 static void smb_shr_set_exec_flags(smb_share_t *);
+static void smb_shr_sa_guest_option(const char *, smb_share_t *);
+
 
 /*
  * libshare handle and synchronization
@@ -236,10 +221,6 @@ static sema_t smb_proc_sem = DEFAULTSEMA;
 int
 smb_shr_start(void)
 {
-	smb_transient_t	*ts;
-	uint32_t	nerr;
-	int		i;
-
 	(void) mutex_lock(&smb_sa_handle.sa_mtx);
 	smb_sa_handle.sa_in_service = B_TRUE;
 	(void) mutex_unlock(&smb_sa_handle.sa_mtx);
@@ -247,16 +228,8 @@ smb_shr_start(void)
 	if (smb_shr_cache_create() != NERR_Success)
 		return (ENOMEM);
 
-	for (i = 0; i < sizeof (tshare)/sizeof (tshare[0]); ++i) {
-		ts = &tshare[i];
-
-		if (ts->check && smb_shr_is_empty(ts->path))
-			continue;
-
-		nerr = smb_shr_add_transient(ts->name, ts->cmnt, ts->path);
-		if (nerr != NERR_Success)
-			return (ENOMEM);
-	}
+	if (smb_shr_addipc() != NERR_Success)
+		return (ENOMEM);
 
 	return (smb_shr_publisher_start());
 }
@@ -474,7 +447,6 @@ smb_shr_remove(char *sharename)
 	smb_share_t *si;
 	char path[MAXPATHLEN];
 	char container[MAXPATHLEN];
-	boolean_t dfsroot;
 
 	assert(sharename != NULL);
 
@@ -510,7 +482,6 @@ smb_shr_remove(char *sharename)
 
 	(void) strlcpy(path, si->shr_path, sizeof (path));
 	(void) strlcpy(container, si->shr_container, sizeof (container));
-	dfsroot = ((si->shr_flags & SMB_SHRF_DFSROOT) != 0);
 	smb_shr_cache_delent(sharename);
 	smb_shr_cache_unlock();
 
@@ -518,9 +489,6 @@ smb_shr_remove(char *sharename)
 
 	/* call kernel to release the hold on the shared file system */
 	(void) smb_kmod_unshare(path, sharename);
-
-	if (dfsroot)
-		dfs_namespace_unload(sharename);
 
 	return (NERR_Success);
 }
@@ -620,7 +588,7 @@ smb_shr_modify(smb_share_t *new_si)
 	smb_share_t *si;
 	boolean_t adc_changed = B_FALSE;
 	char old_container[MAXPATHLEN];
-	uint32_t access, flag;
+	uint32_t catia, cscflg, access, abe;
 
 	assert(new_si != NULL);
 
@@ -649,25 +617,22 @@ smb_shr_modify(smb_share_t *new_si)
 		    sizeof (si->shr_container));
 	}
 
-	flag = (new_si->shr_flags & SMB_SHRF_ABE);
+	abe = (new_si->shr_flags & SMB_SHRF_ABE);
 	si->shr_flags &= ~SMB_SHRF_ABE;
-	si->shr_flags |= flag;
+	si->shr_flags |= abe;
 
-	flag = (new_si->shr_flags & SMB_SHRF_CATIA);
+	catia = (new_si->shr_flags & SMB_SHRF_CATIA);
 	si->shr_flags &= ~SMB_SHRF_CATIA;
-	si->shr_flags |= flag;
+	si->shr_flags |= catia;
 
-	flag = (new_si->shr_flags & SMB_SHRF_GUEST_OK);
-	si->shr_flags &= ~SMB_SHRF_GUEST_OK;
-	si->shr_flags |= flag;
-
-	flag = (new_si->shr_flags & SMB_SHRF_DFSROOT);
-	si->shr_flags &= ~SMB_SHRF_DFSROOT;
-	si->shr_flags |= flag;
-
-	flag = (new_si->shr_flags & SMB_SHRF_CSC_MASK);
+	cscflg = (new_si->shr_flags & SMB_SHRF_CSC_MASK);
 	si->shr_flags &= ~SMB_SHRF_CSC_MASK;
-	si->shr_flags |= flag;
+	si->shr_flags |= cscflg;
+
+	if (new_si->shr_flags & SMB_SHRF_GUEST_OK)
+		si->shr_flags |= SMB_SHRF_GUEST_OK;
+	else
+		si->shr_flags &= ~SMB_SHRF_GUEST_OK;
 
 	access = (new_si->shr_flags & SMB_SHRF_ACC_ALL);
 	si->shr_flags &= ~SMB_SHRF_ACC_ALL;
@@ -861,68 +826,6 @@ smb_shr_is_admin(char *sharename)
 	    smb_isalpha(sharename[0]) && sharename[1] == '$') {
 		return (B_TRUE);
 	}
-
-	return (B_FALSE);
-}
-
-char
-smb_shr_drive_letter(const char *path)
-{
-	smb_transient_t	*ts;
-	int i;
-
-	if (path == NULL)
-		return ('\0');
-
-	for (i = 0; i < sizeof (tshare)/sizeof (tshare[0]); ++i) {
-		ts = &tshare[i];
-
-		if (ts->path == NULL)
-			continue;
-
-		if (strcasecmp(ts->path, path) == 0)
-			return (ts->drive);
-	}
-
-	return ('\0');
-}
-
-/*
- * Returns true if the specified directory is empty,
- * otherwise returns false.
- */
-static boolean_t
-smb_shr_is_empty(const char *path)
-{
-	DIR *dirp;
-	struct dirent *dp;
-
-	if (path == NULL)
-		return (B_TRUE);
-
-	if ((dirp = opendir(path)) == NULL)
-		return (B_TRUE);
-
-	while ((dp = readdir(dirp)) != NULL) {
-		if (!smb_shr_is_dot_or_dotdot(dp->d_name))
-			return (B_FALSE);
-	}
-
-	(void) closedir(dirp);
-	return (B_TRUE);
-}
-
-/*
- * Returns true if name is "." or "..", otherwise returns false.
- */
-static boolean_t
-smb_shr_is_dot_or_dotdot(const char *name)
-{
-	if (*name != '.')
-		return (B_FALSE);
-
-	if ((name[1] == '\0') || (name[1] == '.' && name[2] == '\0'))
-		return (B_TRUE);
 
 	return (B_FALSE);
 }
@@ -1156,32 +1059,22 @@ smb_shr_lookup(char *sharename, smb_share_t *si)
 }
 
 /*
- * Add IPC$ or Admin shares to the cache upon startup.
+ * Add IPC$ to the cache upon startup.
  */
 static uint32_t
-smb_shr_add_transient(char *name, char *cmnt, char *path)
+smb_shr_addipc(void)
 {
-	smb_share_t trans;
+	smb_share_t ipc;
 	uint32_t status = NERR_InternalError;
 
-	if (name == NULL)
-		return (status);
-
-	bzero(&trans, sizeof (smb_share_t));
-	(void) strlcpy(trans.shr_name, name, MAXNAMELEN);
-	if (cmnt)
-		(void) strlcpy(trans.shr_cmnt, cmnt, SMB_SHARE_CMNT_MAX);
-
-	if (path)
-		(void) strlcpy(trans.shr_path, path, MAXPATHLEN);
-
-	if (strcasecmp(name, "IPC$") == 0)
-		trans.shr_type = STYPE_IPC;
-
-	trans.shr_flags = SMB_SHRF_TRANS;
+	bzero(&ipc, sizeof (smb_share_t));
+	(void) strcpy(ipc.shr_name, "IPC$");
+	(void) strcpy(ipc.shr_cmnt, "Remote IPC");
+	ipc.shr_flags = SMB_SHRF_TRANS;
+	ipc.shr_type = STYPE_IPC;
 
 	if (smb_shr_cache_lock(SMB_SHR_CACHE_WRLOCK) == NERR_Success) {
-		status = smb_shr_cache_addent(&trans);
+		status = smb_shr_cache_addent(&ipc);
 		smb_shr_cache_unlock();
 	}
 
@@ -1578,23 +1471,7 @@ smb_shr_sa_load(sa_share_t share, sa_resource_t resource)
 		return (status);
 	}
 
-	if ((si.shr_flags & SMB_SHRF_DFSROOT) != 0)
-		dfs_namespace_load(si.shr_name);
-
 	return (NERR_Success);
-}
-
-static char *
-smb_shr_sa_getprop(sa_optionset_t opts, char *propname)
-{
-	sa_property_t prop;
-	char *val = NULL;
-
-	prop = sa_get_property(opts, propname);
-	if (prop != NULL)
-		val = sa_get_property_attr(prop, "value");
-
-	return (val);
 }
 
 /*
@@ -1606,6 +1483,7 @@ smb_shr_sa_getprop(sa_optionset_t opts, char *propname)
 static uint32_t
 smb_shr_sa_get(sa_share_t share, sa_resource_t resource, smb_share_t *si)
 {
+	sa_property_t prop;
 	sa_optionset_t opts;
 	char *val = NULL;
 	char *path;
@@ -1640,65 +1518,75 @@ smb_shr_sa_get(sa_share_t share, sa_resource_t resource, smb_share_t *si)
 	if (opts == NULL)
 		return (NERR_Success);
 
-	val = smb_shr_sa_getprop(opts, SHOPT_AD_CONTAINER);
-	if (val != NULL) {
-		(void) strlcpy(si->shr_container, val,
-		    sizeof (si->shr_container));
-		free(val);
+	prop = (sa_property_t)sa_get_property(opts, SHOPT_AD_CONTAINER);
+	if (prop != NULL) {
+		if ((val = sa_get_property_attr(prop, "value")) != NULL) {
+			(void) strlcpy(si->shr_container, val,
+			    sizeof (si->shr_container));
+			free(val);
+		}
 	}
 
-	val = smb_shr_sa_getprop(opts, SHOPT_CATIA);
-	if (val != NULL) {
-		smb_shr_sa_setflag(val, si, SMB_SHRF_CATIA);
-		free(val);
+	prop = (sa_property_t)sa_get_property(opts, SHOPT_CATIA);
+	if (prop != NULL) {
+		if ((val = sa_get_property_attr(prop, "value")) != NULL) {
+			smb_shr_sa_catia_option(val, si);
+			free(val);
+		}
 	}
 
-	val = smb_shr_sa_getprop(opts, SHOPT_ABE);
-	if (val != NULL) {
-		smb_shr_sa_setflag(val, si, SMB_SHRF_ABE);
-		free(val);
+	prop = (sa_property_t)sa_get_property(opts, SHOPT_ABE);
+	if (prop != NULL) {
+		if ((val = sa_get_property_attr(prop, "value")) != NULL) {
+			smb_shr_sa_abe_option(val, si);
+			free(val);
+		}
 	}
 
-	val = smb_shr_sa_getprop(opts, SHOPT_GUEST);
-	if (val != NULL) {
-		smb_shr_sa_setflag(val, si, SMB_SHRF_GUEST_OK);
-		free(val);
+	prop = (sa_property_t)sa_get_property(opts, SHOPT_CSC);
+	if (prop != NULL) {
+		if ((val = sa_get_property_attr(prop, "value")) != NULL) {
+			smb_shr_sa_csc_option(val, si);
+			free(val);
+		}
 	}
 
-	val = smb_shr_sa_getprop(opts, SHOPT_DFSROOT);
-	if (val != NULL) {
-		smb_shr_sa_setflag(val, si, SMB_SHRF_DFSROOT);
-		free(val);
+	prop = (sa_property_t)sa_get_property(opts, SHOPT_GUEST);
+	if (prop != NULL) {
+		if ((val = sa_get_property_attr(prop, "value")) != NULL) {
+			smb_shr_sa_guest_option(val, si);
+			free(val);
+		}
 	}
 
-	val = smb_shr_sa_getprop(opts, SHOPT_CSC);
-	if (val != NULL) {
-		smb_shr_sa_csc_option(val, si);
-		free(val);
+	prop = (sa_property_t)sa_get_property(opts, SHOPT_NONE);
+	if (prop != NULL) {
+		if ((val = sa_get_property_attr(prop, "value")) != NULL) {
+			(void) strlcpy(si->shr_access_none, val,
+			    sizeof (si->shr_access_none));
+			free(val);
+			si->shr_flags |= SMB_SHRF_ACC_NONE;
+		}
 	}
 
-	val = smb_shr_sa_getprop(opts, SHOPT_NONE);
-	if (val != NULL) {
-		(void) strlcpy(si->shr_access_none, val,
-		    sizeof (si->shr_access_none));
-		free(val);
-		si->shr_flags |= SMB_SHRF_ACC_NONE;
+	prop = (sa_property_t)sa_get_property(opts, SHOPT_RO);
+	if (prop != NULL) {
+		if ((val = sa_get_property_attr(prop, "value")) != NULL) {
+			(void) strlcpy(si->shr_access_ro, val,
+			    sizeof (si->shr_access_ro));
+			free(val);
+			si->shr_flags |= SMB_SHRF_ACC_RO;
+		}
 	}
 
-	val = smb_shr_sa_getprop(opts, SHOPT_RO);
-	if (val != NULL) {
-		(void) strlcpy(si->shr_access_ro, val,
-		    sizeof (si->shr_access_ro));
-		free(val);
-		si->shr_flags |= SMB_SHRF_ACC_RO;
-	}
-
-	val = smb_shr_sa_getprop(opts, SHOPT_RW);
-	if (val != NULL) {
-		(void) strlcpy(si->shr_access_rw, val,
-		    sizeof (si->shr_access_rw));
-		free(val);
-		si->shr_flags |= SMB_SHRF_ACC_RW;
+	prop = (sa_property_t)sa_get_property(opts, SHOPT_RW);
+	if (prop != NULL) {
+		if ((val = sa_get_property_attr(prop, "value")) != NULL) {
+			(void) strlcpy(si->shr_access_rw, val,
+			    sizeof (si->shr_access_rw));
+			free(val);
+			si->shr_flags |= SMB_SHRF_ACC_RW;
+		}
 	}
 
 	sa_free_derived_optionset(opts);
@@ -1760,16 +1648,42 @@ smb_shr_sa_csc_name(const smb_share_t *si)
 }
 
 /*
- * Takes the value of a boolean share property and set/clear the
- * specified flag based on the property's value.
+ * set SMB_SHRF_CATIA in accordance with catia property value
  */
 void
-smb_shr_sa_setflag(const char *value, smb_share_t *si, uint32_t flag)
+smb_shr_sa_catia_option(const char *value, smb_share_t *si)
 {
-	if ((strcasecmp(value, "true") == 0) || (strcmp(value, "1") == 0))
-		si->shr_flags |= flag;
-	else
-		si->shr_flags &= ~flag;
+	if ((strcasecmp(value, "true") == 0) || (strcmp(value, "1") == 0)) {
+		si->shr_flags |= SMB_SHRF_CATIA;
+	} else {
+		si->shr_flags &= ~SMB_SHRF_CATIA;
+	}
+}
+
+/*
+ * set SMB_SHRF_ABE in accordance with abe property value
+ */
+void
+smb_shr_sa_abe_option(const char *value, smb_share_t *si)
+{
+	if ((strcasecmp(value, "true") == 0) || (strcmp(value, "1") == 0)) {
+		si->shr_flags |= SMB_SHRF_ABE;
+	} else {
+		si->shr_flags &= ~SMB_SHRF_ABE;
+	}
+}
+
+/*
+ * set SMB_SHRF_GUEST_OK in accordance with guestok property value
+ */
+static void
+smb_shr_sa_guest_option(const char *value, smb_share_t *si)
+{
+	if ((strcasecmp(value, "true") == 0) || (strcmp(value, "1") == 0)) {
+		si->shr_flags |= SMB_SHRF_GUEST_OK;
+	} else {
+		si->shr_flags &= ~SMB_SHRF_GUEST_OK;
+	}
 }
 
 /*
@@ -1945,8 +1859,7 @@ smb_shr_publisher(void *arg)
 	ad_queue.spq_state = SMB_SHR_PQS_PUBLISHING;
 	(void) mutex_unlock(&ad_queue.spq_mtx);
 
-	(void) smb_gethostname(hostname, MAXHOSTNAMELEN,
-	    SMB_CASE_PRESERVE);
+	(void) smb_gethostname(hostname, MAXHOSTNAMELEN, 0);
 
 	list_create(&publist, sizeof (smb_shr_pitem_t),
 	    offsetof(smb_shr_pitem_t, spi_lnd));
@@ -2046,39 +1959,33 @@ smb_shr_publisher_flush(list_t *lst)
 
 /*
  * If the share path refers to a ZFS file system, add the
- * .zfs/shares/<share> object and call smb_quota_add_fs()
- * to initialize quota support for the share.
+ * .zfs/shares/<share> object.
  */
+
 static void
 smb_shr_zfs_add(smb_share_t *si)
 {
 	libzfs_handle_t *libhd;
 	zfs_handle_t *zfshd;
 	int ret;
-	char buf[MAXPATHLEN];	/* dataset or mountpoint */
+	char dataset[MAXPATHLEN];
 
-	if (smb_getdataset(si->shr_path, buf, MAXPATHLEN) != 0)
+	if (smb_getdataset(si->shr_path, dataset, MAXPATHLEN) != 0)
 		return;
 
 	if ((libhd = libzfs_init()) == NULL)
 		return;
 
-	if ((zfshd = zfs_open(libhd, buf, ZFS_TYPE_FILESYSTEM)) == NULL) {
+	if ((zfshd = zfs_open(libhd, dataset, ZFS_TYPE_FILESYSTEM)) == NULL) {
 		libzfs_fini(libhd);
 		return;
 	}
 
 	errno = 0;
-	ret = zfs_smb_acl_add(libhd, buf, si->shr_path, si->shr_name);
+	ret = zfs_smb_acl_add(libhd, dataset, si->shr_path, si->shr_name);
 	if (ret != 0 && errno != EAGAIN && errno != EEXIST)
 		syslog(LOG_INFO, "share: failed to add ACL object: %s: %s\n",
 		    si->shr_name, strerror(errno));
-
-	if (zfs_prop_get(zfshd, ZFS_PROP_MOUNTPOINT, buf, MAXPATHLEN,
-	    NULL, NULL, 0, B_FALSE) == 0) {
-		smb_quota_add_fs(buf);
-	}
-
 
 	zfs_close(zfshd);
 	libzfs_fini(libhd);
@@ -2086,38 +1993,33 @@ smb_shr_zfs_add(smb_share_t *si)
 
 /*
  * If the share path refers to a ZFS file system, remove the
- * .zfs/shares/<share> object, and call smb_quota_remove_fs()
- * to end quota support for the share.
+ * .zfs/shares/<share> object.
  */
+
 static void
 smb_shr_zfs_remove(smb_share_t *si)
 {
 	libzfs_handle_t *libhd;
 	zfs_handle_t *zfshd;
 	int ret;
-	char buf[MAXPATHLEN];	/* dataset or mountpoint */
+	char dataset[MAXPATHLEN];
 
-	if (smb_getdataset(si->shr_path, buf, MAXPATHLEN) != 0)
+	if (smb_getdataset(si->shr_path, dataset, MAXPATHLEN) != 0)
 		return;
 
 	if ((libhd = libzfs_init()) == NULL)
 		return;
 
-	if ((zfshd = zfs_open(libhd, buf, ZFS_TYPE_FILESYSTEM)) == NULL) {
+	if ((zfshd = zfs_open(libhd, dataset, ZFS_TYPE_FILESYSTEM)) == NULL) {
 		libzfs_fini(libhd);
 		return;
 	}
 
 	errno = 0;
-	ret = zfs_smb_acl_remove(libhd, buf, si->shr_path, si->shr_name);
+	ret = zfs_smb_acl_remove(libhd, dataset, si->shr_path, si->shr_name);
 	if (ret != 0 && errno != EAGAIN)
 		syslog(LOG_INFO, "share: failed to remove ACL object: %s: %s\n",
 		    si->shr_name, strerror(errno));
-
-	if (zfs_prop_get(zfshd, ZFS_PROP_MOUNTPOINT, buf, MAXPATHLEN,
-	    NULL, NULL, 0, B_FALSE) == 0) {
-		smb_quota_remove_fs(buf);
-	}
 
 	zfs_close(zfshd);
 	libzfs_fini(libhd);
@@ -2127,6 +2029,7 @@ smb_shr_zfs_remove(smb_share_t *si)
  * If the share path refers to a ZFS file system, rename the
  * .zfs/shares/<share> object.
  */
+
 static void
 smb_shr_zfs_rename(smb_share_t *from, smb_share_t *to)
 {

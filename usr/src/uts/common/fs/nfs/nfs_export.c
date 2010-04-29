@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -695,17 +695,18 @@ srv_secinfo_exp2pseu(exportdata_t *curdata, exportdata_t *olddata)
 }
 
 /*
- * Find for given treenode the exportinfo which has its
- * exp_visible linked on its exi_visible list.
+ * Find for given exp_visible the exportinfo which has it
+ * linked on its exi_visible list.
  *
  * Note: We could add new pointer either to treenode or
  * to exp_visible, which will point there directly.
  * This would buy some speed for some memory.
  */
 exportinfo_t *
-vis2exi(treenode_t *tnode)
+vis2exi(struct exp_visible *vis)
 {
 	exportinfo_t *exi_ret = NULL;
+	treenode_t *tnode = vis->vis_tree;
 
 	for (;;) {
 		tnode = tnode->tree_parent;
@@ -1569,8 +1570,13 @@ exi_scan_end:
 	return (0);
 
 out7:
-	/* Unlink the new export in exptable. */
+	/*
+	 * Unlink and re-link the new and old export in exptable.
+	 */
 	(void) export_unlink(&exi->exi_fsid, &exi->exi_fid, exi->exi_vp, NULL);
+	if (ex != NULL)
+		export_link(ex);
+
 	rw_exit(&exported_lock);
 out6:
 	if (kex->ex_flags & EX_INDEX)

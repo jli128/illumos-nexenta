@@ -47,7 +47,7 @@ i r.manifest
 #
 d none etc 0755 root sys
 d none etc/apache 0755 root bin
-e preserve etc/apache2/httpd-standalone-ipp.conf 0644 root bin
+e preserve etc/apache/httpd-standalone-ipp.conf 0644 root bin
 #       smf(5) manifest for IPP Listener
 d none var 755 root sys
 d none var/lp 775 lp lp

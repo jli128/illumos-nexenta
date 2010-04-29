@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,8 +80,6 @@ vdev_ops_t vdev_missing_ops = {
 	vdev_missing_io_start,
 	vdev_missing_io_done,
 	NULL,
-	NULL,
-	NULL,
 	VDEV_TYPE_MISSING,	/* name of this vdev type */
 	B_TRUE			/* leaf vdev */
 };
@@ -92,8 +90,6 @@ vdev_ops_t vdev_hole_ops = {
 	vdev_default_asize,
 	vdev_missing_io_start,
 	vdev_missing_io_done,
-	NULL,
-	NULL,
 	NULL,
 	VDEV_TYPE_HOLE,		/* name of this vdev type */
 	B_TRUE			/* leaf vdev */

@@ -400,17 +400,9 @@ smb_open_subr(smb_request_t *sr)
 	 * created on cur_node
 	 */
 	if (!is_dir && !pn->pn_pname && !pn->pn_fname && pn->pn_sname) {
-		/*
-		 * Can't currently handle a stream on the tree root.
-		 * If a stream is being opened return "not found", otherwise
-		 * return "access denied".
-		 */
+
+		/* can't currently create a stream on the tree root */
 		if (cur_node == sr->tid_tree->t_snode) {
-			if (op->create_disposition == FILE_OPEN) {
-				smbsr_error(sr, NT_STATUS_OBJECT_NAME_NOT_FOUND,
-				    ERRDOS, ERROR_FILE_NOT_FOUND);
-				return (NT_STATUS_OBJECT_NAME_NOT_FOUND);
-			}
 			smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRDOS,
 			    ERROR_ACCESS_DENIED);
 			return (NT_STATUS_ACCESS_DENIED);
@@ -477,17 +469,19 @@ smb_open_subr(smb_request_t *sr)
 
 	if (last_comp_found) {
 
-		node = op->fqi.fq_fnode;
-		dnode = op->fqi.fq_dnode;
+		if ((op->fqi.fq_fattr.sa_vattr.va_type != VREG) &&
+		    (op->fqi.fq_fattr.sa_vattr.va_type != VDIR) &&
+		    (op->fqi.fq_fattr.sa_vattr.va_type != VLNK)) {
 
-		if (!smb_node_is_file(node) && !smb_node_is_dir(node) &&
-		    !smb_node_is_symlink(node)) {
-			smb_node_release(node);
-			smb_node_release(dnode);
+			smb_node_release(op->fqi.fq_fnode);
+			smb_node_release(op->fqi.fq_dnode);
 			smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRDOS,
 			    ERRnoaccess);
 			return (NT_STATUS_ACCESS_DENIED);
 		}
+
+		node = op->fqi.fq_fnode;
+		dnode = op->fqi.fq_dnode;
 
 		/*
 		 * Reject this request if either:
@@ -496,7 +490,7 @@ smb_open_subr(smb_request_t *sr)
 		 * - the target is NOT a directory and client requires that
 		 *   it MUST be.
 		 */
-		if (smb_node_is_dir(node)) {
+		if (op->fqi.fq_fattr.sa_vattr.va_type == VDIR) {
 			if (op->create_options & FILE_NON_DIRECTORY_FILE) {
 				smb_node_release(node);
 				smb_node_release(dnode);
@@ -689,7 +683,7 @@ smb_open_subr(smb_request_t *sr)
 			return (NT_STATUS_OBJECT_NAME_NOT_FOUND);
 		}
 
-		if (pn->pn_fname && smb_is_invalid_filename(pn->pn_fname)) {
+		if (smb_is_invalid_filename(pn->pn_fname)) {
 			smb_node_release(dnode);
 			smbsr_error(sr, NT_STATUS_OBJECT_NAME_INVALID,
 			    ERRDOS, ERROR_INVALID_NAME);
@@ -866,11 +860,10 @@ smb_open_subr(smb_request_t *sr)
 	if (created)
 		smb_node_unlock(dnode);
 
-	if (smb_node_is_file(node)) {
+	if (op->fqi.fq_fattr.sa_vattr.va_type == VREG) {
 		smb_oplock_acquire(node, of, op);
 		op->dsize = op->fqi.fq_fattr.sa_vattr.va_size;
-	} else {
-		/* directory or symlink */
+	} else { /* VDIR or VLNK */
 		op->op_oplock_level = SMB_OPLOCK_NONE;
 		op->dsize = 0;
 	}

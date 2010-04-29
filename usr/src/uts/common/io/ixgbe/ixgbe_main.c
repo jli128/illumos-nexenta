@@ -1,7 +1,7 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
+ * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@
 #include "ixgbe_sw.h"
 
 static char ixgbe_ident[] = "Intel 10Gb Ethernet";
-static char ixgbe_version[] = "driver version 1.1.5";
+static char ixgbe_version[] = "driver version 1.1.4";
 
 /*
  * Local function protoypes
@@ -790,7 +790,7 @@ ixgbe_identify_hardware(ixgbe_t *ixgbe)
 	 */
 	switch (hw->mac.type) {
 	case ixgbe_mac_82598EB:
-		IXGBE_DEBUGLOG_0(ixgbe, "identify 82598 adapter\n");
+		ixgbe_log(ixgbe, "identify 82598 adapter\n");
 		ixgbe->capab = &ixgbe_82598eb_cap;
 
 		if (ixgbe_get_media_type(hw) == ixgbe_media_type_copper) {
@@ -801,7 +801,7 @@ ixgbe_identify_hardware(ixgbe_t *ixgbe)
 
 		break;
 	case ixgbe_mac_82599EB:
-		IXGBE_DEBUGLOG_0(ixgbe, "identify 82599 adapter\n");
+		ixgbe_log(ixgbe, "identify 82599 adapter\n");
 		ixgbe->capab = &ixgbe_82599eb_cap;
 
 		ixgbe->capab->other_intr = (IXGBE_EICR_GPI_SDP1 |
@@ -809,7 +809,7 @@ ixgbe_identify_hardware(ixgbe_t *ixgbe)
 
 		break;
 	default:
-		IXGBE_DEBUGLOG_1(ixgbe,
+		ixgbe_log(ixgbe,
 		    "adapter not supported in ixgbe_identify_hardware(): %d\n",
 		    hw->mac.type);
 		return (IXGBE_FAILURE);
@@ -1210,12 +1210,6 @@ ixgbe_chip_start(ixgbe_t *ixgbe)
 			return (IXGBE_FAILURE);
 		}
 	}
-
-	/*
-	 * Re-enable relaxed ordering for performance.  It is disabled
-	 * by default in the hardware init.
-	 */
-	ixgbe_enable_relaxed_ordering(hw);
 
 	/*
 	 * Setup adapter interrupt vectors
@@ -1952,37 +1946,6 @@ ixgbe_setup_rx(ixgbe_t *ixgbe)
 
 		reg_val = IXGBE_READ_REG(hw, IXGBE_RDRXCTL);
 		reg_val |= IXGBE_RDRXCTL_RSCACKC;
-		reg_val &= ~IXGBE_RDRXCTL_RSCFRSTSIZE;
-
-		IXGBE_WRITE_REG(hw, IXGBE_RDRXCTL, reg_val);
-	}
-
-	/*
-	 * Setup RSC for multiple receive queues.
-	 */
-	if (ixgbe->lro_enable) {
-		for (i = 0; i < ixgbe->num_rx_rings; i++) {
-			/*
-			 * Make sure rx_buf_size * MAXDESC not greater
-			 * than 65535.
-			 * Intel recommends 4 for MAXDESC field value.
-			 */
-			reg_val = IXGBE_READ_REG(hw, IXGBE_RSCCTL(i));
-			reg_val |= IXGBE_RSCCTL_RSCEN;
-			if (ixgbe->rx_buf_size == IXGBE_PKG_BUF_16k)
-				reg_val |= IXGBE_RSCCTL_MAXDESC_1;
-			else
-				reg_val |= IXGBE_RSCCTL_MAXDESC_4;
-			IXGBE_WRITE_REG(hw,  IXGBE_RSCCTL(i), reg_val);
-		}
-
-		reg_val = IXGBE_READ_REG(hw, IXGBE_RSCDBU);
-		reg_val |= IXGBE_RSCDBU_RSCACKDIS;
-		IXGBE_WRITE_REG(hw, IXGBE_RSCDBU, reg_val);
-
-		reg_val = IXGBE_READ_REG(hw, IXGBE_RDRXCTL);
-		reg_val |= IXGBE_RDRXCTL_RSCACKC;
-		reg_val |= IXGBE_RDRXCTL_FCOE_WRFIX;
 		reg_val &= ~IXGBE_RDRXCTL_RSCFRSTSIZE;
 
 		IXGBE_WRITE_REG(hw, IXGBE_RDRXCTL, reg_val);
@@ -3561,7 +3524,6 @@ ixgbe_intr_msi(void *arg1, void *arg2)
 	eicr = IXGBE_READ_REG(hw, IXGBE_EICR);
 
 	if (ixgbe_check_acc_handle(ixgbe->osdep.reg_handle) != DDI_FM_OK) {
-		mutex_exit(&ixgbe->gen_lock);
 		ddi_fm_service_impact(ixgbe->dip, DDI_SERVICE_DEGRADED);
 		atomic_or_32(&ixgbe->ixgbe_state, IXGBE_ERROR);
 		return (DDI_INTR_CLAIMED);
@@ -3938,7 +3900,7 @@ ixgbe_add_intr_handlers(ixgbe_t *ixgbe)
 
 			if (rc != DDI_SUCCESS) {
 				ixgbe_log(ixgbe,
-				    "Add interrupt handler failed. "
+				    "Add rx interrupt handler failed. "
 				    "return: %d, vector: %d", rc, vector);
 				for (vector--; vector >= 0; vector--) {
 					(void) ddi_intr_remove_handler(
@@ -4778,7 +4740,7 @@ ixgbe_rx_ring_intr_enable(mac_intr_handle_t intrh)
 	BT_SET(ixgbe->vect_map[v_idx].rx_map, r_idx);
 
 	/*
-	 * Trigger a Rx interrupt on this ring
+	 * To trigger a Rx interrupt to on this ring
 	 */
 	IXGBE_WRITE_REG(&ixgbe->hw, IXGBE_EICS, (1 << v_idx));
 	IXGBE_WRITE_FLUSH(&ixgbe->hw);

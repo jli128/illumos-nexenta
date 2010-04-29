@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -132,7 +132,6 @@ main(
 	int			retry = 0;
 	sigset_t		sigs, allsigs;
 	struct sigaction	act;
-	uint32_t		rval;
 
 	/*
 	 * Get the locale set up before calling any other routines
@@ -263,8 +262,10 @@ main(
 		case SIGTERM:
 			do {
 				ret = ioctl(iscsi_dev_handle,
-				    ISCSI_SMF_OFFLINE, &rval);
+				    ISCSI_SMF_OFFLINE, NULL);
 				if (ret == -1) {
+					perror(gettext("ioctl: disable"
+					    " iscsi initiator"));
 					/*
 					 * Keep retrying if unable
 					 * to stop
@@ -272,13 +273,9 @@ main(
 					(void) sleep(ISCSI_SMF_OFFLINE_DELAY);
 					retry++;
 				}
-			} while ((ret == -1) &&
-			    (retry < ISCSI_SMF_OFFLINE_MAX_RETRY_TIMES));
+			} while (ret == -1 &&
+			    retry < ISCSI_SMF_OFFLINE_MAX_RETRY_TIMES);
 			(void) close(iscsi_dev_handle);
-			if (rval == B_FALSE) {
-				syslog(LOG_DAEMON, gettext("iSCSI initiator"
-				    " service exited with sessions left."));
-			}
 			return (0);
 			break;
 		default:

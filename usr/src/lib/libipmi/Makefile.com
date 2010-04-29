@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -32,7 +32,6 @@ OBJECTS=	ipmi_bmc.o	\
 		ipmi_fru.o	\
 		ipmi_hash.o	\
 		ipmi_lan.o	\
-		ipmi_lancfg.o	\
 		ipmi_list.o	\
 		ipmi_misc.o	\
 		ipmi_sdr.o	\
@@ -54,9 +53,8 @@ SRCDIR=		../common
 
 CLEANFILES +=	$(SRCDIR)/ipmi_tables.c	
 INCS +=		-I$(SRCDIR)
-LDLIBS +=	-lc -lm -lnvpair -lsocket -lnsl
+LDLIBS +=	-lc -lm
 CPPFLAGS +=	$(INCS)
-C99MODE = $(C99_ENABLE)
 
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
 

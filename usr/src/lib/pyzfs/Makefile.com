@@ -36,7 +36,7 @@ include ../../Makefile.lib
 
 LIBLINKS = 
 SRCDIR =	../common
-ROOTLIBDIR=	$(ROOT)/usr/lib/python2.4/site-packages/zfs
+ROOTLIBDIR=	$(ROOT)/usr/lib/python2.4/vendor-packages/zfs
 PYOBJS=		$(PYSRCS:%.py=$(SRCDIR)/%.pyc)
 PYFILES=	$(PYSRCS) $(PYSRCS:%.py=%.pyc)
 ROOTPYZFSFILES= $(PYFILES:%=$(ROOTLIBDIR)/%)
@@ -46,7 +46,7 @@ C99LMODE=       -Xc99=%all
 
 LIBS =		$(DYNLIB)
 LDLIBS +=	-lc -lnvpair -lsec -lidmap -lpython2.4 -lzfs
-CFLAGS +=	$(CCVERBOSE) -D_XPG6
+CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I/usr/include/python2.4
 CPPFLAGS +=	-I../../../uts/common/fs/zfs
 CPPFLAGS +=	-I../../../common/zfs

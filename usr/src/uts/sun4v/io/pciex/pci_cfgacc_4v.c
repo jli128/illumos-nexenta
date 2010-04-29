@@ -19,7 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*
@@ -47,16 +48,11 @@
 static boolean_t
 pci_cfgacc_valid(pci_cfgacc_req_t *req)
 {
-	int sz = req->size;
-
-	if (IS_P2ALIGNED(req->offset, sz)		&&
+	/* do not support 64 bit pci config space access */
+	return (IS_P2ALIGNED(req->offset, req->size)	&&
 	    (req->offset < PCIE_CFG_SPACE_SIZE)		&&
-	    ((sz & 0xf) && ISP2(sz)))
-		return (B_TRUE);
-
-	cmn_err(CE_WARN, "illegal PCI request: offset = %x, size = %d",
-	    req->offset, sz);
-	return (B_FALSE);
+	    ((req->size == 1) || (req->size == 2) ||
+	    (req->size == 4) || (req->size == 8)));
 }
 
 /*
@@ -70,8 +66,8 @@ pci_cfgacc_get(dev_info_t *dip, uint16_t bdf, uint16_t offset, uint8_t size)
 	uint64_t	devaddr;
 	uint64_t 	data = 0;
 
-	bus_p = PCIE_DIP2DOWNBUS(dip);
-	ASSERT(bus_p != NULL);
+	if ((bus_p = PCIE_DIP2DOWNBUS(dip)) == NULL)
+		return ((uint64_t)-1);
 
 	devhdl = bus_p->bus_cfgacc_base;
 	devaddr = ((uint64_t)bdf) << RC_RA_BDF_SHIFT;
@@ -91,8 +87,8 @@ pci_cfgacc_set(dev_info_t *dip, uint16_t bdf, uint16_t offset, uint8_t size,
 	uint64_t	devaddr;
 	pci_cfg_data_t	wdata = { 0 };
 
-	bus_p = PCIE_DIP2DOWNBUS(dip);
-	ASSERT(bus_p != NULL);
+	if ((bus_p = PCIE_DIP2DOWNBUS(dip)) == NULL)
+		return;
 
 	devhdl = bus_p->bus_cfgacc_base;
 	devaddr = ((uint64_t)bdf) << RC_RA_BDF_SHIFT;
@@ -104,11 +100,12 @@ pci_cfgacc_set(dev_info_t *dip, uint16_t bdf, uint16_t offset, uint8_t size,
 void
 pci_cfgacc_acc(pci_cfgacc_req_t *req)
 {
-	if (!req->write)
-		VAL64(req) = (uint64_t)-1;
-
-	if (!pci_cfgacc_valid(req))
+	/* is request valid? */
+	if (!pci_cfgacc_valid(req)) {
+		if (!req->write)
+			VAL64(req) = (uint64_t)-1;
 		return;
+	}
 
 	if (req->write) {
 		pci_cfgacc_set(req->rcdip, req->bdf, req->offset,
@@ -126,8 +123,6 @@ pci_cfgacc_acc(pci_cfgacc_req_t *req)
 		case 4:
 			VAL32(req) = (uint32_t)VAL64(req);
 			break;
-		case 8:
-			/* fall through, no special handling needed */
 		default:
 			break;
 		}

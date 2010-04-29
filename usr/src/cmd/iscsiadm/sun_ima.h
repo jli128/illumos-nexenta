@@ -19,7 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_SUN_IMA_H
@@ -144,8 +145,7 @@ IMA_STATUS SUN_IMA_GetBootIscsi(
 	IMA_BOOL *pIscsiBoot);
 IMA_STATUS SUN_IMA_GetSvcStatus(
 	IMA_BOOL *pSvcEnabled);
-IMA_STATUS SUN_IMA_ReEnumeration(
-	IMA_OID targetId);
+
 #ifdef	__cplusplus
 }
 #endif

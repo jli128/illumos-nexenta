@@ -647,8 +647,6 @@ struct _nxge_t {
 	boolean_t		phy_absent;
 	uint32_t		xcvr_addr;
 	uint16_t		chip_id;
-	nxge_nlp_conn_t		nlp_conn;
-
 	nxge_mac_t		mac;
 	nxge_ipp_t		ipp;
 	nxge_txc_t		txc;

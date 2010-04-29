@@ -65,7 +65,7 @@ pts:3 0620 root tty
 ptsl:* 0666 root sys
 sad:admin 0666 root sys
 sad:user 0666 root sys
-sgen:* 0660 root sys
+sgen:* 0600 root sys
 cmdk:* 0640 root sys
 st:* 0666 root sys
 sdt:sdt 0644 root sys

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,10 +41,15 @@
 
 #define	SMBRDR_ANON_USER	"IPC$"
 
-static int smbrdr_session_setupx(struct sdb_logon *);
-static struct sdb_logon *smbrdr_logon_init(struct sdb_session *, char *,
-    uint8_t *);
-static int smbrdr_authenticate(char *, char *, uint8_t *);
+static int smbrdr_anonymous_logon(char *domain_controller, char *domain_name);
+static int smbrdr_auth_logon(char *domain_controller, char *domain_name,
+    char *username);
+static int smbrdr_session_setupx(struct sdb_logon *logon);
+static boolean_t smbrdr_logon_validate(char *server, char *username);
+static struct sdb_logon *smbrdr_logon_init(struct sdb_session *session,
+    char *username, unsigned char *pwd);
+static int smbrdr_logon_user(char *server, char *username, unsigned char *pwd);
+static int smbrdr_authenticate(char *, char *, char *, unsigned char *);
 
 /*
  * If the username is SMBRDR_ANON_USER, an anonymous session will be
@@ -54,31 +59,40 @@ static int smbrdr_authenticate(char *, char *, uint8_t *);
 int
 smbrdr_logon(char *domain_controller, char *domain, char *username)
 {
-	uint8_t pwd_hash[SMBAUTH_HASH_SZ];
 	int rc;
 
-	if (username == NULL || *username == 0) {
-		syslog(LOG_DEBUG, "smbrdr: no username");
+	if (strcmp(username, SMBRDR_ANON_USER) == 0)
+		rc = smbrdr_anonymous_logon(domain_controller, domain);
+	else
+		rc = smbrdr_auth_logon(domain_controller, domain, username);
+
+	return (rc);
+}
+
+/*
+ * smbrdr_anonymous_logon
+ *
+ * Set up an anonymous session. If the session to the resource domain
+ * controller appears to be okay we shouldn't need to do anything here.
+ * Otherwise we clean up the stale session and create a new one.
+ */
+static int
+smbrdr_anonymous_logon(char *domain_controller, char *domain_name)
+{
+	if (smbrdr_logon_validate(domain_controller, SMBRDR_ANON_USER))
+		return (0);
+
+	if (smbrdr_negotiate(domain_controller, domain_name) != 0) {
+		syslog(LOG_DEBUG, "smbrdr_anonymous_logon: negotiate failed");
 		return (-1);
 	}
 
-	bzero(pwd_hash, SMBAUTH_HASH_SZ);
-	if (smb_strcasecmp(username, SMBRDR_ANON_USER, 0) != 0) {
-		smb_ipc_get_passwd(pwd_hash, SMBAUTH_HASH_SZ);
-		if (*pwd_hash == 0) {
-			syslog(LOG_DEBUG, "smbrdr: no password");
-			return (-1);
-		}
-	}
-
-	if (smbrdr_negotiate(domain_controller, domain) != 0) {
-		syslog(LOG_DEBUG, "smbrdr: negotiate failed");
+	if (smbrdr_logon_user(domain_controller, SMBRDR_ANON_USER, 0) < 0) {
+		syslog(LOG_DEBUG, "smbrdr_anonymous_logon: logon failed");
 		return (-1);
 	}
 
-	rc = smbrdr_authenticate(domain_controller, username, pwd_hash);
-	return ((rc == AUTH_USER_GRANT) ? 0 : -1);
-
+	return (0);
 }
 
 /*
@@ -116,7 +130,71 @@ smbrdr_get_ssnkey(int fid, unsigned char *ssn_key, size_t key_len)
 }
 
 /*
+ * smbrdr_auth_logon
+ *
+ * Set up a user session. If the session to the resource domain controller
+ * appears to be okay we shouldn't need to do anything here. Otherwise we
+ * clean up the stale session and create a new one. Once a session is
+ * established, we leave it intact. It should only need to be set up again
+ * due to an inactivity timeout or a domain controller reset.
+ */
+static int
+smbrdr_auth_logon(char *domain_controller, char *domain_name, char *username)
+{
+	int erc;
+	uint8_t pwd_hash[SMBAUTH_HASH_SZ];
+
+	if (username == NULL || *username == 0) {
+		syslog(LOG_DEBUG, "smbrdr_auth_logon: no username");
+		return (-1);
+	}
+
+	smb_ipc_get_passwd(pwd_hash, SMBAUTH_HASH_SZ);
+	if (*pwd_hash == 0) {
+		syslog(LOG_DEBUG, "smbrdr_auth_logon: no password");
+		return (-1);
+	}
+
+	if (smbrdr_logon_validate(domain_controller, username))
+		return (0);
+
+	if (smbrdr_negotiate(domain_controller, domain_name) != 0) {
+		syslog(LOG_DEBUG, "smbrdr_auth_logon: negotiate failed");
+		return (-1);
+	}
+
+	erc = smbrdr_authenticate(domain_controller, domain_name, username,
+	    pwd_hash);
+	return ((erc == AUTH_USER_GRANT) ? 0 : -1);
+}
+
+/*
  * smbrdr_authenticate
+ *
+ * Authenticate primary_domain\account_name.
+ *
+ * Returns:
+ * 0	User access granted
+ * 1	Guest access granted
+ * 2	IPC access granted
+ * (<0) Error
+ */
+static int
+smbrdr_authenticate(char *domain_controller, char *primary_domain,
+    char *account_name, unsigned char *pwd)
+{
+	if (pwd == NULL)
+		return (AUTH_USER_GRANT | AUTH_IPC_ONLY_GRANT);
+
+	/*
+	 * Ensure that the domain name is uppercase.
+	 */
+	(void) smb_strupr(primary_domain);
+	return (smbrdr_logon_user(domain_controller, account_name, pwd));
+}
+
+/*
+ * smbrdr_logon_user
  *
  * This is the entry point for logging  a user onto the domain. The
  * session structure should have been obtained via a successful call
@@ -129,16 +207,20 @@ smbrdr_get_ssnkey(int fid, unsigned char *ssn_key, size_t key_len)
  * pointer will be returned.
  */
 static int
-smbrdr_authenticate(char *server, char *username, uint8_t *pwd)
+smbrdr_logon_user(char *server, char *username, unsigned char *pwd)
 {
 	struct sdb_session *session;
 	struct sdb_logon *logon;
 	struct sdb_logon old_logon;
 	int ret;
 
-	session = smbrdr_session_lock(server, SDB_SLCK_WRITE);
+	if ((server == NULL) || (username == NULL) ||
+	    ((strcmp(username, SMBRDR_ANON_USER) != 0) && (pwd == NULL)))
+		return (-1);
+
+	session = smbrdr_session_lock(server, 0, SDB_SLCK_WRITE);
 	if (session == NULL) {
-		syslog(LOG_DEBUG, "smbrdr_authenticate: %s: no session with %s",
+		syslog(LOG_DEBUG, "smbrdr_logon_user: %s: no session with %s",
 		    username, server);
 		return (-1);
 	}
@@ -160,7 +242,8 @@ smbrdr_authenticate(char *server, char *username, uint8_t *pwd)
 	logon = smbrdr_logon_init(session, username, pwd);
 
 	if (logon == NULL) {
-		syslog(LOG_DEBUG, "smbrdr_authenticate: %s: %m", username);
+		syslog(LOG_DEBUG, "smbrdr_logon_user: %s: %s",
+		    username, strerror(ENOMEM));
 		smbrdr_session_unlock(session);
 		return (-1);
 	}
@@ -383,7 +466,7 @@ smbrdr_session_setupx(struct sdb_logon *logon)
  * Build and send an SMB session logoff (SMB_COM_LOGOFF_ANDX) command.
  * This is the inverse of an SMB_COM_SESSION_SETUP_ANDX. See CIFS
  * section 4.1.3. The logon structure should have been obtained from a
- * successful call to smbrdr_authenticate.
+ * successful call to smbrdr_logon_user.
  *
  * Returns 0 on success. Otherwise returns a -ve error code.
  */
@@ -460,7 +543,8 @@ smbrdr_logoffx(struct sdb_logon *logon)
  * to allocate a new one.
  */
 static struct sdb_logon *
-smbrdr_logon_init(struct sdb_session *session, char *username, uint8_t *pwd)
+smbrdr_logon_init(struct sdb_session *session, char *username,
+    unsigned char *pwd)
 {
 	struct sdb_logon *logon;
 	int64_t smbrdr_lmcompl;
@@ -501,4 +585,33 @@ smbrdr_logon_init(struct sdb_session *session, char *username, uint8_t *pwd)
 	(void) strlcpy(logon->username, username, MAX_ACCOUNT_NAME);
 	logon->state = SDB_LSTATE_INIT;
 	return (logon);
+}
+
+/*
+ * smbrdr_logon_validate
+ *
+ * if session is there and it's alive and also the required
+ * user is already logged in don't need to do anything
+ * otherwise clear the session structure.
+ */
+static boolean_t
+smbrdr_logon_validate(char *server, char *username)
+{
+	struct sdb_session *session;
+	boolean_t valid = B_FALSE;
+
+	session = smbrdr_session_lock(server, username, SDB_SLCK_WRITE);
+	if (session) {
+		if (nb_keep_alive(session->sock, session->port) == 0) {
+			valid = B_TRUE;
+		} else {
+			session->state = SDB_SSTATE_STALE;
+			syslog(LOG_DEBUG,
+			    "smbrdr_logon_validate: stale session");
+		}
+
+		smbrdr_session_unlock(session);
+	}
+
+	return (valid);
 }

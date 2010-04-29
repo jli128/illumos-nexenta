@@ -150,9 +150,9 @@ BASE_INS_DIR	= $(ROOT)
 #	Special knowledge of which special debugging options affect which
 #	file is used to optimize the build if these flags are changed.
 #
-DEBUG_DEFS_OBJ32	= $(SIMULATOR)
+DEBUG_DEFS_OBJ32	=
 DEBUG_DEFS_DBG32	= -DDEBUG
-DEBUG_DEFS_OBJ64	= $(SIMULATOR)
+DEBUG_DEFS_OBJ64	=
 DEBUG_DEFS_DBG64	= -DDEBUG
 DEBUG_DEFS		= $(DEBUG_DEFS_$(BUILD_TYPE))
 

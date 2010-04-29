@@ -19,7 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*
@@ -146,7 +147,9 @@
  *    2) All actions applied to a user require a reference count.
  *
  *    3) There are 2 ways of getting a reference count. One is when the user
- *       logs in. The other when the user is looked up.
+ *       logs in. The other when the user is looked up. This translates into
+ *       3 functions: smb_user_login(), smb_user_lookup_by_uid() and
+ *       smb_user_lookup_by_credentials.
  *
  *    It should be noted that the reference count of a user registers the
  *    number of references to the user in other structures (such as an smb
@@ -161,7 +164,7 @@
  *       reference count.
  */
 #include <smbsrv/smb_kproto.h>
-#include <smbsrv/smb_door.h>
+#include <smbsrv/smb_door_svc.h>
 
 
 #define	ADMINISTRATORS_SID	"S-1-5-32-544"
@@ -170,9 +173,8 @@ static smb_sid_t *smb_admins_sid = NULL;
 
 static boolean_t smb_user_is_logged_in(smb_user_t *);
 static int smb_user_enum_private(smb_user_t *, smb_svcenum_t *);
+static void smb_user_delete(smb_user_t *user);
 static smb_tree_t *smb_user_get_tree(smb_llist_t *, smb_tree_t *);
-static void smb_user_nonauth_logon(uint32_t);
-static void smb_user_auth_logoff(uint32_t);
 
 int
 smb_user_init(void)
@@ -228,8 +230,8 @@ smb_user_login(
 	user->u_privileges = privileges;
 	user->u_name_len = strlen(account_name) + 1;
 	user->u_domain_len = strlen(domain_name) + 1;
-	user->u_name = smb_mem_strdup(account_name);
-	user->u_domain = smb_mem_strdup(domain_name);
+	user->u_name = smb_strdup(account_name);
+	user->u_domain = smb_strdup(domain_name);
 	user->u_cred = cr;
 	user->u_privcred = smb_cred_create_privs(cr, privileges);
 	user->u_audit_sid = audit_sid;
@@ -252,8 +254,8 @@ smb_user_login(
 		}
 		smb_idpool_free(&session->s_uid_pool, user->u_uid);
 	}
-	smb_mem_free(user->u_name);
-	smb_mem_free(user->u_domain);
+	smb_mfree(user->u_name);
+	smb_mfree(user->u_domain);
 	kmem_cache_free(session->s_server->si_cache_user, user);
 	return (NULL);
 }
@@ -328,6 +330,55 @@ smb_user_logoff(
 }
 
 /*
+ * smb_user_logoff_all
+ *
+ *
+ */
+void
+smb_user_logoff_all(
+    smb_session_t	*session)
+{
+	smb_user_t	*user;
+
+	ASSERT(session);
+	ASSERT(session->s_magic == SMB_SESSION_MAGIC);
+
+	smb_llist_enter(&session->s_user_list, RW_READER);
+	user = smb_llist_head(&session->s_user_list);
+	while (user) {
+		ASSERT(user->u_magic == SMB_USER_MAGIC);
+		ASSERT(user->u_session == session);
+		mutex_enter(&user->u_mutex);
+		switch (user->u_state) {
+		case SMB_USER_STATE_LOGGED_IN:
+			/* The user is still logged in. */
+			user->u_refcnt++;
+			mutex_exit(&user->u_mutex);
+			smb_llist_exit(&session->s_user_list);
+			smb_user_logoff(user);
+			smb_user_release(user);
+			smb_llist_enter(&session->s_user_list, RW_READER);
+			user = smb_llist_head(&session->s_user_list);
+			break;
+		case SMB_USER_STATE_LOGGING_OFF:
+		case SMB_USER_STATE_LOGGED_OFF:
+			/*
+			 * The user is logged off or logging off.
+			 */
+			mutex_exit(&user->u_mutex);
+			user = smb_llist_next(&session->s_user_list, user);
+			break;
+		default:
+			ASSERT(0);
+			mutex_exit(&user->u_mutex);
+			user = smb_llist_next(&session->s_user_list, user);
+			break;
+		}
+	}
+	smb_llist_exit(&session->s_user_list);
+}
+
+/*
  * Take a reference on a user.
  */
 boolean_t
@@ -349,10 +400,9 @@ smb_user_hold(smb_user_t *user)
 }
 
 /*
- * Release a reference on a user.  If the reference count falls to
- * zero and the user has logged off, post the object for deletion.
- * Object deletion is deferred to avoid modifying a list while an
- * iteration may be in progress.
+ * smb_user_release
+ *
+ *
  */
 void
 smb_user_release(
@@ -363,14 +413,13 @@ smb_user_release(
 	mutex_enter(&user->u_mutex);
 	ASSERT(user->u_refcnt);
 	user->u_refcnt--;
-
-	/* flush the tree list's delete queue */
-	smb_llist_flush(&user->u_tree_list);
-
 	switch (user->u_state) {
 	case SMB_USER_STATE_LOGGED_OFF:
-		if (user->u_refcnt == 0)
-			smb_session_post_user(user->u_session, user);
+		if (user->u_refcnt == 0) {
+			mutex_exit(&user->u_mutex);
+			smb_user_delete(user);
+			return;
+		}
 		break;
 
 	case SMB_USER_STATE_LOGGED_IN:
@@ -384,18 +433,87 @@ smb_user_release(
 	mutex_exit(&user->u_mutex);
 }
 
-void
-smb_user_post_tree(smb_user_t *user, smb_tree_t *tree)
+/*
+ * smb_user_lookup_by_uid
+ *
+ * Find the appropriate user for this request. The request credentials
+ * set here may be overridden by the tree credentials. In domain mode,
+ * the user and tree credentials should be the same. In share mode, the
+ * tree credentials (defined in the share definition) should override
+ * the user credentials.
+ */
+smb_user_t *
+smb_user_lookup_by_uid(
+    smb_session_t	*session,
+    uint16_t		uid)
 {
-	SMB_USER_VALID(user);
-	SMB_TREE_VALID(tree);
-	ASSERT(tree->t_refcnt == 0);
-	ASSERT(tree->t_state == SMB_TREE_STATE_DISCONNECTED);
-	ASSERT(tree->t_user == user);
+	smb_user_t	*user;
 
-	smb_llist_post(&user->u_tree_list, tree, smb_tree_dealloc);
+	ASSERT(session);
+	ASSERT(session->s_magic == SMB_SESSION_MAGIC);
+
+	smb_llist_enter(&session->s_user_list, RW_READER);
+	user = smb_llist_head(&session->s_user_list);
+	while (user) {
+		ASSERT(user->u_magic == SMB_USER_MAGIC);
+		ASSERT(user->u_session == session);
+		if (user->u_uid == uid) {
+			if (smb_user_hold(user)) {
+				smb_llist_exit(&session->s_user_list);
+				return (user);
+			} else {
+				smb_llist_exit(&session->s_user_list);
+				return (NULL);
+			}
+		}
+		user = smb_llist_next(&session->s_user_list, user);
+	}
+	smb_llist_exit(&session->s_user_list);
+	return (NULL);
 }
 
+/*
+ * smb_user_lookup_by_state
+ *
+ * This function returns the first user in the logged in state. If the user
+ * provided is NULL the search starts from the beginning of the list passed
+ * in. It a user is provided the search starts just after that user.
+ */
+smb_user_t *
+smb_user_lookup_by_state(
+    smb_session_t	*session,
+    smb_user_t		*user)
+{
+	smb_llist_t	*lst;
+	smb_user_t	*next;
+
+	ASSERT(session);
+	ASSERT(session->s_magic == SMB_SESSION_MAGIC);
+
+	lst = &session->s_user_list;
+
+	smb_llist_enter(lst, RW_READER);
+	if (user) {
+		ASSERT(user);
+		ASSERT(user->u_magic == SMB_USER_MAGIC);
+		ASSERT(user->u_refcnt);
+		next = smb_llist_next(lst, user);
+	} else {
+		next = smb_llist_head(lst);
+	}
+	while (next) {
+		ASSERT(next->u_magic == SMB_USER_MAGIC);
+		ASSERT(next->u_session == session);
+
+		if (smb_user_hold(next))
+			break;
+
+		next = smb_llist_next(lst, next);
+	}
+	smb_llist_exit(lst);
+
+	return (next);
+}
 
 /*
  * Find a tree by tree-id.
@@ -742,39 +860,39 @@ smb_user_is_logged_in(smb_user_t *user)
 }
 
 /*
- * Delete a user.  The tree list should be empty.
- *
- * Remove the user from the session's user list before freeing resources
- * associated with the user.
+ * smb_user_delete
  */
-void
-smb_user_delete(void *arg)
+static void
+smb_user_delete(
+    smb_user_t		*user)
 {
 	smb_session_t	*session;
-	smb_user_t	*user = (smb_user_t *)arg;
 
-	SMB_USER_VALID(user);
+	ASSERT(user);
+	ASSERT(user->u_magic == SMB_USER_MAGIC);
 	ASSERT(user->u_refcnt == 0);
 	ASSERT(user->u_state == SMB_USER_STATE_LOGGED_OFF);
 
 	session = user->u_session;
+	/*
+	 * Let's remove the user from the list of users of the session. This
+	 * has to be done before any resources associated with the user are
+	 * deleted.
+	 */
 	smb_llist_enter(&session->s_user_list, RW_WRITER);
 	smb_llist_remove(&session->s_user_list, user);
-	smb_idpool_free(&session->s_uid_pool, user->u_uid);
 	smb_llist_exit(&session->s_user_list);
-
-	mutex_enter(&user->u_mutex);
-	mutex_exit(&user->u_mutex);
 
 	user->u_magic = (uint32_t)~SMB_USER_MAGIC;
 	mutex_destroy(&user->u_mutex);
 	smb_llist_destructor(&user->u_tree_list);
 	smb_idpool_destructor(&user->u_tid_pool);
+	smb_idpool_free(&session->s_uid_pool, user->u_uid);
 	crfree(user->u_cred);
 	if (user->u_privcred)
 		crfree(user->u_privcred);
-	smb_mem_free(user->u_name);
-	smb_mem_free(user->u_domain);
+	smb_mfree(user->u_name);
+	smb_mfree(user->u_domain);
 	kmem_cache_free(user->u_server->si_cache_user, user);
 }
 
@@ -895,21 +1013,20 @@ smb_user_netinfo_init(smb_user_t *user, smb_netuserinfo_t *info)
 	info->ui_native_os = session->native_os;
 	info->ui_ipaddr = session->ipaddr;
 	info->ui_numopens = session->s_file_cnt;
-	info->ui_smb_uid = user->u_uid;
+	info->ui_uid = user->u_uid;
 	info->ui_logon_time = user->u_logon_time;
 	info->ui_flags = user->u_flags;
-	info->ui_posix_uid = crgetuid(user->u_cred);
 
 	info->ui_domain_len = user->u_domain_len;
-	info->ui_domain = smb_mem_strdup(user->u_domain);
+	info->ui_domain = smb_strdup(user->u_domain);
 
 	info->ui_account_len = user->u_name_len;
-	info->ui_account = smb_mem_strdup(user->u_name);
+	info->ui_account = smb_strdup(user->u_name);
 
 	buf = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 	smb_session_getclient(session, buf, MAXNAMELEN);
 	info->ui_workstation_len = strlen(buf) + 1;
-	info->ui_workstation = smb_mem_strdup(buf);
+	info->ui_workstation = smb_strdup(buf);
 	kmem_free(buf, MAXNAMELEN);
 }
 
@@ -920,49 +1037,11 @@ smb_user_netinfo_fini(smb_netuserinfo_t *info)
 		return;
 
 	if (info->ui_domain)
-		smb_mem_free(info->ui_domain);
+		smb_mfree(info->ui_domain);
 	if (info->ui_account)
-		smb_mem_free(info->ui_account);
+		smb_mfree(info->ui_account);
 	if (info->ui_workstation)
-		smb_mem_free(info->ui_workstation);
+		smb_mfree(info->ui_workstation);
 
 	bzero(info, sizeof (smb_netuserinfo_t));
-}
-
-static void
-smb_user_nonauth_logon(uint32_t audit_sid)
-{
-	(void) smb_kdoor_upcall(SMB_DR_USER_NONAUTH_LOGON,
-	    &audit_sid, xdr_uint32_t, NULL, NULL);
-}
-
-static void
-smb_user_auth_logoff(uint32_t audit_sid)
-{
-	(void) smb_kdoor_upcall(SMB_DR_USER_AUTH_LOGOFF,
-	    &audit_sid, xdr_uint32_t, NULL, NULL);
-}
-
-smb_token_t *
-smb_get_token(smb_logon_t *user_info)
-{
-	smb_token_t	*token;
-	int		rc;
-
-	token = kmem_zalloc(sizeof (smb_token_t), KM_SLEEP);
-
-	rc = smb_kdoor_upcall(SMB_DR_USER_AUTH_LOGON,
-	    user_info, smb_logon_xdr, token, smb_token_xdr);
-
-	if (rc != 0) {
-		kmem_free(token, sizeof (smb_token_t));
-		return (NULL);
-	}
-
-	if (!smb_token_valid(token)) {
-		smb_token_free(token);
-		return (NULL);
-	}
-
-	return (token);
 }

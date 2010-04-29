@@ -36,7 +36,6 @@
 #include <sys/syscall.h>
 #include <sys/systm.h>
 #include <sys/utsname.h>
-#include <fcntl.h>
 
 #include <sn1_brand.h>
 #include <sn1_misc.h>
@@ -309,12 +308,7 @@ sn1_close_fh(FILE *file)
 	if ((fd = fileno(file)) < 0)
 		return;
 
-	/*
-	 * While we could use dup() since we're linked with the native libc,
-	 * the dup() syscall itself no longer exists so this would be
-	 * problematic for any brands built from sn1.
-	 */
-	fd_new = fcntl(fd, F_DUPFD, 0);
+	fd_new = dup(fd);
 	if (fd_new == -1)
 		return;
 

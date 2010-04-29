@@ -45,22 +45,23 @@ i depend
 #
 d none usr 755 root sys
 d none usr/bin 755 root bin
-m none usr/sun/bin/ctags 555 root bin usr/bin/ctags
+f none usr/bin/ctags 555 root bin
 f none usr/bin/exstr 555 root bin
 f none usr/bin/elfsign 555 root bin
 f none usr/bin/elfwrap 555 root bin
 l none usr/bin/gcore=../../usr/lib/isaexec
 f none usr/bin/ldd 555 root bin
-m none usr/sun/bin/od 555 root bin usr/bin/od
+f none usr/bin/od 555 root bin
 l none usr/bin/plimit=../../usr/lib/isaexec
 f none usr/bin/pvs 555 root bin
 f none usr/bin/sotruss 755 root bin
-m none usr/sun/bin/strings 555 root bin usr/bin/strings
+l none usr/bin/strings=../../usr/lib/isaexec
 l none usr/bin/truss=../../usr/lib/isaexec
 f none usr/bin/whocalls 755 root bin
 d none usr/ccs 755 root bin
 d none usr/ccs/bin 755 root bin
-m none usr/ccs/bin/ld 555 root bin usr/bin/ld
+f none usr/bin/ld 755 root bin
+s none usr/ccs/bin/ld=../../bin/ld
 f none usr/bin/regcmp 555 root bin
 s none usr/ccs/bin/regcmp=../../bin/regcmp
 d none usr/ccs/lib 755 root bin

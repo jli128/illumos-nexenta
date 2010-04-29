@@ -43,6 +43,10 @@ fi
 /usr/bin/egrep -s "^${DRV}[ 	]" $BASEDIR/etc/name_to_major
 if [ $? -eq 0 ]; then
 	${REM_DRV} ${DRV}
+        if [ $? -ne 0 ]; then
+		echo "Failed rem_drv ${DRV}!\n" >&2
+                exit 1
+        fi
 fi
 
 exit 0

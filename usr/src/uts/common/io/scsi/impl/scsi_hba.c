@@ -19,7 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #include <sys/note.h>
@@ -5089,8 +5090,6 @@ scsi_device_createchild(dev_info_t *self, char *addr, scsi_enum_t se,
 	char			*dname = NULL;
 	ddi_devid_t		devid;
 	int			have_devid = 0;
-	ddi_devid_t		cdevid;
-	int			have_cdevid = 0;
 	char			*devid_str;
 	char			*guid = NULL;
 
@@ -5163,7 +5162,7 @@ scsi_device_createchild(dev_info_t *self, char *addr, scsi_enum_t se,
 		 * kernels.
 		 */
 		SCSI_HBA_LOG((_LOG(1), NULL, self,
-		    "no node_name for device @%s:\n	 compatible: %s",
+		    "no node_name for device @%s:\n         compatible: %s",
 		    addr, *compat));
 		goto out;
 	}
@@ -5242,7 +5241,7 @@ scsi_device_createchild(dev_info_t *self, char *addr, scsi_enum_t se,
 		    (ndi_prop_update_string(DDI_DEV_T_NONE, dchild,
 		    "class", "scsi") != DDI_PROP_SUCCESS)) {
 			SCSI_HBA_LOG((_LOG(2), self, NULL,
-			    "devinfo @%s failed decoration", addr));
+			    "@%s failed devinfo decoration", addr));
 			(void) scsi_hba_remove_node(dchild);
 			dchild = NULL;
 			goto out;
@@ -5283,11 +5282,7 @@ scsi_device_createchild(dev_info_t *self, char *addr, scsi_enum_t se,
 			    "pathinfo alloc failed"));
 			goto out;
 		}
-
 		ASSERT(pchild);
-		dchild = mdi_pi_get_client(pchild);
-		ASSERT(dchild);
-		ndi_flavor_set(dchild, SCSA_FLAVOR_SCSI_DEVICE);
 
 		/*
 		 * Decorate new node with addressing properties via
@@ -5295,68 +5290,18 @@ scsi_device_createchild(dev_info_t *self, char *addr, scsi_enum_t se,
 		 */
 		if (scsi_hba_ua_set(addr, NULL, pchild) == 0) {
 			SCSI_HBA_LOG((_LOG(1), self, NULL,
-			    "pathinfo %s decoration failed",
+			    "%s pathinfo decoration failed",
 			    mdi_pi_spathname(pchild)));
+
 			(void) mdi_pi_free(pchild, 0);
 			pchild = NULL;
 			goto out;
-		}
-
-		/* Bind the driver */
-		if (ndi_devi_bind_driver(dchild, 0) != NDI_SUCCESS) {
-			/* need to bind in order to register a devid */
-			SCSI_HBA_LOG((_LOGCFG, self, NULL,
-			    "pathinfo %s created, no client driver-> "
-			    "no devid_register", mdi_pi_spathname(pchild)));
-			goto out;
-		}
-
-		/* Watch out for inconsistancies in devids. */
-		if (ddi_devid_get(dchild, &cdevid) == DDI_SUCCESS)
-			have_cdevid = 1;
-
-		if (have_devid && !have_cdevid) {
-			/* Client does not yet have devid, register ours. */
-			if (ddi_devid_register(dchild, devid) == DDI_FAILURE)
-				SCSI_HBA_LOG((_LOG(1), self, NULL,
-				    "pathinfo %s created, "
-				    "devid register failed",
-				    mdi_pi_spathname(pchild)));
-			else
-				SCSI_HBA_LOG((_LOG(2), self, NULL,
-				    "pathinfo %s created with devid",
-				    mdi_pi_spathname(pchild)));
-		} else if (have_devid && have_cdevid) {
-			/*
-			 * We have devid and client already has devid:
-			 * they must be the same.
-			 */
-			if (ddi_devid_compare(cdevid, devid) != 0) {
-				SCSI_HBA_LOG((_LOG(WARN), NULL, dchild,
-				    "mismatched devid on path %s",
-				    mdi_pi_spathname(pchild)));
-			}
-		} else if (!have_devid && have_cdevid) {
-			/*
-			 * Client already has a devid, but we don't:
-			 * we should not have missing devids.
-			 */
-			SCSI_HBA_LOG((_LOG(WARN), NULL, dchild,
-			    "missing devid on path %s",
-			    mdi_pi_spathname(pchild)));
-		} else if (!have_cdevid && !have_devid) {
-			/* devid not supported */
-			SCSI_HBA_LOG((_LOG(2), self, NULL,
-			    "pathinfo %s created, no devid",
-			    mdi_pi_spathname(pchild)));
 		}
 	}
 
 	/* free the node name and compatible information */
 out:	if (have_devid)
 		ddi_devid_free(devid);
-	if (have_cdevid)
-		ddi_devid_free(cdevid);
 	if (guid)
 		ddi_devid_free_guid(guid);
 	if (compat)
@@ -5369,16 +5314,17 @@ out:	if (have_devid)
 		ddi_prop_free(binding_set);
 
 	/* return child_type results */
-	if (pchild) {
-		*dchildp = NULL;
-		*pchildp = pchild;
-		return (CHILD_TYPE_PATHINFO);
-	} else if (dchild) {
+	ASSERT(!(dchild && pchild));
+	if (dchild) {
 		*dchildp = dchild;
 		*pchildp = NULL;
 		return (CHILD_TYPE_DEVINFO);
 	}
-
+	if (pchild) {
+		*dchildp = NULL;
+		*pchildp = pchild;
+		return (CHILD_TYPE_PATHINFO);
+	}
 	return (CHILD_TYPE_NONE);
 }
 
@@ -8467,71 +8413,52 @@ scsi_tgtmap_sync(scsi_hba_tgtmap_t *handle)
 	return (empty);
 }
 
-static int
-scsi_tgtmap_begin_or_flush(scsi_hba_tgtmap_t *handle, boolean_t do_begin)
+int
+scsi_hba_tgtmap_set_begin(scsi_hba_tgtmap_t *handle)
 {
 	impl_scsi_tgtmap_t	*tgtmap = (impl_scsi_tgtmap_t *)handle;
 	dev_info_t		*self = tgtmap->tgtmap_tran->tran_iport_dip;
 	char			*context;
-	int			rv = DAM_SUCCESS;
+	int			rv = DDI_SUCCESS;
 	int			i;
 
 	for (i = 0; i < SCSI_TGT_NTYPES; i++) {
-		if (tgtmap->tgtmap_dam[i] == NULL) {
+		if (tgtmap->tgtmap_dam[i] == NULL)
+			continue;
+
+		context = damap_name(tgtmap->tgtmap_dam[i]);
+
+		if (i == SCSI_TGT_SCSI_DEVICE) {
+			/*
+			 * In scsi_device context, so we have the 'context'
+			 * string, diagnose the case where the tgtmap caller
+			 * is failing to make forward progress, i.e. the caller
+			 * is never completing an observation, and calling
+			 * scsi_hbg_tgtmap_set_end. If this occurs, the solaris
+			 * target/lun state may be out of sync with hardware.
+			 */
+			if (tgtmap->tgtmap_reports++ >=
+			    scsi_hba_tgtmap_reports_max) {
+				tgtmap->tgtmap_noisy++;
+				if (tgtmap->tgtmap_noisy == 1)
+					SCSI_HBA_LOG((_LOG(WARN), self, NULL,
+					    "%s: failing to complete a tgtmap "
+					    "observation", context));
+			}
+		}
+
+		if (damap_addrset_begin(
+		    tgtmap->tgtmap_dam[i]) != DAM_SUCCESS) {
+			SCSI_HBA_LOG((_LOGTGT, self, NULL, "%s FAIL", context));
+			rv = DDI_FAILURE;
 			continue;
 		}
 
-		context = damap_name(tgtmap->tgtmap_dam[i]);
-		if (do_begin == B_TRUE) {
-			if (i == SCSI_TGT_SCSI_DEVICE) {
-				/*
-				 * In scsi_device context, so we have the
-				 * 'context' string, diagnose the case where
-				 * the tgtmap caller is failing to make
-				 * forward progress, i.e. the caller is never
-				 * completing an observation, and calling
-				 * scsi_hbg_tgtmap_set_end. If this occurs,
-				 * the solaris target/lun state may be out
-				 * of sync with hardware.
-				 */
-				if (tgtmap->tgtmap_reports++ >=
-				    scsi_hba_tgtmap_reports_max) {
-					tgtmap->tgtmap_noisy++;
-					if (tgtmap->tgtmap_noisy == 1) {
-						SCSI_HBA_LOG((_LOG(WARN), self,
-						    NULL, "%s: failing a tgtmap"
-						    " observation", context));
-					}
-				}
-			}
-
-			rv = damap_addrset_begin(tgtmap->tgtmap_dam[i]);
-		} else {
-			rv = damap_addrset_flush(tgtmap->tgtmap_dam[i]);
-		}
-
-		if (rv != DAM_SUCCESS) {
-			SCSI_HBA_LOG((_LOGTGT, self, NULL, "%s FAIL", context));
-		} else {
-			SCSI_HBA_LOG((_LOGTGT, self, NULL, "%s", context));
-		}
+		SCSI_HBA_LOG((_LOGTGT, self, NULL, "%s", context));
 	}
-
-	return ((rv == DAM_SUCCESS) ? DDI_SUCCESS : DDI_FAILURE);
+	return (rv);
 }
 
-
-int
-scsi_hba_tgtmap_set_begin(scsi_hba_tgtmap_t *handle)
-{
-	return (scsi_tgtmap_begin_or_flush(handle, B_TRUE));
-}
-
-int
-scsi_hba_tgtmap_set_flush(scsi_hba_tgtmap_t *handle)
-{
-	return (scsi_tgtmap_begin_or_flush(handle, B_FALSE));
-}
 
 int
 scsi_hba_tgtmap_set_add(scsi_hba_tgtmap_t *handle,

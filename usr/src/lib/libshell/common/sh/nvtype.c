@@ -24,7 +24,6 @@
  *
  */
 
-#include	<ctype.h>
 #include        "defs.h"
 
 static const char sh_opttype[] =

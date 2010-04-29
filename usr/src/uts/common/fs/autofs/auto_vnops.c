@@ -19,8 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -1459,18 +1462,13 @@ retry:
 		if ((fnp->fn_flags & MF_MOUNTPOINT) &&
 		    fnp->fn_trigger != NULL) {
 			ASSERT(fnp->fn_dirents == NULL);
-			mutex_exit(&fnp->fn_lock);
 			/*
 			 * The filesystem that used to sit here has been
-			 * forcibly unmounted. Do our best to recover.
-			 * Try to unmount autofs subtree below this node
-			 * and retry the action.
+			 * forcibly unmounted.
 			 */
-			if (unmount_subtree(fnp, B_TRUE) != 0) {
-				error = EIO;
-				goto done;
-			}
-			goto retry;
+			mutex_exit(&fnp->fn_lock);
+			error = EIO;
+			goto done;
 		}
 	}
 
