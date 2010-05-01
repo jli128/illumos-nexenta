@@ -68,6 +68,8 @@ extern size_t zle_compress(void *src, void *dst, size_t s_len, size_t d_len,
     int level);
 extern int zle_decompress(void *src, void *dst, size_t s_len, size_t d_len,
     int level);
+extern void init_gzip_hardware_compress(void);
+extern void fini_gzip_hardware_compress(void);
 
 /*
  * Compress and decompress data if necessary.

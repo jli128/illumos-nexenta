@@ -17,11 +17,11 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+
 /*
  * PMC Compile Time Tunable Parameters
  */
@@ -49,6 +49,12 @@ extern "C" {
 #define	PMCS_ADDTL_CHUNK_PAGES	8
 
 /*
+ * Maximum amount of time (in milliseconds) we'll wait for writing one chunk
+ * of firmware image data to the chip
+ */
+#define	PMCS_FLASH_WAIT_TIME	10000	/* 10 seconds */
+
+/*
  * Scratch area has to hold Max SMP Request and Max SMP Response,
  * plus some slop.
  */
@@ -61,6 +67,8 @@ extern "C" {
  */
 #define	PMCS_FWLOG_SIZE		(2 << 20)
 #define	PMCS_FWLOG_MAX		5	/* maximum logging level */
+#define	PMCS_FWLOG_THRESH	75	/* Write to file when log this % full */
+
 #define	SATLSIZE		1024
 
 /*
@@ -76,6 +84,15 @@ extern "C" {
  * NB: Needs to be evenly divisible by 10
  */
 #define	PMCS_WATCH_INTERVAL	250000	/* watchdog interval in us */
+
+/*
+ * Forward progress trigger. This is the number of times we run through
+ * watchdog before checking for forward progress.  Implicitly bound to
+ * PMCS_WATCH_INTERVAL above. For example, with a PMCS_WATCH_INTERVAL of
+ * 250000, the watchdog will run every quarter second, so forward progress
+ * will be checked every 16th watchdog fire, or every four seconds.
+ */
+#define	PMCS_FWD_PROG_TRIGGER	16
 
 /*
  * Inbound Queue definitions
@@ -131,6 +148,12 @@ extern "C" {
 #define	PMCS_FIRMWARE_END_SUF		".bin_end"
 #define	PMCS_FIRMWARE_FILENAME		"misc/pmcs/pmcs8001fw"
 #define	PMCS_FIRMWARE_VERSION_NAME	"pmcs8001_fwversion"
+
+/*
+ * These are offsets from the end of the image
+ */
+#define	PMCS_FW_VER_OFFSET		528
+#define	PMCS_ILA_VER_OFFSET		528
 
 #ifdef	__cplusplus
 }

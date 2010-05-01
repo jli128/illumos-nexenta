@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -47,6 +46,9 @@
 #include <arpa/inet.h>
 #include <libshare.h>
 #include <libnvpair.h>
+#include <sys/idmap.h>
+#include <pwd.h>
+#include <nss_dbdefs.h>
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libmlsvc.h>
 #include <smbsrv/lmerr.h>
@@ -54,7 +56,6 @@
 #include <smbsrv/smb.h>
 #include <smbsrv/netrauth.h>
 #include <smbsrv/ndl/srvsvc.ndl>
-#include <smbsrv/smb_common_door.h>
 #include "mlsvc.h"
 
 /*
@@ -175,6 +176,48 @@ void
 srvsvc_initialize(void)
 {
 	(void) ndr_svc_register(&srvsvc_service);
+}
+
+/*
+ * Turn "dfsroot" property on/off for the specified
+ * share and save it.
+ *
+ * If the requested value is the same as what is already
+ * set then no change is required and the function returns.
+ */
+uint32_t
+srvsvc_shr_setdfsroot(smb_share_t *si, boolean_t on)
+{
+	char *dfs = NULL;
+	nvlist_t *nvl;
+	uint32_t nerr;
+
+	if (on && ((si->shr_flags & SMB_SHRF_DFSROOT) == 0)) {
+		si->shr_flags |= SMB_SHRF_DFSROOT;
+		dfs = "true";
+	} else if (!on && (si->shr_flags & SMB_SHRF_DFSROOT)) {
+		si->shr_flags &= ~SMB_SHRF_DFSROOT;
+		dfs = "false";
+	}
+
+	if (dfs == NULL)
+		return (ERROR_SUCCESS);
+
+	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0)
+		return (NERR_InternalError);
+
+	if (nvlist_add_string(nvl, SHOPT_DFSROOT, dfs) != 0) {
+		nvlist_free(nvl);
+		return (NERR_InternalError);
+	}
+
+	nerr = srvsvc_sa_setprop(si, nvl);
+	nvlist_free(nvl);
+
+	if (nerr != NERR_Success)
+		return (nerr);
+
+	return (smb_shr_modify(si));
 }
 
 /*
@@ -744,6 +787,7 @@ srvsvc_NetFileEnum3(ndr_xa_t *mxa, struct mslm_NetFileEnum *param,
 	se->se_resume += entries_read;
 	param->info.ru.info3->entries_read = entries_read;
 	param->total_entries = entries_read;
+	smb_kmod_enum_fini(ns);
 	return (ERROR_SUCCESS);
 }
 
@@ -1615,20 +1659,6 @@ srvsvc_s_NetSessionDel(void *arg, ndr_xa_t *mxa)
 	return (NDR_DRC_OK);
 }
 
-/*
- * SRVSVC NetServerGetInfo
- *
- *	IN	LPTSTR servername,
- *	IN	DWORD level,
- *	OUT	union switch(level) {
- *		case 100:	mslm_SERVER_INFO_100 *p100;
- *		case 101:	mslm_SERVER_INFO_101 *p101;
- *		case 102:	mslm_SERVER_INFO_102 *p102;
- *		...
- *		default:	char *nullptr;
- *		} bufptr,
- *	OUT	DWORD status
- */
 static int
 srvsvc_s_NetServerGetInfo(void *arg, ndr_xa_t *mxa)
 {
@@ -1640,6 +1670,7 @@ srvsvc_s_NetServerGetInfo(void *arg, ndr_xa_t *mxa)
 	struct mslm_SERVER_INFO_503 *info503;
 	char sys_comment[SMB_PI_MAX_COMMENT];
 	char hostname[NETBIOS_NAME_SZ];
+	smb_version_t version;
 
 	if (smb_getnetbiosname(hostname, sizeof (hostname)) != 0) {
 netservergetinfo_no_memory:
@@ -1651,6 +1682,8 @@ netservergetinfo_no_memory:
 	    sizeof (sys_comment));
 	if (*sys_comment == '\0')
 		(void) strcpy(sys_comment, " ");
+
+	smb_config_get_version(&version);
 
 	switch (param->level) {
 	case 100:
@@ -1674,8 +1707,8 @@ netservergetinfo_no_memory:
 
 		bzero(info101, sizeof (struct mslm_SERVER_INFO_101));
 		info101->sv101_platform_id = SV_PLATFORM_ID_NT;
-		info101->sv101_version_major = 4;
-		info101->sv101_version_minor = 0;
+		info101->sv101_version_major = version.sv_major;
+		info101->sv101_version_minor = version.sv_minor;
 		info101->sv101_type = SV_TYPE_DEFAULT;
 		info101->sv101_name = (uint8_t *)NDR_STRDUP(mxa, hostname);
 		info101->sv101_comment
@@ -1695,8 +1728,8 @@ netservergetinfo_no_memory:
 
 		bzero(info102, sizeof (struct mslm_SERVER_INFO_102));
 		info102->sv102_platform_id = SV_PLATFORM_ID_NT;
-		info102->sv102_version_major = 4;
-		info102->sv102_version_minor = 0;
+		info102->sv102_version_major = version.sv_major;
+		info102->sv102_version_minor = version.sv_minor;
 		info102->sv102_type = SV_TYPE_DEFAULT;
 		info102->sv102_name = (uint8_t *)NDR_STRDUP(mxa, hostname);
 		info102->sv102_comment
@@ -2638,9 +2671,21 @@ static boolean_t
 srvsvc_add_autohome(ndr_xa_t *mxa, smb_svcenum_t *se, void *infop)
 {
 	smb_netuserinfo_t *user = &mxa->pipe->np_user;
-	char *username = user->ui_account;
+	char *username;
 	smb_share_t si;
 	DWORD status;
+	struct passwd pw;
+	char buf[NSS_LINELEN_PASSWD];
+
+	if (IDMAP_ID_IS_EPHEMERAL(user->ui_posix_uid)) {
+		username = user->ui_account;
+	} else {
+		if (getpwuid_r(user->ui_posix_uid, &pw, buf, sizeof (buf)) ==
+		    NULL)
+			return (B_FALSE);
+
+		username = pw.pw_name;
+	}
 
 	if (smb_shr_get(username, &si) != NERR_Success)
 		return (B_FALSE);
@@ -2675,9 +2720,16 @@ srvsvc_share_mkpath(ndr_xa_t *mxa, char *path)
 {
 	char tmpbuf[MAXPATHLEN];
 	char *p;
+	char drive_letter;
 
 	if (strlen(path) == 0)
 		return (NDR_STRDUP(mxa, path));
+
+	drive_letter = smb_shr_drive_letter(path);
+	if (drive_letter != '\0') {
+		(void) snprintf(tmpbuf, MAXPATHLEN, "%c:\\", drive_letter);
+		return (NDR_STRDUP(mxa, tmpbuf));
+	}
 
 	/*
 	 * Strip the volume name from the path (/vol1/home -> /home).
@@ -2726,8 +2778,6 @@ srvsvc_s_NetShareCheck(void *arg, ndr_xa_t *mxa)
 }
 
 /*
- * srvsvc_s_NetShareDel
- *
  * Delete a share.  Only members of the Administrators, Server Operators
  * or Power Users local groups are allowed to delete shares.
  *
@@ -2741,11 +2791,19 @@ static int
 srvsvc_s_NetShareDel(void *arg, ndr_xa_t *mxa)
 {
 	struct mslm_NetShareDel *param = arg;
+	smb_share_t si;
 
 	if (!ndr_is_poweruser(mxa) ||
 	    smb_shr_is_restricted((char *)param->netname)) {
 		param->status = ERROR_ACCESS_DENIED;
 		return (NDR_DRC_OK);
+	}
+
+	if (smb_shr_get((char *)param->netname, &si) == NERR_Success) {
+		if (si.shr_flags & SMB_SHRF_DFSROOT) {
+			param->status = NERR_IsDfsShare;
+			return (NDR_DRC_OK);
+		}
 	}
 
 	param->status = srvsvc_sa_delete((char *)param->netname);
@@ -2965,23 +3023,23 @@ srvsvc_sa_setprop(smb_share_t *si, nvlist_t *nvl)
 	int err = 0;
 	char *name, *val;
 
-	if ((handle = smb_shr_sa_enter()) == NULL)
+	if ((handle = sa_init(SA_INIT_SHARE_API)) == NULL)
 		return (NERR_InternalError);
 
 	if ((share = sa_find_share(handle, si->shr_path)) == NULL) {
-		smb_shr_sa_exit();
+		sa_fini(handle);
 		return (NERR_InternalError);
 	}
 
 	if ((resource = sa_get_share_resource(share, si->shr_name)) == NULL) {
-		smb_shr_sa_exit();
+		sa_fini(handle);
 		return (NERR_InternalError);
 	}
 
 	if ((opts = sa_get_optionset(resource, SMB_PROTOCOL_NAME)) == NULL) {
 		opts = sa_create_optionset(resource, SMB_PROTOCOL_NAME);
 		if (opts == NULL) {
-			smb_shr_sa_exit();
+			sa_fini(handle);
 			return (NERR_InternalError);
 		}
 	}
@@ -3021,7 +3079,7 @@ srvsvc_sa_setprop(smb_share_t *si, nvlist_t *nvl)
 	if (nerr == NERR_Success)
 		nerr = sa_commit_properties(opts, 0);
 
-	smb_shr_sa_exit();
+	sa_fini(handle);
 	return (nerr);
 }
 

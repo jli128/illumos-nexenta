@@ -246,14 +246,23 @@ else
 	ln -s inetd_generic.xml $BASEDIR/var/svc/profile/inetd_services.xml
 fi
 
+# /etc/mnttab removed from prototype_com since it is causing an upgrade
+# issues, so we need to touch it here
+touch $BASEDIR/etc/mnttab 2>/dev/null
+chmod 444 $BASEDIR/etc/mnttab 2>/dev/null
+
 #
 # /etc/svc/repository.db was previously packaged but it is now generated
 # from one of the seed repositories and then updated by svccfg(1M).
 # Therefore, removef(1M) is used to remove the packaging database entry
 # although the repository itself is preserved.
 #
-/usr/sbin/removef $PKGINST /etc/svc/repository.db >/dev/null 2>&1
-/usr/sbin/removef -f $PKGINST >/dev/null 2>&1
+removef $PKGINST /etc/svc/repository.db >/dev/null 2>&1
+removef -f $PKGINST >/dev/null 2>&1
+
+# audit fix ups from BFU
+chmod 644 $BASEDIR/etc/security/audit_control
+chmod 644 $BASEDIR/etc/security/audit_user
 
 PROFILEDIR=$BASEDIR/var/svc/profile
 GENERICXML=${PROFILEDIR}/generic.xml

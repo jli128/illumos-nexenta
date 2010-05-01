@@ -73,12 +73,5 @@ include drv_utils
 # 11ab,4380 - 88E8057 (can TX, but RX fails)
 #
 
-pkg_drvadd -i \
-    '"pciex11ab,4354"
-    "pciex11ab,4355"
-    "pciex11ab,4362"
-    "pciex11ab,4363"
-    "pciex11ab,4364"
-    "pciex11ab,436a"
-    "pciex1186,4b00"' \
+pkg_drvadd -i '"pciex11ab,4354" "pciex11ab,4355" "pciex11ab,4362" "pciex11ab,4363" "pciex11ab,4364" "pciex11ab,436a" "pciex1186,4b00"' \
     -m '* 0666 root sys' yge || exit 1

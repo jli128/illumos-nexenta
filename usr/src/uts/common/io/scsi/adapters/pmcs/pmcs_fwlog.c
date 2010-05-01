@@ -43,6 +43,7 @@ static int pmcs_dump_gsm_addiregs(pmcs_hw_t *, caddr_t, uint32_t);
 static int pmcs_dump_hsst_sregs(pmcs_hw_t *, caddr_t, uint32_t);
 static int pmcs_dump_sspa_sregs(pmcs_hw_t *, caddr_t, uint32_t);
 static int pmcs_dump_fwlog(pmcs_hw_t *, caddr_t, uint32_t);
+static void pmcs_write_fwlog(pmcs_hw_t *, pmcs_fw_event_hdr_t *);
 
 /*
  * Dump internal registers. Used after a firmware crash.
@@ -88,6 +89,14 @@ pmcs_register_dump_int(pmcs_hw_t *pwp)
 	n = pmcs_dump_ioqs(pwp, buf, size_left);
 	ASSERT(size_left >= n);
 	buf += n; size_left -= n;
+
+	if (pwp->state == STATE_DEAD) {
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: HBA dead, skipping AAP1/IOP registers and event logs",
+		    __func__);
+		goto skip_logs;
+	}
+
 	mutex_exit(&pwp->lock);
 	slice = (PMCS_REGISTER_DUMP_FLASH_SIZE / PMCS_FLASH_CHUNK_SIZE);
 	n = snprintf(buf, size_left, "\nDump AAP1 register: \n"
@@ -193,6 +202,7 @@ pmcs_register_dump_int(pmcs_hw_t *pwp)
 	}
 	mutex_enter(&pwp->lock);
 
+skip_logs:
 	n = pmcs_dump_gsm_addiregs(pwp, buf, size_left);
 	ASSERT(size_left >= n);
 	buf += n; size_left -= n;
@@ -499,14 +509,12 @@ pmcs_dump_mpi_table(pmcs_hw_t *pwp, caddr_t buf, uint32_t size_left)
 		    (pmcs_rd_mpi_tbl(pwp, PMCS_MPI_SSP_TENQ +
 		    (woff << 2)) >> shf) & 0xff);
 	}
-	for (uint8_t i = 0; i < pwp->nphy; i++) {
-		uint32_t woff = i / 4;
-		uint32_t shf = (i % 4) * 8;
-		n += snprintf(&buf[n], (size_left - n), "SMP Target "
-		    "Event Notification Queue - PHY ID %d = 0x%02x\n", i,
-		    (pmcs_rd_mpi_tbl(pwp, PMCS_MPI_SMP_TENQ +
-		    (woff << 2)) >> shf) & 0xff);
-	}
+
+	n += snprintf(&buf[n], (size_left - n), "I/O Abort Delay = 0x%04x\n",
+	    pmcs_rd_mpi_tbl(pwp, PMCS_MPI_IOABTDLY) & 0xffff);
+	n += snprintf(&buf[n], (size_left - n),
+	    "Customization Setting = 0x%08x\n",
+	    pmcs_rd_mpi_tbl(pwp, PMCS_MPI_CUSTSET));
 	n += snprintf(&buf[n], (size_left - n), "MSGU Event Log Buffer Address "
 	    "Higher = 0x%08x\n", pmcs_rd_mpi_tbl(pwp, PMCS_MPI_MELBAH));
 	n += snprintf(&buf[n], (size_left - n), "MSGU Event Log Buffer Address "
@@ -676,30 +684,31 @@ pmcs_dump_gsm_conf(pmcs_hw_t *pwp, caddr_t buf, uint32_t size_left)
 	n += snprintf(&buf[n], (size_left - n), "\nDump GSM configuration "
 	    "registers: \n -----------------\n");
 	n += snprintf(&buf[n], (size_left - n), "RB6 Access Register = "
-	    "0x%08x\n", pmcs_rd_gsm_reg(pwp, RB6_ACCESS));
+	    "0x%08x\n", pmcs_rd_gsm_reg(pwp, 0, RB6_ACCESS));
 	n += snprintf(&buf[n], (size_left - n), "CFG and RST = 0x%08x\n",
-	    pmcs_rd_gsm_reg(pwp, GSM_CFG_AND_RESET));
+	    pmcs_rd_gsm_reg(pwp, 0, GSM_CFG_AND_RESET));
 	n += snprintf(&buf[n], (size_left - n), "RAM ECC ERR INDICATOR= "
-	    "0x%08x\n", pmcs_rd_gsm_reg(pwp, RAM_ECC_DOUBLE_ERROR_INDICATOR));
+	    "0x%08x\n", pmcs_rd_gsm_reg(pwp, 0,
+	    RAM_ECC_DOUBLE_ERROR_INDICATOR));
 	n += snprintf(&buf[n], (size_left - n), "READ ADR PARITY CHK EN = "
-	    "0x%08x\n", pmcs_rd_gsm_reg(pwp, READ_ADR_PARITY_CHK_EN));
+	    "0x%08x\n", pmcs_rd_gsm_reg(pwp, 0, READ_ADR_PARITY_CHK_EN));
 	n += snprintf(&buf[n], (size_left - n), "WRITE ADR PARITY CHK EN = "
-	    "0x%08x\n", pmcs_rd_gsm_reg(pwp, WRITE_ADR_PARITY_CHK_EN));
+	    "0x%08x\n", pmcs_rd_gsm_reg(pwp, 0, WRITE_ADR_PARITY_CHK_EN));
 	n += snprintf(&buf[n], (size_left - n), "WRITE DATA PARITY CHK EN= "
-	    "0x%08x\n", pmcs_rd_gsm_reg(pwp, WRITE_DATA_PARITY_CHK_EN));
+	    "0x%08x\n", pmcs_rd_gsm_reg(pwp, 0, WRITE_DATA_PARITY_CHK_EN));
 	n += snprintf(&buf[n], (size_left - n),
 	    "READ ADR PARITY ERROR INDICATOR = 0x%08x\n",
-	    pmcs_rd_gsm_reg(pwp, READ_ADR_PARITY_ERROR_INDICATOR));
+	    pmcs_rd_gsm_reg(pwp, 0, READ_ADR_PARITY_ERROR_INDICATOR));
 	n += snprintf(&buf[n], (size_left - n),
 	    "WRITE ADR PARITY ERROR INDICATOR = 0x%08x\n",
-	    pmcs_rd_gsm_reg(pwp, WRITE_ADR_PARITY_ERROR_INDICATOR));
+	    pmcs_rd_gsm_reg(pwp, 0, WRITE_ADR_PARITY_ERROR_INDICATOR));
 	n += snprintf(&buf[n], (size_left - n),
 	    "WRITE DATA PARITY ERROR INDICATOR = 0x%08x\n",
-	    pmcs_rd_gsm_reg(pwp, WRITE_DATA_PARITY_ERROR_INDICATOR));
+	    pmcs_rd_gsm_reg(pwp, 0, WRITE_DATA_PARITY_ERROR_INDICATOR));
 	n += snprintf(&buf[n], (size_left - n), "NMI Enable VPE0 IOP Register"
-	    " = 0x%08x\n", pmcs_rd_gsm_reg(pwp, NMI_EN_VPE0_IOP));
+	    " = 0x%08x\n", pmcs_rd_gsm_reg(pwp, 0, NMI_EN_VPE0_IOP));
 	n += snprintf(&buf[n], (size_left - n), "NMI Enable VPE0 AAP1 Register"
-	    " = 0x%08x\n", pmcs_rd_gsm_reg(pwp, NMI_EN_VPE0_AAP1));
+	    " = 0x%08x\n", pmcs_rd_gsm_reg(pwp, 0, NMI_EN_VPE0_AAP1));
 	n += snprintf(&buf[n], (size_left - n), "-----------------\n"
 	    "Dump GSM configuration registers end \n");
 	return (n);
@@ -881,7 +890,7 @@ pmcs_dump_gsm_addiregs(pmcs_hw_t *pwp, caddr_t buf, uint32_t size_left)
 		if (nums == 0) {
 			n += snprintf(&buf[n], (size_left - n),
 			    "[%04X]: %08X\n", gsm_spregs[i].offset_start,
-			    pmcs_rd_gsm_reg(pwp, gsm_addr));
+			    pmcs_rd_gsm_reg(pwp, 0, gsm_addr));
 		} else if (nums > 0) {
 			n += snprintf(&buf[n], (size_left - n),
 			    "\n[%04X] - [%04X]: \n", gsm_spregs[i].offset_start,
@@ -892,7 +901,7 @@ pmcs_dump_gsm_addiregs(pmcs_hw_t *pwp, caddr_t buf, uint32_t size_left)
 				addr = gsm_addr + j * 4;
 				n += snprintf(&buf[n], (size_left - n),
 				    "[%04X]: %08X\n", addr & GSM_BASE_MASK,
-				    pmcs_rd_gsm_reg(pwp, addr));
+				    pmcs_rd_gsm_reg(pwp, 0, addr));
 				j++;
 				nums -= 4;
 			}
@@ -1081,11 +1090,13 @@ pmcs_dump_hsst_sregs(pmcs_hw_t *pwp, caddr_t buf, uint32_t size_left)
 			addr = hsst_state[i+8].offset_start +
 			    hsst_state[i+8].shift_addr;
 			n += snprintf(&buf[n], (size_left - n),
-			    "[%08X]: %08X\t", addr, pmcs_rd_gsm_reg(pwp, addr));
+			    "[%08X]: %08X\t", addr, pmcs_rd_gsm_reg(pwp, 0,
+			    addr));
 			addr = hsst_state[i+16].offset_start +
 			    hsst_state[i+16].shift_addr;
 			n += snprintf(&buf[n], (size_left - n),
-			    "[%08X]: %08X\n", addr, pmcs_rd_gsm_reg(pwp, addr));
+			    "[%08X]: %08X\n", addr, pmcs_rd_gsm_reg(pwp, 0,
+			    addr));
 		}
 
 	}
@@ -1110,11 +1121,11 @@ pmcs_dump_sspa_sregs(pmcs_hw_t *pwp, caddr_t buf, uint32_t size_left)
 			    sspa_state[i].desc ? sspa_state[i].desc : "NULL");
 		}
 		addr = sspa_state[i].offset_start + sspa_state[i].shift_addr;
-		rv = pmcs_rd_gsm_reg(pwp, addr);
+		rv = pmcs_rd_gsm_reg(pwp, 0, addr);
 		rv |= PMCS_SSPA_CONTROL_REGISTER_BIT27;
 		pmcs_wr_gsm_reg(pwp, addr, rv);
 		n += snprintf(&buf[n], (size_left - n), "[%08X]: %08X \n",
-		    addr, pmcs_rd_gsm_reg(pwp, addr));
+		    addr, pmcs_rd_gsm_reg(pwp, 0, addr));
 
 	}
 	return (n);
@@ -1155,4 +1166,174 @@ pmcs_dump_feregs(pmcs_hw_t *pwp, uint32_t *addr, uint8_t nvmd,
 		    "%c", ptr[i + offset]);
 	}
 	return (i);
+}
+
+/*
+ * Write out either the AAP1 or IOP event log
+ */
+static void
+pmcs_write_fwlog(pmcs_hw_t *pwp, pmcs_fw_event_hdr_t *fwlogp)
+{
+	struct vnode *vnp;
+	caddr_t fwlogfile, bufp;
+	rlim64_t rlimit;
+	ssize_t resid;
+	offset_t offset = 0;
+	int error;
+	uint32_t data_len;
+
+	if (fwlogp == pwp->fwlogp_aap1) {
+		fwlogfile = pwp->fwlogfile_aap1;
+	} else {
+		fwlogfile = pwp->fwlogfile_iop;
+	}
+
+	if ((error = vn_open(fwlogfile, UIO_SYSSPACE, FCREAT|FWRITE, 0644,
+	    &vnp, CRCREAT, 0)) != 0) {
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: Could not create '%s', error %d", __func__,
+		    fwlogfile, error);
+		return;
+	}
+
+	bufp = (caddr_t)fwlogp;
+	data_len = PMCS_FWLOG_SIZE / 2;
+	rlimit = data_len + 1;
+	for (;;) {
+		error = vn_rdwr(UIO_WRITE, vnp, bufp, data_len, offset,
+		    UIO_SYSSPACE, FSYNC, rlimit, CRED(), &resid);
+		if (error) {
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+			    "%s: could not write %s, error %d", __func__,
+			    fwlogfile, error);
+			break;
+		}
+		if (resid == data_len) {
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+			    "%s: Out of space in %s, error %d", __func__,
+			    fwlogfile, error);
+			error = ENOSPC;
+			break;
+		}
+		if (resid == 0)
+			break;
+		offset += (data_len - resid);
+		data_len = (ssize_t)resid;
+	}
+
+	if (error = VOP_CLOSE(vnp, FWRITE, 1, (offset_t)0, kcred, NULL)) {
+		if (!error) {
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+			    "%s: Error on close %s, error %d", __func__,
+			    fwlogfile, error);
+		}
+	}
+
+	VN_RELE(vnp);
+}
+
+/*
+ * Check the in-memory event log.  If it's filled up to or beyond the
+ * threshold, write it out to the configured filename.
+ */
+void
+pmcs_gather_fwlog(pmcs_hw_t *pwp)
+{
+	uint32_t num_entries_aap1, num_entries_iop, fname_suffix;
+
+	ASSERT(!mutex_owned(&pwp->lock));
+
+	/*
+	 * Get our copies of the latest indices
+	 */
+	pwp->fwlog_latest_idx_aap1 = pwp->fwlogp_aap1->fw_el_latest_idx;
+	pwp->fwlog_latest_idx_iop = pwp->fwlogp_iop->fw_el_latest_idx;
+
+	/*
+	 * We need entries in the log before we can know how big they are
+	 */
+	if ((pwp->fwlog_max_entries_aap1 == 0) &&
+	    (pwp->fwlogp_aap1->fw_el_latest_idx != 0)) {
+		pwp->fwlog_max_entries_aap1 =
+		    (PMCS_FWLOG_SIZE / 2) / pwp->fwlogp_aap1->fw_el_entry_size;
+		pwp->fwlog_threshold_aap1 =
+		    (pwp->fwlog_max_entries_aap1 * PMCS_FWLOG_THRESH) / 100;
+	}
+
+	if ((pwp->fwlog_max_entries_iop == 0) &&
+	    (pwp->fwlogp_iop->fw_el_latest_idx != 0)) {
+		pwp->fwlog_max_entries_iop =
+		    (PMCS_FWLOG_SIZE / 2) / pwp->fwlogp_iop->fw_el_entry_size;
+		pwp->fwlog_threshold_iop =
+		    (pwp->fwlog_max_entries_iop * PMCS_FWLOG_THRESH) / 100;
+	}
+
+	/*
+	 * Check if we've reached the threshold in the AAP1 log.  We do this
+	 * by comparing the latest index with our copy of the oldest index
+	 * (not the chip's).
+	 */
+	if (pwp->fwlog_latest_idx_aap1 >= pwp->fwlog_oldest_idx_aap1) {
+		/* Log has not wrapped */
+		num_entries_aap1 =
+		    pwp->fwlog_latest_idx_aap1 - pwp->fwlog_oldest_idx_aap1;
+	} else {
+		/* Log has wrapped */
+		num_entries_aap1 = pwp->fwlog_max_entries_aap1 -
+		    (pwp->fwlog_oldest_idx_aap1 - pwp->fwlog_latest_idx_aap1);
+	}
+
+	/*
+	 * Now check the IOP log
+	 */
+	if (pwp->fwlog_latest_idx_iop >= pwp->fwlog_oldest_idx_iop) {
+		/* Log has not wrapped */
+		num_entries_iop = pwp->fwlog_latest_idx_iop -
+		    pwp->fwlog_oldest_idx_iop;
+	} else {
+		/* Log has wrapped */
+		num_entries_iop = pwp->fwlog_max_entries_iop -
+		    (pwp->fwlog_oldest_idx_iop - pwp->fwlog_latest_idx_iop);
+	}
+
+	if ((num_entries_aap1 < pwp->fwlog_threshold_aap1) &&
+	    (num_entries_iop < pwp->fwlog_threshold_iop)) {
+		return;
+	}
+
+	/*
+	 * We also can't write the event log out if it's too early in boot
+	 * (i.e. the root fs isn't mounted yet).
+	 */
+	if (!modrootloaded) {
+		return;
+	}
+
+	/*
+	 * Write out the necessary log file(s), update the "oldest" pointers
+	 * and the suffix to the written filenames.
+	 */
+	if (num_entries_aap1 >= pwp->fwlog_threshold_aap1) {
+		pmcs_write_fwlog(pwp, pwp->fwlogp_aap1);
+		pwp->fwlog_oldest_idx_aap1 = pwp->fwlog_latest_idx_aap1;
+
+		fname_suffix = strlen(pwp->fwlogfile_aap1) - 1;
+		if (pwp->fwlogfile_aap1[fname_suffix] == '4') {
+			pwp->fwlogfile_aap1[fname_suffix] = '0';
+		} else {
+			++pwp->fwlogfile_aap1[fname_suffix];
+		}
+	}
+
+	if (num_entries_iop >= pwp->fwlog_threshold_iop) {
+		pmcs_write_fwlog(pwp, pwp->fwlogp_iop);
+		pwp->fwlog_oldest_idx_iop = pwp->fwlog_latest_idx_iop;
+
+		fname_suffix = strlen(pwp->fwlogfile_iop) - 1;
+		if (pwp->fwlogfile_iop[fname_suffix] == '4') {
+			pwp->fwlogfile_iop[fname_suffix] = '0';
+		} else {
+			++pwp->fwlogfile_iop[fname_suffix];
+		}
+	}
 }

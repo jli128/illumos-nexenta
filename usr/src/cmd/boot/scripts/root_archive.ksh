@@ -41,6 +41,8 @@
 #   are (un)cpio'd as well
 #
 
+export SUN_PERSONALITY=1
+
 usage()
 {
 	printf "usage: root_archive pack <archive> <root>\n"

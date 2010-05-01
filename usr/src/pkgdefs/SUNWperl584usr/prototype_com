@@ -45,7 +45,7 @@ i depend
 # SUNWperl584usr
 #
 d none usr 0755 root sys
-d none usr/bin 0755 root bin
+#d none usr/bin 0755 root bin
 d none usr/perl5 0755 root bin
 d none usr/perl5/5.8.4 0755 root bin
 d none usr/perl5/5.8.4/bin 0755 root bin

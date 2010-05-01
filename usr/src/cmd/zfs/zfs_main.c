@@ -1125,8 +1125,8 @@ get_callback(zfs_handle_t *zhp, void *data)
 		 * Skip the special fake placeholder.  This will also skip over
 		 * the name property when 'all' is specified.
 		 */
-		if (pl->pl_prop == ZFS_PROP_NAME &&
-		    pl == cbp->cb_proplist)
+		if ((pl->pl_prop == ZFS_PROP_SHAREISCSI) ||
+		    (pl->pl_prop == ZFS_PROP_NAME && pl == cbp->cb_proplist))
 			continue;
 
 		if (pl->pl_prop != ZPROP_INVAL) {
@@ -2491,6 +2491,11 @@ zfs_do_set(int argc, char **argv)
 	if (*cb.cb_propname == '\0') {
 		(void) fprintf(stderr,
 		    gettext("missing property in property=value argument\n"));
+		usage(B_FALSE);
+	}
+
+	if (!strncmp(cb.cb_propname, "shareiscsi", strlen("shareiscsi"))) {
+		(void) fprintf(stderr,"invalid property\n");
 		usage(B_FALSE);
 	}
 

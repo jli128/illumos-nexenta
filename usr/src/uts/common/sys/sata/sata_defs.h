@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -242,10 +242,14 @@ typedef struct sata_id {
 	ushort_t ai_rmsn;	   /* 127 removable media notification	  */
 	ushort_t ai_securestatus;  /* 128 security status		  */
 	ushort_t ai_vendor[31];	   /* 129-159 vendor specific		  */
-	ushort_t ai_padding3[16];  /* 160 pad to 176			  */
+	ushort_t ai_padding3[8];   /* 160 pad to 168			  */
+	ushort_t ai_nomformfactor; /* 168 nominal form factor		  */
+	ushort_t ai_padding4[7];   /* 169 pad to 176			  */
 	ushort_t ai_curmedser[30]; /* 176-205 current media serial #	  */
 	ushort_t ai_sctsupport;	   /* 206 SCT command transport		  */
-	ushort_t ai_padding4[48];  /* 207 pad to 255			  */
+	ushort_t ai_padding5[10];  /* 207 pad to 217			  */
+	ushort_t ai_medrotrate;	   /* 217 nominal media rotation rate	  */
+	ushort_t ai_padding6[37];  /* 218 pad to 255			  */
 	ushort_t ai_integrity;	   /* 255 integrity word		  */
 } sata_id_t;
 
@@ -263,6 +267,7 @@ typedef struct sata_id {
 #define	SATA_ID_MODEL_OFFSET	27
 #define	SATA_ID_MODEL_LEN	40
 #define	SATA_ID_FW_LEN		8
+#define	SATA_ID_BDC_LEN		0x3c
 
 /* Identify Device: common capability bits - word 49 */
 
@@ -308,6 +313,12 @@ typedef struct sata_id {
 #define	SATA_SMART_SELF_TEST_SUPPORTED	0x0002	/* SMART self-test supported */
 /* IDLE IMMEDIATE with UNLOAD FEATURE supported */
 #define	SATA_IDLE_UNLOAD_SUPPORTED	0x2000
+
+/* Identify Device: physical sector size - word 106 */
+#define	SATA_L2PS_CHECK_BIT	0x4000	/* Set when this word valid */
+#define	SATA_L2PS_HAS_MULT	0x2000	/* Multiple logical sectors per phys */
+#define	SATA_L2PS_BIG_SECTORS	0x1000	/* Logical sector size > 512 */
+#define	SATA_L2PS_EXP_MASK	0x000f	/* Logical sectors per phys exponent */
 
 /* Identify (Packet) Device word 63,  ATA/ATAPI-6 & 7 */
 #define	SATA_MDMA_SEL_MASK	0x0700	/* Multiword DMA selected */
@@ -607,7 +618,7 @@ struct read_log_ext_directory {
 
 /*
  * SMART specific data
- * These eventually need to go to a generic scsi hearder file
+ * These eventually need to go to a generic scsi header file
  * for now they will reside here
  */
 #define	PC_CUMULATIVE_VALUES			0x01

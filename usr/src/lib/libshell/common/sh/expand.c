@@ -39,6 +39,7 @@
 #include	<ls.h>
 #include	<stak.h>
 #include	<ast_dir.h>
+#include	<ctype.h>
 #include	"io.h"
 #include	"path.h"
 

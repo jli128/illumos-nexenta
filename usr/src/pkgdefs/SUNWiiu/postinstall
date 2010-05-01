@@ -186,7 +186,7 @@ then
     ${REM_DRV} ${MODULE} > ${ERROR_LOG} 2>&1
     [ $? -ne 0 ] && {
 	message "${REMERR}"
-	exit ${FAILURE}
+	exit 0
     }
 fi
 
@@ -199,7 +199,7 @@ add_devlink "type=ddi_pseudo;name=${MODULE}" '\D'
 ${ADD_DRV} $NOPT -m '* 0666 root sys' ${MODULE} > ${ERROR_LOG} 2>&1
 [ $? -ne 0 ] && {
     message "${ADDERR}"
-    exit ${FAILURE}
+    exit 0
 }
 
 # deal with upgrades from AVS 3.2

@@ -69,6 +69,18 @@ ziprintf(const char *fmt, ...)
 	va_end(ap);
 }
 
+static void
+compress_slashes(const char *src, char *dest)
+{
+	while (*src != '\0') {
+		*dest = *src++;
+		while (*dest == '/' && *src == '/')
+			++src;
+		++dest;
+	}
+	*dest = '\0';
+}
+
 /*
  * Given a full path to a file, translate into a dataset name and a relative
  * path within the dataset.  'dataset' must be at least MAXNAMELEN characters,
@@ -76,13 +88,16 @@ ziprintf(const char *fmt, ...)
  * buffer, which we need later to get the object ID.
  */
 static int
-parse_pathname(const char *fullpath, char *dataset, char *relpath,
+parse_pathname(const char *inpath, char *dataset, char *relpath,
     struct stat64 *statbuf)
 {
 	struct extmnttab mp;
 	FILE *fp;
 	int match;
 	const char *rel;
+	char fullpath[MAXPATHLEN];
+
+	compress_slashes(inpath, fullpath);
 
 	if (fullpath[0] != '/') {
 		(void) fprintf(stderr, "invalid object '%s': must be full "
@@ -468,6 +483,14 @@ translate_device(const char *pool, const char *device, err_type_t label_type,
 	case TYPE_LABEL_NVLIST:
 		record->zi_start = offsetof(vdev_label_t, vl_vdev_phys);
 		record->zi_end = record->zi_start + VDEV_PHYS_SIZE - 1;
+		break;
+	case TYPE_LABEL_PAD1:
+		record->zi_start = offsetof(vdev_label_t, vl_pad1);
+		record->zi_end = record->zi_start + VDEV_PAD_SIZE - 1;
+		break;
+	case TYPE_LABEL_PAD2:
+		record->zi_start = offsetof(vdev_label_t, vl_pad2);
+		record->zi_end = record->zi_start + VDEV_PAD_SIZE - 1;
 		break;
 	}
 	return (0);

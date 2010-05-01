@@ -19,10 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
 
 /*
  * USBA: Solaris USB Architecture support for the hub
@@ -138,6 +136,8 @@ struct bus_ops usba_hubdi_busops =	{
 	hubd_bus_power			/* bus_power */
 };
 
+#define	USB_HUB_INTEL_VID	0x8087
+#define	USB_HUB_INTEL_PID	0x0020
 
 /*
  * local variables
@@ -151,6 +151,7 @@ uint_t			hubdi_errlevel = USB_LOG_L4;
 uint_t			hubdi_errmask = (uint_t)-1;
 uint8_t			hubdi_min_pm_threshold = 5; /* seconds */
 uint8_t			hubdi_reset_delay = 20; /* seconds */
+extern int modrootloaded;
 
 /*
  * initialize private data
@@ -3115,9 +3116,15 @@ hubd_get_hub_descriptor(hubd_t *hubd)
 	usb_cb_flags_t	cb_flags;
 	uint16_t	length;
 	int		rval;
+	usb_req_attrs_t attr = 0;
 
 	USB_DPRINTF_L4(DPRINT_MASK_HUB, hubd->h_log_handle,
 	    "hubd_get_hub_descriptor:");
+
+	if ((hubd->h_dev_data->dev_descr->idVendor == USB_HUB_INTEL_VID) &&
+	    (hubd->h_dev_data->dev_descr->idProduct == USB_HUB_INTEL_PID)) {
+		attr = USB_ATTRS_SHORT_XFER_OK;
+	}
 
 	ASSERT(mutex_owned(HUBD_MUTEX(hubd)));
 	ASSERT(hubd->h_default_pipe != 0);
@@ -3150,19 +3157,26 @@ hubd_get_hub_descriptor(hubd_t *hubd)
 		data = NULL;
 
 		/* get complete hub descriptor */
-		if ((rval = usb_pipe_sync_ctrl_xfer(hubd->h_dip,
+		rval = usb_pipe_sync_ctrl_xfer(hubd->h_dip,
 		    hubd->h_default_pipe,
 		    HUB_CLASS_REQ_TYPE,
 		    USB_REQ_GET_DESCR,		/* bRequest */
 		    USB_DESCR_TYPE_SETUP_HUB,	/* wValue */
 		    0,				/* wIndex */
 		    length,			/* wLength */
-		    &data, 0,
-		    &completion_reason, &cb_flags, 0)) != USB_SUCCESS) {
+		    &data, attr,
+		    &completion_reason, &cb_flags, 0);
+
+		/*
+		 * Hub descriptor data less than 9 bytes is not valid and
+		 * may cause trouble if we use it. See USB2.0 Tab11-13.
+		 */
+		if ((rval != USB_SUCCESS) || (MBLKL(data) <= 8)) {
 			USB_DPRINTF_L2(DPRINT_MASK_ATTA, hubd->h_log_handle,
 			    "get hub descriptor failed: "
-			    "cr=%d cb_fl=0x%x rval=%d",
-			    completion_reason, cb_flags, rval);
+			    "cr=%d cb_fl=0x%x rval=%d, len=%ld",
+			    completion_reason, cb_flags, rval,
+			    (data)?MBLKL(data):0);
 			freemsg(data);
 			mutex_enter(HUBD_MUTEX(hubd));
 
@@ -3650,9 +3664,12 @@ hubd_hotplug_thread(void *arg)
 	 * Before console is init'd, we temporarily block the hotplug
 	 * threads so that BUS_CONFIG_ONE through hubd_bus_config() can be
 	 * processed quickly. This reduces the time needed for vfs_mountroot()
-	 * to mount the root FS from a USB disk.
+	 * to mount the root FS from a USB disk. And on SPARC platform,
+	 * in order to load 'consconfig' successfully after OBP is gone,
+	 * we need to check 'modrootloaded' to make sure root filesystem is
+	 * available.
 	 */
-	while (!consconfig_console_is_ready()) {
+	while (!modrootloaded || !consconfig_console_is_ready()) {
 		delay(drv_usectohz(10000));
 	}
 

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/dmu_objset.h>
@@ -2314,12 +2313,7 @@ dsl_dataset_rename(char *oldname, const char *newname, boolean_t recursive)
 	err = dsl_dir_open(oldname, FTAG, &dd, &tail);
 	if (err)
 		return (err);
-	/*
-	 * If there are more than 2 references there may be holds
-	 * hanging around that haven't been cleared out yet.
-	 */
-	if (dmu_buf_refcount(dd->dd_dbuf) > 2)
-		txg_wait_synced(dd->dd_pool, 0);
+
 	if (tail == NULL) {
 		int delta = strlen(newname) - strlen(oldname);
 
@@ -2328,11 +2322,12 @@ dsl_dataset_rename(char *oldname, const char *newname, boolean_t recursive)
 			err = dmu_objset_find(oldname, dsl_valid_rename,
 			    &delta, DS_FIND_CHILDREN | DS_FIND_SNAPSHOTS);
 
-		if (!err)
+		if (err == 0)
 			err = dsl_dir_rename(dd, newname);
 		dsl_dir_close(dd, FTAG);
 		return (err);
 	}
+
 	if (tail[0] != '@') {
 		/* the name ended in a nonexistent component */
 		dsl_dir_close(dd, FTAG);
@@ -3580,7 +3575,9 @@ dsl_dataset_user_release_one(const char *dsname, void *arg)
 
 	if (might_destroy) {
 #ifdef _KERNEL
+		name = kmem_asprintf("%s@%s", dsname, ha->snapname);
 		error = zfs_unmount_snap(name, NULL);
+		strfree(name);
 		if (error) {
 			dsl_dataset_rele(ds, dtag);
 			return (error);

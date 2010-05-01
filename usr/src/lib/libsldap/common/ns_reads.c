@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2143,6 +2143,8 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 	ns_ldap_error_t *error = NULL;
 	ns_ldap_error_t **errorp;
 	struct timeval	tv;
+	int		entry_state = state;
+	int		nsearch_count = 0;
 
 	errorp = &error;
 	cookie->state = state;
@@ -2266,6 +2268,7 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 			cookie->new_state = EXIT;
 			break;
 		case NEXT_SEARCH:
+			nsearch_count++;
 			/* setup referrals search if necessary */
 			if (cookie->refpos) {
 				if (setup_referral_search(cookie) < 0) {
@@ -2470,6 +2473,7 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 						cookie->resultMsg = NULL;
 						return (cookie->new_state);
 					}
+					sleep(1);
 					rc = LDAP_TIMEOUT;
 					break;
 				case -1:
@@ -2594,6 +2598,7 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 						cookie->resultMsg = NULL;
 						return (cookie->new_state);
 					}
+					sleep(1);
 					rc = LDAP_TIMEOUT;
 					break;
 				case -1:
@@ -2812,6 +2817,11 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 			return (ERROR);
 		}
 
+		if (nsearch_count > 64 && entry_state == INIT) {
+			cookie->err_rc = LDAP_SERVER_DOWN;
+			cookie->new_state = EXIT;
+		}
+
 		if (cookie->conn_user != NULL &&
 		    cookie->conn_user->bad_mt_conn ==  B_TRUE) {
 			__s_api_conn_mt_close(cookie->conn_user, 0, NULL);
@@ -2960,7 +2970,7 @@ ldap_list(
 
 	/* get the service descriptor - or create a default one */
 	rc = __s_api_get_SSD_from_SSDtoUse_service(service,
-	    &sdlist, errorp);
+	    &sdlist, &error);
 	if (rc != NS_LDAP_SUCCESS) {
 		delete_search_cookie(cookie);
 		*errorp = error;
@@ -3563,7 +3573,7 @@ firstEntry(
 
 	/* get the service descriptor - or create a default one */
 	rc = __s_api_get_SSD_from_SSDtoUse_service(service,
-	    &sdlist, errorp);
+	    &sdlist, &error);
 	if (rc != NS_LDAP_SUCCESS) {
 		*errorp = error;
 		return (rc);

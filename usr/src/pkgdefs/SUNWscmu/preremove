@@ -35,7 +35,7 @@ export PATH
 DEVLINKTB="${PKG_INSTALL_ROOT}/etc/devlink.tab"
 FAILURE=1
 NAMEMAJOR="${PKG_INSTALL_ROOT}/etc/name_to_major"
-PKG_INSTALL_ROOT=${PKG_INSTALL_ROOT:=/}
+PKG_INSTALL_ROOT=/etc/..
 # reconfig order
 CFGMODULES="nskern ncall nsctl sdbc"
 # reverse dependency order
@@ -112,7 +112,7 @@ do
 	    ${REM_DRV} ${MODULE} > ${ERRLOG} 2>&1
 	    [ $? -ne 0 ] && {
 		message ${REMOVERR}
-		exit ${FAILURE}
+		exit 0
 	    } 
 	fi
 
@@ -128,8 +128,8 @@ do
  		modunload -i ${MODID}
  		if [ $? -ne 0 ]
  		then
- 			echo "Error: Failed to unload $MODULE module."
- 			exit 1
+ 			echo "Warning: Failed to unload $MODULE module."
+ 			exit 0
  		fi
  	fi
  	fi
@@ -146,7 +146,7 @@ then
 	if [ $? -ne 0 ]
 	then
 		echo "Warning: Failed to unload spuni module."
-		exit 1
+		exit 0
 	fi
 fi
 fi

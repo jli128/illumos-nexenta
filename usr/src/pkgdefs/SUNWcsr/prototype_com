@@ -59,6 +59,7 @@ i i.group
 i i.etcrpc
 i i.etcprofile
 i i.mailxrc
+i i.magic
 i i.initd
 i i.locallogin
 i i.localprofile
@@ -86,7 +87,14 @@ i i.seedmanifest
 #
 # SUNWcsr
 #
-s none bin=./usr/bin
+#s none bin=./usr/bin
+d none boot 755 root sys
+d none boot/solaris 755 root sys
+d none boot/solaris/bin 0755 root sys
+f none boot/solaris/bin/create_ramdisk 0555 root sys
+f none boot/solaris/bin/extract_boot_filelist 0555 root sys
+f none boot/solaris/filelist.ramdisk 0644 root sys
+f none boot/solaris/filelist.safe 0644 root sys
 d none dev 755 root sys
 d none etc 755 root sys
 e renamenew etc/.login 644 root sys
@@ -124,7 +132,7 @@ e defkbd etc/default/kbd 644 root sys
 e preserve etc/default/keyserv 644 root sys
 e deflogin etc/default/login 644 root sys
 e preserve etc/default/nss 644 root sys
-e defpasswd etc/default/passwd 644 root sys
+#e defpasswd etc/default/passwd 644 root sys
 e defsu etc/default/su 644 root sys
 e preserve etc/default/syslogd 644 root sys
 e preserve etc/default/tar 644 root sys
@@ -156,7 +164,7 @@ s none etc/fsck=../usr/sbin/fsck
 s none etc/fsdb=../usr/sbin/fsdb
 s none etc/fstyp=../usr/sbin/fstyp
 s none etc/getty=../usr/lib/saf/ttymon
-e group etc/group 644 root sys
+#e group etc/group 644 root sys
 s none etc/grpck=../usr/sbin/grpck
 s none etc/halt=../usr/sbin/halt
 s none etc/hosts=./inet/hosts
@@ -195,13 +203,13 @@ s none etc/lib/nss_files.so.1=../../lib/nss_files.so.1
 s none etc/log=../var/adm/log
 e logadmconf etc/logadm.conf 644 root sys
 e logindevperm etc/logindevperm 644 root sys
-f none etc/magic 444 root bin
+e magic etc/magic 444 root bin
 d none etc/mail 755 root mail
 e mailxrc etc/mail/mailx.rc 644 root bin
 s none etc/mkfs=../usr/sbin/mkfs
 s none etc/mknod=../usr/sbin/mknod
-v preserve etc/mnttab 444 root root
-v none etc/motd 644 root sys
+#v preserve etc/mnttab 444 root root
+#v none etc/motd 644 root sys
 s none etc/mount=../sbin/mount
 s none etc/mountall=../sbin/mountall
 s none etc/ncheck=../usr/sbin/ncheck
@@ -224,8 +232,8 @@ f none etc/nsswitch.ldap 644 root sys
 f none etc/nsswitch.dns 644 root sys
 f none etc/nsswitch.ad 644 root sys
 d none etc/opt 755 root sys
-e passwd etc/passwd 644 root sys
-e etcprofile etc/profile 644 root sys
+#e passwd etc/passwd 644 root sys
+#e etcprofile etc/profile 644 root sys
 e preserve etc/project 644 root sys
 s none etc/protocols=./inet/protocols
 s none etc/prtconf=../usr/sbin/prtconf
@@ -245,7 +253,10 @@ l initd etc/rc2.d/S89PRESERVE=../../etc/init.d/PRESERVE
 s none etc/rc3=../sbin/rc3
 d none etc/rc3.d 755 root sys
 f none etc/rc3.d/README 644 root sys
+d none etc/rc4.d 755 root sys
+d none etc/rc5.d 755 root sys
 s none etc/rc5=../sbin/rc5
+d none etc/rc6.d 755 root sys
 s none etc/rc6=../sbin/rc6
 s none etc/rcS=../sbin/rcS
 d none etc/rcS.d 755 root sys
@@ -435,12 +446,12 @@ f none sbin/sulogin 555 root bin
 f none sbin/su.static 555 root sys
 s none sbin/su=../usr/bin/su
 f none sbin/swapadd 744 root sys
-f none sbin/sync 555 root bin
+m none usr/sun/sbin/sync 555 root bin sbin/sync
 f none sbin/tzreload 555 root bin
 f none sbin/uadmin 555 root sys
 f none sbin/umount 555 root bin
 f none sbin/umountall 555 root sys
-f none sbin/uname 555 root bin
+m none usr/sun/sbin/uname 555 root bin sbin/uname
 f none sbin/zonename 555 root bin
 d none system 755 root root
 d none system/contract 555 root root

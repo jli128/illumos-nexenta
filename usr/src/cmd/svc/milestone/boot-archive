@@ -61,14 +61,7 @@ cecho ""
 
 /sbin/bootadm update-archive -vn | grep -v "cannot find" > /dev/msglog
 
-cecho ""
-cecho "The recommended action is to reboot to the failsafe archive to correct"
-cecho "the above inconsistency.  To accomplish this, on a GRUB-based platform,"
-cecho "reboot and select the \"Solaris failsafe\" option from the boot menu."
-cecho "On an OBP-based platform, reboot then type \"boot -F failsafe\".  Then"
-cecho "follow the prompts to update the boot archive. Alternately, to continue"
-cecho "booting at your own risk, you may clear the service by running:"
-cecho "\"svcadm clear system/boot-archive\""
+cecho "The recommended action is to update the boot archive."
 cecho ""
 
-exit $SMF_EXIT_ERR_FATAL
+exit $SMF_EXIT_OK

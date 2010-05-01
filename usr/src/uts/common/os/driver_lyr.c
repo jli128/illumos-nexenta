@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -141,6 +140,7 @@ struct ldi_ev_cookie {
 static struct ldi_ev_cookie ldi_ev_cookies[] = {
 	{ LDI_EV_OFFLINE, 1, CT_DEV_EV_OFFLINE},
 	{ LDI_EV_DEGRADE, 0, CT_DEV_EV_DEGRADED},
+	{ LDI_EV_DEVICE_REMOVE, 0, 0},
 	{ NULL}			/* must terminate list */
 };
 
@@ -533,7 +533,7 @@ ldi_vp_from_dev(dev_t dev, int otyp, vnode_t **vpp)
 }
 
 /* get a vnode to a device by pathname */
-static int
+int
 ldi_vp_from_name(char *path, vnode_t **vpp)
 {
 	vnode_t			*vp = NULL;
@@ -668,7 +668,7 @@ ldi_devid_match(ddi_devid_t devid, dev_info_t *dip, dev_t dev)
 }
 
 /* get a handle to a device by devid and minor name */
-static int
+int
 ldi_vp_from_devid(ddi_devid_t devid, char *minor_name, vnode_t **vpp)
 {
 	dev_info_t		*dip;
@@ -1918,7 +1918,7 @@ ldi_ioctl(ldi_handle_t lh, int cmd, intptr_t arg, int mode,
 	struct ldi_handle	*handlep = (struct ldi_handle *)lh;
 	vnode_t			*vp;
 	dev_t			dev;
-	int			ret, copymode;
+	int			ret, copymode, unused;
 
 	if (lh == NULL)
 		return (EINVAL);
@@ -1930,6 +1930,13 @@ ldi_ioctl(ldi_handle_t lh, int cmd, intptr_t arg, int mode,
 	if (mode & FKIOCTL)
 		mode = (mode & ~FMODELS) | FNATIVE | FKIOCTL;
 
+	/*
+	 * Some drivers assume that rvalp will always be non-NULL, so in
+	 * an attempt to avoid panics if the caller passed in a NULL
+	 * value, update rvalp to point to a temporary variable.
+	 */
+	if (rvalp == NULL)
+		rvalp = &unused;
 	vp = handlep->lh_vp;
 	dev = vp->v_rdev;
 	if (handlep->lh_type & LH_CBDEV) {

@@ -45,7 +45,7 @@
 d none lib/amd64 755 root bin
 s none lib/64=amd64
 f none lib/amd64/c_synonyms.so.1 755 root bin
-f none lib/amd64/ld.so.1 755 root bin
+#f none lib/amd64/ld.so.1 755 root bin
 s none lib/amd64/libadm.so=libadm.so.1
 f none lib/amd64/libadm.so.1 755 root bin
 s none lib/amd64/libaio.so=libaio.so.1

@@ -17,10 +17,9 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ */
+/*
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -131,7 +130,7 @@ pmcs_work_not_found(pmcs_hw_t *pwp, uint32_t htag, uint32_t *iomb)
 	(void) snprintf(buf, sizeof (buf),
 	    "unable to find work structure for tag 0x%x", htag);
 
-	pmcs_print_entry(pwp, PMCS_PRT_DEBUG, buf, iomb);
+	pmcs_print_entry(pwp, PMCS_PRT_DEBUG1, buf, iomb);
 	if (htag == 0) {
 		return;
 	}
@@ -139,12 +138,12 @@ pmcs_work_not_found(pmcs_hw_t *pwp, uint32_t htag, uint32_t *iomb)
 	for (i = 0; i < 256; i++) {
 		mutex_enter(&pwp->dbglock);
 		if (pwp->ltags[i] == htag) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG1, NULL, NULL,
 			    "same tag already completed (%llu us ago)",
 			    (unsigned long long) (now - pwp->ltime[i]));
 		}
 		if (pwp->ftags[i] == htag) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG1, NULL, NULL,
 			    "same tag started (line %d) (%llu ns ago)",
 			    pwp->ftag_lines[i], (unsigned long long)
 			    (now - pwp->ftime[i]));
@@ -155,7 +154,7 @@ pmcs_work_not_found(pmcs_hw_t *pwp, uint32_t htag, uint32_t *iomb)
 	char buf[64];
 	(void) snprintf(buf, sizeof (buf),
 	    "unable to find work structure for tag 0x%x", htag);
-	pmcs_print_entry(pwp, PMCS_PRT_DEBUG, buf, iomb);
+	pmcs_print_entry(pwp, PMCS_PRT_DEBUG1, buf, iomb);
 #endif
 }
 
@@ -1233,7 +1232,11 @@ pmcs_process_abort_completion(pmcs_hw_t *pwp, void *iomb, size_t amt)
 
 	pptr = pwrk->phy;
 	if (pptr) {
-		pmcs_lock_phy(pptr);
+		/*
+		 * Don't use pmcs_lock_phy here since it could potentially lock
+		 * other PHYs beneath, which is unnecessary in this context.
+		 */
+		mutex_enter(&pptr->phy_lock);
 		pptr->abort_pending = 0;
 		pptr->abort_sent = 0;
 
@@ -1246,7 +1249,7 @@ pmcs_process_abort_completion(pmcs_hw_t *pwp, void *iomb, size_t amt)
 			cv_signal(&pptr->abort_all_cv);
 		}
 		path = pptr->path;
-		pmcs_unlock_phy(pptr);
+		mutex_exit(&pptr->phy_lock);
 	} else {
 		path = "(no phy)";
 	}
@@ -1464,17 +1467,23 @@ pmcs_check_intr_coal(void *arg)
 {
 	pmcs_hw_t	*pwp = (pmcs_hw_t *)arg;
 	uint32_t	avg_nsecs;
+	clock_t		lbolt, ret;
 	pmcs_io_intr_coal_t *ici;
 
 	ici = &pwp->io_intr_coal;
 	mutex_enter(&pwp->ict_lock);
-
 	while (ici->stop_thread == B_FALSE) {
 		/*
 		 * Wait for next time quantum... collect stats
 		 */
-		(void) cv_timedwait(&pwp->ict_cv, &pwp->ict_lock,
-		    ddi_get_lbolt() + ici->quantum);
+		lbolt = ddi_get_lbolt();
+		while (ici->stop_thread == B_FALSE) {
+			ret = cv_timedwait(&pwp->ict_cv, &pwp->ict_lock,
+			    lbolt + ici->quantum);
+			if (ret == -1) {
+				break;
+			}
+		}
 
 		if (ici->stop_thread == B_TRUE) {
 			continue;
@@ -1534,6 +1543,18 @@ pmcs_check_intr_coal(void *arg)
 		ici->nsecs_between_intrs = 0;
 		ici->num_intrs = 0;
 		ici->num_io_completions = 0;
+
+		/*
+		 * If a firmware event log file is configured, check to see
+		 * if it needs to be written to the file.  We do this here
+		 * because writing to a file from a callout thread (i.e.
+		 * from the watchdog timer) can cause livelocks.
+		 */
+		if (pwp->fwlog_file) {
+			mutex_exit(&pwp->ict_lock);
+			pmcs_gather_fwlog(pwp);
+			mutex_enter(&pwp->ict_lock);
+		}
 	}
 
 	mutex_exit(&pwp->ict_lock);

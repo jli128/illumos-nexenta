@@ -48,7 +48,7 @@ f none boot/grub/ffs_stage1_5 0644 root sys
 f none boot/grub/install_menu 0644 root sys
 f none boot/grub/iso9660_stage1_5 0644 root sys
 f none boot/grub/jfs_stage1_5 0644 root sys
-e preserve boot/grub/menu.lst 0644 root sys
+#e preserve boot/grub/menu.lst 0644 root sys
 e preserve boot/grub/default 0444 root sys
 f none boot/grub/minix_stage1_5 0644 root sys
 f none boot/grub/nbgrub 0644 root sys
@@ -62,5 +62,5 @@ f none boot/grub/zfs_stage1_5 0644 root sys
 f none boot/grub/vstafs_stage1_5 0644 root sys
 f none boot/grub/xfs_stage1_5 0644 root sys
 f none boot/grub/stage1 0644 root sys
-f none boot/grub/splash.xpm.gz 0644 root sys
+#f none boot/grub/splash.xpm.gz 0644 root sys
 f none boot/grub/capability 0444 root sys

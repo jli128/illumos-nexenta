@@ -1427,9 +1427,7 @@ rfs4_op_commit(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		goto out;
 	}
 
-	error = VOP_PUTPAGE(vp, args->offset, args->count, 0, cr, NULL);
-	if (!error)
-		error = VOP_FSYNC(vp, FNODSYNC, cr, NULL);
+	error = VOP_FSYNC(vp, FSYNC, cr, NULL);
 
 	if (error) {
 		*cs->statusp = resp->status = puterrno4(error);
@@ -1623,6 +1621,8 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 
 	if (status != NFS4_OK) {
 		*cs->statusp = resp->status = status;
+		if (name != nm)
+			kmem_free(name, MAXPATHLEN + 1);
 		kmem_free(nm, len);
 		nfs4_ntov_table_free(&ntov, &sarg);
 		resp->attrset = 0;
@@ -1630,10 +1630,12 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	}
 
 	/* Get "before" change value */
-	bva.va_mask = AT_CTIME|AT_SEQ;
+	bva.va_mask = AT_CTIME|AT_SEQ|AT_MODE;
 	error = VOP_GETATTR(dvp, &bva, 0, cr, NULL);
 	if (error) {
 		*cs->statusp = resp->status = puterrno4(error);
+		if (name != nm)
+			kmem_free(name, MAXPATHLEN + 1);
 		kmem_free(nm, len);
 		nfs4_ntov_table_free(&ntov, &sarg);
 		resp->attrset = 0;
@@ -1644,14 +1646,15 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	vap = sarg.vap;
 
 	/*
-	 * Set default initial values for attributes when not specified
-	 * in createattrs.
+	 * Set the default initial values for attributes when the parent
+	 * directory does not have the VSUID/VSGID bit set and they have
+	 * not been specified in createattrs.
 	 */
-	if ((vap->va_mask & AT_UID) == 0) {
+	if (!(bva.va_mode & VSUID) && (vap->va_mask & AT_UID) == 0) {
 		vap->va_uid = crgetuid(cr);
 		vap->va_mask |= AT_UID;
 	}
-	if ((vap->va_mask & AT_GID) == 0) {
+	if (!(bva.va_mode & VSGID) && (vap->va_mask & AT_GID) == 0) {
 		vap->va_gid = crgetgid(cr);
 		vap->va_mask |= AT_GID;
 	}
@@ -1664,7 +1667,7 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 			vap->va_mode = 0700;	/* default: owner rwx only */
 			vap->va_mask |= AT_MODE;
 		}
-		error = VOP_MKDIR(dvp, nm, vap, &vp, cr, NULL, 0, NULL);
+		error = VOP_MKDIR(dvp, name, vap, &vp, cr, NULL, 0, NULL);
 		if (error)
 			break;
 
@@ -1723,11 +1726,10 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 			goto out;
 		}
 
-		error = VOP_SYMLINK(dvp, nm, vap, lnm, cr, NULL, 0);
+		error = VOP_SYMLINK(dvp, name, vap, lname, cr, NULL, 0);
 		if (lname != lnm)
 			kmem_free(lname, MAXPATHLEN + 1);
-		if (lnm != NULL)
-			kmem_free(lnm, llen);
+		kmem_free(lnm, llen);
 		if (error)
 			break;
 
@@ -1739,7 +1741,7 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		if (VOP_GETATTR(dvp, &iva, 0, cs->cr, NULL))
 			iva.va_seq = 0;
 
-		error = VOP_LOOKUP(dvp, nm, &vp, NULL, 0, NULL, cr,
+		error = VOP_LOOKUP(dvp, name, &vp, NULL, 0, NULL, cr,
 		    NULL, NULL, NULL);
 		if (error)
 			break;
@@ -1765,7 +1767,7 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		/*
 		 * We know this will only generate one VOP call
 		 */
-		vp = do_rfs4_op_mknod(args, resp, req, cs, vap, nm);
+		vp = do_rfs4_op_mknod(args, resp, req, cs, vap, name);
 
 		if (vp == NULL) {
 			if (name != nm)
@@ -4265,12 +4267,12 @@ rfs4_op_remove(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		} else {
 			/*
 			 * System V defines rmdir to return EEXIST,
-			 * not * ENOTEMPTY, if the directory is not
+			 * not ENOTEMPTY, if the directory is not
 			 * empty.  A System V NFS server needs to map
 			 * NFS4ERR_EXIST to NFS4ERR_NOTEMPTY to
 			 * transmit over the wire.
 			 */
-			if ((error = VOP_RMDIR(dvp, nm, rootdir, cs->cr,
+			if ((error = VOP_RMDIR(dvp, name, rootdir, cs->cr,
 			    NULL, 0)) == EEXIST)
 				error = ENOTEMPTY;
 		}

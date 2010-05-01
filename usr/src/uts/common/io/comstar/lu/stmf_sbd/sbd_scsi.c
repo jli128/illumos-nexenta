@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/conf.h>
@@ -44,6 +43,8 @@
 #include <stmf_sbd.h>
 #include <stmf_sbd_ioctl.h>
 #include <sbd_impl.h>
+
+extern dev_info_t *stmf_sbd_dip;
 
 #define	SCSI2_CONFLICT_FREE_CMDS(cdb)	( \
 	/* ----------------------- */                                      \
@@ -99,7 +100,7 @@ void sbd_handle_mode_select_xfer(scsi_task_t *task, uint8_t *buf,
     uint32_t buflen);
 void sbd_handle_mode_select(scsi_task_t *task, stmf_data_buf_t *dbuf);
 
-extern void sbd_pgr_initialize_it(scsi_task_t *);
+extern void sbd_pgr_initialize_it(scsi_task_t *, sbd_it_data_t *);
 extern int sbd_pgr_reservation_conflict(scsi_task_t *);
 extern void sbd_pgr_reset(sbd_lu_t *);
 extern void sbd_pgr_remove_it_handle(sbd_lu_t *, sbd_it_data_t *);
@@ -138,7 +139,7 @@ sbd_do_read_xfer(struct scsi_task *task, sbd_cmd_t *scmd,
 		iolen = min(len - buflen, dbuf->db_sglist[ndx].seg_length);
 		if (iolen == 0)
 			break;
-		if (sbd_data_read(sl, laddr, (uint64_t)iolen,
+		if (sbd_data_read(sl, task, laddr, (uint64_t)iolen,
 		    dbuf->db_sglist[ndx].seg_addr) != STMF_SUCCESS) {
 			scmd->flags |= SBD_SCSI_CMD_XFER_FAIL;
 			/* Do not need to do xfer anymore, just complete it */
@@ -306,7 +307,7 @@ sbd_handle_read(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 
 	if ((dbuf->db_buf_size >= len) && fast_path &&
 	    (dbuf->db_sglist_length == 1)) {
-		if (sbd_data_read(sl, laddr, (uint64_t)len,
+		if (sbd_data_read(sl, task, laddr, (uint64_t)len,
 		    dbuf->db_sglist[0].seg_addr) == STMF_SUCCESS) {
 			dbuf->db_relative_offset = 0;
 			dbuf->db_data_size = len;
@@ -447,7 +448,7 @@ sbd_handle_write_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd,
 		    dbuf->db_sglist[ndx].seg_length);
 		if (iolen == 0)
 			break;
-		if (sbd_data_write(sl, laddr, (uint64_t)iolen,
+		if (sbd_data_write(sl, task, laddr, (uint64_t)iolen,
 		    dbuf->db_sglist[ndx].seg_addr) != STMF_SUCCESS) {
 			scmd->flags |= SBD_SCSI_CMD_XFER_FAIL;
 			break;
@@ -462,11 +463,27 @@ WRITE_XFER_DONE:
 		if (scmd->nbufs)
 			return;	/* wait for all buffers to complete */
 		scmd->flags &= ~SBD_SCSI_CMD_ACTIVE;
-		if (scmd->flags & SBD_SCSI_CMD_XFER_FAIL)
+		if (scmd->flags & SBD_SCSI_CMD_XFER_FAIL) {
 			stmf_scsilib_send_status(task, STATUS_CHECK,
 			    STMF_SAA_WRITE_ERROR);
-		else
-			stmf_scsilib_send_status(task, STATUS_GOOD, 0);
+		} else {
+			/*
+			 * If SYNC_WRITE flag is on then we need to flush
+			 * cache before sending status.
+			 * Note: this may be a no-op because of how
+			 * SL_WRITEBACK_CACHE_DISABLE and
+			 * SL_FLUSH_ON_DISABLED_WRITECACHE are set, but not
+			 * worth code complexity of checking those in this code
+			 * path, SBD_SCSI_CMD_SYNC_WRITE is rarely set.
+			 */
+			if ((scmd->flags & SBD_SCSI_CMD_SYNC_WRITE) &&
+			    (sbd_flush_data_cache(sl, 0) != SBD_SUCCESS)) {
+				stmf_scsilib_send_status(task, STATUS_CHECK,
+				    STMF_SAA_WRITE_ERROR);
+			} else {
+				stmf_scsilib_send_status(task, STATUS_GOOD, 0);
+			}
+		}
 		return;
 	}
 	sbd_do_write_xfer(task, scmd, dbuf, dbuf_reusable);
@@ -481,6 +498,7 @@ sbd_handle_write(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private;
 	sbd_cmd_t *scmd;
 	stmf_data_buf_t *dbuf;
+	uint8_t	sync_wr_flag = 0;
 
 	if (sl->sl_flags & SL_WRITE_PROTECTED) {
 		stmf_scsilib_send_status(task, STATUS_CHECK,
@@ -503,6 +521,18 @@ sbd_handle_write(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	} else if (op == SCMD_WRITE_G4) {
 		lba = READ_SCSI64(&task->task_cdb[2], uint64_t);
 		len = READ_SCSI32(&task->task_cdb[10], uint32_t);
+	} else if (op == SCMD_WRITE_VERIFY) {
+		lba = READ_SCSI32(&task->task_cdb[2], uint64_t);
+		len = READ_SCSI16(&task->task_cdb[7], uint32_t);
+		sync_wr_flag = SBD_SCSI_CMD_SYNC_WRITE;
+	} else if (op == SCMD_WRITE_VERIFY_G5) {
+		lba = READ_SCSI32(&task->task_cdb[2], uint64_t);
+		len = READ_SCSI32(&task->task_cdb[6], uint32_t);
+		sync_wr_flag = SBD_SCSI_CMD_SYNC_WRITE;
+	} else if (op == SCMD_WRITE_VERIFY_G4) {
+		lba = READ_SCSI64(&task->task_cdb[2], uint64_t);
+		len = READ_SCSI32(&task->task_cdb[10], uint32_t);
+		sync_wr_flag = SBD_SCSI_CMD_SYNC_WRITE;
 	} else {
 		stmf_scsilib_send_status(task, STATUS_CHECK,
 		    STMF_SAA_INVALID_OPCODE);
@@ -552,7 +582,7 @@ sbd_handle_write(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 		scmd = (sbd_cmd_t *)kmem_alloc(sizeof (sbd_cmd_t), KM_SLEEP);
 		task->task_lu_private = scmd;
 	}
-	scmd->flags = SBD_SCSI_CMD_ACTIVE;
+	scmd->flags = SBD_SCSI_CMD_ACTIVE | sync_wr_flag;
 	scmd->cmd_type = SBD_CMD_SCSI_WRITE;
 	scmd->nbufs = 0;
 	scmd->addr = laddr;
@@ -560,6 +590,10 @@ sbd_handle_write(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	scmd->current_ro = 0;
 
 	if (do_immediate_data) {
+		/*
+		 * Accout for data passed in this write command
+		 */
+		(void) stmf_xfer_data(task, dbuf, STMF_IOF_STATS_ONLY);
 		scmd->len -= dbuf->db_data_size;
 		scmd->current_ro += dbuf->db_data_size;
 		dbuf->db_xfer_status = STMF_SUCCESS;
@@ -1141,6 +1175,7 @@ sbd_handle_inquiry(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	uint8_t *cdbp = (uint8_t *)&task->task_cdb[0];
 	uint8_t *p;
 	uint8_t byte0;
+	char *sbd_serial = NULL;
 	uint8_t page_length;
 	uint16_t bsize = 512;
 	uint16_t cmd_size;
@@ -1315,7 +1350,13 @@ sbd_handle_inquiry(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 		break;
 
 	case 0x80:
-		if (sl->sl_serial_no_size) {
+		if (ddi_prop_lookup_string(DDI_DEV_T_ANY, stmf_sbd_dip,
+		    DDI_PROP_DONTPASS, "sbd-serial-no",
+		    &sbd_serial) == DDI_PROP_SUCCESS) {
+			page_length = strlen(sbd_serial);
+			bcopy(sbd_serial, p + 4, page_length);
+			ddi_prop_free(sbd_serial);
+		} else if (sl->sl_serial_no_size) {
 			page_length = sl->sl_serial_no_size;
 			bcopy(sl->sl_serial_no, p + 4, sl->sl_serial_no_size);
 		} else {
@@ -1517,7 +1558,7 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 
 		DTRACE_PROBE1(itl__nexus__start, scsi_task *, task);
 
-		sbd_pgr_initialize_it(task);
+		sbd_pgr_initialize_it(task, it);
 		if (stmf_register_itl_handle(task->task_lu, task->task_lun_no,
 		    task->task_session, it->sbd_it_session_id, it)
 		    != STMF_SUCCESS) {
@@ -1530,7 +1571,7 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 			it->sbd_it_ua_conditions = SBD_UA_POR;
 		}
 	} else if (it->sbd_it_flags & SBD_IT_PGR_CHECK_FLAG) {
-		sbd_pgr_initialize_it(task);
+		sbd_pgr_initialize_it(task, it);
 		mutex_enter(&sl->sl_lock);
 		it->sbd_it_flags &= ~SBD_IT_PGR_CHECK_FLAG;
 		mutex_exit(&sl->sl_lock);
@@ -1569,7 +1610,7 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	}
 
 	/* Reservation conflict checks */
-	if (sl->sl_access_state != SBD_LU_STANDBY) {
+	if (sl->sl_access_state == SBD_LU_ACTIVE) {
 		if (SBD_PGR_RSVD(sl->sl_pgr)) {
 			if (sbd_pgr_reservation_conflict(task)) {
 				stmf_scsilib_send_status(task,
@@ -1855,6 +1896,26 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	if (cdb0 == SCMD_SYNCHRONIZE_CACHE ||
 	    cdb0 == SCMD_SYNCHRONIZE_CACHE_G4) {
 		sbd_handle_sync_cache(task, initial_dbuf);
+		return;
+	}
+
+	/*
+	 * Write and Verify use the same path as write, but don't clutter the
+	 * performance path above with checking for write_verify opcodes.  We
+	 * rely on zfs's integrity checks for the "Verify" part of Write &
+	 * Verify.  (Even if we did a read to "verify" we'd merely be reading
+	 * cache, not actual media.)
+	 * Therefore we
+	 *   a) only support this if sbd_is_zvol, and
+	 *   b) run the IO through the normal write path with a forced
+	 *	sbd_flush_data_cache at the end.
+	 */
+
+	if ((sl->sl_flags & SL_ZFS_META) && (
+	    cdb0 == SCMD_WRITE_VERIFY ||
+	    cdb0 == SCMD_WRITE_VERIFY_G4 ||
+	    cdb0 == SCMD_WRITE_VERIFY_G5)) {
+		sbd_handle_write(task, initial_dbuf);
 		return;
 	}
 

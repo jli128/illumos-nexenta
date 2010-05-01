@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -337,7 +336,11 @@ pcitool_get_intr(dev_info_t *dip, void *arg, int mode)
 	 * Fill in the pcitool_intr_get_t to be returned,
 	 * with the CPU, num_devs_ret and num_devs.
 	 */
-	iget->cpu_id = intr_info.avgi_cpu_id & ~PSMGI_CPU_USER_BOUND;
+	if (intr_info.avgi_cpu_id == IRQ_UNBOUND ||
+	    intr_info.avgi_cpu_id == IRQ_UNINIT)
+		iget->cpu_id = 0;
+	else
+		iget->cpu_id = intr_info.avgi_cpu_id & ~PSMGI_CPU_USER_BOUND;
 
 	/* Number of devices returned by apic. */
 	iget->num_devs = intr_info.avgi_num_devs;
@@ -557,7 +560,20 @@ pcitool_cfg_access(pcitool_reg_t *prg, boolean_t write_flag,
 		pci_cfgacc_acc(&req);
 	} else {
 		pci_cfgacc_acc(&req);
-		local_data = VAL64(&req);
+		switch (size) {
+		case 1:
+			local_data = VAL8(&req);
+			break;
+		case 2:
+			local_data = VAL16(&req);
+			break;
+		case 4:
+			local_data = VAL32(&req);
+			break;
+		case 8:
+			local_data = VAL64(&req);
+			break;
+		}
 		if (big_endian) {
 			prg->data =
 			    pcitool_swap_endian(local_data, size);

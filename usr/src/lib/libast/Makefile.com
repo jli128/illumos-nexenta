@@ -679,7 +679,7 @@ LIBS =		$(DYNLIB) $(LINTLIB)
 LDLIBS += \
 	-lsocket \
 	-lm \
-	-lc
+	-lc -liconv
 
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 

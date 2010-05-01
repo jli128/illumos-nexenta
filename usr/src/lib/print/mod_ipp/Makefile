@@ -30,11 +30,11 @@ OBJECTS = mod_ipp.o
 include ../../Makefile.lib
 include ../../Makefile.rootfs
 
-APACHEMODDIR =	$(ROOT)/usr/apache/libexec
-APACHECONFDIR =	$(ROOT)/etc/apache
+APACHEMODDIR =	$(ROOT)/usr/lib/apache2/modules
+APACHECONFDIR =	$(ROOT)/etc/apache2
 LISTENERDIR =	$(ROOT)/var/lp/ipp-listener
 
-ROOTDIRS =	$(ROOT)/usr/apache $(APACHEMODDIR) $(APACHECONFDIR) \
+ROOTDIRS =	$(ROOT)/usr $(APACHEMODDIR) $(APACHECONFDIR) \
 		$(ROOT)/var/lp $(LISTENERDIR)
 
 $(ROOT)/var/lp:=	DIRMODE = 775
@@ -48,7 +48,7 @@ SRCS = $(OBJECTS:%.o = %.c)
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I../libipp-listener/common
 CPPFLAGS +=	-I../libipp-core/common
-CPPFLAGS +=	-I/usr/apache/include
+CPPFLAGS +=	-I/usr/include/apache2 -I/usr/include/apr-1.0
 CPPFLAGS +=	-DEAPI
 ZDEFS =		$(ZNODEFS)
 

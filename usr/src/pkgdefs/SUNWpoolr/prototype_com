@@ -41,6 +41,8 @@ i depend
 i preinstall
 i postinstall
 i preremove
+i i.manifest
+i r.manifest
 #
 # source locations relative to the prototype file
 #

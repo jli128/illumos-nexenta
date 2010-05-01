@@ -36,7 +36,7 @@ MSGFILES=$(SRCS:%.c=%.i)
 
 CPPFLAGS += -xCC
 LINTFLAGS += -XCC  -L/usr/lib
-LDLIBS += -ltspi -luuid
+LDLIBS += -ltspi -luuid -liconv
 
 .KEEP_STATE:
 

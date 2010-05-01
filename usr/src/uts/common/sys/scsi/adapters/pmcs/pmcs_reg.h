@@ -17,10 +17,9 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- *
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ */
+/*
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * PMC 8x6G register definitions
@@ -211,6 +210,13 @@ extern "C" {
 #define	WRITE_ADR_PARITY_ERROR_INDICATOR	0x700060
 #define	WRITE_DATA_PARITY_ERROR_INDICATOR	0x700068
 
+#define	GSM_FLASH_BASE_UPPER			0x18
+#define	GSM_FLASH_BASE				0x40000000
+#define	GSM_FLASH_ILA				GSM_FLASH_BASE
+#define	GSM_FLASH_IMG_FLAGS			(GSM_FLASH_BASE + 0x400000)
+
+#define	PMCS_IMG_FLAG_A				0x01
+
 /*
  * GSM Share Memory, IO Status Table and Ring Buffer
  */
@@ -291,6 +297,7 @@ extern "C" {
 #define	PMCS_ERROR_INT_ENABLE		0x3048
 #define	PMCS_ERROR_INT_STAT		0x304C
 #define	PMCS_AXI_TRANS			0x3258
+#define	PMCS_AXI_TRANS_UPPER		0x3268
 #define	PMCS_OBDB_AUTO_CLR		0x335C
 #define	PMCS_INT_COALESCING_TIMER	0x33C0
 #define	PMCS_INT_COALESCING_CONTROL	0x33C4
@@ -344,12 +351,22 @@ extern "C" {
 #define	PMCS_GPIO_TSMODE_BIT0		(1 << 0)
 #define	PMCS_GPIO_TSMODE_BIT1		(1 << 1)
 
+/*
+ * SAS/SATA PHY Layer Registers
+ * These are in MEMBASE-III (i.e. in GSM space)
+ */
+#define	OPEN_RETRY_INTERVAL(phy)	\
+	(phy < 4) ? (0x330B4 + (0x4000 * (phy))) : \
+	(0x430B4 + (0x4000 * (phy - 4)))
+
+#define	OPEN_RETRY_INTERVAL_DEF		20
+#define	OPEN_RETRY_INTERVAL_MAX		0x7FFF
 
 /*
  * Register Access Inline Functions
  */
 uint32_t pmcs_rd_msgunit(pmcs_hw_t *, uint32_t);
-uint32_t pmcs_rd_gsm_reg(pmcs_hw_t *, uint32_t);
+uint32_t pmcs_rd_gsm_reg(pmcs_hw_t *, uint8_t, uint32_t);
 uint32_t pmcs_rd_topunit(pmcs_hw_t *, uint32_t);
 uint32_t pmcs_rd_mpi_tbl(pmcs_hw_t *, uint32_t);
 uint32_t pmcs_rd_gst_tbl(pmcs_hw_t *, uint32_t);

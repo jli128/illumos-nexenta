@@ -19,14 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_SUNLDI_H
 #define	_SYS_SUNLDI_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/modctl.h>
 #include <sys/stream.h>
@@ -69,6 +66,7 @@ typedef struct __ldi_ev_cookie		*ldi_ev_cookie_t;
 #define	LDI_EV_NONE	(-2)	/* no matching callbacks registered */
 #define	LDI_EV_OFFLINE	"LDI:EVENT:OFFLINE"
 #define	LDI_EV_DEGRADE	"LDI:EVENT:DEGRADE"
+#define	LDI_EV_DEVICE_REMOVE	"LDI:EVENT:DEVICE_REMOVE"
 
 #define	LDI_EV_CB_VERS_1	1
 #define	LDI_EV_CB_VERS		LDI_EV_CB_VERS_1
@@ -101,6 +99,8 @@ extern int ldi_open_by_name(char *, int, cred_t *,
     ldi_handle_t *, ldi_ident_t);
 extern int ldi_open_by_devid(ddi_devid_t, char *, int, cred_t *,
     ldi_handle_t *, ldi_ident_t);
+extern int ldi_vp_from_name(char *, vnode_t **);
+extern int ldi_vp_from_devid(ddi_devid_t, char *, vnode_t **);
 
 extern int ldi_close(ldi_handle_t, int flag, cred_t *);
 

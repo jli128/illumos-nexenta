@@ -45,15 +45,15 @@
 #
 # SUNWhal
 #
-d none usr/lib/amd64 755 root bin
-s none usr/lib/amd64/libhal.so=./libhal.so.1.0.0
-s none usr/lib/amd64/libhal.so.1=./libhal.so.1.0.0
-f none usr/lib/amd64/libhal.so.1.0.0 755 root bin
-s none usr/lib/amd64/libhal-storage.so=./libhal-storage.so.1.0.0
-s none usr/lib/amd64/libhal-storage.so.1=./libhal-storage.so.1.0.0
-f none usr/lib/amd64/libhal-storage.so.1.0.0 755 root bin
-f none usr/lib/amd64/llib-lhal.ln 644 root bin
-f none usr/lib/amd64/llib-lhal-storage.ln 644 root bin
-d none usr/lib/amd64/pkgconfig 755 root other
-f none usr/lib/amd64/pkgconfig/hal.pc 644 root bin
-f none usr/lib/amd64/pkgconfig/hal-storage.pc 644 root bin
+#d none usr/lib/amd64 755 root bin
+#s none usr/lib/amd64/libhal.so=./libhal.so.1.0.0
+#s none usr/lib/amd64/libhal.so.1=./libhal.so.1.0.0
+#f none usr/lib/amd64/libhal.so.1.0.0 755 root bin
+#s none usr/lib/amd64/libhal-storage.so=./libhal-storage.so.1.0.0
+#s none usr/lib/amd64/libhal-storage.so.1=./libhal-storage.so.1.0.0
+#f none usr/lib/amd64/libhal-storage.so.1.0.0 755 root bin
+#f none usr/lib/amd64/llib-lhal.ln 644 root bin
+#f none usr/lib/amd64/llib-lhal-storage.ln 644 root bin
+#d none usr/lib/amd64/pkgconfig 755 root other
+#f none usr/lib/amd64/pkgconfig/hal.pc 644 root bin
+#f none usr/lib/amd64/pkgconfig/hal-storage.pc 644 root bin

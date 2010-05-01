@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -64,6 +63,11 @@ uint8_t mcfg_bus_start = 0;
 uint8_t mcfg_bus_end = 0xff;
 
 /*
+ * Maximum offset in config space when not using MMIO
+ */
+uint_t pci_iocfg_max_offset = 0xff;
+
+/*
  * These function pointers lead to the actual implementation routines
  * for configuration space access.  Normally they lead to either the
  * pci_mech1_* or pci_mech2_* routines, but they can also lead to
@@ -91,8 +95,11 @@ static int pci_check_bios(void);
 static int pci_get_cfg_type(void);
 #endif
 
-/* all config-space access routines share this one... */
+/* for legacy io-based config space access */
 kmutex_t pcicfg_mutex;
+
+/* for mmio-based config space access */
+kmutex_t pcicfg_mmio_mutex;
 
 /* ..except Orion and Neptune, which have to have their own */
 kmutex_t pcicfg_chipset_mutex;
@@ -102,10 +109,13 @@ pci_cfgspace_init(void)
 {
 	mutex_init(&pcicfg_mutex, NULL, MUTEX_SPIN,
 	    (ddi_iblock_cookie_t)ipltospl(15));
+	mutex_init(&pcicfg_mmio_mutex, NULL, MUTEX_SPIN,
+	    (ddi_iblock_cookie_t)ipltospl(DISP_LEVEL));
 	mutex_init(&pcicfg_chipset_mutex, NULL, MUTEX_SPIN,
 	    (ddi_iblock_cookie_t)ipltospl(15));
 	if (!pci_check()) {
 		mutex_destroy(&pcicfg_mutex);
+		mutex_destroy(&pcicfg_mmio_mutex);
 		mutex_destroy(&pcicfg_chipset_mutex);
 	}
 }
@@ -167,6 +177,14 @@ pci_check(void)
 			pci_putb_func = pci_orion_putb;
 			pci_putw_func = pci_orion_putw;
 			pci_putl_func = pci_orion_putl;
+		} else if (pci_check_amd_ioecs()) {
+			pci_getb_func = pci_mech1_amd_getb;
+			pci_getw_func = pci_mech1_amd_getw;
+			pci_getl_func = pci_mech1_amd_getl;
+			pci_putb_func = pci_mech1_amd_putb;
+			pci_putw_func = pci_mech1_amd_putw;
+			pci_putl_func = pci_mech1_amd_putl;
+			pci_iocfg_max_offset = 0xfff;
 		} else {
 			pci_getb_func = pci_mech1_getb;
 			pci_getw_func = pci_mech1_getw;

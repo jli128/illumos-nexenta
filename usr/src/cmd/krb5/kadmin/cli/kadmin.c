@@ -1042,14 +1042,6 @@ kadmin_parse_princ_args(argc, argv, oprinc, mask, pass, randkey,
 			     argv[i]);
 		     return -1;
  		}
-				if (date <= now) {
-					fprintf(stderr,
-						gettext("Date specified is "
-							"in the past "
-							"\"%s\".\n"),
-						argv[i]);
-					return (-1);
-				}
 		oprinc->max_life = date - now;
 		*mask |= KADM5_MAX_LIFE;
 		continue;
@@ -1069,14 +1061,6 @@ kadmin_parse_princ_args(argc, argv, oprinc, mask, pass, randkey,
 			     argv[i]);
 		     return -1;
  		}
-				if (date <= now) {
-					fprintf(stderr,
-						gettext("Date specified is "
-							"in the past "
-							"\"%s\".\n"),
-						argv[i]);
-					return (-1);
-				}
 		oprinc->max_renewable_life = date - now;
 		*mask |= KADM5_MAX_RLIFE;
 		continue;

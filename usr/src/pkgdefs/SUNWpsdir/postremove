@@ -40,3 +40,6 @@ i386)
 ppc)
 	;;
 esac
+
+# do not fail postrm
+true

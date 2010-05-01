@@ -36,7 +36,6 @@ CMDSUBDIRS=	\
 		pkgname		\
 		pkgparam	\
 		pkgproto	\
-		pkgremove	\
 		pkgrm		\
 		pkgscripts	\
 		pkgserv		\

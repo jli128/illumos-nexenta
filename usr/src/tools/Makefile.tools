@@ -51,7 +51,7 @@ ROOTONBLDETCEXCEPT=	$(ROOTONBLD)/etc/exception_lists
 
 CPPFLAGS=		-D_TS_ERRNO
 ELFSIGN_O=		$(TRUE)
-LDLIBS=
+LDLIBS=			-lintl
 LDFLAGS=		$(MAPFILE.NES:%=-M%) $(MAPFILE.NED:%=-M%) \
 			    $(MAPFILE.PGA:%=-M%)
 

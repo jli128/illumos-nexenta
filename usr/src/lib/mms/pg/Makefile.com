@@ -47,7 +47,7 @@ CCFLAGS +=	$(C_BIGPICFLAGS)
 CPPFLAGS +=	-DMMS_OPENSSL
 CPPFLAGS +=	-I$(SRCDIR) -I$(SRC)/common/mms/mms
 CPPFLAGS +=	-I$(SRC)/lib/mms/mms/common
-CPPFLAGS +=	-I/usr/postgres/8.3/include/server
+CPPFLAGS +=	-I/usr/include/postgresql -I/usr/include/postgresql/8.3/server
 
 C99MODE = $(C99_ENABLE)
 

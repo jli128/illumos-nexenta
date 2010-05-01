@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -4177,8 +4176,10 @@ spa_vdev_split_mirror(spa_t *spa, char *newname, nvlist_t *config,
 	    glist, children) == 0);
 	kmem_free(glist, children * sizeof (uint64_t));
 
+	mutex_enter(&spa->spa_props_lock);
 	VERIFY(nvlist_add_nvlist(spa->spa_config, ZPOOL_CONFIG_SPLIT,
 	    nvl) == 0);
+	mutex_exit(&spa->spa_props_lock);
 	spa->spa_config_splitting = nvl;
 	vdev_config_dirty(spa->spa_root_vdev);
 
@@ -4287,6 +4288,14 @@ out:
 	spa_remove(newspa);
 
 	txg = spa_vdev_config_enter(spa);
+
+	/* re-online all offlined disks */
+	for (c = 0; c < children; c++) {
+		if (vml[c] != NULL)
+			vml[c]->vdev_offline = B_FALSE;
+	}
+	vdev_reopen(spa->spa_root_vdev);
+
 	nvlist_free(spa->spa_config_splitting);
 	spa->spa_config_splitting = NULL;
 	(void) spa_vdev_exit(spa, NULL, txg, error);
@@ -4556,6 +4565,7 @@ spa_vdev_resilver_done_hunt(vdev_t *vd)
 		newvd = vd->vdev_child[1];
 
 		if (vdev_dtl_empty(newvd, DTL_MISSING) &&
+		    vdev_dtl_empty(newvd, DTL_OUTAGE) &&
 		    !vdev_dtl_required(oldvd))
 			return (oldvd);
 	}
@@ -4569,6 +4579,7 @@ spa_vdev_resilver_done_hunt(vdev_t *vd)
 
 		if (newvd->vdev_unspare &&
 		    vdev_dtl_empty(newvd, DTL_MISSING) &&
+		    vdev_dtl_empty(newvd, DTL_OUTAGE) &&
 		    !vdev_dtl_required(oldvd)) {
 			newvd->vdev_unspare = 0;
 			return (oldvd);
@@ -4622,6 +4633,7 @@ spa_vdev_set_common(spa_t *spa, uint64_t guid, const char *value,
     boolean_t ispath)
 {
 	vdev_t *vd;
+	boolean_t sync = B_FALSE;
 
 	spa_vdev_state_enter(spa, SCL_ALL);
 
@@ -4632,15 +4644,23 @@ spa_vdev_set_common(spa_t *spa, uint64_t guid, const char *value,
 		return (spa_vdev_state_exit(spa, NULL, ENOTSUP));
 
 	if (ispath) {
-		spa_strfree(vd->vdev_path);
-		vd->vdev_path = spa_strdup(value);
+		if (strcmp(value, vd->vdev_path) != 0) {
+			spa_strfree(vd->vdev_path);
+			vd->vdev_path = spa_strdup(value);
+			sync = B_TRUE;
+		}
 	} else {
-		if (vd->vdev_fru != NULL)
+		if (vd->vdev_fru == NULL) {
+			vd->vdev_fru = spa_strdup(value);
+			sync = B_TRUE;
+		} else if (strcmp(value, vd->vdev_fru) != 0) {
 			spa_strfree(vd->vdev_fru);
-		vd->vdev_fru = spa_strdup(value);
+			vd->vdev_fru = spa_strdup(value);
+			sync = B_TRUE;
+		}
 	}
 
-	return (spa_vdev_state_exit(spa, vd, 0));
+	return (spa_vdev_state_exit(spa, sync ? vd : NULL, 0));
 }
 
 int
@@ -4703,7 +4723,8 @@ static void
 spa_async_remove(spa_t *spa, vdev_t *vd)
 {
 	if (vd->vdev_remove_wanted) {
-		vd->vdev_remove_wanted = 0;
+		vd->vdev_remove_wanted = B_FALSE;
+		vd->vdev_delayed_close = B_FALSE;
 		vdev_set_state(vd, B_FALSE, VDEV_STATE_REMOVED, VDEV_AUX_NONE);
 
 		/*
@@ -4727,7 +4748,7 @@ static void
 spa_async_probe(spa_t *spa, vdev_t *vd)
 {
 	if (vd->vdev_probe_wanted) {
-		vd->vdev_probe_wanted = 0;
+		vd->vdev_probe_wanted = B_FALSE;
 		vdev_reopen(vd);	/* vdev_open() does the actual probe */
 	}
 
@@ -5281,7 +5302,7 @@ spa_sync(spa_t *spa, uint64_t txg)
 
 	} while (dmu_objset_is_dirty(mos, txg));
 
-	ASSERT(free_bpl->bpl_queue == NULL);
+	ASSERT(list_is_empty(&free_bpl->bpl_queue));
 
 	bplist_close(defer_bpl);
 
@@ -5371,8 +5392,8 @@ spa_sync(spa_t *spa, uint64_t txg)
 	ASSERT(txg_list_empty(&dp->dp_dirty_datasets, txg));
 	ASSERT(txg_list_empty(&dp->dp_dirty_dirs, txg));
 	ASSERT(txg_list_empty(&spa->spa_vdev_txg_list, txg));
-	ASSERT(defer_bpl->bpl_queue == NULL);
-	ASSERT(free_bpl->bpl_queue == NULL);
+	ASSERT(list_is_empty(&defer_bpl->bpl_queue));
+	ASSERT(list_is_empty(&free_bpl->bpl_queue));
 
 	spa->spa_sync_pass = 0;
 

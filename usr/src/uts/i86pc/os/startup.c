@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -133,7 +132,6 @@ struct xen_evt_data cpu0_evt_data;
 #endif /* __xpv */
 
 extern void progressbar_init(void);
-extern void progressbar_start(void);
 extern void brand_init(void);
 extern void pcf_init(void);
 extern void pg_init(void);
@@ -669,7 +667,6 @@ startup(void)
 {
 #if !defined(__xpv)
 	extern void startup_pci_bios(void);
-	extern int post_fastreboot;
 #endif
 	extern cpuset_t cpu_ready_set;
 
@@ -698,8 +695,11 @@ startup(void)
 	startup_kmem();
 	startup_vm();
 #if !defined(__xpv)
-	if (!post_fastreboot)
-		startup_pci_bios();
+	/*
+	 * Note we need to do this even on fast reboot in order to access
+	 * the irq routing table (used for pci labels).
+	 */
+	startup_pci_bios();
 #endif
 #if defined(__xpv)
 	startup_xen_mca();
@@ -707,7 +707,6 @@ startup(void)
 	startup_modules();
 
 	startup_end();
-	progressbar_start();
 }
 
 static void
@@ -1432,7 +1431,7 @@ update_default_path()
 	 */
 	current = (default_path == NULL) ? kobj_module_path : default_path;
 
-	newlen = strlen(HVM_MOD_DIR) + strlen(current) + 1;
+	newlen = strlen(HVM_MOD_DIR) + strlen(current) + 2;
 	newpath = kmem_alloc(newlen, KM_SLEEP);
 	(void) strcpy(newpath, HVM_MOD_DIR);
 	(void) strcat(newpath, " ");

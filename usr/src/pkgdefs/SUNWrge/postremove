@@ -31,9 +31,5 @@ BD=${BASEDIR:-/}
 if grep -w rge $BD/etc/name_to_major > /dev/null 2>&1
 then
 	rem_drv -b ${BD} rge
-	if [ $? -ne 0 ]
-	then
-		exit 1 	
-	fi
 fi
 exit 0

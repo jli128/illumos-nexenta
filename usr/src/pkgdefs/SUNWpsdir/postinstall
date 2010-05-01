@@ -152,7 +152,13 @@ drvclasses_updates()
 	nawk '
 	BEGIN {
 	  seen_ata = 0
+	}
+	END {
+	  if (seen_ata == 0) {
+	    print "ata\tdada"
+	    print "ata\tscsi"
 	  }
+	}
 	/^#/ || /^$/ {
 	  print
 	  next

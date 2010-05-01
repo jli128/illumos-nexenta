@@ -36,6 +36,13 @@
 #include <sys/arc.h>
 #include <sys/ddt.h>
 
+
+/*
+ * use_gzip_hardware is a tunable parameter which can be used to
+ * ON/OFF the hardware compression.
+ */
+extern int use_gzip_hardware;
+
 /*
  * ==========================================================================
  * I/O priority table
@@ -154,6 +161,14 @@ zio_init(void)
 	}
 
 	zio_inject_init();
+
+      
+	/*
+	 * initialize the hardware compression.
+	 * */
+        if (use_gzip_hardware) {
+	    init_gzip_hardware_compress();
+        } 
 }
 
 void
@@ -162,6 +177,10 @@ zio_fini(void)
 	size_t c;
 	kmem_cache_t *last_cache = NULL;
 	kmem_cache_t *last_data_cache = NULL;
+
+        if (use_gzip_hardware) {
+	    fini_gzip_hardware_compress();
+        }
 
 	for (c = 0; c < SPA_MAXBLOCKSIZE >> SPA_MINBLOCKSHIFT; c++) {
 		if (zio_buf_cache[c] != last_cache) {

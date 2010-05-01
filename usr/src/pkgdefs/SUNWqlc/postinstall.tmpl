@@ -36,6 +36,7 @@ if [ ${ARCH} = "sparc" ]; then
 	    "pciex1077,2432"
 	    "pciex1077,2532"
 	    "pciex1077,5432"
+	    "pciex1077,8021"
 	    "pciex1077,8001"' \
 	    -m '* 0666 root sys' -c "fibre-channel" qlc || ret=1
 elif [ ${ARCH} = "i386" ]; then
@@ -48,6 +49,7 @@ elif [ ${ARCH} = "i386" ]; then
 	    "pciex1077,2432"
 	    "pciex1077,2532"
 	    "pciex1077,5432"
+	    "pciex1077,8021"
 	    "pciex1077,8001"' \
 	    -m '* 0666 root sys' -c "fibre-channel" qlc || ret=1
 else

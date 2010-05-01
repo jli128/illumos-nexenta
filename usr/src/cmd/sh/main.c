@@ -87,6 +87,11 @@ main(int c, char *v[], char *e[])
 	mysid = getsid(mypid);
 
 	/*
+	 * Always assume SUN personality
+	 */
+	putenv("SUN_PERSONALITY=1");
+
+	/*
 	 * Do locale processing only if /usr is mounted.
 	 */
 	localedir_exists = (access(localedir, F_OK) == 0);

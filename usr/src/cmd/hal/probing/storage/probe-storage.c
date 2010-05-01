@@ -164,7 +164,7 @@ get_cdrom_properties (int fd, LibHalChangeSet *cs)
 	libhal_changeset_set_property_int (cs, "storage.cdrom.read_speed", read_speed);
 	libhal_changeset_set_property_int (cs, "storage.cdrom.write_speed", write_speed);
 
-	if (n_wspeeds <= 0) {
+	if (n_wspeeds <= 0 || n_wspeeds > 256) {
 		wspeeds_mem = NULL;
  		libhal_changeset_set_property_strlist (cs, "storage.cdrom.write_speeds", (const char **)&wspeeds_mem);
 		return;

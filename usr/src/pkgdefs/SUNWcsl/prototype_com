@@ -138,8 +138,6 @@ f none usr/lib/libinetsvc.so.1 755 root bin
 s none usr/lib/libinetutil.so.1=../../lib/libinetutil.so.1
 f none usr/lib/libike.so.1 755 root bin
 s none usr/lib/libinetcfg.so.1=../../lib/libinetcfg.so.1
-s none usr/lib/libintl.so=../../lib/libintl.so.1
-s none usr/lib/libintl.so.1=../../lib/libintl.so.1
 f none usr/lib/libipmi.so.1 755 root bin
 s none usr/lib/libipmi.so=./libipmi.so.1
 s none usr/lib/libipp.so=./libipp.so.1
@@ -152,7 +150,7 @@ f none usr/lib/libkvm.so.1 755 root bin
 s none usr/lib/libl.so=./libl.so.1
 s none usr/ccs/lib/libl.so=../../lib/libl.so.1
 f none usr/lib/libl.so.1 0755 root bin
-s none usr/lib/libldap.so=libldap.so.5
+#s none usr/lib/libldap.so=libldap.so.5
 f none usr/lib/libldap.so.5 755 root bin
 f none usr/lib/libldap.so.4 755 root bin
 s none usr/lib/liblddbg.so.4=../../lib/liblddbg.so.4
@@ -176,7 +174,7 @@ s none usr/lib/libmenu.so=./libmenu.so.1
 s none usr/ccs/lib/libmenu.so=../../lib/libmenu.so.1
 f none usr/lib/libmtmalloc.so.1 755 root bin
 s none usr/lib/libmtmalloc.so=./libmtmalloc.so.1
-s none usr/lib/libmp.so=../../lib/libmp.so.2
+#s none usr/lib/libmp.so=../../lib/libmp.so.2
 s none usr/lib/libmp.so.2=../../lib/libmp.so.2
 s none usr/lib/libmp.so.1=../../lib/libmp.so.1
 s none usr/lib/libnls.so=./libnls.so.1
@@ -189,7 +187,7 @@ f none usr/lib/libpanel.so.1 755 root bin
 s none usr/lib/libpanel.so=./libpanel.so.1
 s none usr/ccs/lib/libpanel.so=../../lib/libpanel.so.1
 f none usr/lib/libplot.so.1 755 root bin
-s none usr/lib/libplot.so=./libplot.so.1
+#s none usr/lib/libplot.so=./libplot.so.1
 f none usr/lib/libproject.so.1 755 root bin
 s none usr/lib/libproject.so=./libproject.so.1
 f none usr/lib/libpkcs11.so.1 755 root bin

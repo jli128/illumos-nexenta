@@ -17,10 +17,9 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- *
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ */
+/*
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
  * This file is the principle header file for the PMCS driver
@@ -38,6 +37,7 @@ extern "C" {
 #include <sys/modctl.h>
 #include <sys/pci.h>
 #include <sys/pcie.h>
+#include <sys/file.h>
 #include <sys/isa_defs.h>
 #include <sys/sunmdi.h>
 #include <sys/mdi_impldefs.h>
@@ -292,8 +292,22 @@ struct pmcs_hw {
 		STATE_PROBING,
 		STATE_RUNNING,
 		STATE_UNPROBING,
+		STATE_IN_RESET,
 		STATE_DEAD
 	} state;
+
+	/*
+	 * Last reason for a soft reset
+	 */
+	enum pwp_last_reset_reason {
+		PMCS_LAST_RST_UNINIT,
+		PMCS_LAST_RST_ATTACH,
+		PMCS_LAST_RST_FW_UPGRADE,
+		PMCS_LAST_RST_FATAL_ERROR,
+		PMCS_LAST_RST_STALL,
+		PMCS_LAST_RST_QUIESCE,
+		PMCS_LAST_RST_DETACH
+	} last_reset_reason;
 
 	uint32_t
 		fw_disable_update	: 1,
@@ -311,7 +325,10 @@ struct pmcs_hw {
 		physpeed		: 3,
 		resource_limited	: 1,
 		configuring		: 1,
-		ds_err_recovering	: 1;
+		ds_err_recovering	: 1,
+		quiesced		: 1,
+		fwlog_file		: 1,
+		fw_active_img		: 1;	/* 1='A', 0='B' */
 
 	/*
 	 * This HBA instance's iportmap and list of iport states.
@@ -407,6 +424,8 @@ struct pmcs_hw {
 	 */
 	uint32_t	shadow_iqpi[PMCS_MAX_IQ];
 	uint32_t	iqpi_offset[PMCS_MAX_IQ];
+	uint32_t	last_iqci[PMCS_MAX_IQ];
+	uint32_t	last_htag[PMCS_MAX_IQ];
 	uint32_t	*iqp[PMCS_MAX_IQ];
 	kmutex_t	iqp_lock[PMCS_NIQ];
 
@@ -448,10 +467,42 @@ struct pmcs_hw {
 	volatile uint8_t	scratch_locked;	/* Scratch area ownership */
 
 	/*
-	 * Firmware log pointer
+	 * Firmware info
+	 *
+	 * fwlogp: Pointer to block of memory mapped for the event logs
+	 * fwlogp_aap1: Pointer to the beginning of the AAP1 event log
+	 * fwlogp_iop: Pointer to the beginning of the IOP event log
+	 * fwaddr: The physical address of fwlogp
+	 *
+	 * fwlogfile_aap1/iop: Path to the saved AAP1/IOP event logs
+	 * fwlog_max_entries_aap1/iop: Max # of entries in each log
+	 * fwlog_oldest_idx_aap1/iop: Index of oldest entry in each log
+	 * fwlog_latest_idx_aap1/iop: Index of newest entry in each log
+	 * fwlog_threshold_aap1/iop: % full at which we save the event log
+	 * fwlog_findex_aap1/iop: Suffix to each event log's next filename
+	 *
+	 * Firmware event logs are written out to the filenames specified in
+	 * fwlogp_aap1/iop when the number of entries in the in-memory copy
+	 * reaches or exceeds the threshold value.  The filenames are suffixed
+	 * with .X where X is an integer ranging from 0 to 4.  This allows us
+	 * to save up to 5MB of event log data for each log.
 	 */
 	uint32_t	*fwlogp;
+	pmcs_fw_event_hdr_t *fwlogp_aap1;
+	pmcs_fw_event_hdr_t *fwlogp_iop;
 	uint64_t	fwaddr;
+	char		fwlogfile_aap1[MAXPATHLEN + 1];
+	uint32_t	fwlog_max_entries_aap1;
+	uint32_t	fwlog_oldest_idx_aap1;
+	uint32_t	fwlog_latest_idx_aap1;
+	uint32_t	fwlog_threshold_aap1;
+	uint32_t	fwlog_findex_aap1;
+	char		fwlogfile_iop[MAXPATHLEN + 1];
+	uint32_t	fwlog_max_entries_iop;
+	uint32_t	fwlog_oldest_idx_iop;
+	uint32_t	fwlog_latest_idx_iop;
+	uint32_t	fwlog_threshold_iop;
+	uint32_t	fwlog_findex_iop;
 
 	/*
 	 * Internal register dump region and flash chunk DMA info
@@ -462,9 +513,16 @@ struct pmcs_hw {
 	uint64_t	flash_chunk_addr;
 
 	/*
+	 * Copies of the last read MSGU and IOP heartbeats.
+	 */
+	uint32_t	last_msgu_tick;
+	uint32_t	last_iop_tick;
+
+	/*
 	 * Card information, some determined during MPI setup
 	 */
 	uint32_t	fw;		/* firmware version */
+	uint32_t	ila_ver;	/* ILA version */
 	uint8_t		max_iq;		/* maximum inbound queues this card */
 	uint8_t 	max_oq;		/* "" outbound "" */
 	uint8_t		nphy;		/* number of phys this card */
@@ -473,6 +531,12 @@ struct pmcs_hw {
 	uint16_t	max_dev;	/* max number of devices supported */
 	uint16_t	last_wq_dev;	/* last dev whose wq was serviced */
 
+	/*
+	 * Counter for the number of times watchdog fires.  We can use this
+	 * to throttle events which fire off of the watchdog, such as the
+	 * forward progress detection routine.
+	 */
+	uint8_t		watchdog_count;
 
 	/*
 	 * Interrupt Setup stuff.
@@ -546,23 +610,26 @@ struct pmcs_hw {
 	/*
 	 * Discovery-related items.
 	 * config_lock: Protects config_changed and should never be held
-	 * outside of getting or setting the value of config_changed.
+	 * outside of getting or setting the value of config_changed or
+	 * configuring.
 	 * config_changed: Boolean indicating whether discovery needs to
 	 * be restarted.
 	 * configuring: 1 = discovery is running, 0 = discovery not running.
 	 * NOTE: configuring is now in the bitfield above.
-	 *
 	 * config_restart_time is set by the tgtmap_[de]activate callbacks each
 	 * time we decide we want SCSA to retry enumeration on some device.
 	 * The watchdog timer will not fire discovery unless it has reached
 	 * config_restart_time and config_restart is TRUE.  This ensures that
 	 * we don't ask SCSA to retry enumerating devices while it is still
 	 * running.
+	 * config_cv can be used by any thread waiting on the configuring
+	 * bit to clear.
 	 */
 	kmutex_t		config_lock;
 	volatile boolean_t	config_changed;
 	boolean_t		config_restart;
 	clock_t			config_restart_time;
+	kcondvar_t		config_cv;
 
 	/*
 	 * Work Related Stuff
@@ -609,6 +676,7 @@ struct pmcs_hw {
 	uint16_t			debug_mask;
 	uint16_t			phyid_block_mask;
 	uint16_t			phys_started;
+	uint16_t			open_retry_interval;
 	uint32_t			hipri_queue;
 	uint32_t			mpibar;
 	uint32_t			intr_pri;
@@ -618,6 +686,22 @@ struct pmcs_hw {
 	kmutex_t			ict_lock;
 	kcondvar_t			ict_cv;
 	kthread_t			*ict_thread;
+
+	/*
+	 * Receptacle information - FMA
+	 */
+	char				*recept_labels[PMCS_NUM_RECEPTACLES];
+	char				*recept_pm[PMCS_NUM_RECEPTACLES];
+
+	/*
+	 * fw_timestamp: Firmware timestamp taken after PHYs are started
+	 * sys_timestamp: System timestamp taken at roughly the same time
+	 * hrtimestamp is the hrtime at roughly the same time
+	 * All of these are protected by the global pmcs_trace_lock.
+	 */
+	uint64_t	fw_timestamp;
+	timespec_t	sys_timestamp;
+	hrtime_t	hrtimestamp;
 
 #ifdef	DEBUG
 	kmutex_t	dbglock;
@@ -640,6 +724,11 @@ extern void 		*pmcs_iport_softstate;
 extern const char pmcs_nowrk[];
 extern const char pmcs_nomsg[];
 extern const char pmcs_timeo[];
+
+/*
+ * Other externs
+ */
+extern int modrootloaded;
 
 #ifdef	__cplusplus
 }

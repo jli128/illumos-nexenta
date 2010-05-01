@@ -176,9 +176,9 @@ include	$(UTSBASE)/$(PLATFORM)/Makefile.workarounds
 #	     is left as an experiment to the interested reader. Be forewarned,
 #	     that excessive use could lead to maintenance difficulties.
 #
-DEBUG_DEFS_OBJ32	=
+DEBUG_DEFS_OBJ32	= $(SIMULATOR)
 DEBUG_DEFS_DBG32	= -DDEBUG
-DEBUG_DEFS_OBJ64	=
+DEBUG_DEFS_OBJ64	= $(SIMULATOR)
 DEBUG_DEFS_DBG64	= -DDEBUG
 DEBUG_DEFS		= $(DEBUG_DEFS_$(BUILD_TYPE))
 

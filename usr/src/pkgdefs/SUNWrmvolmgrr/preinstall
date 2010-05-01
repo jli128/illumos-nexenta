@@ -35,4 +35,10 @@ if [ -f $PKG_INSTALL_ROOT/var/svc/manifest/system/filesystem/rmvolmgr.xml ]; the
 	touch $PKG_INSTALL_ROOT/var/tmp/rmvolmgr_installed.tmp
 fi
 
+if [ -f /var/svc/manifest/system/filesystem/volfs.xml ]; then
+	svcadm disable svc:/system/filesystem/volfs:default >/dev/null 2>&1
+	svccfg delete svc:/system/filesystem/volfs:default >/dev/null 2>&1
+	rm -f /var/svc/manifest/system/filesystem/volfs.xml
+fi
+
 exit 0

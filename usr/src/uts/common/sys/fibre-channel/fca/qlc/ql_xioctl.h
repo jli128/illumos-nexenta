@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2009 QLogic Corporation */
+/* Copyright 2010 QLogic Corporation */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _QL_XIOCTL_H
@@ -35,7 +34,7 @@
  * ***********************************************************************
  * *									**
  * *				NOTICE					**
- * *		COPYRIGHT (C) 1996-2009 QLOGIC CORPORATION		**
+ * *		COPYRIGHT (C) 1996-2010 QLOGIC CORPORATION		**
  * *			ALL RIGHTS RESERVED				**
  * *									**
  * ***********************************************************************
@@ -332,6 +331,36 @@ typedef struct ql_flash_layout_region {
 	uint8_t		end_addr[4];
 } ql_flt_region_t;
 
+typedef struct ql_fp_cfg_hdr {
+	uint8_t		version[2];
+	uint8_t		len[2];
+	uint8_t		checksum[2];
+	uint8_t		NumberEntries[2];
+	uint8_t		SizeEntry[2];
+	uint8_t		unused[2];
+	uint8_t		Signature[4];
+} ql_fp_cfg_hdr_t;
+
+typedef struct ql_fp_cfg {
+	uint8_t		FunctionNumber[2];
+	uint8_t		FunctionType;
+	uint8_t		PortConfigIndex;
+	uint8_t		ConfigRegion;
+	uint8_t		VpdRegion;
+	uint8_t		DCBXRegion;
+	uint8_t		Reserved;
+} ql_fp_cfg_t;
+
+#define	FT_NIC		0
+#define	FT_FC		1
+#define	FT_ISCSI	2
+#define	FT_VNIC		3
+
+typedef struct ql_fp_cfg_map {
+	ql_fp_cfg_hdr_t	hdr;
+	ql_fp_cfg_t	cfg[6];
+} ql_fp_cfg_map_t;
+
 #define	FLASH_FW_REGION			0x01
 #define	FLASH_VPD_0_REGION		0x14
 #define	FLASH_NVRAM_0_REGION		0x15
@@ -341,6 +370,11 @@ typedef struct ql_flash_layout_region {
 #define	FLASH_ERROR_LOG_0_REGION	0x1D
 #define	FLASH_ERROR_LOG_1_REGION	0x1F
 #define	FLASH_GOLDEN_FW_REGION		0x2F
+
+#define	FLASH_8021_FW_REGION		0x74
+#define	FLASH_8021_GOLDEN_FW_REGION	0x75
+#define	FLASH_8021_BOOTLOADER_REGION	0x72
+#define	FLASH_8021_VPD_REGION		0x81
 
 #define	FLASH_LAYOUT_TABLE_SIZE		4096
 
