@@ -118,7 +118,7 @@ clean: unpatch
 		cd $(GATEROOT) ; \
 		hg qpop -a ;  \
 	fi
-	rm -f build-on-stamp build-stamp upload-packages-stamp build-packages-stamp
+	rm -f build-on-stamp build-stamp upload-packages-stamp build-packages-stamp debian/files
 
 
 binary-indep: build

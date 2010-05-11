@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,7 +30,6 @@
 #include <sys/dmu.h>
 #include <sys/fs/zfs.h>
 #include <sys/zfs_ioctl.h>
-#include <sys/zfs_acl.h>
 #include <sys/spa.h>
 #include <sys/nvpair.h>
 
@@ -128,7 +127,6 @@ typedef  enum {
  */
 typedef enum {
 	SHARED_NOT_SHARED = 0x0,
-	SHARED_ISCSI = 0x1,
 	SHARED_NFS = 0x2,
 	SHARED_SMB = 0x4
 } zfs_share_type_t;

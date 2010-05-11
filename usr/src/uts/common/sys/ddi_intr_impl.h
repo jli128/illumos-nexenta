@@ -148,7 +148,7 @@ typedef struct ddi_intr_handle_impl {
 #define	DDI_MAX_MSI_ALLOC	2
 
 /* Default number of MSI-X resources to allocate */
-#define	DDI_DEFAULT_MSIX_ALLOC	2
+#define	DDI_DEFAULT_MSIX_ALLOC	8
 
 #define	DDI_MSIX_ALLOC_DIVIDER	32
 #define	DDI_MIN_MSIX_ALLOC	8

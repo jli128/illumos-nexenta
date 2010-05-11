@@ -19,7 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #include <sys/zfs_context.h>
@@ -107,7 +108,7 @@ vdev_disk_open(vdev_t *vd, uint64_t *psize, uint64_t *ashift)
 {
 	spa_t *spa = vd->vdev_spa;
 	vdev_disk_t *dvd;
-	struct dk_minfo_ext dkmext;
+	struct dk_minfo dkm;
 	int error;
 	dev_t dev;
 	int otyp;
@@ -287,11 +288,11 @@ skip_open:
 	 * Determine the device's minimum transfer size.
 	 * If the ioctl isn't supported, assume DEV_BSIZE.
 	 */
-	if (ldi_ioctl(dvd->vd_lh, DKIOCGMEDIAINFOEXT, (intptr_t)&dkmext,
+	if (ldi_ioctl(dvd->vd_lh, DKIOCGMEDIAINFO, (intptr_t)&dkm,
 	    FKIOCTL, kcred, NULL) != 0)
-		dkmext.dki_pbsize = DEV_BSIZE;
+		dkm.dki_lbsize = DEV_BSIZE;
 
-	*ashift = highbit(MAX(dkmext.dki_pbsize, SPA_MINBLOCKSIZE)) - 1;
+	*ashift = highbit(MAX(dkm.dki_lbsize, SPA_MINBLOCKSIZE)) - 1;
 
 	/*
 	 * Clear the nowritecache bit, so that on a vdev_reopen() we will

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_SYS_FS_ZFS_H
@@ -86,12 +85,11 @@ typedef enum {
 	ZFS_PROP_READONLY,
 	ZFS_PROP_ZONED,
 	ZFS_PROP_SNAPDIR,
-	ZFS_PROP_ACLMODE,
+	ZFS_PROP_PRIVATE,		/* not exposed to user, temporary */
 	ZFS_PROP_ACLINHERIT,
 	ZFS_PROP_CREATETXG,		/* not exposed to the user */
 	ZFS_PROP_NAME,			/* not exposed to the user */
 	ZFS_PROP_CANMOUNT,
-	ZFS_PROP_SHAREISCSI,
 	ZFS_PROP_ISCSIOPTIONS,		/* not exposed to the user */
 	ZFS_PROP_XATTR,
 	ZFS_PROP_NUMCLONES,		/* not exposed to the user */
@@ -324,14 +322,17 @@ typedef enum zfs_cache_type {
 #define	SPA_VERSION_20			20ULL
 #define	SPA_VERSION_21			21ULL
 #define	SPA_VERSION_22			22ULL
+#define	SPA_VERSION_23			23ULL
+#define	SPA_VERSION_24			24ULL
+#define	SPA_VERSION_25			25ULL
 /*
  * When bumping up SPA_VERSION, make sure GRUB ZFS understands the on-disk
  * format change. Go to usr/src/grub/grub-0.97/stage2/{zfs-include/, fsys_zfs*},
  * and do the appropriate changes.  Also bump the version number in
  * usr/src/grub/capability.
  */
-#define	SPA_VERSION			SPA_VERSION_22
-#define	SPA_VERSION_STRING		"22"
+#define	SPA_VERSION			SPA_VERSION_25
+#define	SPA_VERSION_STRING		"25"
 
 /*
  * Symbolic names for the changes that caused a SPA_VERSION switch.
@@ -375,6 +376,9 @@ typedef enum zfs_cache_type {
 #define	SPA_VERSION_ZLE_COMPRESSION	SPA_VERSION_20
 #define	SPA_VERSION_DEDUP		SPA_VERSION_21
 #define	SPA_VERSION_RECVD_PROPS		SPA_VERSION_22
+#define	SPA_VERSION_SLIM_ZIL		SPA_VERSION_23
+#define	SPA_VERSION_SA			SPA_VERSION_24
+#define	SPA_VERSION_SCAN		SPA_VERSION_25
 
 /*
  * ZPL version - rev'd whenever an incompatible on-disk format change
@@ -388,8 +392,9 @@ typedef enum zfs_cache_type {
 #define	ZPL_VERSION_2			2ULL
 #define	ZPL_VERSION_3			3ULL
 #define	ZPL_VERSION_4			4ULL
-#define	ZPL_VERSION			ZPL_VERSION_4
-#define	ZPL_VERSION_STRING		"4"
+#define	ZPL_VERSION_5			5ULL
+#define	ZPL_VERSION			ZPL_VERSION_5
+#define	ZPL_VERSION_STRING		"5"
 
 #define	ZPL_VERSION_INITIAL		ZPL_VERSION_1
 #define	ZPL_VERSION_DIRENT_TYPE		ZPL_VERSION_2
@@ -397,18 +402,21 @@ typedef enum zfs_cache_type {
 #define	ZPL_VERSION_NORMALIZATION	ZPL_VERSION_3
 #define	ZPL_VERSION_SYSATTR		ZPL_VERSION_3
 #define	ZPL_VERSION_USERSPACE		ZPL_VERSION_4
+#define	ZPL_VERSION_SA			ZPL_VERSION_5
 
 /* Rewind request information */
-#define	ZPOOL_NO_REWIND		0
-#define	ZPOOL_TRY_REWIND	1 /* Search for best txg, but do not rewind */
-#define	ZPOOL_DO_REWIND		2 /* Rewind to best txg w/in deferred frees */
-#define	ZPOOL_EXTREME_REWIND	4 /* Allow extreme measures to find best txg */
-#define	ZPOOL_REWIND_MASK	7 /* All the possible policy bits */
+#define	ZPOOL_NO_REWIND		1  /* No policy - default behavior */
+#define	ZPOOL_NEVER_REWIND	2  /* Do not search for best txg or rewind */
+#define	ZPOOL_TRY_REWIND	4  /* Search for best txg, but do not rewind */
+#define	ZPOOL_DO_REWIND		8  /* Rewind to best txg w/in deferred frees */
+#define	ZPOOL_EXTREME_REWIND	16 /* Allow extreme measures to find best txg */
+#define	ZPOOL_REWIND_MASK	28 /* All the possible rewind bits */
+#define	ZPOOL_REWIND_POLICIES	31 /* All the possible policy bits */
 
 typedef struct zpool_rewind_policy {
 	uint32_t	zrp_request;	/* rewind behavior requested */
-	uint32_t	zrp_maxmeta;	/* max acceptable meta-data errors */
-	uint32_t	zrp_maxdata;	/* max acceptable data errors */
+	uint64_t	zrp_maxmeta;	/* max acceptable meta-data errors */
+	uint64_t	zrp_maxdata;	/* max acceptable data errors */
 	uint64_t	zrp_txg;	/* specific txg to load */
 } zpool_rewind_policy_t;
 
@@ -435,7 +443,8 @@ typedef struct zpool_rewind_policy {
 #define	ZPOOL_CONFIG_ASHIFT		"ashift"
 #define	ZPOOL_CONFIG_ASIZE		"asize"
 #define	ZPOOL_CONFIG_DTL		"DTL"
-#define	ZPOOL_CONFIG_STATS		"stats"
+#define	ZPOOL_CONFIG_SCAN_STATS		"scan_stats"	/* not stored on disk */
+#define	ZPOOL_CONFIG_VDEV_STATS		"vdev_stats"	/* not stored on disk */
 #define	ZPOOL_CONFIG_WHOLE_DISK		"whole_disk"
 #define	ZPOOL_CONFIG_ERRCOUNT		"error_count"
 #define	ZPOOL_CONFIG_NOT_PRESENT	"not_present"
@@ -458,6 +467,7 @@ typedef struct zpool_rewind_policy {
 #define	ZPOOL_CONFIG_ORIG_GUID		"orig_guid"
 #define	ZPOOL_CONFIG_SPLIT_GUID		"split_guid"
 #define	ZPOOL_CONFIG_SPLIT_LIST		"guid_list"
+#define	ZPOOL_CONFIG_REMOVING		"removing"
 #define	ZPOOL_CONFIG_SUSPENDED		"suspended"	/* not stored on disk */
 #define	ZPOOL_CONFIG_TIMESTAMP		"timestamp"	/* not stored on disk */
 #define	ZPOOL_CONFIG_BOOTFS		"bootfs"	/* not stored on disk */
@@ -565,14 +575,14 @@ typedef enum pool_state {
 } pool_state_t;
 
 /*
- * Scrub types.
+ * Scan Functions.
  */
-typedef enum pool_scrub_type {
-	POOL_SCRUB_NONE,
-	POOL_SCRUB_RESILVER,
-	POOL_SCRUB_EVERYTHING,
-	POOL_SCRUB_TYPES
-} pool_scrub_type_t;
+typedef enum pool_scan_func {
+	POOL_SCAN_NONE,
+	POOL_SCAN_SCRUB,
+	POOL_SCAN_RESILVER,
+	POOL_SCAN_FUNCS
+} pool_scan_func_t;
 
 /*
  * ZIO types.  Needed to interpret vdev statistics below.
@@ -586,6 +596,36 @@ typedef enum zio_type {
 	ZIO_TYPE_IOCTL,
 	ZIO_TYPES
 } zio_type_t;
+
+/*
+ * Pool statistics.  Note: all fields should be 64-bit because this
+ * is passed between kernel and userland as an nvlist uint64 array.
+ */
+typedef struct pool_scan_stat {
+	/* values stored on disk */
+	uint64_t	pss_func;	/* pool_scan_func_t */
+	uint64_t	pss_state;	/* dsl_scan_state_t */
+	uint64_t	pss_start_time;	/* scan start time */
+	uint64_t	pss_end_time;	/* scan end time */
+	uint64_t	pss_to_examine;	/* total bytes to scan */
+	uint64_t	pss_examined;	/* total examined bytes	*/
+	uint64_t	pss_to_process; /* total bytes to process */
+	uint64_t	pss_processed;	/* total processed bytes */
+	uint64_t	pss_errors;	/* scan errors	*/
+
+	/* values not stored on disk */
+	uint64_t	pss_pass_exam;	/* examined bytes per scan pass */
+	uint64_t	pss_pass_start;	/* start time of a scan pass */
+} pool_scan_stat_t;
+
+typedef enum dsl_scan_state {
+	DSS_NONE,
+	DSS_SCANNING,
+	DSS_FINISHED,
+	DSS_CANCELED,
+	DSS_NUM_STATES
+} dsl_scan_state_t;
+
 
 /*
  * Vdev statistics.  Note: all fields should be 64-bit because this
@@ -605,13 +645,8 @@ typedef struct vdev_stat {
 	uint64_t	vs_write_errors;	/* write errors		*/
 	uint64_t	vs_checksum_errors;	/* checksum errors	*/
 	uint64_t	vs_self_healed;		/* self-healed bytes	*/
-	uint64_t	vs_scrub_type;		/* pool_scrub_type_t	*/
-	uint64_t	vs_scrub_complete;	/* completed?		*/
-	uint64_t	vs_scrub_examined;	/* bytes examined; top	*/
-	uint64_t	vs_scrub_repaired;	/* bytes repaired; leaf	*/
-	uint64_t	vs_scrub_errors;	/* errors during scrub	*/
-	uint64_t	vs_scrub_start;		/* UTC scrub start time	*/
-	uint64_t	vs_scrub_end;		/* UTC scrub end time	*/
+	uint64_t	vs_scan_removing;	/* removing?	*/
+	uint64_t	vs_scan_processed;	/* scan processed bytes	*/
 } vdev_stat_t;
 
 /*
@@ -667,7 +702,7 @@ typedef enum zfs_ioc {
 	ZFS_IOC_POOL_CONFIGS,
 	ZFS_IOC_POOL_STATS,
 	ZFS_IOC_POOL_TRYIMPORT,
-	ZFS_IOC_POOL_SCRUB,
+	ZFS_IOC_POOL_SCAN,
 	ZFS_IOC_POOL_FREEZE,
 	ZFS_IOC_POOL_UPGRADE,
 	ZFS_IOC_POOL_GET_HISTORY,
@@ -703,7 +738,6 @@ typedef enum zfs_ioc {
 	ZFS_IOC_POOL_GET_PROPS,
 	ZFS_IOC_SET_FSACL,
 	ZFS_IOC_GET_FSACL,
-	ZFS_IOC_ISCSI_PERM_CHECK,
 	ZFS_IOC_SHARE,
 	ZFS_IOC_INHERIT_PROP,
 	ZFS_IOC_SMB_ACL,
@@ -806,7 +840,7 @@ typedef enum history_internal_events {
 	LOG_POOL_VDEV_OFFLINE,
 	LOG_POOL_UPGRADE,
 	LOG_POOL_CLEAR,
-	LOG_POOL_SCRUB,
+	LOG_POOL_SCAN,
 	LOG_POOL_PROPSET,
 	LOG_DS_CREATE,
 	LOG_DS_CLONE,
@@ -829,7 +863,7 @@ typedef enum history_internal_events {
 	LOG_DS_UPGRADE,
 	LOG_DS_REFQUOTA,
 	LOG_DS_REFRESERV,
-	LOG_POOL_SCRUB_DONE,
+	LOG_POOL_SCAN_DONE,
 	LOG_DS_USER_HOLD,
 	LOG_DS_USER_RELEASE,
 	LOG_POOL_SPLIT,

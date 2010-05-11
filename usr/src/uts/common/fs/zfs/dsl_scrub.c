@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/dsl_pool.h>
@@ -42,6 +41,8 @@
 #include <sys/zil_impl.h>
 #include <sys/zio_checksum.h>
 #include <sys/ddt.h>
+#include <sys/sa.h>
+#include <sys/sa_impl.h>
 
 typedef int (scrub_cb_t)(dsl_pool_t *, const blkptr_t *, const zbookmark_t *);
 
@@ -268,6 +269,13 @@ dsl_free(dsl_pool_t *dp, uint64_t txg, const blkptr_t *bpp)
 	 * This function will be used by bp-rewrite wad to intercept frees.
 	 */
 	zio_free(dp->dp_spa, txg, bpp);
+}
+
+void
+dsl_free_sync(zio_t *pio, dsl_pool_t *dp, uint64_t txg, const blkptr_t *bpp)
+{
+	ASSERT(dsl_pool_sync_context(dp));
+	zio_nowait(zio_free_sync(pio, dp->dp_spa, txg, bpp, pio->io_flags));
 }
 
 static boolean_t
@@ -612,6 +620,12 @@ scrub_visitdnode(dsl_pool_t *dp, dnode_phys_t *dnp, arc_buf_t *buf,
 
 		SET_BOOKMARK(&czb, objset, object, dnp->dn_nlevels - 1, j);
 		scrub_visitbp(dp, dnp, buf, &dnp->dn_blkptr[j], &czb);
+
+		if (dnp->dn_flags & DNODE_FLAG_SPILL_BLKPTR) {
+			zbookmark_t czb;
+			SET_BOOKMARK(&czb, objset, object, 0, DMU_SPILL_BLKID);
+			scrub_visitbp(dp, dnp, buf, &dnp->dn_spill, &czb);
+		}
 	}
 }
 

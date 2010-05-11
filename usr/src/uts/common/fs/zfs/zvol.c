@@ -114,6 +114,7 @@ typedef struct zvol_state {
 	zilog_t		*zv_zilog;	/* ZIL handle */
 	list_t		zv_extents;	/* List of extents for dump */
 	znode_t		zv_znode;	/* for range locking */
+	dmu_buf_t	*zv_dbuf;	/* bonus handle */
 } zvol_state_t;
 
 /*
@@ -246,7 +247,7 @@ struct maparg {
 
 /*ARGSUSED*/
 static int
-zvol_map_block(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
+zvol_map_block(spa_t *spa, zilog_t *zilog, const blkptr_t *bp, arc_buf_t *pbuf,
     const zbookmark_t *zb, const dnode_phys_t *dnp, void *arg)
 {
 	struct maparg *ma = arg;
@@ -599,6 +600,11 @@ zvol_first_open(zvol_state_t *zv)
 		return (error);
 	}
 	zv->zv_objset = os;
+	error = dmu_bonus_hold(os, ZVOL_OBJ, zvol_tag, &zv->zv_dbuf);
+	if (error) {
+		dmu_objset_disown(os, zvol_tag);
+		return (error);
+	}
 	zv->zv_volsize = volsize;
 	zv->zv_zilog = zil_open(os, zvol_get_data);
 	zvol_size_changed(zv->zv_volsize, ddi_driver_major(zfs_dip),
@@ -618,6 +624,8 @@ zvol_last_close(zvol_state_t *zv)
 {
 	zil_close(zv->zv_zilog);
 	zv->zv_zilog = NULL;
+	dmu_buf_rele(zv->zv_dbuf, zvol_tag);
+	zv->zv_dbuf = NULL;
 	dmu_objset_disown(zv->zv_objset, zvol_tag);
 	zv->zv_objset = NULL;
 }
@@ -941,7 +949,8 @@ zvol_get_data(void *arg, lr_write_t *lr, char *buf, zio_t *zio)
 	} else {
 		size = zv->zv_volblocksize;
 		offset = P2ALIGN(offset, size);
-		error = dmu_buf_hold(os, object, offset, zgd, &db);
+		error = dmu_buf_hold(os, object, offset, zgd, &db,
+		    DMU_READ_NO_PREFETCH);
 		if (error == 0) {
 			zgd->zgd_db = db;
 			zgd->zgd_bp = bp;
@@ -1372,7 +1381,7 @@ zvol_write(dev_t dev, uio_t *uio, cred_t *cr)
 			dmu_tx_abort(tx);
 			break;
 		}
-		error = dmu_write_uio(zv->zv_objset, ZVOL_OBJ, uio, bytes, tx);
+		error = dmu_write_uio_dbuf(zv->zv_dbuf, uio, bytes, tx);
 		if (error == 0)
 			zvol_log_write(zv, tx, off, bytes, sync);
 		dmu_tx_commit(tx);

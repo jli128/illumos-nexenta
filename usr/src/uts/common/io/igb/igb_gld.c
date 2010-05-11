@@ -1093,16 +1093,16 @@ setup_link:
 		err = ENOTSUP; /* read-only prop. Can't set this. */
 		break;
 	case MAC_PROP_MTU:
-		/* adapter must be stopped for an MTU change */
-		if (igb->igb_state & IGB_STARTED) {
-			err = EBUSY;
-			break;
-		}
-
 		cur_mtu = igb->default_mtu;
 		bcopy(pr_val, &new_mtu, sizeof (new_mtu));
 		if (new_mtu == cur_mtu) {
 			err = 0;
+			break;
+		}
+
+		/* adapter must be stopped for an MTU change */
+		if (igb->igb_state & IGB_STARTED) {
+			err = EBUSY;
 			break;
 		}
 

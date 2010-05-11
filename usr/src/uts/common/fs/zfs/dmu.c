@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/dmu.h>
@@ -40,6 +39,7 @@
 #include <sys/zfs_ioctl.h>
 #include <sys/zap.h>
 #include <sys/zio_checksum.h>
+#include <sys/sa.h>
 #ifdef _KERNEL
 #include <sys/vmsystm.h>
 #include <sys/zfs_znode.h>
@@ -84,22 +84,32 @@ const dmu_object_type_info_t dmu_ot[DMU_OT_NUMTYPES] = {
 	{	byteswap_uint8_array,	TRUE,	"FUID table"		},
 	{	byteswap_uint64_array,	TRUE,	"FUID table size"	},
 	{	zap_byteswap,		TRUE,	"DSL dataset next clones"},
-	{	zap_byteswap,		TRUE,	"scrub work queue"	},
+	{	zap_byteswap,		TRUE,	"scan work queue"	},
 	{	zap_byteswap,		TRUE,	"ZFS user/group used"	},
 	{	zap_byteswap,		TRUE,	"ZFS user/group quota"	},
 	{	zap_byteswap,		TRUE,	"snapshot refcount tags"},
 	{	zap_byteswap,		TRUE,	"DDT ZAP algorithm"	},
 	{	zap_byteswap,		TRUE,	"DDT statistics"	},
+	{	byteswap_uint8_array,	TRUE,	"System attributes"	},
+	{	zap_byteswap,		TRUE,	"SA master node"	},
+	{	zap_byteswap,		TRUE,	"SA attr registration"	},
+	{	zap_byteswap,		TRUE,	"SA attr layouts"	},
+	{	zap_byteswap,		TRUE,	"scan translations"	},
+	{	byteswap_uint8_array,	FALSE,	"deduplicated block"	},
 };
 
 int
 dmu_buf_hold(objset_t *os, uint64_t object, uint64_t offset,
-    void *tag, dmu_buf_t **dbp)
+    void *tag, dmu_buf_t **dbp, int flags)
 {
 	dnode_t *dn;
 	uint64_t blkid;
 	dmu_buf_impl_t *db;
 	int err;
+	int db_flags = DB_RF_CANFAIL;
+
+	if (flags & DMU_READ_NO_PREFETCH)
+		db_flags |= DB_RF_NOPREFETCH;
 
 	err = dnode_hold(os, object, FTAG, &dn);
 	if (err)
@@ -111,7 +121,7 @@ dmu_buf_hold(objset_t *os, uint64_t object, uint64_t offset,
 	if (db == NULL) {
 		err = EIO;
 	} else {
-		err = dbuf_read(db, NULL, DB_RF_CANFAIL);
+		err = dbuf_read(db, NULL, db_flags);
 		if (err) {
 			dbuf_rele(db, tag);
 			db = NULL;
@@ -140,6 +150,36 @@ dmu_set_bonus(dmu_buf_t *db, int newsize, dmu_tx_t *tx)
 		return (EINVAL);
 	dnode_setbonuslen(dn, newsize, tx);
 	return (0);
+}
+
+int
+dmu_set_bonustype(dmu_buf_t *db, dmu_object_type_t type, dmu_tx_t *tx)
+{
+	dnode_t *dn = ((dmu_buf_impl_t *)db)->db_dnode;
+
+	if (type > DMU_OT_NUMTYPES)
+		return (EINVAL);
+
+	if (dn->dn_bonus != (dmu_buf_impl_t *)db)
+		return (EINVAL);
+
+	dnode_setbonus_type(dn, type, tx);
+	return (0);
+}
+
+int
+dmu_rm_spill(objset_t *os, uint64_t object, dmu_tx_t *tx)
+{
+	dnode_t *dn;
+	int error;
+
+	error = dnode_hold(os, object, FTAG, &dn);
+	dbuf_rm_spill(dn, tx);
+	rw_enter(&dn->dn_struct_rwlock, RW_WRITER);
+	dnode_rm_spill(dn, tx);
+	rw_exit(&dn->dn_struct_rwlock);
+	dnode_rele(dn, FTAG);
+	return (error);
 }
 
 /*
@@ -172,10 +212,65 @@ dmu_bonus_hold(objset_t *os, uint64_t object, void *tag, dmu_buf_t **dbp)
 
 	dnode_rele(dn, FTAG);
 
-	VERIFY(0 == dbuf_read(db, NULL, DB_RF_MUST_SUCCEED));
+	VERIFY(0 == dbuf_read(db, NULL, DB_RF_MUST_SUCCEED | DB_RF_NOPREFETCH));
 
 	*dbp = &db->db;
 	return (0);
+}
+
+/*
+ * returns ENOENT, EIO, or 0.
+ *
+ * This interface will allocate a blank spill dbuf when a spill blk
+ * doesn't already exist on the dnode.
+ *
+ * if you only want to find an already existing spill db, then
+ * dmu_spill_hold_existing() should be used.
+ */
+int
+dmu_spill_hold_by_dnode(dnode_t *dn, uint32_t flags, void *tag, dmu_buf_t **dbp)
+{
+	dmu_buf_impl_t *db = NULL;
+	int err;
+
+	if ((flags & DB_RF_HAVESTRUCT) == 0)
+		rw_enter(&dn->dn_struct_rwlock, RW_READER);
+
+	db = dbuf_hold(dn, DMU_SPILL_BLKID, tag);
+
+	if ((flags & DB_RF_HAVESTRUCT) == 0)
+		rw_exit(&dn->dn_struct_rwlock);
+
+	ASSERT(db != NULL);
+	err = dbuf_read(db, NULL, DB_RF_MUST_SUCCEED | flags);
+	*dbp = &db->db;
+	return (err);
+}
+
+int
+dmu_spill_hold_existing(dmu_buf_t *bonus, void *tag, dmu_buf_t **dbp)
+{
+	dnode_t *dn = ((dmu_buf_impl_t *)bonus)->db_dnode;
+	int err;
+
+	if (spa_version(dn->dn_objset->os_spa) < SPA_VERSION_SA)
+		return (EINVAL);
+	rw_enter(&dn->dn_struct_rwlock, RW_READER);
+
+	if (!dn->dn_have_spill) {
+		rw_exit(&dn->dn_struct_rwlock);
+		return (ENOENT);
+	}
+	err = dmu_spill_hold_by_dnode(dn, DB_RF_HAVESTRUCT, tag, dbp);
+	rw_exit(&dn->dn_struct_rwlock);
+	return (err);
+}
+
+int
+dmu_spill_hold_by_bonus(dmu_buf_t *bonus, void *tag, dmu_buf_t **dbp)
+{
+	return (dmu_spill_hold_by_dnode(((dmu_buf_impl_t *)bonus)->db_dnode,
+	    0, tag, dbp));
 }
 
 /*
@@ -842,19 +937,16 @@ dmu_read_uio(objset_t *os, uint64_t object, uio_t *uio, uint64_t size)
 	return (err);
 }
 
-int
-dmu_write_uio(objset_t *os, uint64_t object, uio_t *uio, uint64_t size,
-    dmu_tx_t *tx)
+static int
+dmu_write_uio_dnode(dnode_t *dn, uio_t *uio, uint64_t size, dmu_tx_t *tx)
 {
 	dmu_buf_t **dbp;
-	int numbufs, i;
+	int numbufs;
 	int err = 0;
+	int i;
 
-	if (size == 0)
-		return (0);
-
-	err = dmu_buf_hold_array(os, object, uio->uio_loffset, size,
-	    FALSE, FTAG, &numbufs, &dbp);
+	err = dmu_buf_hold_array_by_dnode(dn, uio->uio_loffset, size,
+	    FALSE, FTAG, &numbufs, &dbp, DMU_READ_PREFETCH);
 	if (err)
 		return (err);
 
@@ -892,7 +984,40 @@ dmu_write_uio(objset_t *os, uint64_t object, uio_t *uio, uint64_t size,
 
 		size -= tocpy;
 	}
+
 	dmu_buf_rele_array(dbp, numbufs, FTAG);
+	return (err);
+}
+
+int
+dmu_write_uio_dbuf(dmu_buf_t *zdb, uio_t *uio, uint64_t size,
+    dmu_tx_t *tx)
+{
+	if (size == 0)
+		return (0);
+
+	return (dmu_write_uio_dnode(((dmu_buf_impl_t *)zdb)->db_dnode,
+	    uio, size, tx));
+}
+
+int
+dmu_write_uio(objset_t *os, uint64_t object, uio_t *uio, uint64_t size,
+    dmu_tx_t *tx)
+{
+	dnode_t *dn;
+	int err;
+
+	if (size == 0)
+		return (0);
+
+	err = dnode_hold(os, object, FTAG, &dn);
+	if (err)
+		return (err);
+
+	err = dmu_write_uio_dnode(dn, uio, size, tx);
+
+	dnode_rele(dn, FTAG);
+
 	return (err);
 }
 
@@ -1096,7 +1221,7 @@ dmu_sync_late_arrival(zio_t *pio, objset_t *os, dmu_sync_cb_t *done, zgd_t *zgd,
 
 	tx = dmu_tx_create(os);
 	dmu_tx_hold_space(tx, zgd->zgd_db->db_size);
-	if (dmu_tx_assign(tx, TXG_NOWAIT) != 0) {
+	if (dmu_tx_assign(tx, TXG_WAIT) != 0) {
 		dmu_tx_abort(tx);
 		return (EIO);	/* Make zl_get_data do txg_waited_synced() */
 	}
@@ -1304,7 +1429,7 @@ dmu_write_policy(objset_t *os, dnode_t *dn, int level, int wp, zio_prop_t *zp)
 		 * to fletcher4.
 		 */
 		if (zio_checksum_table[checksum].ci_correctable < 1 ||
-		    zio_checksum_table[checksum].ci_zbt)
+		    zio_checksum_table[checksum].ci_eck)
 			checksum = ZIO_CHECKSUM_FLETCHER_4;
 	} else {
 		checksum = zio_checksum_select(dn->dn_checksum, checksum);
@@ -1349,7 +1474,7 @@ dmu_write_policy(objset_t *os, dnode_t *dn, int level, int wp, zio_prop_t *zp)
 
 	zp->zp_checksum = checksum;
 	zp->zp_compress = compress;
-	zp->zp_type = type;
+	zp->zp_type = (wp & WP_SPILL) ? dn->dn_bonustype : type;
 	zp->zp_level = level;
 	zp->zp_copies = MIN(copies + ismd, spa_max_replication(os->os_spa));
 	zp->zp_dedup = dedup;
@@ -1508,12 +1633,14 @@ byteswap_uint8_array(void *vbuf, size_t size)
 void
 dmu_init(void)
 {
+	zfs_dbgmsg_init();
 	dbuf_init();
 	dnode_init();
 	zfetch_init();
 	arc_init();
 	l2arc_init();
 	xuio_stat_init();
+	sa_cache_init();
 }
 
 void
@@ -1525,4 +1652,6 @@ dmu_fini(void)
 	dbuf_fini();
 	l2arc_fini();
 	xuio_stat_fini();
+	sa_cache_fini();
+	zfs_dbgmsg_fini();
 }

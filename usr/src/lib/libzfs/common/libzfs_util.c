@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -137,10 +136,6 @@ libzfs_error_description(libzfs_handle_t *hdl)
 		return (dgettext(TEXT_DOMAIN, "smb remove share failed"));
 	case EZFS_SHARESMBFAILED:
 		return (dgettext(TEXT_DOMAIN, "smb add share failed"));
-	case EZFS_ISCSISVCUNAVAIL:
-		return (dgettext(TEXT_DOMAIN,
-		    "iscsitgt service need to be enabled by "
-		    "a privileged user"));
 	case EZFS_PERM:
 		return (dgettext(TEXT_DOMAIN, "permission denied"));
 	case EZFS_NOSPC:
@@ -160,12 +155,6 @@ libzfs_error_description(libzfs_handle_t *hdl)
 		return (dgettext(TEXT_DOMAIN, "recursive dataset dependency"));
 	case EZFS_NOHISTORY:
 		return (dgettext(TEXT_DOMAIN, "no history available"));
-	case EZFS_UNSHAREISCSIFAILED:
-		return (dgettext(TEXT_DOMAIN,
-		    "iscsitgtd failed request to unshare"));
-	case EZFS_SHAREISCSIFAILED:
-		return (dgettext(TEXT_DOMAIN,
-		    "iscsitgtd failed request to share"));
 	case EZFS_POOLPROPS:
 		return (dgettext(TEXT_DOMAIN, "failed to retrieve "
 		    "pool properties"));
@@ -226,6 +215,11 @@ libzfs_error_description(libzfs_handle_t *hdl)
 	case EZFS_POSTSPLIT_ONLINE:
 		return (dgettext(TEXT_DOMAIN, "disk was split from this pool "
 		    "into a new one"));
+	case EZFS_SCRUBBING:
+		return (dgettext(TEXT_DOMAIN, "currently scrubbing; "
+		    "use 'zpool scrub -s' to cancel current scrub"));
+	case EZFS_NO_SCRUB:
+		return (dgettext(TEXT_DOMAIN, "there is no active scrub"));
 	case EZFS_UNKNOWN:
 		return (dgettext(TEXT_DOMAIN, "unknown error"));
 	default:
@@ -1349,17 +1343,6 @@ zprop_get_list(libzfs_handle_t *hdl, char *props, zprop_list_t **listp,
 	 */
 	if (strcmp(props, "all") == 0)
 		return (0);
-
-	/*
-	 * If shareiscsi is specified as one of the arguemnts,
-	 * return error.
-	 */
-	if (strcmp(props, "shareiscsi") == 0) {
-		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-		    "invalid property"));
-		return (zfs_error(hdl, EZFS_BADPROP, dgettext(TEXT_DOMAIN,
-		    "bad property list")));
-	}
 
 	/*
 	 * If no props were specified, return an error.

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -62,12 +61,14 @@
 #include <sys/zfs_ctldir.h>
 #include <sys/zfs_dir.h>
 #include <sys/zvol.h>
+#include <sys/dsl_scan.h>
 #include <sharefs/share.h>
 #include <sys/dmu_objset.h>
 
 #include "zfs_namecheck.h"
 #include "zfs_prop.h"
 #include "zfs_deleg.h"
+#include "zfs_comutil.h"
 
 extern struct modlfs zfs_modlfs;
 
@@ -136,7 +137,7 @@ void
 __dprintf(const char *file, const char *func, int line, const char *fmt, ...)
 {
 	const char *newfile;
-	char buf[256];
+	char buf[512];
 	va_list adx;
 
 	/*
@@ -643,16 +644,6 @@ zfs_secpolicy_destroy_snaps(zfs_cmd_t *zc, cred_t *cr)
 
 	strfree(dsname);
 	return (error);
-}
-
-/*
- * Must have sys_config privilege to check the iscsi permission
- */
-/* ARGSUSED */
-static int
-zfs_secpolicy_iscsi(zfs_cmd_t *zc, cred_t *cr)
-{
-	return (secpolicy_zfs(cr));
 }
 
 int
@@ -1266,8 +1257,13 @@ zfs_ioc_pool_tryimport(zfs_cmd_t *zc)
 	return (error);
 }
 
+/*
+ * inputs:
+ * zc_name              name of the pool
+ * zc_cookie            scan func (pool_scan_func_t)
+ */
 static int
-zfs_ioc_pool_scrub(zfs_cmd_t *zc)
+zfs_ioc_pool_scan(zfs_cmd_t *zc)
 {
 	spa_t *spa;
 	int error;
@@ -1275,7 +1271,10 @@ zfs_ioc_pool_scrub(zfs_cmd_t *zc)
 	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
 		return (error);
 
-	error = spa_scrub(spa, zc->zc_cookie);
+	if (zc->zc_cookie == POOL_SCAN_NONE)
+		error = spa_scan_stop(spa);
+	else
+		error = spa_scan(spa, zc->zc_cookie);
 
 	spa_close(spa, FTAG);
 
@@ -1431,6 +1430,12 @@ zfs_ioc_vdev_add(zfs_cmd_t *zc)
 	return (error);
 }
 
+/*
+ * inputs:
+ * zc_name		name of the pool
+ * zc_nvlist_conf	nvlist of devices to remove
+ * zc_cookie		to stop the remove?
+ */
 static int
 zfs_ioc_vdev_remove(zfs_cmd_t *zc)
 {
@@ -1984,19 +1989,9 @@ zfs_prop_set_special(const char *dsname, zprop_source_t source,
 	case ZFS_PROP_VERSION:
 	{
 		zfsvfs_t *zfsvfs;
-		uint64_t maxzplver = ZPL_VERSION;
 
 		if ((err = zfsvfs_hold(dsname, FTAG, &zfsvfs)) != 0)
 			break;
-
-		if (zfs_earlier_version(dsname, SPA_VERSION_USERSPACE))
-			maxzplver = ZPL_VERSION_USERSPACE - 1;
-		if (zfs_earlier_version(dsname, SPA_VERSION_FUID))
-			maxzplver = ZPL_VERSION_FUID - 1;
-		if (intval > maxzplver) {
-			zfsvfs_rele(zfsvfs, FTAG);
-			return (ENOTSUP);
-		}
 
 		err = zfs_set_version(zfsvfs, intval);
 		zfsvfs_rele(zfsvfs, FTAG);
@@ -2459,53 +2454,6 @@ zfs_ioc_pool_get_props(zfs_cmd_t *zc)
 	return (error);
 }
 
-static int
-zfs_ioc_iscsi_perm_check(zfs_cmd_t *zc)
-{
-	nvlist_t *nvp;
-	int error;
-	uint32_t uid;
-	uint32_t gid;
-	uint32_t *groups;
-	uint_t group_cnt;
-	cred_t	*usercred;
-
-	if ((error = get_nvlist(zc->zc_nvlist_src, zc->zc_nvlist_src_size,
-	    zc->zc_iflags, &nvp)) != 0) {
-		return (error);
-	}
-
-	if ((error = nvlist_lookup_uint32(nvp,
-	    ZFS_DELEG_PERM_UID, &uid)) != 0) {
-		nvlist_free(nvp);
-		return (EPERM);
-	}
-
-	if ((error = nvlist_lookup_uint32(nvp,
-	    ZFS_DELEG_PERM_GID, &gid)) != 0) {
-		nvlist_free(nvp);
-		return (EPERM);
-	}
-
-	if ((error = nvlist_lookup_uint32_array(nvp, ZFS_DELEG_PERM_GROUPS,
-	    &groups, &group_cnt)) != 0) {
-		nvlist_free(nvp);
-		return (EPERM);
-	}
-	usercred = cralloc();
-	if ((crsetugid(usercred, uid, gid) != 0) ||
-	    (crsetgroups(usercred, group_cnt, (gid_t *)groups) != 0)) {
-		nvlist_free(nvp);
-		crfree(usercred);
-		return (EPERM);
-	}
-	nvlist_free(nvp);
-	error = dsl_deleg_access(zc->zc_name,
-	    zfs_prop_to_name(ZFS_PROP_SHAREISCSI), usercred);
-	crfree(usercred);
-	return (error);
-}
-
 /*
  * inputs:
  * zc_name		name of filesystem
@@ -2635,8 +2583,8 @@ zfs_create_cb(objset_t *os, void *arg, cred_t *cr, dmu_tx_t *tx)
  */
 static int
 zfs_fill_zplprops_impl(objset_t *os, uint64_t zplver,
-    boolean_t fuids_ok, nvlist_t *createprops, nvlist_t *zplprops,
-    boolean_t *is_ci)
+    boolean_t fuids_ok, boolean_t sa_ok, nvlist_t *createprops,
+    nvlist_t *zplprops, boolean_t *is_ci)
 {
 	uint64_t sense = ZFS_PROP_UNDEFINED;
 	uint64_t norm = ZFS_PROP_UNDEFINED;
@@ -2672,6 +2620,7 @@ zfs_fill_zplprops_impl(objset_t *os, uint64_t zplver,
 	 */
 	if ((zplver < ZPL_VERSION_INITIAL || zplver > ZPL_VERSION) ||
 	    (zplver >= ZPL_VERSION_FUID && !fuids_ok) ||
+	    (zplver >= ZPL_VERSION_SA && !sa_ok) ||
 	    (zplver < ZPL_VERSION_NORMALIZATION &&
 	    (norm != ZFS_PROP_UNDEFINED || u8 != ZFS_PROP_UNDEFINED ||
 	    sense != ZFS_PROP_UNDEFINED)))
@@ -2687,6 +2636,14 @@ zfs_fill_zplprops_impl(objset_t *os, uint64_t zplver,
 		VERIFY(zfs_get_zplprop(os, ZFS_PROP_NORMALIZE, &norm) == 0);
 	VERIFY(nvlist_add_uint64(zplprops,
 	    zfs_prop_to_name(ZFS_PROP_NORMALIZE), norm) == 0);
+
+	if (os) {
+		char osname[MAXNAMELEN];
+
+		dmu_objset_name(os, osname);
+		if (zfs_is_wormed(osname))
+			return EPERM;
+	}
 
 	/*
 	 * If we're normalizing, names must always be valid UTF-8 strings.
@@ -2713,11 +2670,13 @@ static int
 zfs_fill_zplprops(const char *dataset, nvlist_t *createprops,
     nvlist_t *zplprops, boolean_t *is_ci)
 {
-	boolean_t fuids_ok = B_TRUE;
+	boolean_t fuids_ok, sa_ok;
 	uint64_t zplver = ZPL_VERSION;
 	objset_t *os = NULL;
 	char parentname[MAXNAMELEN];
 	char *cp;
+	spa_t *spa;
+	uint64_t spa_vers;
 	int error;
 
 	(void) strlcpy(parentname, dataset, sizeof (parentname));
@@ -2725,15 +2684,15 @@ zfs_fill_zplprops(const char *dataset, nvlist_t *createprops,
 	ASSERT(cp != NULL);
 	cp[0] = '\0';
 
-	if (zfs_earlier_version(dataset, SPA_VERSION_USERSPACE))
-		zplver = ZPL_VERSION_USERSPACE - 1;
-	if (zfs_earlier_version(dataset, SPA_VERSION_FUID)) {
-		zplver = ZPL_VERSION_FUID - 1;
-		fuids_ok = B_FALSE;
-	}
+	if ((error = spa_open(dataset, &spa, FTAG)) != 0)
+		return (error);
 
-	if (zfs_is_wormed(dataset))
-		return EPERM;
+	spa_vers = spa_version(spa);
+	spa_close(spa, FTAG);
+
+	zplver = zfs_zpl_version_map(spa_vers);
+	fuids_ok = (zplver >= ZPL_VERSION_FUID);
+	sa_ok = (zplver >= ZPL_VERSION_SA);
 
 	/*
 	 * Open parent object set so we can inherit zplprop values.
@@ -2741,7 +2700,7 @@ zfs_fill_zplprops(const char *dataset, nvlist_t *createprops,
 	if ((error = dmu_objset_hold(parentname, FTAG, &os)) != 0)
 		return (error);
 
-	error = zfs_fill_zplprops_impl(os, zplver, fuids_ok, createprops,
+	error = zfs_fill_zplprops_impl(os, zplver, fuids_ok, sa_ok, createprops,
 	    zplprops, is_ci);
 	dmu_objset_rele(os, FTAG);
 	return (error);
@@ -2751,17 +2710,17 @@ static int
 zfs_fill_zplprops_root(uint64_t spa_vers, nvlist_t *createprops,
     nvlist_t *zplprops, boolean_t *is_ci)
 {
-	boolean_t fuids_ok = B_TRUE;
+	boolean_t fuids_ok;
+	boolean_t sa_ok;
 	uint64_t zplver = ZPL_VERSION;
 	int error;
 
-	if (spa_vers < SPA_VERSION_FUID) {
-		zplver = ZPL_VERSION_FUID - 1;
-		fuids_ok = B_FALSE;
-	}
+	zplver = zfs_zpl_version_map(spa_vers);
+	fuids_ok = (zplver >= ZPL_VERSION_FUID);
+	sa_ok = (zplver >= ZPL_VERSION_SA);
 
-	error = zfs_fill_zplprops_impl(NULL, zplver, fuids_ok, createprops,
-	    zplprops, is_ci);
+	error = zfs_fill_zplprops_impl(NULL, zplver, fuids_ok, sa_ok,
+	    createprops, zplprops, is_ci);
 	return (error);
 }
 
@@ -3788,7 +3747,7 @@ zfs_ioc_clear(zfs_cmd_t *zc)
 	spa->spa_last_open_failed = 0;
 	mutex_exit(&spa_namespace_lock);
 
-	if (zc->zc_cookie == ZPOOL_NO_REWIND) {
+	if (zc->zc_cookie & ZPOOL_NO_REWIND) {
 		error = spa_open(zc->zc_name, &spa, FTAG);
 	} else {
 		nvlist_t *policy;
@@ -4349,7 +4308,7 @@ static zfs_ioc_vec_t zfs_ioc_vec[] = {
 	    B_FALSE },
 	{ zfs_ioc_pool_tryimport, zfs_secpolicy_config, NO_NAME, B_FALSE,
 	    B_FALSE },
-	{ zfs_ioc_pool_scrub, zfs_secpolicy_config, POOL_NAME, B_TRUE,
+	{ zfs_ioc_pool_scan, zfs_secpolicy_config, POOL_NAME, B_TRUE,
 	    B_TRUE },
 	{ zfs_ioc_pool_freeze, zfs_secpolicy_config, NO_NAME, B_FALSE,
 	    B_FALSE },
@@ -4414,8 +4373,6 @@ static zfs_ioc_vec_t zfs_ioc_vec[] = {
 	{ zfs_ioc_set_fsacl, zfs_secpolicy_fsacl, DATASET_NAME, B_TRUE,
 	    B_TRUE },
 	{ zfs_ioc_get_fsacl, zfs_secpolicy_read, DATASET_NAME, B_FALSE,
-	    B_FALSE },
-	{ zfs_ioc_iscsi_perm_check, zfs_secpolicy_iscsi, DATASET_NAME, B_FALSE,
 	    B_FALSE },
 	{ zfs_ioc_share, zfs_secpolicy_share, DATASET_NAME, B_FALSE, B_FALSE },
 	{ zfs_ioc_inherit_prop, zfs_secpolicy_inherit, DATASET_NAME, B_TRUE,

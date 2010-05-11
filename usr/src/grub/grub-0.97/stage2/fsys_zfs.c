@@ -17,7 +17,7 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -123,10 +123,11 @@ zio_checksum_info_t zio_checksum_table[ZIO_CHECKSUM_FUNCTIONS] = {
 	zio_checksum_off,	zio_checksum_off,	0, 0,	"off",
 	zio_checksum_SHA256,	zio_checksum_SHA256,	1, 1,	"label",
 	zio_checksum_SHA256,	zio_checksum_SHA256,	1, 1,	"gang_header",
-	fletcher_2_native,	fletcher_2_byteswap,	0, 1,	"zilog",
+	NULL,			NULL,			0, 0,	"zilog",
 	fletcher_2_native,	fletcher_2_byteswap,	0, 0,	"fletcher2",
 	fletcher_4_native,	fletcher_4_byteswap,	1, 0,	"fletcher4",
 	zio_checksum_SHA256,	zio_checksum_SHA256,	1, 0,	"SHA256",
+	NULL,			NULL,			0, 0,	"zilog2",
 };
 
 /*
@@ -144,7 +145,7 @@ zio_checksum_verify(blkptr_t *bp, char *data, int size)
 	zio_cksum_t zc = bp->blk_cksum;
 	uint32_t checksum = BP_GET_CHECKSUM(bp);
 	int byteswap = BP_SHOULD_BYTESWAP(bp);
-	zio_block_tail_t *zbt = (zio_block_tail_t *)(data + size) - 1;
+	zio_eck_t *zec = (zio_eck_t *)(data + size) - 1;
 	zio_checksum_info_t *ci = &zio_checksum_table[checksum];
 	zio_cksum_t actual_cksum, expected_cksum;
 
@@ -155,11 +156,11 @@ zio_checksum_verify(blkptr_t *bp, char *data, int size)
 	if (checksum >= ZIO_CHECKSUM_FUNCTIONS || ci->ci_func[0] == NULL)
 		return (-1);
 
-	if (ci->ci_zbt) {
-		expected_cksum = zbt->zbt_cksum;
-		zbt->zbt_cksum = zc;
+	if (ci->ci_eck) {
+		expected_cksum = zec->zec_cksum;
+		zec->zec_cksum = zc;
 		ci->ci_func[0](data, size, &actual_cksum);
-		zbt->zbt_cksum = expected_cksum;
+		zec->zec_cksum = expected_cksum;
 		zc = expected_cksum;
 
 	} else {
@@ -669,6 +670,7 @@ zap_lookup(dnode_phys_t *zap_dnode, char *name, uint64_t *val, char *stack)
 	zapbuf = stack;
 	size = zap_dnode->dn_datablkszsec << SPA_MINBLOCKSHIFT;
 	stack += size;
+
 	if (errnum = dmu_read(zap_dnode, 0, zapbuf, stack))
 		return (errnum);
 
@@ -1424,7 +1426,43 @@ zfs_open(char *filename)
 	}
 
 	/* get the file size and set the file position to 0 */
-	filemax = ((znode_phys_t *)DN_BONUS(DNODE))->zp_size;
+
+	/*
+	 * For DMU_OT_SA we will need to locate the SIZE attribute
+	 * attribute, which could be either in the bonus buffer
+	 * or the "spill" block.
+	 */
+	if (DNODE->dn_bonustype == DMU_OT_SA) {
+		sa_hdr_phys_t *sahdrp;
+		int hdrsize;
+
+		if (DNODE->dn_bonuslen != 0) {
+			sahdrp = (sa_hdr_phys_t *)DN_BONUS(DNODE);
+		} else {
+			if (DNODE->dn_flags & DNODE_FLAG_SPILL_BLKPTR) {
+				blkptr_t *bp = &DNODE->dn_spill;
+				void *buf;
+
+				buf = (void *)stack;
+				stack += BP_GET_LSIZE(bp);
+
+				/* reset errnum to rawread() failure */
+				errnum = 0;
+				if (zio_read(bp, buf, stack) != 0) {
+					return (0);
+				}
+				sahdrp = buf;
+			} else {
+				errnum = ERR_FSYS_CORRUPT;
+				return (0);
+			}
+		}
+		hdrsize = SA_HDR_SIZE(sahdrp);
+		filemax = *(uint64_t *)((char *)sahdrp + hdrsize +
+		    SA_SIZE_OFFSET);
+	} else {
+		filemax = ((znode_phys_t *)DN_BONUS(DNODE))->zp_size;
+	}
 	filepos = 0;
 
 	dnode_buf = NULL;

@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_LIBZFS_H
@@ -93,8 +92,6 @@ enum {
 	EZFS_INVALCONFIG,	/* invalid vdev configuration */
 	EZFS_RECURSIVE,		/* recursive dependency */
 	EZFS_NOHISTORY,		/* no history object */
-	EZFS_UNSHAREISCSIFAILED, /* iscsitgtd failed request to unshare */
-	EZFS_SHAREISCSIFAILED,	/* iscsitgtd failed request to share */
 	EZFS_POOLPROPS,		/* couldn't retrieve pool props */
 	EZFS_POOL_NOTSUP,	/* ops not supported for this type of pool */
 	EZFS_POOL_INVALARG,	/* invalid argument for this pool operation */
@@ -102,7 +99,6 @@ enum {
 	EZFS_OPENFAILED,	/* open of device failed */
 	EZFS_NOCAP,		/* couldn't get capacity */
 	EZFS_LABELFAILED,	/* write of label failed */
-	EZFS_ISCSISVCUNAVAIL,	/* iscsi service unavailable */
 	EZFS_BADWHO,		/* invalid permission who */
 	EZFS_BADPERM,		/* invalid permission */
 	EZFS_BADPERMSET,	/* invalid permission set name */
@@ -122,6 +118,8 @@ enum {
 	EZFS_PIPEFAILED,	/* pipe create failed */
 	EZFS_THREADCREATEFAILED, /* thread create failed */
 	EZFS_POSTSPLIT_ONLINE,	/* onlining a disk after splitting it */
+	EZFS_SCRUBBING,		/* currently scrubbing */
+	EZFS_NO_SCRUB,		/* no active scrub */
 	EZFS_UNKNOWN
 };
 
@@ -227,7 +225,7 @@ typedef struct splitflags {
 /*
  * Functions to manipulate pool and vdev state
  */
-extern int zpool_scrub(zpool_handle_t *, pool_scrub_type_t);
+extern int zpool_scan(zpool_handle_t *, pool_scan_func_t);
 extern int zpool_clear(zpool_handle_t *, const char *, nvlist_t *);
 
 extern int zpool_vdev_online(zpool_handle_t *, const char *, int,
@@ -357,7 +355,7 @@ extern nvlist_t *zpool_find_import_cached(libzfs_handle_t *, const char *,
  */
 struct zfs_cmd;
 
-extern const char *hist_event_table[LOG_END];
+extern const char *zfs_history_event_names[LOG_END];
 
 extern char *zpool_vdev_name(libzfs_handle_t *, zpool_handle_t *, nvlist_t *,
     boolean_t verbose);
@@ -529,14 +527,15 @@ typedef struct sendflags {
 
 typedef boolean_t (snapfilter_cb_t)(zfs_handle_t *, void *);
 
-extern int zfs_send(zfs_handle_t *, const char *, const char *,
-    sendflags_t, int, snapfilter_cb_t, void *);
+extern int zfs_send(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
+    sendflags_t flags, int outfd, snapfilter_cb_t filter_func,
+    void *cb_arg, nvlist_t **debugnvp);
 
 extern int zfs_promote(zfs_handle_t *);
 extern int zfs_hold(zfs_handle_t *, const char *, const char *, boolean_t,
     boolean_t, boolean_t);
 extern int zfs_hold_range(zfs_handle_t *, const char *, const char *,
-    const char *, boolean_t, boolean_t);
+    const char *, boolean_t, boolean_t, snapfilter_cb_t, void *);
 extern int zfs_release(zfs_handle_t *, const char *, const char *, boolean_t);
 extern int zfs_release_range(zfs_handle_t *, const char *, const char *,
     const char *, boolean_t);
@@ -621,10 +620,6 @@ extern int zfs_unshareall_nfs(zfs_handle_t *);
 extern int zfs_unshareall_smb(zfs_handle_t *);
 extern int zfs_unshareall_bypath(zfs_handle_t *, const char *);
 extern int zfs_unshareall(zfs_handle_t *);
-extern boolean_t zfs_is_shared_iscsi(zfs_handle_t *);
-extern int zfs_share_iscsi(zfs_handle_t *);
-extern int zfs_unshare_iscsi(zfs_handle_t *);
-extern int zfs_iscsi_perm_check(libzfs_handle_t *, char *, ucred_t *);
 extern int zfs_deleg_share_nfs(libzfs_handle_t *, char *, char *, char *,
     void *, void *, int, zfs_share_op_t);
 

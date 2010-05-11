@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -94,6 +93,7 @@
 #include <sys/metaslab_impl.h>
 #include <sys/dsl_prop.h>
 #include <sys/dsl_dataset.h>
+#include <sys/dsl_scan.h>
 #include <sys/refcount.h>
 #include <stdio.h>
 #include <stdio_ext.h>
@@ -285,9 +285,9 @@ ztest_info_t ztest_info[] = {
 	{ ztest_spa_rename,			1,	&zopt_rarely	},
 	{ ztest_scrub,				1,	&zopt_rarely	},
 	{ ztest_dsl_dataset_promote_busy,	1,	&zopt_rarely	},
-	{ ztest_vdev_attach_detach,		1,	&zopt_rarely	},
+	{ ztest_vdev_attach_detach,		1,	&zopt_rarely },
 	{ ztest_vdev_LUN_growth,		1,	&zopt_rarely	},
-	{ ztest_vdev_add_remove,		1,	&zopt_vdevtime	},
+	{ ztest_vdev_add_remove,		1,	&zopt_vdevtime },
 	{ ztest_vdev_aux_add_remove,		1,	&zopt_vdevtime	},
 };
 
@@ -1674,7 +1674,8 @@ ztest_get_data(void *arg, lr_write_t *lr, char *buf, zio_t *zio)
 		zgd->zgd_rl = ztest_range_lock(zd, object, offset, size,
 		    RL_READER);
 
-		error = dmu_buf_hold(os, object, offset, zgd, &db);
+		error = dmu_buf_hold(os, object, offset, zgd, &db,
+		    DMU_READ_NO_PREFETCH);
 
 		if (error == 0) {
 			zgd->zgd_db = db;
@@ -3603,7 +3604,7 @@ ztest_dmu_read_write_zcopy(ztest_ds_t *zd, uint64_t id)
 
 			if (i == 1) {
 				VERIFY(dmu_buf_hold(os, bigobj, off,
-				    FTAG, &dbt) == 0);
+				    FTAG, &dbt, DMU_READ_NO_PREFETCH) == 0);
 			}
 			if (i != 5) {
 				dmu_assign_arcbuf(bonus_db, off,
@@ -4600,7 +4601,8 @@ ztest_ddt_repair(ztest_ds_t *zd, uint64_t id)
 	 */
 	for (int i = 0; i < copies; i++) {
 		uint64_t offset = i * blocksize;
-		VERIFY(dmu_buf_hold(os, object, offset, FTAG, &db) == 0);
+		VERIFY(dmu_buf_hold(os, object, offset, FTAG, &db,
+		    DMU_READ_NO_PREFETCH) == 0);
 		ASSERT(db->db_offset == offset);
 		ASSERT(db->db_size == blocksize);
 		ASSERT(ztest_pattern_match(db->db_data, db->db_size, pattern) ||
@@ -4616,7 +4618,8 @@ ztest_ddt_repair(ztest_ds_t *zd, uint64_t id)
 	/*
 	 * Find out what block we got.
 	 */
-	VERIFY(dmu_buf_hold(os, object, 0, FTAG, &db) == 0);
+	VERIFY(dmu_buf_hold(os, object, 0, FTAG, &db,
+	    DMU_READ_NO_PREFETCH) == 0);
 	blk = *((dmu_buf_impl_t *)db)->db_blkptr;
 	dmu_buf_rele(db, FTAG);
 
@@ -4646,9 +4649,9 @@ ztest_scrub(ztest_ds_t *zd, uint64_t id)
 	ztest_shared_t *zs = ztest_shared;
 	spa_t *spa = zs->zs_spa;
 
-	(void) spa_scrub(spa, POOL_SCRUB_EVERYTHING);
+	(void) spa_scan(spa, POOL_SCAN_SCRUB);
 	(void) poll(NULL, 0, 100); /* wait a moment, then force a restart */
-	(void) spa_scrub(spa, POOL_SCRUB_EVERYTHING);
+	(void) spa_scan(spa, POOL_SCAN_SCRUB);
 }
 
 /*
@@ -4801,7 +4804,7 @@ ztest_spa_import_export(char *oldname, char *newname)
 	 * Kick off a scrub to tickle scrub/export races.
 	 */
 	if (ztest_random(2) == 0)
-		(void) spa_scrub(spa, POOL_SCRUB_EVERYTHING);
+		(void) spa_scan(spa, POOL_SCAN_SCRUB);
 
 	pool_guid = spa_guid(spa);
 	spa_close(spa, FTAG);

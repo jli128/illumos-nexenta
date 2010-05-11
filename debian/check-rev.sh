@@ -1,6 +1,6 @@
 #!/bin/bash
 
-START_DATE="Tue Sep 01 11:05:39 2009"
+START_DATE="Tue Feb 16 21:36:53 2010"
 
 path=$1
 if test "x$path" = x; then
@@ -9,7 +9,9 @@ if test "x$path" = x; then
 fi
 #cd $GATEROOT; hg pull
 
-revs=$(cd $GATEROOT; hg qseries | awk -F- '/\-specific\-.*patch/ {print $4}' | awk -F\. '{print $1}')
+revs=$(cd $GATEROOT; hg qseries | awk -F- '/^bkport\-/ {print $2}' | awk -F\. '{print $1}' | grep -v reworked)
+revs_reworked=$(cd $GATEROOT; hg qseries | awk -F- '/^bkport\-reworked\-/ {print $3}' | awk -F\. '{print $1}')
+revs="$revs $revs_reworked"
 
 if test "x$path" = xiscsi; then
 	paths="usr/src/cmd/iscsid usr/src/cmd/iscsiadm usr/src/uts/common/io/scsi/adapters/iscsi usr/src/uts/intel/iscsi"
@@ -18,7 +20,7 @@ elif test "x$path" = xcomstar; then
 elif test "x$path" = xiscsitgt; then
 	paths="usr/src/lib/libiscsitgt usr/src/cmd/iscsi/iscsitadm usr/src/cmd/iscsi/iscsitgtd"
 elif test "x$path" = xzfs; then
-	paths="usr/src/lib/libzfs usr/src/lib/libzpool usr/src/cmd/zfs usr/src/cmd/zpool usr/src/cmd/zdb usr/src/cmd/zdump usr/src/cmd/zinject usr/src/cmd/ztest usr/src/uts/common/fs/zfs usr/src/uts/intel/zfs"
+	paths="usr/src/lib/libzfs usr/src/lib/libzpool usr/src/cmd/zfs usr/src/cmd/zpool usr/src/cmd/zdb usr/src/cmd/zdump usr/src/cmd/zinject usr/src/cmd/ztest usr/src/uts/common/fs/zfs usr/src/uts/intel/zfs usr/src/cmd/mdb/common/modules/zfs usr/src/grub/grub-0.97/stage2/zfs-include"
 elif test "x$path" = xcifs; then
 	paths="usr/src/uts/common/smbsrv usr/src/uts/intel/smbsrv usr/src/lib/smbsrv usr/src/lib/smbsrv/libmlrpc usr/src/lib/smbsrv/libmlsvc usr/src/lib/smbsrv/libsmb usr/src/lib/smbsrv/libsmbns usr/src/lib/smbsrv/libsmbrdr usr/src/cmd/smbsrv usr/src/cmd/smbsrv/dtrace usr/src/cmd/smbsrv/smbadm usr/src/cmd/smbsrv/smbd usr/src/cmd/smbsrv/smbstat usr/src/uts/common/fs/smbsrv"
 elif test "x$path" = xidmap; then
@@ -41,8 +43,10 @@ for p in $paths; do
 			if echo $missing_revs | grep -w $r >/dev/null; then
 				echo "$r: NOT FOUND (see above)"
 			else
+				cd $GATEROOT/$p
+				hg log -v -r $r | grep bkport >/dev/null && continue
 				echo "$r: NOT FOUND"
-				cd $GATEROOT/$p; hg log -v -r $r
+				hg log -v -r $r
 				missing_revs="$r $missing_revs"
 			fi
 		else

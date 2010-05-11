@@ -3189,18 +3189,18 @@ reset:
 			err = ENOTSUP; /* read-only prop. Can't set this. */
 			break;
 		case MAC_PROP_MTU:
-			/* adapter must be stopped for an MTU change */
-			if (Adapter->e1000g_state & E1000G_STARTED) {
-				err = EBUSY;
-				break;
-			}
-
 			cur_mtu = Adapter->default_mtu;
 
 			/* get new requested MTU */
 			bcopy(pr_val, &new_mtu, sizeof (new_mtu));
 			if (new_mtu == cur_mtu) {
 				err = 0;
+				break;
+			}
+
+			/* adapter must be stopped for an MTU change */
+			if (Adapter->e1000g_state & E1000G_STARTED) {
+				err = EBUSY;
 				break;
 			}
 

@@ -1,3 +1,9 @@
+nexenta-on-source (5.11.134-9) hardy; urgency=low
+
+  * 134d, ZFS bug fixes mostly
+
+ -- Super-User <root@tbm35>  Wed, 05 May 2010 12:05:17 -0700
+
 nexenta-on-source (5.11.134-8) hardy; urgency=low
 
   * New patches, bug fixes for ZFS and CIFS
