@@ -39,7 +39,7 @@ printf "Generating Packages... (this will take some time)\n\n"
 
 test "x$cont_pkg" = x && rm -f *.udeb *.deb *.dsc *.gz *.upload *.changes */debian/files
 
-dirlist=`find . -maxdepth 1 -mindepth 1 -type d -name "sunw*" -o -type d -name "brcmbnx" -o -type d -name "libsunw-perl" -o -type d -name "nexenta-lu" -o -type d -name "nexenta-sunw" -o -type d -name "cpqary3"`
+dirlist=`find . -maxdepth 1 -mindepth 1 -type d -name "sunw*" -o -type d -name "brcmbnx" -o -type d -name "libsunw-perl" -o -type d -name "nexenta-lu" -o -type d -name "nexenta-sunw" -o -type d -name "cpqary3" -o -type d -name "brcmbnxe"`
 set -- $dirlist
 
 jn=0; i=1; n=$#

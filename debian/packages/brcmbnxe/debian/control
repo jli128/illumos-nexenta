@@ -1,0 +1,10 @@
+Source: brcmbnxe
+Section: net
+Priority: required
+Maintainer: Nexenta Systems <support@nexenta.com>
+Build-Depends: debhelper(>=4.9.5gnusol5)
+
+Package: brcmbnxe
+Architecture: solaris-i386
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-9), sunwkvm (>=5.11.134-9), sunwcsr (>=5.11.134-9), sunwckr (>=5.11.134-9), sunwcnetr (>=5.11.134-9), sunwcsu (>=5.11.134-9), sunwcsd (>=5.11.134-9), sunwcsl (>=5.11.134-9)
+Description: Broadcom NetXtreme II 10GbE NIC Driver 

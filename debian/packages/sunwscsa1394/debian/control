@@ -6,7 +6,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwscsa1394
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-7), sunwkvm (>=5.11.134-7), sunwcsr (>=5.11.134-7), sunwckr (>=5.11.134-7), sunwcnetr (>=5.11.134-7), sunwcsu (>=5.11.134-7), sunwcsd (>=5.11.134-7), sunwcsl (>=5.11.134-7), sunw1394 (>=5.11.134-7), sunwsbp2 (>=5.11.134-7)
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-9), sunwkvm (>=5.11.134-9), sunwcsr (>=5.11.134-9), sunwckr (>=5.11.134-9), sunwcnetr (>=5.11.134-9), sunwcsu (>=5.11.134-9), sunwcsd (>=5.11.134-9), sunwcsl (>=5.11.134-9), sunw1394 (>=5.11.134-9), sunwsbp2 (>=5.11.134-9)
 Description: IEEE 1394 mass storage driver
  IEEE 1394 mass storage driver
  .

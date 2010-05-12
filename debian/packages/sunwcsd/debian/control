@@ -6,7 +6,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwcsd
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwcsr (>=5.11.134-7), nexenta-lu (>=5.11.134-7)
+Depends: ${shlibs:Depends}, sunwcsr (>=5.11.134-9), nexenta-lu (>=5.11.134-9)
 Essential: Yes
 Description: Core Solaris Devices
  core entries for /dev and /devices needed for the initial boot of Solaris

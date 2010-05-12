@@ -174,15 +174,21 @@ zfs_worm_in_trans(znode_t *zp)
 {
 	zfsvfs_t		*zfsvfs = zp->z_zfsvfs;
 	timestruc_t		now;
-	sa_bulk_attr_t		bulk[5];
+	sa_bulk_attr_t		bulk[2];
 	uint64_t		ctime[2];
 	int			count = 0;
+	int error = 0;
 
 	if (!nms_worm_transition_time)
 		return 0;
+
 	gethrestime(&now);
 	SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_CTIME(zfsvfs), NULL,
 	    &ctime, sizeof (ctime));
+	if ((error = sa_bulk_lookup(zp->z_sa_hdl, bulk, count)) != 0) {
+                return (0);
+        }
+
 	return ((uint64_t)now.tv_sec - ctime[0] < nms_worm_transition_time);
 }
 

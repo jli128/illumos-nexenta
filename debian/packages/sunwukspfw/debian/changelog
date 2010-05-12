@@ -1,3 +1,9 @@
+sunwukspfw (5.11.134-9) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 134)
+
+ -- Gate Keeper <maintainer@nexenta.com>  Tue, 11 May 2010 07:27:02 -0700
+
 sunwukspfw (5.11.134-7) nexenta; urgency=low
 
   * Synchronized with OpenSolaris code (5.11 build 134)

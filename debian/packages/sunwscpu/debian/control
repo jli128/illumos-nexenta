@@ -6,7 +6,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwscpu
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-7), sunwkvm (>=5.11.134-7), sunwcsr (>=5.11.134-7), sunwckr (>=5.11.134-7), sunwcnetr (>=5.11.134-7), sunwcsu (>=5.11.134-7), sunwcsd (>=5.11.134-7), sunwcsl (>=5.11.134-7), sunwrcmdc (>=5.11.134-7), sunwrcmds (>=5.11.134-7), sunwbip (>=5.11.134-7), sunwtftp (>=5.11.134-7), sunwtnetc (>=5.11.134-7), sunwscpr (>=5.11.134-7)
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-9), sunwkvm (>=5.11.134-9), sunwcsr (>=5.11.134-9), sunwckr (>=5.11.134-9), sunwcnetr (>=5.11.134-9), sunwcsu (>=5.11.134-9), sunwcsd (>=5.11.134-9), sunwcsl (>=5.11.134-9), sunwrcmdc (>=5.11.134-9), sunwrcmds (>=5.11.134-9), sunwbip (>=5.11.134-9), sunwtftp (>=5.11.134-9), sunwtnetc (>=5.11.134-9), sunwscpr (>=5.11.134-9)
 Description: Source Compatibility, (Usr)
  utilities for user interface and source build compatibility with SunOS 4.x
  .

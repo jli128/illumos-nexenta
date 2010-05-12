@@ -8,7 +8,7 @@ Package: sunwaudiovia97
 Architecture: solaris-i386
 Replaces: jkaudio-toolsva686
 Conflicts: jkaudio-toolsva686
-Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-7), sunwkvm (>=5.11.134-7), sunwcsr (>=5.11.134-7), sunwckr (>=5.11.134-7), sunwcnetr (>=5.11.134-7), sunwcsu (>=5.11.134-7), sunwcsd (>=5.11.134-7), sunwcsl (>=5.11.134-7), sunwcar (>=5.11.134-7), sunwaudd (>=5.11.134-7)
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-9), sunwkvm (>=5.11.134-9), sunwcsr (>=5.11.134-9), sunwckr (>=5.11.134-9), sunwcnetr (>=5.11.134-9), sunwcsu (>=5.11.134-9), sunwcsd (>=5.11.134-9), sunwcsl (>=5.11.134-9), sunwcar (>=5.11.134-9), sunwaudd (>=5.11.134-9)
 Description: Via 82C686 Audio Driver
  SunOS audio device driver for Via 82C686
  .

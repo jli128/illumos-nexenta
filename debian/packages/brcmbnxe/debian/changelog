@@ -1,0 +1,11 @@
+brcmbnxe (5.11.134-9) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 134)
+
+ -- Gate Keeper <maintainer@nexenta.com>  Tue, 11 May 2010 07:30:41 -0700
+
+brcmbnxe (5.11.134-1) nexenta; urgency=low
+
+  * Initial release
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 12 Dec 2007 12:26:11 -0800

@@ -6,7 +6,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwpool
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwcsl (>=5.11.134-7), libxml2, sunwpoolr (>=5.11.134-7)
+Depends: ${shlibs:Depends}, sunwcsl (>=5.11.134-9), libxml2, sunwpoolr (>=5.11.134-9)
 Description: Resource Pools
  core software for resource pools
  .
