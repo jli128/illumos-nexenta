@@ -1522,6 +1522,12 @@ top:
 			error = EISDIR;
 			goto out;
 		}
+		if ((flag & FWRITE) &&
+		    zfs_is_wormed(dzp)) {
+			error = EPERM;
+			goto out;
+		}
+
 		if (!(flag & FAPPEND) &&
 		    (zp->z_pflags & ZFS_IMMUTABLE) &&
 		    zfs_is_wormed(dzp)) {
@@ -1639,6 +1645,11 @@ top:
 	}
 
 	vp = ZTOV(zp);
+
+	if (zfs_is_wormed(dzp)) {
+		error = EPERM;
+		goto out;
+	}
 
 	if (error = zfs_zaccess_delete(dzp, zp, cr)) {
 		goto out;
@@ -2037,6 +2048,11 @@ top:
 	}
 
 	vp = ZTOV(zp);
+
+	if (zfs_is_wormed(zp)) {
+		error = EPERM;
+		goto out;
+	}
 
 	if (error = zfs_zaccess_delete(dzp, zp, cr)) {
 		goto out;
@@ -3065,8 +3081,15 @@ top:
 
 	mutex_enter(&zp->z_lock);
 
-	if (attrzp)
+	SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_FLAGS(zfsvfs), NULL,
+	    &zp->z_pflags, sizeof (zp->z_pflags));
+
+	if (attrzp) {
 		mutex_enter(&attrzp->z_lock);
+		SA_ADD_BULK_ATTR(xattr_bulk, xattr_count,
+		    SA_ZPL_FLAGS(zfsvfs), NULL, &attrzp->z_pflags,
+		    sizeof (attrzp->z_pflags));
+	}
 
 	if (mask & (AT_UID|AT_GID)) {
 
@@ -3079,7 +3102,7 @@ top:
 				SA_ADD_BULK_ATTR(xattr_bulk, xattr_count,
 				    SA_ZPL_UID(zfsvfs), NULL, &new_uid,
 				    sizeof (new_uid));
-				attrzp->z_gid = zp->z_uid;
+				attrzp->z_uid = zp->z_uid;
 			}
 		}
 
@@ -3138,9 +3161,8 @@ top:
 
 	/* XXX - shouldn't this be done *before* the ATIME/MTIME checks? */
 	if (mask & AT_SIZE && !(mask & AT_MTIME)) {
-		if (!(mask & AT_MTIME))
-			SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_MTIME(zfsvfs),
-			    NULL, mtime, sizeof (mtime));
+		SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_MTIME(zfsvfs),
+		    NULL, mtime, sizeof (mtime));
 		SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_CTIME(zfsvfs), NULL,
 		    &ctime, sizeof (ctime));
 		zfs_tstamp_update_setup(zp, CONTENT_MODIFIED, mtime, ctime,
@@ -3192,8 +3214,6 @@ top:
 		if (XVA_ISSET_REQ(xvap, XAT_AV_SCANSTAMP))
 			ASSERT(vp->v_type == VREG);
 
-		SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_FLAGS(zfsvfs), NULL,
-		    &zp->z_pflags, sizeof (zp->z_pflags));
 		zfs_xvattr_set(zp, xvap, tx);
 	}
 
@@ -4128,13 +4148,15 @@ top:
 
 	if (err == 0) {
 		uint64_t mtime[2], ctime[2];
-		sa_bulk_attr_t bulk[2];
+		sa_bulk_attr_t bulk[3];
 		int count = 0;
 
 		SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_MTIME(zfsvfs), NULL,
 		    &mtime, 16);
 		SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_CTIME(zfsvfs), NULL,
 		    &ctime, 16);
+		SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_FLAGS(zfsvfs), NULL,
+		    &zp->z_pflags, 8);
 		zfs_tstamp_update_setup(zp, CONTENT_MODIFIED, mtime, ctime,
 		    B_TRUE);
 		zfs_log_write(zfsvfs->z_log, tx, TX_WRITE, zp, off, len, 0);

@@ -68,17 +68,14 @@ static topo_mod_t *pcimp = NULL;
 int
 x86pi_hbr_enum_init(topo_mod_t *mod)
 {
-	did_hash_t *tab = (did_hash_t *)topo_mod_getspecific(mod);
 	const char *f = "x86pi_hbr_enum_init";
 
-	if (tab == NULL && did_hash_init(mod) < 0) {
+	if (did_hash_init(mod) < 0) {
 		topo_mod_dprintf(mod, "%s: did_hash_init() failed.\n", f);
 		return (-1);
 	}
 
-	if (pcimp == NULL &&
-	    (pcimp = topo_mod_load(mod, PCI_ENUM, PCI_ENUMR_VERS))
-	    == NULL) {
+	if ((pcimp = topo_mod_load(mod, PCI_ENUM, PCI_ENUMR_VERS)) == NULL) {
 		topo_mod_dprintf(mod,
 		    "%s: %s enumerator could not load %s.\n",
 		    f, HOSTBRIDGE, PCI_ENUM);
@@ -93,10 +90,8 @@ void
 x86pi_hbr_enum_fini(topo_mod_t *mod)
 {
 	did_hash_fini(mod);
-	if (pcimp != NULL) {
-		topo_mod_unload(pcimp);
-		pcimp = NULL;
-	}
+	topo_mod_unload(pcimp);
+	pcimp = NULL;
 }
 
 static uint16_t
