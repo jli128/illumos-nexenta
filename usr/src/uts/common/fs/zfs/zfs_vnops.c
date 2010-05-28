@@ -3767,6 +3767,7 @@ top:
 		if (imm_was_set)
 			ZFS_ATTR_PFLAGS_SET(dzp, ZFS_IMMUTABLE, 1);
 		zfs_acl_ids_free(&acl_ids);
+		zfs_dirent_unlock(dl);
 		ZFS_EXIT(zfsvfs);
 		return (error);
 	}

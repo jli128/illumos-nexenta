@@ -19,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1990 Mentat Inc.
  */
-/* Copyright (c) 1990 Mentat Inc. */
 
 /*
  * This file contains routines that manipulate Internet Routing Entries (IREs).
@@ -2459,7 +2458,7 @@ ire_nce_init(ill_t *ill, const void *addr, int ire_type)
 	is_unicast = ((ire_type & (IRE_MULTICAST|IRE_BROADCAST)) == 0);
 	if (IS_IPMP(ill) ||
 	    ((ire_type & IRE_BROADCAST) && IS_UNDER_IPMP(ill))) {
-		if ((ill = ipmp_ill_get_xmit_ill(ill, is_unicast)) == NULL)
+		if ((ill = ipmp_ill_hold_xmit_ill(ill, is_unicast)) == NULL)
 			return (NULL);
 		need_refrele = B_TRUE;
 	}
@@ -2528,14 +2527,13 @@ retry:
 	if (need_refrele && IS_UNDER_IPMP(ill) && !ipmp_ill_is_active(ill)) {
 		/*
 		 * need_refrele implies that the under ill was selected by
-		 * ipmp_ill_get_xmit_ill() because either the in_ill was an
-		 * ipmp_ill, or we are sending a non-unicast packet on
-		 * an under_ill. However, when we get here, the ill selected by
-		 * ipmp_ill_get_xmit_ill  was pulled out of the active set
-		 * (for unicast)  or cast_ill nomination (for
-		 * !unicast) after it was  picked as the outgoing ill.
-		 * We have to pick an active interface and/or cast_ill in the
-		 * group.
+		 * ipmp_ill_hold_xmit_ill() because either the in_ill was an
+		 * ipmp_ill, or we are sending a non-unicast packet on an
+		 * under_ill. However, when we get here, the ill selected by
+		 * ipmp_ill_hold_xmit_ill was pulled out of the active set
+		 * (for unicast) or cast_ill nomination (for !unicast) after
+		 * it was picked as the outgoing ill.  We have to pick an
+		 * active interface and/or cast_ill in the group.
 		 */
 		mutex_exit(&ill->ill_phyint->phyint_lock);
 		nce_delete(nce);
@@ -2543,7 +2541,7 @@ retry:
 		rw_exit(&ill->ill_ipst->ips_ill_g_lock);
 		nce_refrele(nce);
 		ill_refrele(ill);
-		if ((ill = ipmp_ill_get_xmit_ill(in_ill, is_unicast)) == NULL)
+		if ((ill = ipmp_ill_hold_xmit_ill(in_ill, is_unicast)) == NULL)
 			return (NULL);
 		goto retry;
 	} else {

@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1990 Mentat Inc.
  */
-/* Copyright (c) 1990 Mentat Inc. */
 
 #ifndef	_INET_IP_H
 #define	_INET_IP_H
@@ -828,15 +827,11 @@ typedef struct iulp_s {
 } iulp_t;
 
 /*
- * The conn drain list structure (idl_t).
- * The list is protected by idl_lock. Each conn_t inserted in the list
- * points back at this idl_t using conn_idl. IP primes the draining of the
- * conns queued in these lists, by qenabling the 1st conn of each list. This
- * occurs when STREAMS backenables ip_wsrv on the IP module. Each conn instance
- * of ip_wsrv successively qenables the next conn in the list.
- * idl_lock protects all other members of idl_t and conn_drain_next
- * and conn_drain_prev of conn_t. The conn_lock protects IPCF_DRAIN_DISABLED
- * flag of the conn_t and conn_idl.
+ * The conn drain list structure (idl_t), protected by idl_lock.  Each conn_t
+ * inserted in the list points back at this idl_t using conn_idl, and is
+ * chained by conn_drain_next and conn_drain_prev, which are also protected by
+ * idl_lock.  When flow control is relieved, either ip_wsrv() (STREAMS) or
+ * ill_flow_enable() (non-STREAMS) will call conn_drain().
  *
  * The conn drain list, idl_t, itself is part of tx cookie list structure.
  * A tx cookie list points to a blocked Tx ring and contains the list of
@@ -860,10 +855,6 @@ struct idl_tx_list_s {
 struct idl_s {
 	conn_t		*idl_conn;		/* Head of drain list */
 	kmutex_t	idl_lock;		/* Lock for this list */
-	uint32_t
-		idl_repeat : 1,			/* Last conn must re-enable */
-						/* drain list again */
-		idl_unused : 31;
 	idl_tx_list_t	*idl_itl;
 };
 
@@ -3370,6 +3361,7 @@ extern uint_t	ipmp_ill_get_ipmp_ifindex(const ill_t *);
 extern void	ipmp_ill_join_illgrp(ill_t *, ipmp_illgrp_t *);
 extern void	ipmp_ill_leave_illgrp(ill_t *);
 extern ill_t	*ipmp_ill_hold_ipmp_ill(ill_t *);
+extern ill_t	*ipmp_ill_hold_xmit_ill(ill_t *, boolean_t);
 extern boolean_t ipmp_ill_is_active(ill_t *);
 extern void	ipmp_ill_refresh_active(ill_t *);
 extern void	ipmp_phyint_join_grp(phyint_t *, ipmp_grp_t *);
@@ -3380,9 +3372,8 @@ extern ill_t	*ipmp_ipif_hold_bound_ill(const ipif_t *);
 extern boolean_t ipmp_ipif_is_dataaddr(const ipif_t *);
 extern boolean_t ipmp_ipif_is_stubaddr(const ipif_t *);
 extern boolean_t ipmp_packet_is_probe(mblk_t *, ill_t *);
-extern ill_t	*ipmp_ill_get_xmit_ill(ill_t *, boolean_t);
-extern void	ipmp_ncec_flush_nce(ncec_t *);
-extern void	ipmp_ncec_fastpath(ncec_t *, ill_t *);
+extern void	ipmp_ncec_delete_nce(ncec_t *);
+extern void	ipmp_ncec_refresh_nce(ncec_t *);
 
 extern void	conn_drain_insert(conn_t *, idl_tx_list_t *);
 extern void	conn_setqfull(conn_t *, boolean_t *);
