@@ -1,3 +1,9 @@
+nexenta-on-source (5.11.134-11) hardy; urgency=low
+
+  * 3.0.3 updates
+
+ -- Nexenta Systems <maintainer@nexenta.com>  Thu, 10 Jun 2010 16:58:00 -0700
+
 nexenta-on-source (5.11.134-10) hardy; urgency=low
 
   * bump
