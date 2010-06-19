@@ -23,6 +23,9 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
 
 i pkginfo
 i copyright
@@ -100,6 +103,8 @@ f none usr/lib/fm/fmd/plugins/syslog-msgs.conf 644 root bin
 f none usr/lib/fm/fmd/plugins/syslog-msgs.so 555 root bin
 f none usr/lib/fm/fmd/plugins/zfs-diagnosis.conf 644 root bin
 f none usr/lib/fm/fmd/plugins/zfs-diagnosis.so 555 root bin
+f none usr/lib/fm/fmd/plugins/zfs-monitor.conf 644 root bin
+f none usr/lib/fm/fmd/plugins/zfs-monitor.so 555 root bin
 f none usr/lib/fm/fmd/plugins/zfs-retire.conf 644 root bin
 f none usr/lib/fm/fmd/plugins/zfs-retire.so 555 root bin
 d none usr/lib/fm/fmd/schemes 755 root bin

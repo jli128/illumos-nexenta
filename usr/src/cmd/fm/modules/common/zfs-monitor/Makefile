@@ -19,25 +19,15 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-SUBDIRS = cpumem-retire \
-	disk-monitor	\
-	disk-transport	\
-	eversholt 	\
-	ext-event-transport \
-	fabric-xlate \
-	fdd-msg \
-	io-retire	\
-	ip-transport	\
-	sensor-transport \
-	snmp-trapgen	\
-	sp-monitor	\
-	syslog-msgs	\
-	zfs-diagnosis	\
-	zfs-monitor	\
-	zfs-retire
+MODULE = zfs-monitor
+CLASS = common
+SRCS = zfs_monitor.c
 
-include ../../Makefile.subdirs
+include ../../Makefile.plugin
+
+LDLIBS += -L$(ROOTLIB)/fm -luutil -lzfs -ltopo
+LDFLAGS += -R/usr/lib/fm
