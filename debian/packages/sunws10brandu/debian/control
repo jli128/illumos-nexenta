@@ -6,7 +6,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunws10brandu
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-9), sunwkvm (>=5.11.134-9), sunwcsr (>=5.11.134-9), sunwckr (>=5.11.134-9), sunwcnetr (>=5.11.134-9), sunwcsu (>=5.11.134-9), sunwcsd (>=5.11.134-9), sunwcsl (>=5.11.134-9), sunwcar (>=5.11.134-9), sunwzoneu (>=5.11.134-9), sunwzoner (>=5.11.134-9), sunws10brandr (>=5.11.134-9)
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-11), sunwkvm (>=5.11.134-11), sunwcsr (>=5.11.134-11), sunwckr (>=5.11.134-11), sunwcnetr (>=5.11.134-11), sunwcsu (>=5.11.134-11), sunwcsd (>=5.11.134-11), sunwcsl (>=5.11.134-11), sunwcar (>=5.11.134-11), sunwzoneu (>=5.11.134-11), sunwzoner (>=5.11.134-11), sunws10brandr (>=5.11.134-11)
 Description: Solaris 10 Containers: solaris10 brand support (Usr)
  Support for the 'solaris10' Brand
  .

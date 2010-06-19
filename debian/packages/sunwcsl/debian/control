@@ -7,7 +7,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 Package: sunwcsl
 Architecture: solaris-i386
 Conflicts: sunwtsu (<< 5.11.79), libwrap0-dev (<< 7.6.dbs-14nexenta3)
-Depends: sunwcslr (>=5.11.134-9), libnss3, libnspr4, nexenta-lu (>=5.11.134-9), libtspi1
+Depends: sunwcslr (>=5.11.134-11), libnss3, libnspr4, nexenta-lu (>=5.11.134-11), libtspi1
 Essential: Yes
 Description: Core Solaris, (Shared Libs)
  core shared libraries for a specific instruction-set architecture
@@ -17,7 +17,7 @@ Package: libc
 XBS-Virtual: libc
 Architecture: all
 Priority: required
-Depends: sunwcsl (>=5.11.134-9)
+Depends: sunwcsl (>=5.11.134-11)
 Description: Transitional package
  This dummy package is provided for a smooth transition from the
  SUNW PKG to GNU/OpenSolaris naming convention
@@ -26,7 +26,7 @@ Package: libpam0g
 XBS-Virtual: libpam0g
 Architecture: all
 Priority: required
-Depends: sunwcsl (>=5.11.134-9)
+Depends: sunwcsl (>=5.11.134-11)
 Description: Transitional package
  This dummy package is provided for a smooth transition from the
  SUNW PKG to GNU/OpenSolaris naming convention
@@ -35,7 +35,7 @@ Package: libpam-modules
 XBS-Virtual: libpam-modules
 Architecture: solaris-i386
 Priority: required
-Depends: sunwcsl (>=5.11.134-9)
+Depends: sunwcsl (>=5.11.134-11)
 Description: Transitional package
  This dummy package is provided for a smooth transition from the
  SUNW PKG to GNU/OpenSolaris naming convention
@@ -44,7 +44,7 @@ Package: libpam-runtime
 XBS-Virtual: libpam-runtime
 Architecture: all
 Priority: required
-Depends: sunwcsl (>=5.11.134-9)
+Depends: sunwcsl (>=5.11.134-11)
 Description: Transitional package
  This dummy package is provided for a smooth transition from the
  SUNW PKG to GNU/OpenSolaris naming convention

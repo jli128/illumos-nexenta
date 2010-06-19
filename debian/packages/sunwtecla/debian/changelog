@@ -1,3 +1,9 @@
+sunwtecla (5.11.134-11) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 134)
+
+ -- Gate Keeper <maintainer@nexenta.com>  Fri, 18 Jun 2010 18:34:03 -0700
+
 sunwtecla (5.11.134-9) nexenta; urgency=low
 
   * Synchronized with OpenSolaris code (5.11 build 134)

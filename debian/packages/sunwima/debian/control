@@ -6,7 +6,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwima
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-9), sunwkvm (>=5.11.134-9), sunwcsr (>=5.11.134-9), sunwckr (>=5.11.134-9), sunwcnetr (>=5.11.134-9), sunwcsu (>=5.11.134-9), sunwcsd (>=5.11.134-9), sunwcsl (>=5.11.134-9), sunwcar (>=5.11.134-9), sunwcslr (>=5.11.134-9), sunwimar (>=5.11.134-9), sunwimac (>=5.11.134-9)
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-11), sunwkvm (>=5.11.134-11), sunwcsr (>=5.11.134-11), sunwckr (>=5.11.134-11), sunwcnetr (>=5.11.134-11), sunwcsu (>=5.11.134-11), sunwcsd (>=5.11.134-11), sunwcsl (>=5.11.134-11), sunwcar (>=5.11.134-11), sunwcslr (>=5.11.134-11), sunwimar (>=5.11.134-11), sunwimac (>=5.11.134-11)
 Description: Solaris IMA Software Initiator Plugin
  SNIA iSCSI Managment API plugin library for iSCSI adapters
  .

@@ -6,7 +6,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwgssdh
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwgss (>=5.11.134-9), sunwrsg (>=5.11.134-9)
+Depends: ${shlibs:Depends}, sunwgss (>=5.11.134-11), sunwrsg (>=5.11.134-11)
 Description: GSS Diffie-Hellman
  GSS-API mechanism libraries for NIS+ extended Diffie-Hellman
  .

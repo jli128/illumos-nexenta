@@ -9,7 +9,7 @@ Architecture: solaris-i386
 Conflicts: libslp1
 Replaces: libslp1
 Provides: libslp1
-Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-9), sunwkvm (>=5.11.134-9), sunwcsr (>=5.11.134-9), sunwckr (>=5.11.134-9), sunwcnetr (>=5.11.134-9), sunwcsu (>=5.11.134-9), sunwcsl (>=5.11.134-9), sunwcsd (>=5.11.134-9), sunwj5rt | sunwjre1.5, sunwslpr (>=5.11.134-9)
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-11), sunwkvm (>=5.11.134-11), sunwcsr (>=5.11.134-11), sunwckr (>=5.11.134-11), sunwcnetr (>=5.11.134-11), sunwcsu (>=5.11.134-11), sunwcsl (>=5.11.134-11), sunwcsd (>=5.11.134-11), sunwj5rt | sunwjre1.5, sunwslpr (>=5.11.134-11)
 Description: SLP, (Usr)
  Usr filesystem portion of the Service Location Protocol (SLP) framework. Included are C and Java developer libraries and a daemon which can act as a directory agent (DA).
  .

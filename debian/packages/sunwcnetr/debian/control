@@ -6,7 +6,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwcnetr
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwcsr (>=5.11.134-9), nexenta-lu (>=5.11.134-9)
+Depends: ${shlibs:Depends}, sunwcsr (>=5.11.134-11), nexenta-lu (>=5.11.134-11)
 Essential: Yes
 Description: Core Solaris Network Infrastructure (Root)
  core software for network infrastructure configuration

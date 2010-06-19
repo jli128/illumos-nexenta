@@ -7,7 +7,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 Package: sunwkvm
 XBS-PKG: sunwkvm.i
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-9), sunwcsr (>=5.11.134-9), nexenta-lu (>=5.11.134-9)
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-11), sunwcsr (>=5.11.134-11), nexenta-lu (>=5.11.134-11)
 Essential: Yes
 Description: Core Architecture, (Kvm)
  core software for a specific hardware platform group
