@@ -3014,6 +3014,9 @@ zfs_ioc_rollback(zfs_cmd_t *zc)
 	zfsvfs_t *zfsvfs;
 	char *clone_name;
 
+	if (zfs_is_wormed(zc->zc_name))
+		return EPERM;
+
 	error = dsl_dataset_hold(zc->zc_name, FTAG, &ds);
 	if (error)
 		return (error);
