@@ -37,7 +37,6 @@ SUBDIRS = cpumem-retire \
 	sp-monitor	\
 	syslog-msgs	\
 	zfs-diagnosis	\
-	zfs-monitor	\
 	zfs-retire
 
 include ../../Makefile.subdirs

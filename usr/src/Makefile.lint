@@ -168,6 +168,7 @@ COMMON_SUBDIRS = \
 	cmd/ipcs \
 	cmd/isaexec \
 	cmd/isalist \
+	cmd/iscsi \
 	cmd/iscsiadm \
 	cmd/iscsid \
 	cmd/iscsitsvc \
@@ -378,6 +379,7 @@ COMMON_SUBDIRS = \
 	lib/libipp \
 	lib/libipsecutil \
 	lib/libiscsit \
+	lib/libiscsitgt \
 	lib/libkmf \
 	lib/libkstat \
 	lib/liblgrp \

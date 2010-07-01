@@ -143,7 +143,4 @@ mdns		5353/tcp
 vnc-server	5900/tcp			# VNC Server
 dtspc		6112/tcp			# CDE subprocess control
 fs		7100/tcp			# Font server
-amanda          10080/udp			# Amanda client
-amandaidx       10082/tcp			# Amanda server
-amidxtape       10083/tcp			# Amanda server tape daemon
 solaris-audit	16162/tcp			# Secure remote audit logging

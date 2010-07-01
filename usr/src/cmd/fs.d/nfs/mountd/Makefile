@@ -19,7 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 
 FSTYPE	  =	nfs
@@ -36,7 +37,7 @@ SRCS	  =	$(LOCAL:%.o=%.c) $(FSLIBSRC) ../lib/nfs_sec.c \
 		../lib/sharetab.c ../lib/daemon.c
 DSRC	  =	mountd_dt.d
 DOBJ	  =	$(DSRC:%.d=%.o)
-LDLIBS	 +=	-lrpcsvc -lnsl -lbsm -lsocket -ltsnet -ltsol -lnvpair
+LDLIBS	 +=	-lrpcsvc -lnsl -lbsm -lsocket -ltsnet -ltsol
 CPPFLAGS +=	-D_REENTRANT
 
 $(TYPEPROG):	$(OBJS)

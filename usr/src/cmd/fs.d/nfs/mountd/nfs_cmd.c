@@ -20,7 +20,8 @@
  */
 
 /*
- * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #include <sys/types.h>
@@ -156,7 +157,7 @@ charmap_search(struct netbuf *nbuf, char *opts)
 			cp = strchr(name, '=');
 			if (cp != NULL)
 				*cp = '\0';
-			if (in_access_list(NULL, &nbuf, &hl, val)) {
+			if (in_access_list(NULL, nbuf, &hl, val)) {
 				result = name;
 				break;
 			}

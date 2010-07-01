@@ -27,7 +27,6 @@ format=ufs
 ALT_ROOT=
 EXTRACT_ARGS=
 compress=yes
-USE_LINKS=no
 SPLIT=unknown
 ERROR=0
 dirsize32=0
@@ -58,7 +57,6 @@ else
 	export PATH=/usr/sbin:/usr/bin:/sbin
 	export GZIP_CMD=/usr/bin/gzip
 fi
-export SUN_PERSONALITY=1
 
 EXTRACT_FILELIST="/boot/solaris/bin/extract_boot_filelist"
 
@@ -185,43 +183,6 @@ function getsize
 }
 
 #
-# Syncing all desired files to a target directory using GNU cp -al.
-# One argument should be passed: the file containing the list of files to copy.
-#
-# Variables that must be set before calling:
-#
-# $ALT_ROOT - the target directory
-# $rdmnt - the target directory
-#
-function link_files
-{
-	list="$1"
-
-	rm -f /tmp/gcp; ln -s /usr/bin/cp /tmp/gcp
-
-	for path in $list; do
-		src="/$path"
-		dir_src=$(dirname $src)
-		src="$ALT_ROOT$src"
-		if test -d $src; then
-			dest_dir="$rdmnt$dir_src"
-			mkdir -p $dest_dir 2>/dev/null
-			/tmp/gcp -al $src $dest_dir
-		elif test -e $src; then
-			if test "x$ALT_ROOT" != x -a "x$ALT_ROOT" != x/; then
-				cd $ALT_ROOT
-				echo $path | cpio -pdum "$rdmnt" 2>/dev/null
-				cd - >/dev/null
-			else
-				echo $src | cpio -pdum "$rdmnt" 2>/dev/null
-			fi
-		fi
-	done
-
-	rm -f /tmp/gcp
-}
-
-#
 # Copies all desired files to a target directory.  One argument should be
 # passed: the file containing the list of files to copy.  This function also
 # depends on several variables that must be set before calling:
@@ -264,7 +225,6 @@ function copy_files
 		fi
 	fi
 
-	sync
 }
 
 #
@@ -303,17 +263,7 @@ function create_ufs
 
 	# do the actual copy
 	copy_files "$list"
-	retry=0
-	while test $retry -lt 3; do
-		sleep 1
-		umount "$rdmnt" 2>/dev/null && break
-		let retry=$retry+1
-	done
-	if test $retry -ge 3; then
-		ERROR=1
-		umount -f "$rdmnt"
-		echo "Error: $rdmnt: failed to archive system files"
-	fi
+	umount -f "$rdmnt"
 	rmdir "$rdmnt"
 
 	if [ $ISA = sparc ] ; then
@@ -332,8 +282,8 @@ function create_ufs
 	# compressed, and the final compression will accomplish very
 	# little.  To save time, we skip the gzip in this case.
 	#
-	if [ $ISA = i386 ] && [ $compress = no ] && [ -x $GZIP_CMD ] ;
-	then
+	if [ $ISA = i386 ] && [ $compress = no ] && \
+	    [ -x $GZIP_CMD ] ; then
 		gzip -c "$rdfile" > "${archive}-new"
 	else
 		cat "$rdfile" > "${archive}-new"
@@ -372,7 +322,7 @@ function create_isofs
 	fi
 
 	# create image directory seed with graft points
-	mkdir "$rdmnt" 2>/dev/null
+	mkdir "$rdmnt"
 	files=
 	isocmd="mkisofs -quiet -graft-points -dlrDJN -relaxed-filenames"
 
@@ -381,11 +331,7 @@ function create_isofs
 		isocmd="$isocmd -G \"$bb\""
 	fi
 
-	if [ $USE_LINKS = no ]; then
-		copy_files "$list"
-	else
-		link_files "$list"
-	fi
+	copy_files "$list"
 	isocmd="$isocmd \"$rdmnt\""
 	rm -f "$errlog"
 
@@ -400,13 +346,13 @@ function create_isofs
 	#
 	mkiso_ret=0
 
-	if [ `uname -p` = i386 ] &&[ $compress = no ] && [ -x $GZIP_CMD ]; then
-		ksh -c "$isocmd" 2> "$errlog" | gzip > "${archive}-new"
-	elif [ `uname -p` = i386 ] && [ $compress = yes ] && [ -x $GZIP_CMD ] && [ $USE_LINKS = yes ]; then
-		ksh -c "$isocmd" 2> "$errlog" | gzip > "${archive}-new"
- 	else
- 		ksh -c "$isocmd" 2> "$errlog" > "${archive}-new"
- 	fi
+	if [ $ISA = i386 ] &&[ $compress = no ] && [ -x $GZIP_CMD ]
+	then
+		ksh -c "$isocmd" 2> "$errlog" | \
+		    gzip > "${archive}-new"
+	else
+		ksh -c "$isocmd" 2> "$errlog" > "${archive}-new"
+	fi
 
 	if [ $? -ne 0 ]; then
 		cat "$errlog"
@@ -502,30 +448,11 @@ filelist=$($EXTRACT_FILELIST $EXTRACT_ARGS \
 	/etc/boot/solaris/filelist.ramdisk \
 		2>/dev/null | sort -u)
 
-same_device=no
-if ln "$ALT_ROOT/etc/driver_aliases" "$ALT_ROOT/var/tmp/driver_aliases.$$.tmp" 2>/dev/null; then
-	rm -f "$ALT_ROOT/var/tmp/driver_aliases.$$.tmp"
-	same_device=yes
-fi
-if [ "$format" = "isofs" ] && [ "$same_device" = "yes" ]; then
-	#
-	# Case 1. no hard links optimizations
-	#
-	# Using hard links to build resulted archives.
-	# Requirements are: a) isofs and b) no cross-device with / and /var/tmp
-	#
-	rddir="$ALT_ROOT/var/tmp/create_ramdisk.$$.tmp"
-	SPLIT=no
-	USE_LINKS=yes
-else
-	#
-	# Case 2. no hard links optimizations
-	#
-	# We use /tmp/ for scratch space now.  This may be changed later if there
-	# is insufficient space in /tmp/.
-	#
-	rddir="/tmp/create_ramdisk.$$.tmp"
-fi
+#
+# We use /tmp/ for scratch space now.  This may be changed later if there
+# is insufficient space in /tmp/.
+#
+rddir="/tmp/create_ramdisk.$$.tmp"
 new_rddir=
 rm -rf "$rddir"
 mkdir "$rddir" || fatal_error "Could not create temporary directory $rddir"
@@ -538,44 +465,40 @@ list64="$rddir/filelist.64"
 
 touch $list32 $list64
 
-if [ $USE_LINKS = no ]; then
-	#
-	# This loop creates the 32-bit and 64-bit lists of files.  The 32-bit list
-	# is written to stdout, which is redirected at the end of the loop.  The
-	# 64-bit list is appended with each write.
-	#
-	cd "/$ALT_ROOT"
-	for path in `find $filelist -print 2>/dev/null`
-	do
-		if [ $SPLIT = no ]; then
-			print "$path"
-		elif [ -d "$path" ]; then
-			if [ $format = ufs ]; then
-				size=`ls -lLd "$path" | nawk '
-				    {print ($5 % 1024) ? (int($5 / 1024) + 1) * 1024 : $5}'`
-				if [ `basename "$path"` != "amd64" ]; then
-					(( dirsize32 += size ))
-				fi
-				(( dirsize64 += size ))
+#
+# This loop creates the 32-bit and 64-bit lists of files.  The 32-bit list
+# is written to stdout, which is redirected at the end of the loop.  The
+# 64-bit list is appended with each write.
+#
+cd "/$ALT_ROOT"
+find $filelist -print 2>/dev/null | while read path
+do
+	if [ $SPLIT = no ]; then
+		print "$path"
+	elif [ -d "$path" ]; then
+		if [ $format = ufs ]; then
+			size=`ls -lLd "$path" | nawk '
+			    {print ($5 % 1024) ? (int($5 / 1024) + 1) * 1024 : $5}'`
+			if [ `basename "$path"` != "amd64" ]; then
+				(( dirsize32 += size ))
 			fi
-		else
-			case `LC_MESSAGES=C /usr/bin/file -m /dev/null "$path" 2>/dev/null` in
-			*ELF\ 64-bit*)
-				print "$path" >> "$list64"
-				;;
-			*ELF\ 32-bit*)
-				print "$path"
-				;;
-			*)
-				# put in both lists
-				print "$path"
-				print "$path" >> "$list64"
-			esac
+			(( dirsize64 += size ))
 		fi
-	done >"$list32"
-else
-	list32=$filelist
-fi
+	else
+		case `LC_MESSAGES=C /usr/bin/file -m /dev/null "$path" 2>/dev/null` in
+		*ELF\ 64-bit*)
+			print "$path" >> "$list64"
+			;;
+		*ELF\ 32-bit*)
+			print "$path"
+			;;
+		*)
+			# put in both lists
+			print "$path"
+			print "$path" >> "$list64"
+		esac
+	fi
+done >"$list32"
 
 if [ $format = ufs ] ; then
 	# calculate image size
@@ -643,10 +566,6 @@ else
 	fi
 	create_archive "both" "$ALT_ROOT/$BOOT_ARCHIVE" $lofidev32
 	[ "$format" = "ufs" ] && lofiadm -d "$rdfile32"
-	if [ `uname -p` = i386 ]; then
-		rm -f "$ALT_ROOT/$BOOT_ARCHIVE_64"
-		ln "$ALT_ROOT/$BOOT_ARCHIVE" "$ALT_ROOT/$BOOT_ARCHIVE_64"
-	fi
 fi
 if [ $ERROR = 1 ]; then
 	cleanup

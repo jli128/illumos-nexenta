@@ -208,6 +208,7 @@ COMMON_SUBDIRS=		\
 	ipf		\
 	isainfo		\
 	isalist		\
+	iscsi		\
 	itutools	\
 	iscsiadm	\
 	iscsid		\
@@ -431,6 +432,7 @@ COMMON_SUBDIRS=		\
 	vt		\
 	w		\
 	wall		\
+	wbem		\
 	which		\
 	who		\
 	whodo		\
@@ -597,6 +599,7 @@ MSGSUBDIRS=		\
 	id		\
 	idmap		\
 	isaexec		\
+	iscsi		\
 	iscsiadm	\
 	iscsid		\
 	isns		\
@@ -719,6 +722,7 @@ MSGSUBDIRS=		\
 	vrrpadm		\
 	vscan		\
 	w		\
+	wbem		\
 	who		\
 	whodo		\
 	wracct		\

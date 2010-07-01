@@ -45,4 +45,3 @@ usr/src/lib/librstp/common/transmit.h
 usr/src/lib/librstp/common/uid_stp.h
 usr/src/lib/librstp/common/vector.c
 usr/src/lib/librstp/common/vector.h
-usr/src/cmd/smbsrv/smbd/eventlog.dll

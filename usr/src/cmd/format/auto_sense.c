@@ -829,7 +829,6 @@ auto_sense(
 	int				force_generic = 0;
 	u_ioparam_t			ioparam;
 	int				deflt;
-	char				*buf;
 
 	/*
 	 * First, if expert mode, find out if the user
@@ -896,13 +895,9 @@ auto_sense(
 		err_print("disk name:  `%s`\n", disk_name);
 	}
 
-	buf = zalloc(cur_blksz);
-	if (scsi_rdwr(DIR_READ, fd, (diskaddr_t)0, 1, (caddr_t)buf,
-	    F_SILENT, NULL)) {
-		free(buf);
+	if (scsi_rdwr(DIR_READ, fd, (diskaddr_t)0, 1, (caddr_t)label,
+	    F_SILENT, NULL))
 		return ((struct disk_type *)NULL);
-	}
-	free(buf);
 
 	/*
 	 * Figure out which method we use for auto sense.
@@ -2285,13 +2280,7 @@ compute_chs_values(diskaddr_t total_capacity, diskaddr_t usable_capacity,
 {
 
 	/* Unlabeled SCSI floppy device */
-	if (total_capacity < 160) {
-		/* Less than 80K */
-		*nheadp = 1;
-		*pcylp = total_capacity;
-		*nsectp = 1;
-		return;
-	} else if (total_capacity <= 0x1000) {
+	if (total_capacity <= 0x1000) {
 		*nheadp = 2;
 		*pcylp = 80;
 		*nsectp = total_capacity / (80 * 2);

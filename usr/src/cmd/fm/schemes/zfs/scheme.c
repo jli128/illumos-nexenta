@@ -19,7 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #include <fm/fmd_fmri.h>
@@ -99,28 +100,20 @@ find_vdev_iter(nvlist_t *nv, uint64_t search)
 		return (nv);
 
 	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_CHILDREN,
-	    &child, &children) == 0) {
+	    &child, &children) != 0)
+		return (NULL);
 
-		for (c = 0; c < children; c++)
-			if ((ret = find_vdev_iter(child[c], search)) != 0)
-				return (ret);
-	}
+	for (c = 0; c < children; c++)
+		if ((ret = find_vdev_iter(child[c], search)) != 0)
+			return (ret);
 
 	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_L2CACHE,
-	    &child, &children) == 0) {
+	    &child, &children) != 0)
+		return (NULL);
 
-		for (c = 0; c < children; c++)
-			if ((ret = find_vdev_iter(child[c], search)) != 0)
-				return (ret);
-	}
-
-	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_SPARES,
-	    &child, &children) == 0) {
-
-		for (c = 0; c < children; c++)
-			if ((ret = find_vdev_iter(child[c], search)) != 0)
-				return (ret);
-	}
+	for (c = 0; c < children; c++)
+		if ((ret = find_vdev_iter(child[c], search)) != 0)
+			return (ret);
 
 	return (NULL);
 }
@@ -221,7 +214,7 @@ fmd_fmri_unusable(nvlist_t *nvl)
 		vdev_stat_t *vs;
 		uint_t c;
 
-		(void) nvlist_lookup_uint64_array(vd, ZPOOL_CONFIG_VDEV_STATS,
+		(void) nvlist_lookup_uint64_array(vd, ZPOOL_CONFIG_STATS,
 		    (uint64_t **)&vs, &c);
 
 		ret = (vs->vs_state < VDEV_STATE_DEGRADED);

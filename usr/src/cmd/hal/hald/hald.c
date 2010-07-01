@@ -342,11 +342,9 @@ parent_wait_for_child (int child_fd, pid_t child_pid)
 		goto out;
 	}
 
-	sleep(10);
-
 	/* assume timeout; kill child */
 	kill (child_pid, SIGTERM);
-	ret = 0;
+	ret = 2;
 
 out:
 	return ret;
