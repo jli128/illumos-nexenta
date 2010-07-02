@@ -23,6 +23,12 @@
 # Use is subject to license terms.
 #
 
+# nexenta/ksh fix
+if test "x$SUN_PERSONALITY" != x1; then
+	SUN_PERSONALITY=1 $0 $*
+	exit $?
+fi
+
 typeset -r PROG=$(basename $0)
 typeset -r CTAG_NULL="-"
 
@@ -1016,27 +1022,27 @@ set_fs_local_grouping()
 check_fs_local_grouping()
 {
 	$xopt
-	typeset svc=$1
+	typeset _svc=$1
 	typeset cur_grouping
 
-	if [ $svc = nws_rdcsyncd ]
+	if [ $_svc = nws_rdcsyncd ]
 	then
 		return 0
 	fi
 
 	# If it's not imported, we just return success, since we don't want
 	# further processing
-	is_imported $svc
+	is_imported $_svc
 	if [ $? = 0 ]
 	then
 		return 0
 	fi
 
 	# get the current grouping value from the repository
-	cur_grouping=`svcprop -c -p ${svc}-local-fs/grouping $FS_LOCAL_SVC`
+	cur_grouping=`svcprop -c -p ${_svc}-local-fs/grouping $FS_LOCAL_SVC`
 
 	# Figure out what the grouping should be (based on enabled status)
-	is_enabled $svc
+	is_enabled $_svc
 	if [ $? = 1 ]
 	then
 		CORRECT_GROUPING="require_all"

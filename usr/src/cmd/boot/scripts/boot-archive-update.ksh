@@ -25,6 +25,9 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 
+SUN_PERSONALITY=1
+export SUN_PERSONALITY
+
 . /lib/svc/share/smf_include.sh
 . /lib/svc/share/fs_include.sh
 

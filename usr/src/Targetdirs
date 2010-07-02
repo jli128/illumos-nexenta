@@ -254,8 +254,8 @@ DIRS= \
 	/usr/net/servers \
 	/usr/lib/pool \
 	/usr/lib/python2.4 \
-	/usr/lib/python2.4/vendor-packages \
-	/usr/lib/python2.4/vendor-packages/zfs \
+	/usr/lib/python2.4/site-packages \
+	/usr/lib/python2.4/site-packages/zfs \
 	/usr/lib/rcap \
 	/usr/lib/rcap/$(MACH32) \
 	/usr/lib/sa  \
@@ -342,6 +342,10 @@ DIRS= \
 	/var/sadm/pkg \
 	/var/sadm/security \
 	/var/smb \
+	/var/smb/cvol \
+	/var/smb/cvol/windows \
+	/var/smb/cvol/windows/system32 \
+	/var/smb/cvol/windows/system32/vss \
 	/var/spool \
 	/var/spool/cron \
 	/var/spool/cron/atjobs \
@@ -837,8 +841,6 @@ $(ROOT)/usr/lib/libinetutil.so.1:=	REALPATH=../../lib/libinetutil.so.1
 $(ROOT)/usr/lib/libinetutil.so:=	REALPATH=../../lib/libinetutil.so.1
 $(ROOT)/usr/lib/libintl.so.1:=		REALPATH=../../lib/libintl.so.1
 $(ROOT)/usr/lib/libintl.so:=		REALPATH=../../lib/libintl.so.1
-$(ROOT)/usr/lib/libiscsitgt.so.1:=	REALPATH=../../lib/libiscsitgt.so.1
-$(ROOT)/usr/lib/libiscsitgt.so:=	REALPATH=../../lib/libiscsitgt.so.1
 $(ROOT)/usr/lib/libkmf.so.1:=		REALPATH=../../lib/libkmf.so.1
 $(ROOT)/usr/lib/libkmf.so:=		REALPATH=../../lib/libkmf.so.1
 $(ROOT)/usr/lib/libkmfberder.so.1:=	REALPATH=../../lib/libkmfberder.so.1
@@ -1121,10 +1123,6 @@ $(ROOT)/usr/lib/$(MACH64)/libintl.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/libintl.so.1
 $(ROOT)/usr/lib/$(MACH64)/libintl.so:= \
 	REALPATH=../../../lib/$(MACH64)/libintl.so.1
-$(ROOT)/usr/lib/$(MACH64)/libiscsitgt.so.1:= \
-	REALPATH=../../../lib/$(MACH64)/libiscsitgt.so.1
-$(ROOT)/usr/lib/$(MACH64)/libiscsitgt.so:= \
-	REALPATH=../../../lib/$(MACH64)/libiscsitgt.so.1
 $(ROOT)/usr/lib/$(MACH64)/libkstat.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/libkstat.so.1
 $(ROOT)/usr/lib/$(MACH64)/libkstat.so:= \
@@ -1443,8 +1441,6 @@ SYM.USRLIB= \
 	/usr/lib/libinetutil.so.1 \
 	/usr/lib/libintl.so \
 	/usr/lib/libintl.so.1 \
-	/usr/lib/libiscsitgt.so \
-	/usr/lib/libiscsitgt.so.1 \
 	/usr/lib/libkstat.so \
 	/usr/lib/libkstat.so.1 \
 	/usr/lib/liblddbg.so.4 \
@@ -1683,8 +1679,6 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/libinetutil.so.1 \
 	/usr/lib/$(MACH64)/libintl.so \
 	/usr/lib/$(MACH64)/libintl.so.1 \
-	/usr/lib/$(MACH64)/libiscsitgt.so \
-	/usr/lib/$(MACH64)/libiscsitgt.so.1 \
 	/usr/lib/$(MACH64)/libkstat.so \
 	/usr/lib/$(MACH64)/libkstat.so.1 \
 	/usr/lib/$(MACH64)/liblddbg.so.4 \

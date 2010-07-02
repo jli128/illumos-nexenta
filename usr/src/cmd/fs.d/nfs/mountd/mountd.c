@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -77,6 +76,8 @@
 #include <sys/tsol/label_macro.h>
 #include <libtsnet.h>
 #include <sys/sdt.h>
+#include <sys/nvpair.h>
+#include <attr.h>
 
 extern int daemonize_init(void);
 extern void daemonize_fini(int fd);
@@ -90,9 +91,9 @@ static mutex_t logging_queue_lock;
 static cond_t logging_queue_cv;
 
 static share_t *find_lofsentry(char *, int *);
-static void getclientsnames_lazy(char *, struct netbuf **,
+static int getclientsnames_lazy(char *, struct netbuf **,
 	struct nd_hostservlist **);
-static void getclientsnames(SVCXPRT *, struct netbuf **,
+static int getclientsnames(SVCXPRT *, struct netbuf **,
 	struct nd_hostservlist **);
 static int getclientsflavors_old(share_t *, SVCXPRT *, struct netbuf **,
 	struct nd_hostservlist **, int *);
@@ -293,9 +294,8 @@ do_logging_queue(logging_data *lq)
 	while (lq) {
 		if (lq->ld_host == NULL) {
 			DTRACE_PROBE(mountd, name_by_lazy);
-			getclientsnames_lazy(lq->ld_netid,
-			    &lq->ld_nb, &clnames);
-			if (clnames == NULL)
+			if (getclientsnames_lazy(lq->ld_netid,
+			    &lq->ld_nb, &clnames) != 0)
 				host = NULL;
 			else
 				host = clnames->h_hostservs[0].h_host;
@@ -718,36 +718,45 @@ anon_client(char *host)
 	return (anon_hsl);
 }
 
-static void
+static int
 getclientsnames_common(struct netconfig *nconf, struct netbuf **nbuf,
     struct nd_hostservlist **serv)
 {
-	char tmp[MAXIPADDRLEN];
-	char *host = NULL;
+	char host[MAXIPADDRLEN];
+
+	assert(*nbuf != NULL);
 
 	/*
 	 * Use the this API instead of the netdir_getbyaddr()
 	 * to avoid service lookup.
 	 */
-	if (__netdir_getbyaddr_nosrv(nconf, serv, *nbuf)) {
-		host = &tmp[0];
+	if (__netdir_getbyaddr_nosrv(nconf, serv, *nbuf) != 0) {
 		if (strcmp(nconf->nc_protofmly, NC_INET) == 0) {
 			struct sockaddr_in *sa;
 
 			/* LINTED pointer alignment */
 			sa = (struct sockaddr_in *)((*nbuf)->buf);
-			(void) inet_ntoa_r(sa->sin_addr, tmp);
+			(void) inet_ntoa_r(sa->sin_addr, host);
 		} else if (strcmp(nconf->nc_protofmly, NC_INET6) == 0) {
 			struct sockaddr_in6 *sa;
 
 			/* LINTED pointer alignment */
 			sa = (struct sockaddr_in6 *)((*nbuf)->buf);
 			(void) inet_ntop(AF_INET6, sa->sin6_addr.s6_addr,
-			    tmp, INET6_ADDRSTRLEN);
+			    host, INET6_ADDRSTRLEN);
+		} else {
+			syslog(LOG_ERR, gettext(
+			    "Client's address is neither IPv4 nor IPv6"));
+			return (EINVAL);
 		}
 
 		*serv = anon_client(host);
+		if (*serv == NULL)
+			return (ENOMEM);
 	}
+
+	assert(*serv != NULL);
+	return (0);
 }
 
 /*
@@ -755,50 +764,60 @@ getclientsnames_common(struct netconfig *nconf, struct netbuf **nbuf,
  * relevant transport handle parts.
  * If the name is not available then return "(anon)".
  */
-static void
+static int
 getclientsnames_lazy(char *netid, struct netbuf **nbuf,
     struct nd_hostservlist **serv)
 {
 	struct netconfig *nconf;
+	int	rc;
 
 	nconf = getnetconfigent(netid);
 	if (nconf == NULL) {
 		syslog(LOG_ERR, "%s: getnetconfigent failed", netid);
 		*serv = anon_client(NULL);
-		return;
+		if (*serv == NULL)
+			return (ENOMEM);
+		return (0);
 	}
 
-	getclientsnames_common(nconf, nbuf, serv);
+	rc = getclientsnames_common(nconf, nbuf, serv);
 	freenetconfigent(nconf);
+	return (rc);
 }
 
 /*
  * Get the client's hostname from the transport handle.
  * If the name is not available then return "(anon)".
  */
-void
+int
 getclientsnames(SVCXPRT *transp, struct netbuf **nbuf,
     struct nd_hostservlist **serv)
 {
 	struct netconfig *nconf;
+	int	rc;
 
 	nconf = getnetconfigent(transp->xp_netid);
 	if (nconf == NULL) {
 		syslog(LOG_ERR, "%s: getnetconfigent failed",
 		    transp->xp_netid);
 		*serv = anon_client(NULL);
-		return;
+		if (*serv == NULL)
+			return (ENOMEM);
+		return (0);
 	}
 
 	*nbuf = svc_getrpccaller(transp);
 	if (*nbuf == NULL) {
 		freenetconfigent(nconf);
 		*serv = anon_client(NULL);
-		return;
+		if (*serv == NULL)
+			return (ENOMEM);
+		return (0);
 	}
 
-	getclientsnames_common(nconf, nbuf, serv);
+	rc = getclientsnames_common(nconf, nbuf, serv);
 	freenetconfigent(nconf);
+	return (rc);
 }
 
 void
@@ -810,8 +829,7 @@ log_cant_reply(SVCXPRT *transp)
 	struct netbuf *nb;
 
 	saverrno = errno;	/* save error code */
-	getclientsnames(transp, &nb, &clnames);
-	if (clnames == NULL)
+	if (getclientsnames(transp, &nb, &clnames) != 0)
 		return;
 	host = clnames->h_hostservs->h_host;
 
@@ -1143,8 +1161,7 @@ mount(struct svc_req *rqstp)
 	 */
 	if (verbose) {
 		DTRACE_PROBE(mountd, name_by_verbose);
-		getclientsnames(transp, &nb, &clnames);
-		if (clnames == NULL || nb == NULL) {
+		if (getclientsnames(transp, &nb, &clnames) != 0) {
 			/*
 			 * We failed to get a name for the client, even
 			 * 'anon', probably because we ran out of memory.
@@ -1379,8 +1396,7 @@ reply:
 	if (enqueued == FALSE) {
 		if (host == NULL) {
 			DTRACE_PROBE(mountd, name_by_in_thread);
-			getclientsnames(transp, &nb, &clnames);
-			if (clnames != NULL)
+			if (getclientsnames(transp, &nb, &clnames) == 0)
 				host = clnames->h_hostservs[0].h_host;
 		}
 
@@ -1401,14 +1417,73 @@ done:
 	return (error);
 }
 
+/*
+ * Determine whether two paths are within the same file system.
+ * Returns nonzero (true) if paths are the same, zero (false) if
+ * they are different.  If an error occurs, return false.
+ *
+ * Use the actual FSID if it's available (via getattrat()); otherwise,
+ * fall back on st_dev.
+ *
+ * With ZFS snapshots, st_dev differs from the regular file system
+ * versus the snapshot.  But the fsid is the same throughout.  Thus
+ * the fsid is a better test.
+ */
+static int
+same_file_system(const char *path1, const char *path2)
+{
+	uint64_t fsid1, fsid2;
+	struct stat64 st1, st2;
+	nvlist_t *nvl1 = NULL;
+	nvlist_t *nvl2 = NULL;
+
+	if ((getattrat(AT_FDCWD, XATTR_VIEW_READONLY, path1, &nvl1) == 0) &&
+	    (getattrat(AT_FDCWD, XATTR_VIEW_READONLY, path2, &nvl2) == 0) &&
+	    (nvlist_lookup_uint64(nvl1, A_FSID, &fsid1) == 0) &&
+	    (nvlist_lookup_uint64(nvl2, A_FSID, &fsid2) == 0)) {
+		nvlist_free(nvl1);
+		nvlist_free(nvl2);
+		/*
+		 * We have found fsid's for both paths.
+		 */
+
+		if (fsid1 == fsid2)
+			return (B_TRUE);
+
+		return (B_FALSE);
+	}
+
+	if (nvl1 != NULL)
+		nvlist_free(nvl1);
+	if (nvl2 != NULL)
+		nvlist_free(nvl2);
+
+	/*
+	 * We were unable to find fsid's for at least one of the paths.
+	 * fall back on st_dev.
+	 */
+
+	if (stat64(path1, &st1) < 0) {
+		syslog(LOG_NOTICE, "%s: %m", path1);
+		return (B_FALSE);
+	}
+	if (stat64(path2, &st2) < 0) {
+		syslog(LOG_NOTICE, "%s: %m", path2);
+		return (B_FALSE);
+	}
+
+	if (st1.st_dev == st2.st_dev)
+		return (B_TRUE);
+
+	return (B_FALSE);
+}
+
 share_t *
 findentry(char *path)
 {
 	share_t *sh = NULL;
 	struct sh_list *shp;
 	register char *p1, *p2;
-	struct stat st1;
-	struct stat64 st2;
 
 	check_sharetab();
 
@@ -1431,31 +1506,15 @@ findentry(char *path)
 		 *
 		 * Parent: /export/foo/		(no trailing slash on child)
 		 * Child:  /export/foo
-		 *
-		 * Then compare the dev_t of the parent and child to
-		 * make sure that they're both in the same filesystem.
 		 */
 		if ((*p1 == '\0' && *p2 == '/') ||
 		    (*p1 == '\0' && *(p1-1) == '/') ||
 		    (*p2 == '\0' && *p1 == '/' && *(p1+1) == '\0')) {
-			if (stat(sh->sh_path, &st1) < 0) {
-				if (verbose)
-					syslog(LOG_NOTICE, "%s: %m", p1);
-				shp = NULL;
-				goto done;
-			}
-
 			/*
-			 * Use stat64 on "path" since it might be larger
-			 * than 2 Gb and 32 bit stat would fail EOVERFLOW
+			 * We have a subdirectory.  Test whether the
+			 * subdirectory is in the same file system.
 			 */
-			if (stat64(path, &st2) < 0) {
-				if (verbose)
-					syslog(LOG_NOTICE, "%s: %m", p2);
-				shp = NULL;
-				goto done;
-			}
-			if (st1.st_dev == st2.st_dev)
+			if (same_file_system(path, sh->sh_path))
 				goto done;
 		}
 	}
@@ -1649,6 +1708,10 @@ done:
  * Names in the access list may be either hosts or netgroups;  they're
  * not distinguished syntactically.  We check for hosts first because
  * it's cheaper (just M*N strcmp()s), then try netgroups.
+ *
+ * If pnb and pclnames are NULL, it means that we have to use transp
+ * to resolve client's IP address to host name. If they aren't NULL
+ * then transp argument won't be used and can be NULL.
  */
 int
 in_access_list(SVCXPRT *transp, struct netbuf **pnb,
@@ -1663,8 +1726,6 @@ in_access_list(SVCXPRT *transp, struct netbuf **pnb,
 	int i;
 	int netgroup_match;
 	int response;
-
-	bool_t lookup_names;
 	struct nd_hostservlist *clnames;
 
 	/*
@@ -1673,18 +1734,7 @@ in_access_list(SVCXPRT *transp, struct netbuf **pnb,
 	if (access_list == NULL || *access_list == '\0')
 		return (1);
 
-	/*
-	 * Just get the netbuf, avoiding the costly name
-	 * lookup. This will suffice for access based
-	 * soley on addresses.
-	 */
-	if (*pnb == NULL) {
-		lookup_names = TRUE;
-		*pnb = svc_getrpccaller(transp);
-		if (*pnb == NULL)
-			*pclnames = anon_client(NULL);
-	} else
-		lookup_names = FALSE;
+	assert(transp != NULL || (*pnb != NULL && *pclnames != NULL));
 
 	nentries = 0;
 
@@ -1707,6 +1757,20 @@ in_access_list(SVCXPRT *transp, struct netbuf **pnb,
 		 * sign then do a network comparison.
 		 */
 		if (*gr == '@') {
+			/*
+			 * Just get the netbuf, avoiding the costly name
+			 * lookup. This will suffice for access based
+			 * solely on addresses.
+			 */
+			if (*pnb == NULL) {
+				/*
+				 * Don't grant access if client's address isn't
+				 * known.
+				 */
+				if ((*pnb = svc_getrpccaller(transp)) == NULL)
+					return (0);
+			}
+
 			if (netmatch(*pnb, gr + 1))
 				return (response);
 			continue;
@@ -1716,18 +1780,14 @@ in_access_list(SVCXPRT *transp, struct netbuf **pnb,
 		 * We need to get the host name if we haven't gotten
 		 * it by now!
 		 */
-		if (lookup_names) {
+		if (*pclnames == NULL) {
 			DTRACE_PROBE(mountd, name_by_addrlist);
-			getclientsnames(transp, pnb, pclnames);
-
 			/*
 			 * Do not grant access if we can't
 			 * get a name!
 			 */
-			if (*pclnames == NULL || *pnb == NULL)
+			if (getclientsnames(transp, pnb, pclnames) != 0)
 				return (0);
-
-			lookup_names = FALSE;
 		}
 
 		clnames = *pclnames;
@@ -1773,18 +1833,14 @@ in_access_list(SVCXPRT *transp, struct netbuf **pnb,
 	 * We need to get the host name if we haven't gotten
 	 * it by now!
 	 */
-	if (lookup_names) {
+	if (*pclnames == NULL) {
 		DTRACE_PROBE(mountd, name_by_netgroup);
-		getclientsnames(transp, pnb, pclnames);
-
 		/*
 		 * Do not grant access if we can't
 		 * get a name!
 		 */
-		if (*pclnames == NULL || *pnb == NULL)
+		if (getclientsnames(transp, pnb, pclnames) != 0)
 			return (0);
-
-		lookup_names = FALSE;
 	}
 
 	netgroup_match = netgroup_check(*pclnames, access_list, nentries);
@@ -2566,8 +2622,7 @@ umount(struct svc_req *rqstp)
 	if (!svc_sendreply(transp, xdr_void, (char *)NULL))
 		log_cant_reply(transp);
 
-	getclientsnames(transp, &nb, &clnames);
-	if (clnames == NULL) {
+	if (getclientsnames(transp, &nb, &clnames) != 0) {
 		/*
 		 * Without the hostname we can't do audit or delete
 		 * this host from the mount entries.
@@ -2618,8 +2673,7 @@ umountall(struct svc_req *rqstp)
 	 * on the net blasting the requester with a response.
 	 */
 	svcerr_systemerr(transp);
-	getclientsnames(transp, &nb, &clnames);
-	if (clnames == NULL) {
+	if (getclientsnames(transp, &nb, &clnames) != 0) {
 		/* Can't do anything without the name of the client */
 		return;
 	}

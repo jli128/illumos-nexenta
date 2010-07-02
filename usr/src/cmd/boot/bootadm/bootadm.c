@@ -425,6 +425,8 @@ struct iso_pdesc {
 
 #define	bam_nowrite()		(bam_check || bam_smf_check)
 
+#define NEXENTA 1
+
 static int sync_menu = 1;	/* whether we need to sync the BE menus */
 
 static void
@@ -437,7 +439,7 @@ usage(void)
 	    "\t%s update-archive [-vn] [-R altroot [-p platform>]]\n", prog);
 	(void) fprintf(stderr,
 	    "\t%s list-archive [-R altroot [-p platform>]]\n", prog);
-#if !defined(_OPB)
+#if !defined(_OPB) && !NEXENTA
 	/* x86 only */
 	(void) fprintf(stderr, "\t%s set-menu [-R altroot] key=value\n", prog);
 	(void) fprintf(stderr, "\t%s list-menu [-R altroot]\n", prog);
@@ -526,7 +528,12 @@ main(int argc, char *argv[])
 
 	switch (bam_cmd) {
 		case BAM_MENU:
+#if NEXENTA
+			ret = 0;
+			printf("Unsupported command. Please use 'apt-clone' command instead.\n");
+#else
 			ret = bam_menu(bam_subcmd, bam_opt, bam_argc, bam_argv);
+#endif
 			break;
 		case BAM_ARCHIVE:
 			ret = bam_archive(bam_subcmd, bam_opt);
@@ -3698,7 +3705,9 @@ synchronize_BE_menu(void)
 	char		*curr_cksum_str;
 	char		*curr_size_str;
 	char		*curr_file;
-	char		*pool;
+	char		*pool = NULL;
+	char		*mntpt = NULL;
+	zfs_mnted_t	mnted;
 	FILE		*cfp;
 	int		found;
 	int		ret;
@@ -3753,11 +3762,24 @@ synchronize_BE_menu(void)
 
 	/* Get checksum of current menu */
 	pool = find_root_pool();
-	(void) snprintf(cmdline, sizeof (cmdline), "%s %s%s%s",
-	    CKSUM, pool == NULL ? "" : "/", pool == NULL ? "" : pool,
-	    GRUB_MENU);
-	free(pool);
+	if (pool) {
+		mntpt = mount_top_dataset(pool, &mnted);
+		if (mntpt == NULL) {
+			bam_error(FAIL_MNT_TOP_DATASET, pool);
+			free(pool);
+			return (BAM_ERROR);
+		}
+		(void) snprintf(cmdline, sizeof (cmdline), "%s %s%s",
+		    CKSUM, mntpt, GRUB_MENU);
+	} else {
+		(void) snprintf(cmdline, sizeof (cmdline), "%s %s",
+		    CKSUM, GRUB_MENU);
+	}
 	ret = exec_cmd(cmdline, &flist);
+	if (pool) {
+		(void) umount_top_dataset(pool, mnted, mntpt);
+		free(pool);
+	}
 	INJECT_ERROR1("GET_CURR_CKSUM", ret = 1);
 	if (ret != 0) {
 		bam_error(MENU_CKSUM_FAIL);

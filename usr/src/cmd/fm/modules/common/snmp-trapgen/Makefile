@@ -35,7 +35,7 @@ ROOTNETSNMPCONFS = $(NETSNMPCONFS:%=$(ROOTNETSNMPDIR)/%)
 
 include ../../Makefile.plugin
 
-SNMPLIBS = -lnetsnmp -lnetsnmpagent -lfmd_msg
+SNMPLIBS = -lnetsnmp -lnetsnmpagent -lfmd_msg -lnetsnmpmibs -lkvm -lkstat -lnetsnmphelpers -ladm
 lint := SNMPLIBS =
 
 LDFLAGS += -L$(ROOT)/usr/lib/fm -R/usr/lib/fm
