@@ -3569,8 +3569,9 @@ emlxs_sli3_prep_fct_iocb(emlxs_port_t *port, emlxs_buf_t *cmd_sbp,
 
 		iocb->ULPCOMMAND = CMD_FCP_TSEND64_CX;
 
-		if (dbuf->db_data_size ==
-		    fct_task->task_expected_xfer_length)
+		if ((hba->sli_mode == EMLXS_HBA_SLI3_MODE) &&
+		    (dbuf->db_data_size ==
+		    fct_task->task_expected_xfer_length))
 			iocb->ULPCT = 0x1;
 			/* enable auto-rsp AP feature */
 	}
