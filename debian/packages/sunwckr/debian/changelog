@@ -1,3 +1,9 @@
+sunwckr (5.11.134-12a) nexenta; urgency=low
+
+  * Issue 1984: Include fix for bug 6957205 to complete the fix for issue 1861
+
+ -- Vineeth Pillai <vineeth@nexenta.com>  Wed, 21 Jul 2010 23:00:00 -0700
+
 sunwckr (5.11.134-12) nexenta; urgency=low
 
   * Synchronized with OpenSolaris code (5.11 build 134)
