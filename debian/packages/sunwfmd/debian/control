@@ -6,7 +6,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwfmd
 Architecture: solaris-i386
-Depends: libsnmp9, libxml2, sunwcsl (>=5.11.134-11), sunwcslr (>=5.11.134-11), sunwcakr (>=5.11.134-11), sunwkvm (>=5.11.134-11), sunwcsr (>=5.11.134-11), sunwckr (>=5.11.134-11), sunwcnetr (>=5.11.134-11), sunwcsu (>=5.11.134-11), sunwcsd (>=5.11.134-11), sunwcsl (>=5.11.134-11)
+Depends: libsnmp9, libxml2, sunwcsl (>=5.11.134-12), sunwcslr (>=5.11.134-12), sunwcakr (>=5.11.134-12), sunwkvm (>=5.11.134-12), sunwcsr (>=5.11.134-12), sunwckr (>=5.11.134-12), sunwcnetr (>=5.11.134-12), sunwcsu (>=5.11.134-12), sunwcsd (>=5.11.134-12), sunwcsl (>=5.11.134-12)
 Description: Fault Management Daemon and Utilities
  Fault Management Daemon and Utilities
  .

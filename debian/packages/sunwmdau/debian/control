@@ -6,7 +6,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwmdau
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwcsr (>=5.11.134-11), sunwckr (>=5.11.134-11), sunwcnetr (>=5.11.134-11), sunwcsd (>=5.11.134-11), sunwcsu (>=5.11.134-11), sunwcakr (>=5.11.134-11), sunwkvm (>=5.11.134-11), sunwmdr (>=5.11.134-11), sunwmdu (>=5.11.134-11), sunwsmapi (>=5.11.134-11), sunwmdar (>=5.11.134-11), libxml2
+Depends: ${shlibs:Depends}, sunwcsr (>=5.11.134-12), sunwckr (>=5.11.134-12), sunwcnetr (>=5.11.134-12), sunwcsd (>=5.11.134-12), sunwcsu (>=5.11.134-12), sunwcakr (>=5.11.134-12), sunwkvm (>=5.11.134-12), sunwmdr (>=5.11.134-12), sunwmdu (>=5.11.134-12), sunwsmapi (>=5.11.134-12), sunwmdar (>=5.11.134-12), libxml2
 Description: Solaris Volume Manager Assistant (Usr)
  Solaris Volume Manager Assistant (Usr)
  .

@@ -7,7 +7,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 Package: sunwpsdir
 Architecture: solaris-i386
 Essential: Yes
-Depends: ${shlibs:Depends}, sunwcsr (>=5.11.134-11), sunwckr (>=5.11.134-11), sunwcnetr (>=5.11.134-11), sunwcsd (>=5.11.134-11), sunwcakr (>=5.11.134-11), sunwpsdcr (>=5.11.134-11), nexenta-lu (>=5.11.134-11)
+Depends: ${shlibs:Depends}, sunwcsr (>=5.11.134-12), sunwckr (>=5.11.134-12), sunwcnetr (>=5.11.134-12), sunwcsd (>=5.11.134-12), sunwcakr (>=5.11.134-12), sunwpsdcr (>=5.11.134-12), nexenta-lu (>=5.11.134-12)
 Description: Platform Support, ISA Bus Device Drivers, (Root)
  Platform Support, ISA Bus Device Drivers, (Root)
  .

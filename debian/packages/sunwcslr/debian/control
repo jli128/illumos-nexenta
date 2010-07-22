@@ -6,7 +6,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwcslr
 Architecture: solaris-i386
-Depends: coreutils, diff, ed, findutils, gawk, grep, sed, nexenta-lu (>=5.11.134-11)
+Depends: coreutils, diff, ed, findutils, gawk, grep, sed, nexenta-lu (>=5.11.134-12)
 Essential: Yes
 Description: Core Solaris Libraries (Root)
  core software for a specific instruction-set architecture

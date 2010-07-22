@@ -6,7 +6,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwsmedia
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-11), sunwkvm (>=5.11.134-11), sunwcsr (>=5.11.134-11), sunwckr (>=5.11.134-11), sunwcsu (>=5.11.134-11), sunwcsd (>=5.11.134-11), sunwcsl (>=5.11.134-11), sunwnfscr (>=5.11.134-11), sunwnfsckr (>=5.11.134-11), sunwnfscu (>=5.11.134-11), sunwsmediar (>=5.11.134-11)
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-12), sunwkvm (>=5.11.134-12), sunwcsr (>=5.11.134-12), sunwckr (>=5.11.134-12), sunwcsu (>=5.11.134-12), sunwcsd (>=5.11.134-12), sunwcsl (>=5.11.134-12), sunwnfscr (>=5.11.134-12), sunwnfsckr (>=5.11.134-12), sunwnfscu (>=5.11.134-12), sunwsmediar (>=5.11.134-12)
 Description: Storage media management library
  Storage media management library
  .
