@@ -95,6 +95,8 @@
 
 #define	ALL_MODE_EXECS (S_IXUSR | S_IXGRP | S_IXOTH)
 
+extern int  zfs_worm_in_trans(znode_t *zp);
+
 static uint16_t
 zfs_ace_v0_get_type(void *acep)
 {
@@ -2138,7 +2140,7 @@ zfs_zaccess_dataset_check(znode_t *zp, uint32_t v4_mode)
 	}
 
 	if ((v4_mode & (ACE_DELETE | ACE_DELETE_CHILD)) &&
-	    (zp->z_pflags & ZFS_NOUNLINK)) {
+	    ((zp->z_pflags & ZFS_NOUNLINK))) {
 		return (EPERM);
 	}
 

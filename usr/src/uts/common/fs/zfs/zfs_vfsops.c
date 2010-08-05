@@ -1106,6 +1106,7 @@ zfs_domount(vfs_t *vfsp, char *osname)
 	uint64_t recordsize, fsid_guid;
 	int error = 0;
 	zfsvfs_t *zfsvfs;
+	char	worminfo[13] = {0};
 
 	ASSERT(vfsp);
 	ASSERT(osname);
@@ -1128,6 +1129,14 @@ zfs_domount(vfs_t *vfsp, char *osname)
 	if (error = dsl_prop_get_integer(osname, "recordsize", &recordsize,
 	    NULL))
 		goto out;
+
+	if (dsl_prop_get(osname, "nms:worm", 1, 12, &worminfo, NULL) == 0 &&
+	    worminfo[0] && strcmp(worminfo, "0") != 0 &&
+	    strcmp(worminfo, "off") != 0 && strcmp(worminfo, "-") != 0) {
+		zfsvfs->z_isworm = B_TRUE;
+	} else {
+		zfsvfs->z_isworm = B_FALSE;
+	}
 
 	vfsp->vfs_dev = mount_dev;
 	vfsp->vfs_fstype = zfsfstype;

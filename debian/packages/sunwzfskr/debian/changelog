@@ -1,3 +1,9 @@
+sunwzfskr (5.11.134-13) nexenta; urgency=low
+
+  * Issue 1928: ZFS WORM fix for CIFS interaction 
+
+ -- Vineeth Pillai <vineeth@nexenta.com>  Fri, 05 Aug 2010 10:00:03 -0700
+
 sunwzfskr (5.11.134-12) nexenta; urgency=low
 
   * Issue 1906: ZFS ACL Fix (Cchangeset 12fcd99a642d) 

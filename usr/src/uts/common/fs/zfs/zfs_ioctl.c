@@ -2038,6 +2038,8 @@ zfs_set_prop_nvlist(const char *dsname, zprop_source_t source, nvlist_t *nvl,
 	nvlist_t *genericnvl;
 	nvlist_t *errors;
 	nvlist_t *retrynvl;
+	zfsvfs_t *zfsvfs;
+	boolean_t set_worm = B_FALSE;
 
 	VERIFY(nvlist_alloc(&genericnvl, NV_UNIQUE_NAME, KM_SLEEP) == 0);
 	VERIFY(nvlist_alloc(&errors, NV_UNIQUE_NAME, KM_SLEEP) == 0);
@@ -2050,6 +2052,11 @@ retry:
 		zfs_prop_t prop = zfs_name_to_prop(propname);
 		int err = 0;
 
+		if (!set_worm && !strcmp(propname, "nms:worm")) {
+			set_worm = TRUE;
+		}
+
+		cmn_err(CE_NOTE, "The property is %s\n", propname);
 		/* decode the property value */
 		propval = pair;
 		if (nvpair_type(pair) == DATA_TYPE_NVLIST) {
@@ -2182,6 +2189,15 @@ retry:
 		nvlist_free(errors);
 	else
 		*errlist = errors;
+
+	if (set_worm && getzfsvfs(dsname, &zfsvfs) == 0) {
+		if (zfs_is_wormed(dsname)) {
+			zfsvfs->z_isworm = B_TRUE;
+		} else {
+			zfsvfs->z_isworm = B_FALSE;
+		}
+		VFS_RELE(zfsvfs->z_vfs);
+	}
 
 	return (rv);
 }

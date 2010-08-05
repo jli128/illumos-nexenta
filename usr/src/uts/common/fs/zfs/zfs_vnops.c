@@ -170,8 +170,8 @@
  *	return (error);			// done, report error
  */
 
-static int nms_worm_transition_time = 30;
-static int
+int nms_worm_transition_time = 30;
+int
 zfs_worm_in_trans(znode_t *zp)
 {
 	zfsvfs_t		*zfsvfs = zp->z_zfsvfs;
@@ -190,24 +190,7 @@ zfs_worm_in_trans(znode_t *zp)
 	if ((error = sa_bulk_lookup(zp->z_sa_hdl, bulk, count)) != 0) {
                 return (0);
         }
-
 	return ((uint64_t)now.tv_sec - ctime[0] < nms_worm_transition_time);
-}
-
-static int
-zfs_is_wormed(znode_t *zp)
-{
-	zfsvfs_t		*zfsvfs = zp->z_zfsvfs;
-	char			worminfo[13] = {0};
-	char			osname[MAXNAMELEN];
-
-	dmu_objset_name(zfsvfs->z_os, osname);
-	if (dsl_prop_get(osname, "nms:worm", 1, 12, &worminfo, NULL) == 0 &&
-	    worminfo[0] && strcmp(worminfo, "0") != 0 &&
-	    strcmp(worminfo, "off") != 0 && strcmp(worminfo, "-") != 0) {
-		return 1;
-	}
-	return 0;
 }
 
 #define	ZFS_ATTR_PFLAGS_SET(zp, attr, value) \
@@ -685,7 +668,7 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 	if ((zp->z_pflags & (ZFS_IMMUTABLE | ZFS_READONLY)) ||
 	    ((zp->z_pflags & ZFS_APPENDONLY) && !(ioflag & FAPPEND) &&
 	    (uio->uio_loffset < zp->z_size))) {
-		if ((zp->z_pflags & ZFS_IMMUTABLE) && zfs_is_wormed(zp)) {
+		if ((zp->z_pflags & ZFS_IMMUTABLE) && zp->z_zfsvfs->z_isworm) {
 			/* do nothing */
 		} else {
 			ZFS_EXIT(zfsvfs);
@@ -1193,7 +1176,7 @@ zfs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
     int flags, vnode_t *rdir, cred_t *cr,  caller_context_t *ct,
     int *direntflags, pathname_t *realpnp)
 {
-	znode_t *zdp = VTOZ(dvp);
+	znode_t *zp, *zdp = VTOZ(dvp);
 	zfsvfs_t *zfsvfs = zdp->z_zfsvfs;
 	int	error = 0;
 
@@ -1301,6 +1284,13 @@ zfs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
 	error = zfs_dirlook(zdp, nm, vpp, flags, direntflags, realpnp);
 	if (error == 0)
 		error = specvp_check(vpp, cr);
+	if (*vpp) {
+		zp = VTOZ(*vpp);
+		if (!(zp->z_pflags & ZFS_IMMUTABLE) &&  ((*vpp)->v_type != VDIR) &&
+			zfsvfs->z_isworm && !zfs_worm_in_trans(zp)) {
+			zp->z_pflags |= ZFS_IMMUTABLE;
+		}
+	}
 
 	ZFS_EXIT(zfsvfs);
 	return (error);
@@ -1421,7 +1411,7 @@ top:
 		uint64_t txtype;
 
 		if ((dzp->z_pflags & ZFS_IMMUTABLE) &&
-		    zfs_is_wormed(dzp)) {
+		    dzp->z_zfsvfs->z_isworm) {
 			imm_was_set = 1;
 			ZFS_ATTR_PFLAGS_SET(dzp, ZFS_IMMUTABLE, 0);
 		}
@@ -1526,14 +1516,14 @@ top:
 			goto out;
 		}
 		if ((flag & FWRITE) &&
-		    zfs_is_wormed(dzp)) {
+		    dzp->z_zfsvfs->z_isworm) {
 			error = EPERM;
 			goto out;
 		}
 
 		if (!(flag & FAPPEND) &&
 		    (zp->z_pflags & ZFS_IMMUTABLE) &&
-		    zfs_is_wormed(dzp)) {
+		    dzp->z_zfsvfs->z_isworm) {
 			imm_was_set = 1;
 			ZFS_ATTR_PFLAGS_SET(zp, ZFS_IMMUTABLE, 0);
 		}
@@ -1652,7 +1642,7 @@ top:
 
 	vp = ZTOV(zp);
 
-	if (zfs_is_wormed(dzp)) {
+	if (zp->z_zfsvfs->z_isworm) {
 		error = EPERM;
 		goto out;
 	}
@@ -1925,7 +1915,7 @@ top:
 	}
 
 	if ((dzp->z_pflags & ZFS_IMMUTABLE) &&
-	    zfs_is_wormed(dzp)) {
+	    dzp->z_zfsvfs->z_isworm) {
 		imm_was_set = 1;
 		ZFS_ATTR_PFLAGS_SET(dzp, ZFS_IMMUTABLE, 0);
 	}
@@ -2068,7 +2058,7 @@ top:
 
 	vp = ZTOV(zp);
 
-	if (zfs_is_wormed(zp)) {
+	if (dzp->z_zfsvfs->z_isworm) {
 		error = EPERM;
 		goto out;
 	}
@@ -2749,7 +2739,7 @@ zfs_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	 */
 	if ((zp->z_pflags & ZFS_IMMUTABLE) &&
 	    XVA_ISSET_REQ(xvap, XAT_IMMUTABLE) &&
-	    zfs_is_wormed(zp)) {
+	    zp->z_zfsvfs->z_isworm) {
 		ZFS_EXIT(zfsvfs);
 		return (EPERM);
 	}
@@ -2757,10 +2747,10 @@ zfs_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	/*
 	 * Immutable files can only alter atime
 	 */
-	if ((zp->z_pflags & ZFS_IMMUTABLE) &&
+	if (((zp->z_pflags & ZFS_IMMUTABLE) || zp->z_zfsvfs->z_isworm) &&
 	    ((mask & (AT_SIZE|AT_UID|AT_GID|AT_MTIME|AT_MODE)) ||
 	    ((mask & AT_XVATTR) && XVA_ISSET_REQ(xvap, XAT_CREATETIME)))) {
-		if (!zfs_is_wormed(zp) || !zfs_worm_in_trans(zp)) {
+		if (!zp->z_zfsvfs->z_isworm || !zfs_worm_in_trans(zp)) {
 			ZFS_EXIT(zfsvfs);
 			return (EPERM);
 		}
@@ -3798,7 +3788,7 @@ top:
 	}
 
 	if ((dzp->z_pflags & ZFS_IMMUTABLE) &&
-	    zfs_is_wormed(dzp)) {
+	    dzp->z_zfsvfs->z_isworm) {
 		imm_was_set = 1;
 		ZFS_ATTR_PFLAGS_SET(dzp, ZFS_IMMUTABLE, 0);
 	}
