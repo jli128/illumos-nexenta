@@ -41,6 +41,8 @@
 #include <security/cryptoki.h>
 #include "common.h"
 
+char *nms_pin = NULL;
+
 /*
  * The verbcmd construct allows genericizing information about a verb so
  * that it is easier to manipulate.  Makes parsing code easier to read,
@@ -686,6 +688,12 @@ main(int argc, char *argv[], char *envp[])
 	if (argc == 0) {
 		usage(-1);
 		return (1);
+	}
+
+	if (strcmp(argv[0], "-N") == 0) {
+		nms_pin = argv[1];
+		argv += 2;
+		argc -= 2;
 	}
 
 	/* Check for help options.  For CLIP-compliance. */

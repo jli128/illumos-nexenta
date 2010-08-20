@@ -1,3 +1,9 @@
+sunwcsu (5.11.134-12b) nexenta; urgency=low
+
+  * Issue #2262 pktool/lofiadm changes for zfs crypto workaround.
+
+ -- Nexenta Systems <maintainer@nexenta.com>  Fri, 20 Aug 2010 21:12:43 +0530
+
 sunwcsu (5.11.134-12a) nexenta; urgency=low
 
   * Edited pc.ti fixes Bug: 2109
