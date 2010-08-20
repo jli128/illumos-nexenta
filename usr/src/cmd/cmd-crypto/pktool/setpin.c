@@ -38,9 +38,6 @@
 #include <security/cryptoki.h>
 #include "common.h"
 
-char *nms_old_pin = NULL;
-char *nms_new_pin = NULL;
-
 static int
 setpin_nss(KMF_HANDLE_T handle,
 	char *token_spec, char *dir, char *prefix)
@@ -68,20 +65,14 @@ setpin_nss(KMF_HANDLE_T handle,
 		numattrs++;
 	}
 
-	if (nms_old_pin != NULL) {
-		old_pin = (CK_UTF8CHAR_PTR)strdup(nms_old_pin);
-		old_pinlen = strlen(nms_old_pin);
-	} else if ((rv = get_pin(gettext("Enter current token passphrase "
+	if ((rv = get_pin(gettext("Enter current token passphrase "
 	    "(<CR> if not set):"), NULL, &old_pin, &old_pinlen)) != CKR_OK) {
 		cryptoerror(LOG_STDERR,
 		    gettext("Unable to get token passphrase."));
 		return (PK_ERR_NSS);
 	}
 	/* Get the user's new PIN. */
-	if (nms_new_pin != NULL) {
-		new_pin = (CK_UTF8CHAR_PTR)strdup(nms_new_pin);
-		new_pinlen = strlen(nms_new_pin);
-	} else if ((rv = get_pin(gettext("Create new passphrase:"), gettext(
+	if ((rv = get_pin(gettext("Create new passphrase:"), gettext(
 	    "Re-enter new passphrase:"), &new_pin, &new_pinlen)) != CKR_OK) {
 		if (rv == CKR_PIN_INCORRECT)
 			cryptoerror(LOG_STDERR, gettext(
@@ -166,9 +157,6 @@ setpin_pkcs11(KMF_HANDLE_T handle, char *token_spec, boolean_t souser)
 			return (PK_ERR_PK11);
 		}
 		old_pinlen = strlen(SOFT_DEFAULT_PIN);
-	} else if (nms_old_pin != NULL) {
-		old_pin = (CK_UTF8CHAR_PTR)strdup(nms_old_pin);
-		old_pinlen = strlen(nms_old_pin);
 	} else {
 		if ((rv = get_pin(gettext("Enter token passphrase:"), NULL,
 		    &old_pin, &old_pinlen)) != CKR_OK) {
@@ -181,10 +169,7 @@ setpin_pkcs11(KMF_HANDLE_T handle, char *token_spec, boolean_t souser)
 	}
 
 	/* Get the user's new PIN. */
-	if (nms_new_pin != NULL) {
-		new_pin = (CK_UTF8CHAR_PTR)strdup(nms_new_pin);
-		new_pinlen = strlen(nms_new_pin);
-	} else if ((rv = get_pin(gettext("Create new passphrase:"), gettext(
+	if ((rv = get_pin(gettext("Create new passphrase:"), gettext(
 	    "Re-enter new passphrase:"), &new_pin, &new_pinlen)) != CKR_OK) {
 		if (rv == CKR_PIN_INCORRECT)
 			cryptoerror(LOG_STDERR, gettext(
@@ -262,17 +247,9 @@ pk_setpin(int argc, char *argv[])
 
 	/* Parse command line options.  Do NOT i18n/l10n. */
 	while ((opt = getopt_av(argc, argv,
-		"o:(old)n:(new)T:(token)k:(keystore)d:(dir)"
+		"T:(token)k:(keystore)d:(dir)"
 		"p:(prefix)u:(usertype)")) != EOF) {
 		switch (opt) {
-			case 'o':
-				fprintf(stderr, "old pin is %s\n", optarg_av);
-				nms_old_pin = optarg_av;
-				break;
-			case 'n':
-				fprintf(stderr, "new pin is %s\n", optarg_av);
-				nms_new_pin = optarg_av;
-				break;
 			case 'k':
 				kstype = KS2Int(optarg_av);
 				if (kstype == 0)
