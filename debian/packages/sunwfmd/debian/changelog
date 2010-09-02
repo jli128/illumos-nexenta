@@ -1,3 +1,9 @@
+sunwfmd (5.11.134-13) nexenta; urgency=low
+
+  * Bug #2403: fmd memory footprint constantly increasing
+
+ -- Garrett D'Amore <garrett@nexenta.com>  Thu, 02 Sep 2010 13:39:52 -0700
+
 sunwfmd (5.11.134-12) nexenta; urgency=low
 
   * Synchronized with OpenSolaris code (5.11 build 134)
