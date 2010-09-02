@@ -1,9 +1,3 @@
-sunwcsu (5.11.134-12b) nexenta; urgency=low
-
-  * zfs_crypto workaround using pkgtool and lofiadm  
-
- -- Nexenta Systems <maintainer@nexenta.com>  Fri, 27 Aug 2010 10:38:50 -0700
-
 sunwcsu (5.11.134-12a) nexenta; urgency=low
 
   * Edited pc.ti fixes Bug: 2109

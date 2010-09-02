@@ -38,7 +38,6 @@
 #include "common.h"
 #include <kmfapi.h>
 
-extern char *nms_pin;
 static KMF_RETURN
 pk_destroy_keys(void *handle, KMF_ATTRIBUTE *attrlist, int numattr)
 {
@@ -158,7 +157,7 @@ pk_delete_keys(KMF_HANDLE_T kmfhandle, KMF_ATTRIBUTE *attlist, int numattr,
 		    "to delete them (y/N) ?"), numkeys,
 		    (desc != NULL ? desc : ""));
 
-		if ( (nms_pin == NULL) && !yesno(prompt,
+		if (!yesno(prompt,
 		    gettext("Respond with yes or no.\n"),
 		    B_FALSE)) {
 			*keysdeleted = numkeys;

@@ -62,7 +62,6 @@
 #include <des/des_impl.h>
 #include <blowfish/blowfish_impl.h>
 
-char *nms_pin = NULL;
 static const char USAGE[] =
 	"Usage: %s -a file [ device ] "
 	" [-c aes-128-cbc|aes-192-cbc|aes-256-cbc|des3-cbc|blowfish-cbc]"
@@ -843,14 +842,7 @@ getkeyfromuser(mech_alias_t *cipher, char **raw_key, size_t *raw_key_sz)
 		goto cleanup;
 
 	/* get user passphrase with 8 byte minimum */
-	if ((nms_pin != NULL) && (strlen(nms_pin) >= 8)) {
-		pass = strdup(nms_pin);
-		if (pass == NULL) {
-			die(gettext("No memory\n"));
-		}
-		passlen = strlen(nms_pin);
-	} else if (pkcs11_get_pass(NULL, &pass, &passlen,
-		MIN_PASSLEN, B_TRUE) < 0) {
+	if (pkcs11_get_pass(NULL, &pass, &passlen, MIN_PASSLEN, B_TRUE) < 0) {
 		die(gettext("passphrases do not match\n"));
 	}
 
@@ -1007,14 +999,7 @@ getkeyfromtoken(CK_SESSION_HANDLE sess,
 		    pkcs11_strerror(CKR_MECHANISM_INVALID));
 	}
 
-	if (nms_pin != NULL) {
-		pass = strdup(nms_pin);
-		if (pass == NULL) {
-			die(gettext("No memory\n"));
-		}
-		passlen = strlen(nms_pin);
-	} else if (pkcs11_get_pass(token->name, &pass, &passlen,
-		0, B_FALSE) < 0)
+	if (pkcs11_get_pass(token->name, &pass, &passlen, 0, B_FALSE) < 0)
 		die(gettext("unable to get passphrase"));
 
 	/* use passphrase to login to token */
@@ -1821,7 +1806,7 @@ main(int argc, char *argv[])
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
 
-	while ((c = getopt(argc, argv, "a:c:Cd:efk:N:o:s:T:U")) != EOF) {
+	while ((c = getopt(argc, argv, "a:c:Cd:efk:o:s:T:U")) != EOF) {
 		switch (c) {
 		case 'a':
 			addflag = B_TRUE;
@@ -1875,9 +1860,6 @@ main(int argc, char *argv[])
 			keyfile = optarg;
 			need_crypto = B_TRUE;
 			cipher_only = B_FALSE;	/* need to unset cipher_only */
-			break;
-		case 'N':
-			nms_pin = optarg;
 			break;
 		case 's':
 			segsize = convert_to_num(optarg);
