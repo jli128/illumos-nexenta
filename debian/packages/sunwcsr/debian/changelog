@@ -1,3 +1,9 @@
+sunwcsr (5.11.134-13) nexenta; urgency=low
+
+  * Issue 2406: idmap should map unresolvable SIDs by default.
+
+ -- Vineeth Pillai <vineeth@nexenta.com>  Fri, 03 Sep 2010 22:25:36 +0530
+
 sunwcsr (5.11.134-12) nexenta; urgency=low
 
   * Synchronized with OpenSolaris code (5.11 build 134)

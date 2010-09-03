@@ -26,6 +26,19 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 
+set_prop_on_reboot()
+{
+cat >> $BASEDIR/var/svc/profile/upgrade <<\_IDMAP
+svccfg -s idmap setprop config/unresolvable_sid_mapping = boolean: true
+svcadm refresh idmap
+_IDMAP
+}
+
 rm -f $BASEDIR/dev/.devfsadm_deamon.lock >/dev/null 2>&1
 
+if [ -z "$BOOTSTRAP_BASE" ]; then
+      set_prop_on_reboot
+fi
+
 exit 0
+

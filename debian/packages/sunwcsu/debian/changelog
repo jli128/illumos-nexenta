@@ -1,3 +1,9 @@
+sunwcsu (5.11.134-13) nexenta; urgency=low
+
+  * Issue 2406: idmap should map unresolvable SIDs by default.
+
+ -- Vineeth Pillai <vineeth@nexenta.com>  Fri, 03 Sep 2010 22:24:51 +0530
+
 sunwcsu (5.11.134-12a) nexenta; urgency=low
 
   * Edited pc.ti fixes Bug: 2109
