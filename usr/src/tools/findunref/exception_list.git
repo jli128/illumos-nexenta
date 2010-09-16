@@ -1,0 +1,6 @@
+#
+# file patterns findunref should ignore
+#
+
+./.git
+./.gitignore
