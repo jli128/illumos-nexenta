@@ -37,6 +37,7 @@
 #include <sys/zfs_ioctl.h>
 #include <sys/spa.h>
 #include <sys/zfs_znode.h>
+#include <sys/zfs_onexit.h>
 #include <sys/zvol.h>
 #include <sys/dsl_scan.h>
 #include <sys/dsl_deadlist.h>
@@ -366,6 +367,7 @@ dsl_dataset_get_ref(dsl_pool_t *dp, uint64_t dsobj, void *tag,
 	dmu_buf_t *dbuf;
 	dsl_dataset_t *ds;
 	int err;
+	dmu_object_info_t doi;
 
 	ASSERT(RW_LOCK_HELD(&dp->dp_config_rwlock) ||
 	    dsl_pool_sync_context(dp));
@@ -373,6 +375,12 @@ dsl_dataset_get_ref(dsl_pool_t *dp, uint64_t dsobj, void *tag,
 	err = dmu_bonus_hold(mos, dsobj, tag, &dbuf);
 	if (err)
 		return (err);
+
+	/* Make sure dsobj has the correct object type. */
+	dmu_object_info_from_db(dbuf, &doi);
+	if (doi.doi_type != DMU_OT_DSL_DATASET)
+		return (EINVAL);
+
 	ds = dmu_buf_get_user(dbuf);
 	if (ds == NULL) {
 		dsl_dataset_t *winner;
@@ -3415,6 +3423,36 @@ struct dsl_ds_holdarg {
 	char failed[MAXPATHLEN];
 };
 
+typedef struct zfs_hold_cleanup_arg {
+	dsl_pool_t *dp;
+	uint64_t dsobj;
+	char htag[MAXNAMELEN];
+} zfs_hold_cleanup_arg_t;
+
+static void
+dsl_dataset_user_release_onexit(void *arg)
+{
+	zfs_hold_cleanup_arg_t *ca = arg;
+
+	(void) dsl_dataset_user_release_tmp(ca->dp, ca->dsobj, ca->htag,
+	    B_TRUE);
+	kmem_free(ca, sizeof (zfs_hold_cleanup_arg_t));
+}
+
+void
+dsl_register_onexit_hold_cleanup(dsl_dataset_t *ds, const char *htag,
+    minor_t minor)
+{
+	zfs_hold_cleanup_arg_t *ca;
+
+	ca = kmem_alloc(sizeof (zfs_hold_cleanup_arg_t), KM_SLEEP);
+	ca->dp = ds->ds_dir->dd_pool;
+	ca->dsobj = ds->ds_object;
+	(void) strlcpy(ca->htag, htag, sizeof (ca->htag));
+	VERIFY3U(0, ==, zfs_onexit_add_cb(minor,
+	    dsl_dataset_user_release_onexit, ca, NULL));
+}
+
 /*
  * The max length of a temporary tag prefix is the number of hex digits
  * required to express UINT64_MAX plus one for the hyphen.
@@ -3518,13 +3556,41 @@ dsl_dataset_user_hold_one(const char *dsname, void *arg)
 }
 
 int
+dsl_dataset_user_hold_for_send(dsl_dataset_t *ds, char *htag,
+    boolean_t temphold)
+{
+	struct dsl_ds_holdarg *ha;
+	int error;
+
+	ha = kmem_zalloc(sizeof (struct dsl_ds_holdarg), KM_SLEEP);
+	ha->htag = htag;
+	ha->temphold = temphold;
+	error = dsl_sync_task_do(ds->ds_dir->dd_pool,
+	    dsl_dataset_user_hold_check, dsl_dataset_user_hold_sync,
+	    ds, ha, 0);
+	kmem_free(ha, sizeof (struct dsl_ds_holdarg));
+
+	return (error);
+}
+
+int
 dsl_dataset_user_hold(char *dsname, char *snapname, char *htag,
-    boolean_t recursive, boolean_t temphold)
+    boolean_t recursive, boolean_t temphold, int cleanup_fd)
 {
 	struct dsl_ds_holdarg *ha;
 	dsl_sync_task_t *dst;
 	spa_t *spa;
 	int error;
+	minor_t minor = 0;
+
+	if (cleanup_fd != -1) {
+		/* Currently we only support cleanup-on-exit of tempholds. */
+		if (!temphold)
+			return (EINVAL);
+		error = zfs_onexit_fd_hold(cleanup_fd, &minor);
+		if (error)
+			return (error);
+	}
 
 	ha = kmem_zalloc(sizeof (struct dsl_ds_holdarg), KM_SLEEP);
 
@@ -3533,6 +3599,8 @@ dsl_dataset_user_hold(char *dsname, char *snapname, char *htag,
 	error = spa_open(dsname, &spa, FTAG);
 	if (error) {
 		kmem_free(ha, sizeof (struct dsl_ds_holdarg));
+		if (cleanup_fd != -1)
+			zfs_onexit_fd_rele(cleanup_fd);
 		return (error);
 	}
 
@@ -3541,6 +3609,7 @@ dsl_dataset_user_hold(char *dsname, char *snapname, char *htag,
 	ha->snapname = snapname;
 	ha->recursive = recursive;
 	ha->temphold = temphold;
+
 	if (recursive) {
 		error = dmu_objset_find(dsname, dsl_dataset_user_hold_one,
 		    ha, DS_FIND_CHILDREN);
@@ -3557,6 +3626,12 @@ dsl_dataset_user_hold(char *dsname, char *snapname, char *htag,
 		if (dst->dst_err) {
 			dsl_dataset_name(ds, ha->failed);
 			*strchr(ha->failed, '@') = '\0';
+		} else if (error == 0 && minor != 0 && temphold) {
+			/*
+			 * If this hold is to be released upon process exit,
+			 * register that action now.
+			 */
+			dsl_register_onexit_hold_cleanup(ds, htag, minor);
 		}
 		dsl_dataset_rele(ds, ha->dstg);
 	}
@@ -3568,8 +3643,11 @@ dsl_dataset_user_hold(char *dsname, char *snapname, char *htag,
 		(void) strlcpy(dsname, ha->failed, sizeof (ha->failed));
 
 	dsl_sync_task_group_destroy(ha->dstg);
+
 	kmem_free(ha, sizeof (struct dsl_ds_holdarg));
 	spa_close(spa, FTAG);
+	if (cleanup_fd != -1)
+		zfs_onexit_fd_rele(cleanup_fd);
 	return (error);
 }
 
@@ -3660,11 +3738,6 @@ dsl_dataset_user_release_sync(void *arg1, void *tag, dmu_tx_t *tx)
 	uint64_t dsobj = ds->ds_object;
 	uint64_t refs;
 	int error;
-
-	if (ds->ds_objset) {
-		dmu_objset_evict(ds->ds_objset);
-		ds->ds_objset = NULL;
-	}
 
 	mutex_enter(&ds->ds_lock);
 	ds->ds_userrefs--;
@@ -3825,10 +3898,12 @@ top:
 }
 
 /*
- * Called at spa_load time to release a stale temporary user hold.
+ * Called at spa_load time (with retry == B_FALSE) to release a stale
+ * temporary user hold. Also called by the onexit code (with retry == B_TRUE).
  */
 int
-dsl_dataset_user_release_tmp(dsl_pool_t *dp, uint64_t dsobj, char *htag)
+dsl_dataset_user_release_tmp(dsl_pool_t *dp, uint64_t dsobj, char *htag,
+    boolean_t retry)
 {
 	dsl_dataset_t *ds;
 	char *snap;
@@ -3836,20 +3911,36 @@ dsl_dataset_user_release_tmp(dsl_pool_t *dp, uint64_t dsobj, char *htag)
 	int namelen;
 	int error;
 
-	rw_enter(&dp->dp_config_rwlock, RW_READER);
-	error = dsl_dataset_hold_obj(dp, dsobj, FTAG, &ds);
-	rw_exit(&dp->dp_config_rwlock);
-	if (error)
-		return (error);
-	namelen = dsl_dataset_namelen(ds)+1;
-	name = kmem_alloc(namelen, KM_SLEEP);
-	dsl_dataset_name(ds, name);
-	dsl_dataset_rele(ds, FTAG);
+	do {
+		rw_enter(&dp->dp_config_rwlock, RW_READER);
+		error = dsl_dataset_hold_obj(dp, dsobj, FTAG, &ds);
+		rw_exit(&dp->dp_config_rwlock);
+		if (error)
+			return (error);
+		namelen = dsl_dataset_namelen(ds)+1;
+		name = kmem_alloc(namelen, KM_SLEEP);
+		dsl_dataset_name(ds, name);
+		dsl_dataset_rele(ds, FTAG);
 
-	snap = strchr(name, '@');
-	*snap = '\0';
-	++snap;
-	return (dsl_dataset_user_release(name, snap, htag, B_FALSE));
+		snap = strchr(name, '@');
+		*snap = '\0';
+		++snap;
+		error = dsl_dataset_user_release(name, snap, htag, B_FALSE);
+		kmem_free(name, namelen);
+
+		/*
+		 * The object can't have been destroyed because we have a hold,
+		 * but it might have been renamed, resulting in ENOENT.  Retry
+		 * if we've been requested to do so.
+		 *
+		 * It would be nice if we could use the dsobj all the way
+		 * through and avoid ENOENT entirely.  But we might need to
+		 * unmount the snapshot, and there's currently no way to lookup
+		 * a vfsp using a ZFS object id.
+		 */
+	} while ((error == ENOENT) && retry);
+
+	return (error);
 }
 
 int
