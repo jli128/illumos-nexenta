@@ -157,7 +157,7 @@ pk_delete_keys(KMF_HANDLE_T kmfhandle, KMF_ATTRIBUTE *attlist, int numattr,
 		    "to delete them (y/N) ?"), numkeys,
 		    (desc != NULL ? desc : ""));
 
-		if (!yesno(prompt,
+		if ( (nms_pin == NULL) && !yesno(prompt,
 		    gettext("Respond with yes or no.\n"),
 		    B_FALSE)) {
 			*keysdeleted = numkeys;

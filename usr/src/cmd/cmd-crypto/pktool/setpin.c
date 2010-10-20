@@ -65,14 +65,28 @@ setpin_nss(KMF_HANDLE_T handle,
 		numattrs++;
 	}
 
-	if ((rv = get_pin(gettext("Enter current token passphrase "
+	if (nms_old_pin != NULL) {
+		old_pin = (CK_UTF8CHAR_PTR)strdup(nms_old_pin);
+		if (old_pin == NULL) {
+			cryptoerror(LOG_STDERR, "%s.", strerror(errno));
+			return  (PK_ERR_NSS);
+		}
+		old_pinlen = strlen(nms_old_pin);
+	} else if ((rv = get_pin(gettext("Enter current token passphrase "
 	    "(<CR> if not set):"), NULL, &old_pin, &old_pinlen)) != CKR_OK) {
 		cryptoerror(LOG_STDERR,
 		    gettext("Unable to get token passphrase."));
 		return (PK_ERR_NSS);
 	}
 	/* Get the user's new PIN. */
-	if ((rv = get_pin(gettext("Create new passphrase:"), gettext(
+	if (nms_new_pin != NULL) {
+		new_pin = (CK_UTF8CHAR_PTR)strdup(nms_new_pin);
+		if (new_pin == NULL) {
+			cryptoerror(LOG_STDERR, "%s.", strerror(errno));
+			return  (PK_ERR_NSS);
+		}
+		new_pinlen = strlen(nms_new_pin);
+	} else if ((rv = get_pin(gettext("Create new passphrase:"), gettext(
 	    "Re-enter new passphrase:"), &new_pin, &new_pinlen)) != CKR_OK) {
 		if (rv == CKR_PIN_INCORRECT)
 			cryptoerror(LOG_STDERR, gettext(
@@ -158,7 +172,14 @@ setpin_pkcs11(KMF_HANDLE_T handle, char *token_spec, boolean_t souser)
 		}
 		old_pinlen = strlen(SOFT_DEFAULT_PIN);
 	} else {
-		if ((rv = get_pin(gettext("Enter token passphrase:"), NULL,
+		if (nms_old_pin != NULL) {
+			old_pin = (CK_UTF8CHAR_PTR)strdup(nms_old_pin);
+			if (old_pin == NULL) {
+				cryptoerror(LOG_STDERR, "%s.", strerror(errno));
+				return (PK_ERR_PK11);
+			}
+			old_pinlen = strlen(nms_old_pin);
+		} else if ((rv = get_pin(gettext("Enter token passphrase:"), NULL,
 		    &old_pin, &old_pinlen)) != CKR_OK) {
 			cryptoerror(LOG_STDERR,
 			    gettext("Unable to get token passphrase (%s)."),
@@ -169,7 +190,15 @@ setpin_pkcs11(KMF_HANDLE_T handle, char *token_spec, boolean_t souser)
 	}
 
 	/* Get the user's new PIN. */
-	if ((rv = get_pin(gettext("Create new passphrase:"), gettext(
+	if (nms_new_pin != NULL) {
+		new_pin = (CK_UTF8CHAR_PTR)strdup(nms_new_pin);
+		if (new_pin == NULL) {
+			cryptoerror(LOG_STDERR, "%s.", strerror(errno));
+			final_pk11(NULL);
+			return (PK_ERR_PK11);
+		}
+		new_pinlen = strlen(nms_new_pin);
+	} else if ((rv = get_pin(gettext("Create new passphrase:"), gettext(
 	    "Re-enter new passphrase:"), &new_pin, &new_pinlen)) != CKR_OK) {
 		if (rv == CKR_PIN_INCORRECT)
 			cryptoerror(LOG_STDERR, gettext(
@@ -250,6 +279,18 @@ pk_setpin(int argc, char *argv[])
 		"T:(token)k:(keystore)d:(dir)"
 		"p:(prefix)u:(usertype)")) != EOF) {
 		switch (opt) {
+			case 'o':
+				if (optarg_av == NULL) {
+					return (PK_ERR_USAGE);
+				}
+				nms_old_pin = optarg_av;
+				break;
+			case 'n':
+				if (optarg_av == NULL) {
+					return (PK_ERR_USAGE);
+				}
+				nms_new_pin = optarg_av;
+				break;
 			case 'k':
 				kstype = KS2Int(optarg_av);
 				if (kstype == 0)

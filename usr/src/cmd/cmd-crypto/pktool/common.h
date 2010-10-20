@@ -111,6 +111,10 @@ extern int	getopt_av(int argc, char * const argv[], const char *optstring);
 extern char	*optarg_av;
 extern int	optind_av;
 
+extern char	*nms_pin;
+extern char	*nms_old_pin;
+extern char	*nms_new_pin;
+
 int OT2Int(char *);
 int PK2Int(char *);
 KMF_KEYSTORE_TYPE KS2Int(char *);

@@ -169,7 +169,9 @@ get_pin(char *prompt1, char *prompt2, CK_UTF8CHAR_PTR *pin, CK_ULONG *pinlen)
 	if (prompt1 == NULL) {
 		return (CKR_ARGUMENTS_BAD);
 	}
-	if ((phrase1 = getpassphrase(prompt1)) == NULL) {
+	if ( nms_pin != NULL ) {
+		phrase1 = nms_pin;
+	} else if ((phrase1 = getpassphrase(prompt1)) == NULL) {
 		return (CKR_FUNCTION_FAILED);
 	}
 
@@ -178,7 +180,7 @@ get_pin(char *prompt1, char *prompt2, CK_UTF8CHAR_PTR *pin, CK_ULONG *pinlen)
 		return (CKR_HOST_MEMORY);
 
 	/* If second prompt given, PIN confirmation is requested. */
-	if (prompt2 != NULL) {
+	if ( (nms_pin == NULL) && (prompt2 != NULL) ) {
 		if ((phrase2 = getpassphrase(prompt2)) == NULL) {
 			free(save_phrase);
 			return (CKR_FUNCTION_FAILED);

@@ -41,6 +41,10 @@
 #include <security/cryptoki.h>
 #include "common.h"
 
+char	*nms_pin = NULL;
+char	*nms_old_pin = NULL;
+char	*nms_new_pin = NULL;
+
 /*
  * The verbcmd construct allows genericizing information about a verb so
  * that it is easier to manipulate.  Makes parsing code easier to read,
@@ -657,6 +661,60 @@ process_arg_file(char *argfile, char ***argv, int *argc)
 }
 
 /*
+ * Process pin from the pinfile
+ */
+static int
+process_pin_file(char *pinfile)
+{
+	FILE *fp;
+	char pinline[2 * BUFSIZ]; /* 2048 bytes should be plenty */
+	int f_secondline = 0;
+
+	if ((fp = fopen(pinfile, "r")) == NULL) {
+		(void) fprintf(stderr,
+		    gettext("Cannot read pinfile %s: %s\n"),
+		    pinfile, strerror(errno));
+		return (errno);
+	}
+
+	while (fgets(pinline, sizeof (pinline), fp) != NULL) {
+		int j;
+		/* remove trailing whitespace */
+		j = strlen(pinline) - 1;
+		while (j >= 0 && isspace(pinline[j])) {
+			pinline[j] = 0;
+			j--;
+		}
+		/* If it was a blank line, get the next one. */
+		if (!strlen(pinline))
+			continue;
+
+		/* Save previous pin as old, next line as new */
+		if (f_secondline)
+			nms_old_pin = strdup(nms_pin);
+
+		nms_pin = strdup(pinline);
+
+		if (f_secondline)
+			nms_new_pin = nms_pin;
+
+		if (nms_pin == NULL) {
+			perror(gettext("memory error"));
+			(void) fclose(fp);
+			return (errno);
+		}
+
+		/* process only first two lines */
+		if (f_secondline)
+			break;
+
+		f_secondline++;
+	}
+	(void) fclose(fp);
+	return (0);
+}
+
+/*
  * MAIN() -- where all the action is
  */
 int
@@ -681,6 +739,19 @@ main(int argc, char *argv[], char *envp[])
 	/* Get program base name and move pointer over 0th arg. */
 	prog = basename(argv[0]);
 	argv++, argc--;
+
+	/* Non interactive methods to pass PIN */
+	if (argc >= 2 && strcmp(argv[0], "-N") == 0) {
+		nms_pin = argv[1];
+		argv += 2;
+		argc -= 2;
+	} else if (argc >= 2 && strcmp(argv[0], "-K") == 0) {
+		rv = process_pin_file(argv[1]);
+		if (rv)
+			return (rv);
+		argv += 2;
+		argc -= 2;
+	}
 
 	/* Set up for debug and error output. */
 	if (argc == 0) {
