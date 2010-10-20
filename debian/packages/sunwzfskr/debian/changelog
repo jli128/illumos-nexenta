@@ -1,8 +1,9 @@
 sunwzfskr (5.11.134-100) nexenta; urgency=low
 
+  * Issue 2611: Fix for zfs panic when accessing special files in snapshot
   * Issue 2626: Fix for zfs panic in dmu_objset_stat
 
- -- Vineeth Pillai <vineeth@nexenta.com>  Fri, 01 Oct 2010 23:13:22 +0530
+ -- Vineeth Pillai <vineeth@nexenta.com>  Wed, 20 Oct 2010 20:34:25 +0530
 
 sunwzfskr (5.11.134-13) nexenta; urgency=low
 
