@@ -4,8 +4,9 @@ sunwzfskr (5.11.134-100) nexenta; urgency=low
   * Issue 2626: Fix for zfs panic in dmu_objset_stat
   * Issue 3315: zfs scrub/resilver performance backport
   * Issue 3319: zfs has a partially deleted file
+  * Issue 3360: backport SA related bug fixes
 
- -- Nexenta Systems <maintainer@nexenta.com>  Fri, 17 Dec 2010 01:06:57 -0800
+ -- Nexenta Systems <maintainer@nexenta.com>  Mon, 20 Dec 2010 13:50:05 -0800
 
 sunwzfskr (5.11.134-13) nexenta; urgency=low
 

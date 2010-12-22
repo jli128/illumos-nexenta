@@ -1,8 +1,9 @@
 sunwzfsr (5.11.134-100) nexenta; urgency=low
 
   * Issue 2626: Fix for zfs panic in dmu_objset_stats
+  * Issue 3360: backport SA related bug fixes
 
- -- Vineeth Pillai <vineeth@nexenta.com>  Fri, 01 Oct 2010 23:14:42 +0530
+ -- Nexenta Systems <maintainer@nexenta.com>  Tue, 21 Dec 2010 07:54:08 -0800
 
 sunwzfsr (5.11.134-12) nexenta; urgency=low
 
