@@ -8,8 +8,9 @@ sunwzfskr (5.11.134-100) nexenta; urgency=low
   * Issue 3230: zpool online txg not synced early enough
   * Issue 3232: pd_blks_max should be tunable
   * Issue 3233: backport several arc related fixes
+  * Issue 3234: fix dedup race 6957089
 
- -- Nexenta Systems <support@nexenta.com>  Tue, 21 Dec 2010 17:34:15 -0800
+ -- Nexenta Systems <support@nexenta.com>  Tue, 21 Dec 2010 17:46:39 -0800
 
 sunwzfskr (5.11.134-13) nexenta; urgency=low
 
