@@ -9,8 +9,9 @@ sunwzfskr (5.11.134-100) nexenta; urgency=low
   * Issue 3232: pd_blks_max should be tunable
   * Issue 3233: backport several arc related fixes
   * Issue 3234: fix dedup race 6957089
+  * Issue 3235: zinject can hang system
 
- -- Nexenta Systems <support@nexenta.com>  Tue, 21 Dec 2010 17:46:39 -0800
+ -- Nexenta Systems <support@nexenta.com>  Tue, 21 Dec 2010 17:55:06 -0800
 
 sunwzfskr (5.11.134-13) nexenta; urgency=low
 
