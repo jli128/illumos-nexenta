@@ -10,8 +10,9 @@ sunwzfskr (5.11.134-100) nexenta; urgency=low
   * Issue 3233: backport several arc related fixes
   * Issue 3234: fix dedup race 6957089
   * Issue 3235: zinject can hang system
+  * Issue 3236: backport 6959651 -- assertion failure in dedup
 
- -- Nexenta Systems <support@nexenta.com>  Tue, 21 Dec 2010 17:55:06 -0800
+ -- Nexenta Systems <support@nexenta.com>  Tue, 21 Dec 2010 17:58:37 -0800
 
 sunwzfskr (5.11.134-13) nexenta; urgency=low
 
