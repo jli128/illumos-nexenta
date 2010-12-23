@@ -17,8 +17,9 @@ sunwzfskr (5.11.134-100) nexenta; urgency=low
   * Issue 3241: backport 6952867 recursive rw_enter in dsl_dataset_clone_swap
   * Issue 3242: txg_wait_synced() is called when unmounting zfs snapshots
   * Issue 3428: panic from dmu_recv_begin: No such hold X on refcount Y
+  * Issue 3244: potential data corruption on crash with rename
 
- -- Nexenta Systems <support@nexenta.com>  Thu, 23 Dec 2010 15:46:22 -0800
+ -- Nexenta Systems <support@nexenta.com>  Thu, 23 Dec 2010 15:55:14 -0800
 
 sunwzfskr (5.11.134-13) nexenta; urgency=low
 
