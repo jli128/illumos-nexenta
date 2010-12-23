@@ -1366,7 +1366,8 @@ ZFS_COMMON_OBJS +=		\
 	zio_checksum.o		\
 	zio_compress.o		\
 	zio_inject.o		\
-	zle.o
+	zle.o			\
+	zrlock.o
 
 ZFS_SHARED_OBJS +=		\
 	zfs_namecheck.o		\

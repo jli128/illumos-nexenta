@@ -1,3 +1,9 @@
+sunwpsdcr (5.11.134-100) nexenta; urgency=low
+
+  * Issue 3238: backport dnode related improvements
+
+ -- Nexenta Systems <support@nexenta.com>  Tue, 21 Dec 2010 18:21:30 -0800
+
 sunwpsdcr (5.11.134-12) nexenta; urgency=low
 
   * Synchronized with OpenSolaris code (5.11 build 134)

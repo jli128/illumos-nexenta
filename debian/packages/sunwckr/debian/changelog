@@ -1,3 +1,9 @@
+sunwckr (5.11.134-100) nexenta; urgency=low
+
+  * Issue 3238: backport dnode related improvements
+ 
+ -- Nexenta Systems <support@nexenta.com>  Tue, 21 Dec 2010 18:24:47 -0800
+
 sunwckr (5.11.134-12a) nexenta; urgency=low
 
   * Issue 1984: Include fix for bug 6957205 to complete the fix for issue 1861
