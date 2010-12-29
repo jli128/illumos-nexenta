@@ -14,8 +14,9 @@ sunwzfskr (5.11.134-100) nexenta; urgency=low
   * Issue 3237: backport 6954665 - system stuck spinning in arc
   * Issue 3238: backport dnode related improvements
   * Issue 3417: backport several ZIL related fixes
+  * Issue 3241: backport 6952867 recursive rw_enter in dsl_dataset_clone_swap
 
- -- Nexenta Systems <support@nexenta.com>  Thu, 23 Dec 2010 08:21:34 -0800
+ -- Nexenta Systems <support@nexenta.com>  Thu, 23 Dec 2010 15:32:48 -0800
 
 sunwzfskr (5.11.134-13) nexenta; urgency=low
 
