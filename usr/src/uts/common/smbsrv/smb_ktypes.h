@@ -300,6 +300,7 @@ typedef struct smb_llist {
 	kmutex_t	ll_mutex;
 	list_t		ll_deleteq;
 	uint32_t	ll_deleteq_count;
+	boolean_t	ll_flushing;
 } smb_llist_t;
 
 typedef struct smb_slist {

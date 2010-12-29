@@ -496,6 +496,7 @@ smb_llist_constructor(
 	ll->ll_count = 0;
 	ll->ll_wrop = 0;
 	ll->ll_deleteq_count = 0;
+	ll->ll_flushing = B_FALSE;
 }
 
 /*
@@ -562,6 +563,11 @@ smb_llist_flush(smb_llist_t *ll)
 	smb_dtor_t    *dtor;
 
 	mutex_enter(&ll->ll_mutex);
+	if (ll->ll_flushing) {
+		mutex_exit(&ll->ll_mutex);
+		return;
+	}
+	ll->ll_flushing = B_TRUE;
 
 	dtor = list_head(&ll->ll_deleteq);
 	while (dtor != NULL) {
@@ -578,6 +584,7 @@ smb_llist_flush(smb_llist_t *ll)
 		mutex_enter(&ll->ll_mutex);
 		dtor = list_head(&ll->ll_deleteq);
 	}
+	ll->ll_flushing = B_FALSE;
 
 	mutex_exit(&ll->ll_mutex);
 }
