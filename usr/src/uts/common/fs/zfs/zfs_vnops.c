@@ -2282,7 +2282,7 @@ zfs_readdir(vnode_t *vp, uio_t *uio, cred_t *cr, int *eofp,
 	while (outcount < bytes_wanted) {
 		ino64_t objnum;
 		ushort_t reclen;
-		off64_t *next;
+		off64_t *next = NULL;
 
 		/*
 		 * Special case `.', `..', and `.zfs'.
@@ -2408,7 +2408,8 @@ zfs_readdir(vnode_t *vp, uio_t *uio, cred_t *cr, int *eofp,
 		} else {
 			offset += 1;
 		}
-		*next = offset;
+		if (next)
+			*next = offset;
 	}
 	zp->z_zn_prefetch = B_FALSE; /* a lookup will re-enable pre-fetching */
 
