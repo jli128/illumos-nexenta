@@ -4,8 +4,9 @@ sunwzfsr (5.11.134-100) nexenta; urgency=low
   * Issue 3360: backport SA related bug fixes
   * Issue 3236: backport 6959651 -- assertion failure in dedup
   * Issue 3238: backport dnode related improvements
+  * Issue 3247: zfs recursive snapshots take a long time
 
- -- Nexenta Systems <support@nexenta.com>  Tue, 21 Dec 2010 18:14:04 -0800
+ -- Nexenta Systems <support@nexenta.com>  Thu, 23 Dec 2010 22:52:05 -0800
 
 sunwzfsr (5.11.134-12) nexenta; urgency=low
 
