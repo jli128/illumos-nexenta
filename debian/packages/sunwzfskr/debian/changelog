@@ -25,8 +25,9 @@ sunwzfskr (5.11.134-100) nexenta; urgency=low
   * Issue 3435: ZFS DE should ignore ereports prior to pool import
   * Issue 3431: memleak in zil_alloc_lwb
   * Issue 3443: Allow a pool to be imported with a missing slog
+  * Issue 3444: rollback can leak log blocks
 
- -- Nexenta Systems <support@nexenta.com>  Fri, 24 Dec 2010 15:32:17 -0800
+ -- Nexenta Systems <support@nexenta.com>  Fri, 24 Dec 2010 15:46:50 -0800
 
 sunwzfskr (5.11.134-13) nexenta; urgency=low
 
