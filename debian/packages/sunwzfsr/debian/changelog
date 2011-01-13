@@ -1,4 +1,4 @@
-sunwzfsr (5.11.134-100) nexenta; urgency=low
+sunwzfsr (5.11.134-100) nexenta; urgency=high
 
   * Issue 2626: Fix for zfs panic in dmu_objset_stats
   * Issue 3360: backport SA related bug fixes
@@ -6,8 +6,9 @@ sunwzfsr (5.11.134-100) nexenta; urgency=low
   * Issue 3238: backport dnode related improvements
   * Issue 3247: zfs recursive snapshots take a long time
   * Issue 3443: Allow a pool to be imported with a missing slog
+  * Issue 3446: zpool cannot replace a replacing device
 
- -- Nexenta Systems <support@nexenta.com>  Fri, 24 Dec 2010 15:34:12 -0800
+ -- Nexenta Systems <support@nexenta.com>  Thu, 13 Jan 2011 08:28:44 -0800
 
 sunwzfsr (5.11.134-12) nexenta; urgency=low
 
