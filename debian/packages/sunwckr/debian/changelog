@@ -1,8 +1,9 @@
-sunwckr (5.11.134-100) nexenta; urgency=low
+sunwckr (5.11.134-100) nexenta; urgency=high
 
   * Issue 3238: backport dnode related improvements
- 
- -- Nexenta Systems <support@nexenta.com>  Tue, 21 Dec 2010 18:24:47 -0800
+  * Issue 3449: zfs diff
+
+ -- Nexenta Systems <support@nexenta.com>  Thu, 13 Jan 2011 10:01:10 -0800
 
 sunwckr (5.11.134-12a) nexenta; urgency=low
 

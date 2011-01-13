@@ -1,8 +1,9 @@
 sunwtoo (5.11.134-100) nexenta; urgency=low
 
   * Issue 2626: Fix for zfs panic in dmu_objset_stats
+  * Issue 3449: zfs diff
 
- -- Vineeth Pillai <vineeth@nexenta.com>  Fri, 01 Oct 2010 23:25:24 +0530
+ -- Nexenta Systems <support@nexenta.com>  Sat, 25 Dec 2010 09:21:38 -0800
 
 sunwtoo (5.11.134-12) nexenta; urgency=low
 

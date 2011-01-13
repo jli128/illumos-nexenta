@@ -7,8 +7,9 @@ sunwzfsr (5.11.134-100) nexenta; urgency=high
   * Issue 3247: zfs recursive snapshots take a long time
   * Issue 3443: Allow a pool to be imported with a missing slog
   * Issue 3446: zpool cannot replace a replacing device
+  * Issue 3449: zfs diff
 
- -- Nexenta Systems <support@nexenta.com>  Thu, 13 Jan 2011 08:28:44 -0800
+ -- Nexenta Systems <support@nexenta.com>  Thu, 13 Jan 2011 09:57:44 -0800
 
 sunwzfsr (5.11.134-12) nexenta; urgency=low
 

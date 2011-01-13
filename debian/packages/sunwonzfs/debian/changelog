@@ -1,8 +1,9 @@
-sunwonzfs (5.11.134-100) nexenta; urgency=low
+sunwonzfs (5.11.134-100) nexenta; urgency=high
 
   * Issue 3417: backport several ZIL related fixes
+  * Issue 3449: zfs diff
 
- -- Nexenta Systems <support@nexenta.com>  Thu, 23 Dec 2010 08:20:40 -0800
+ -- Nexenta Systems <support@nexenta.com>  Thu, 13 Jan 2011 09:59:52 -0800
 
 sunwonzfs (5.11.134-12) nexenta; urgency=low
 
