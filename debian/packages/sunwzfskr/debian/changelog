@@ -29,8 +29,9 @@ sunwzfskr (5.11.134-100) nexenta; urgency=high
   * Issue 3445: assertion failed: BP_GET_DEDUP(zio->io_bp)
   * Issue 3446: zpool cannot replace a replacing device
   * Issue 3449: zfs diff
+  * Issue 3450: ACL upgrade from zpl version 2 -> 4 panic
 
- -- Nexenta Systems <support@nexenta.com>  Thu, 13 Jan 2011 09:57:09 -0800
+ -- Nexenta Systems <support@nexenta.com>  Thu, 13 Jan 2011 13:10:12 -0800
 
 sunwzfskr (5.11.134-13) nexenta; urgency=low
 
