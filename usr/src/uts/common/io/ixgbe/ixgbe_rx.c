@@ -1,7 +1,6 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -21,8 +20,11 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
+ */
+
+/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include "ixgbe_sw.h"
@@ -514,7 +516,7 @@ ixgbe_rx_assoc_hcksum(mblk_t *mp, uint32_t status_error)
 	 */
 	if ((status_error & IXGBE_RXD_STAT_L4CS) &&
 	    !(status_error & IXGBE_RXDADV_ERR_TCPE))
-		hcksum_flags |= HCK_FULLCKSUM | HCK_FULLCKSUM_OK;
+		hcksum_flags |= HCK_FULLCKSUM_OK;
 
 	/*
 	 * Check IP Checksum
@@ -561,6 +563,7 @@ ixgbe_ring_rx(ixgbe_rx_ring_t *rx_ring, int poll_bytes)
 
 	if ((ixgbe->ixgbe_state & IXGBE_SUSPENDED) ||
 	    (ixgbe->ixgbe_state & IXGBE_ERROR) ||
+	    (ixgbe->ixgbe_state & IXGBE_OVERTEMP) ||
 	    !(ixgbe->ixgbe_state & IXGBE_STARTED))
 		return (NULL);
 
@@ -722,6 +725,9 @@ rx_discard:
 		status_error = current_rbd->wb.upper.status_error;
 	}
 
+	rx_ring->stat_rbytes += received_bytes;
+	rx_ring->stat_ipackets += pkt_num;
+
 	DMA_SYNC(&rx_data->rbd_area, DDI_DMA_SYNC_FORDEV);
 
 	rx_data->rbd_next = rx_next;
@@ -735,7 +741,7 @@ rx_discard:
 	} else
 		rx_tail = PREV_INDEX(rx_next, 1, rx_data->ring_size);
 
-	IXGBE_WRITE_REG(&ixgbe->hw, IXGBE_RDT(rx_ring->index), rx_tail);
+	IXGBE_WRITE_REG(&ixgbe->hw, IXGBE_RDT(rx_ring->hw_index), rx_tail);
 
 	if (ixgbe_check_acc_handle(ixgbe->osdep.reg_handle) != DDI_FM_OK) {
 		ddi_fm_service_impact(ixgbe->dip, DDI_SERVICE_DEGRADED);

@@ -1,7 +1,6 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -21,8 +20,11 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
+ */
+
+/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_IXGBE_SW_H
@@ -80,9 +82,11 @@ extern "C" {
 #define	IXGBE_STARTED			0x02
 #define	IXGBE_SUSPENDED			0x04
 #define	IXGBE_STALL			0x08
+#define	IXGBE_OVERTEMP			0x20
+#define	IXGBE_INTR_ADJUST		0x40
 #define	IXGBE_ERROR			0x80
 
-#define	MAX_NUM_UNICAST_ADDRESSES 	0x10
+#define	MAX_NUM_UNICAST_ADDRESSES 	0x80
 #define	MAX_NUM_MULTICAST_ADDRESSES 	0x1000
 #define	IXGBE_INTR_NONE			0
 #define	IXGBE_INTR_MSIX			1
@@ -113,7 +117,6 @@ extern "C" {
 /*
  * Maximum values for user configurable parameters
  */
-#define	MAX_RX_GROUP_NUM		1
 #define	MAX_TX_RING_SIZE		4096
 #define	MAX_RX_RING_SIZE		4096
 
@@ -128,7 +131,6 @@ extern "C" {
 /*
  * Minimum values for user configurable parameters
  */
-#define	MIN_RX_GROUP_NUM		1
 #define	MIN_TX_RING_SIZE		64
 #define	MIN_RX_RING_SIZE		64
 
@@ -143,7 +145,6 @@ extern "C" {
 /*
  * Default values for user configurable parameters
  */
-#define	DEFAULT_RX_GROUP_NUM		1
 #define	DEFAULT_TX_RING_SIZE		1024
 #define	DEFAULT_RX_RING_SIZE		1024
 
@@ -164,6 +165,7 @@ extern "C" {
 #define	DEFAULT_LRO_ENABLE		B_FALSE
 #define	DEFAULT_MR_ENABLE		B_TRUE
 #define	DEFAULT_TX_HEAD_WB_ENABLE	B_TRUE
+#define	DEFAULT_RELAX_ORDER_ENABLE	B_TRUE
 
 #define	IXGBE_LSO_MAXLEN		65535
 
@@ -204,6 +206,7 @@ extern "C" {
 #define	ATTACH_PROGRESS_FM_INIT		0x2000	/* FMA initialized */
 #define	ATTACH_PROGRESS_SFP_TASKQ	0x4000	/* SFP taskq created */
 #define	ATTACH_PROGRESS_LINK_TIMER	0x8000	/* link check timer */
+#define	ATTACH_PROGRESS_OVERTEMP_TASKQ	0x10000 /* Over-temp taskq created */
 
 #define	PROP_DEFAULT_MTU		"default_mtu"
 #define	PROP_FLOW_CONTROL		"flow_control"
@@ -219,6 +222,7 @@ extern "C" {
 #define	PROP_LSO_ENABLE			"lso_enable"
 #define	PROP_LRO_ENABLE			"lro_enable"
 #define	PROP_MR_ENABLE			"mr_enable"
+#define	PROP_RELAX_ORDER_ENABLE		"relax_order_enable"
 #define	PROP_TX_HEAD_WB_ENABLE		"tx_head_wb_enable"
 #define	PROP_TX_COPY_THRESHOLD		"tx_copy_threshold"
 #define	PROP_TX_RECYCLE_THRESHOLD	"tx_recycle_threshold"
@@ -250,12 +254,25 @@ extern "C" {
 #define	IXGBE_FLAG_VMDQ_ENABLED		(u32)(1 << 7)
 #define	IXGBE_FLAG_FAN_FAIL_CAPABLE	(u32)(1 << 8)
 #define	IXGBE_FLAG_RSC_CAPABLE		(u32)(1 << 9)
+#define	IXGBE_FLAG_SFP_PLUG_CAPABLE	(u32)(1 << 10)
+#define	IXGBE_FLAG_TEMP_SENSOR_CAPABLE	(u32)(1 << 11)
+
+/*
+ * Classification mode
+ */
+#define	IXGBE_CLASSIFY_NONE		0
+#define	IXGBE_CLASSIFY_RSS		1
+#define	IXGBE_CLASSIFY_VMDQ		2
+#define	IXGBE_CLASSIFY_VMDQ_RSS		3
 
 /* adapter-specific info for each supported device type */
 typedef struct adapter_info {
-	uint32_t	max_rx_que_num;	/* maximum number of rx queues */
-	uint32_t	min_rx_que_num;	/* minimum number of rx queues */
-	uint32_t	def_rx_que_num;	/* default number of rx queues */
+	uint32_t	max_rx_que_num; /* maximum number of rx queues */
+	uint32_t	min_rx_que_num; /* minimum number of rx queues */
+	uint32_t	def_rx_que_num; /* default number of rx queues */
+	uint32_t	max_rx_grp_num; /* maximum number of rx groups */
+	uint32_t	min_rx_grp_num; /* minimum number of rx groups */
+	uint32_t	def_rx_grp_num; /* default number of rx groups */
 	uint32_t	max_tx_que_num;	/* maximum number of tx queues */
 	uint32_t	min_tx_que_num;	/* minimum number of tx queues */
 	uint32_t	def_tx_que_num;	/* default number of tx queues */
@@ -271,6 +288,7 @@ typedef struct adapter_info {
 	uint32_t	max_ring_vect;	/* maximum number of ring vectors */
 	uint32_t	max_other_vect;	/* maximum number of other vectors */
 	uint32_t	other_intr;	/* "other" interrupt types handled */
+	uint32_t	other_gpie;	/* "other" interrupt types enabling */
 	uint32_t	flags;		/* capability flags */
 } adapter_info_t;
 
@@ -358,7 +376,7 @@ typedef union ixgbe_ether_addr {
 	} reg;
 	struct {
 		uint8_t		set;
-		uint8_t		redundant;
+		uint8_t		group_index;
 		uint8_t		addr[ETHERADDRL];
 	} mac;
 } ixgbe_ether_addr_t;
@@ -494,6 +512,8 @@ typedef struct ixgbe_tx_ring {
 	uint32_t		stat_break_tbd_limit;
 	uint32_t		stat_lso_header_fail;
 #endif
+	uint64_t		stat_obytes;
+	uint64_t		stat_opackets;
 
 	mac_ring_handle_t	ring_handle;
 
@@ -546,6 +566,8 @@ typedef struct ixgbe_rx_data {
  */
 typedef struct ixgbe_rx_ring {
 	uint32_t		index;		/* Ring index */
+	uint32_t		group_index;	/* Group index */
+	uint32_t		hw_index;	/* h/w ring index */
 	uint32_t		intr_vector;	/* Interrupt vector index */
 	uint32_t		vect_bit;	/* vector's bit in register */
 
@@ -561,6 +583,8 @@ typedef struct ixgbe_rx_ring {
 	uint32_t		stat_cksum_error;
 	uint32_t		stat_exceed_pkt;
 #endif
+	uint64_t		stat_rbytes;
+	uint64_t		stat_ipackets;
 
 	mac_ring_handle_t	ring_handle;
 	uint64_t		ring_gen_num;
@@ -601,6 +625,7 @@ typedef struct ixgbe {
 
 	adapter_info_t		*capab;	/* adapter hardware capabilities */
 	ddi_taskq_t		*sfp_taskq;	/* sfp-change taskq */
+	ddi_taskq_t		*overtemp_taskq; /* overtemp taskq */
 	uint32_t		eims;		/* interrupt mask setting */
 	uint32_t		eimc;		/* interrupt mask clear */
 	uint32_t		eicr;		/* interrupt cause reg */
@@ -651,6 +676,8 @@ typedef struct ixgbe {
 	boolean_t		tx_hcksum_enable; /* Tx h/w cksum offload */
 	boolean_t 		lso_enable; 	/* Large Segment Offload */
 	boolean_t 		mr_enable; 	/* Multiple Tx and Rx Ring */
+	boolean_t		relax_order_enable; /* Relax Order */
+	uint32_t		classify_mode;	/* Classification mode */
 	uint32_t		tx_copy_thresh;	/* Tx copy threshold */
 	uint32_t		tx_recycle_thresh; /* Tx recycle threshold */
 	uint32_t		tx_overload_thresh; /* Tx overload threshold */
@@ -664,11 +691,14 @@ typedef struct ixgbe {
 
 	int			intr_type;
 	int			intr_cnt;
+	uint32_t		intr_cnt_max;
+	uint32_t		intr_cnt_min;
 	int			intr_cap;
 	size_t			intr_size;
 	uint_t			intr_pri;
 	ddi_intr_handle_t	*htable;
 	uint32_t		eims_mask;
+	ddi_cb_handle_t		cb_hdl;		/* Interrupt callback handle */
 
 	kmutex_t		gen_lock; /* General lock for device access */
 	kmutex_t		watchdog_lock;
@@ -825,16 +855,15 @@ int ixgbe_m_start(void *);
 void ixgbe_m_stop(void *);
 int ixgbe_m_promisc(void *, boolean_t);
 int ixgbe_m_multicst(void *, boolean_t, const uint8_t *);
-int ixgbe_m_stat(void *, uint_t, uint64_t *);
 void ixgbe_m_resources(void *);
 void ixgbe_m_ioctl(void *, queue_t *, mblk_t *);
 boolean_t ixgbe_m_getcapab(void *, mac_capab_t, void *);
 int ixgbe_m_setprop(void *, const char *, mac_prop_id_t, uint_t, const void *);
-int ixgbe_m_getprop(void *, const char *, mac_prop_id_t,
-    uint_t, uint_t, void *, uint_t *);
+int ixgbe_m_getprop(void *, const char *, mac_prop_id_t, uint_t, uint_t,
+    void *, uint_t *);
 int ixgbe_set_priv_prop(ixgbe_t *, const char *, uint_t, const void *);
-int ixgbe_get_priv_prop(ixgbe_t *, const char *,
-    uint_t, uint_t, void *, uint_t *);
+int ixgbe_get_priv_prop(ixgbe_t *, const char *, uint_t, uint_t,
+    void *, uint_t *);
 boolean_t ixgbe_param_locked(mac_prop_id_t);
 
 /*
@@ -864,6 +893,9 @@ void ixgbe_error(void *, const char *, ...);
  * Function prototypes in ixgbe_stat.c
  */
 int ixgbe_init_stats(ixgbe_t *);
+int ixgbe_m_stat(void *, uint_t, uint64_t *);
+int ixgbe_rx_ring_stat(mac_ring_driver_t, uint_t, uint64_t *);
+int ixgbe_tx_ring_stat(mac_ring_driver_t, uint_t, uint64_t *);
 
 #ifdef __cplusplus
 }

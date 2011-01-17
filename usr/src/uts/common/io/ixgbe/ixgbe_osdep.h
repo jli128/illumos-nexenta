@@ -1,19 +1,17 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at:
- *      http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
- * When using or redistributing this file, you may do so under the
- * License only. No other modification of this header is permitted.
- *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
  * If applicable, add the following below this CDDL HEADER, with the
  * fields enclosed by brackets "[]" replaced with your own identifying
  * information: Portions Copyright [yyyy] [name of copyright owner]
@@ -22,8 +20,11 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
+ */
+
+/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef	_IXGBE_OSDEP_H
@@ -71,8 +72,6 @@ void ixgbe_write_pci_cfg(struct ixgbe_hw *, uint32_t, uint32_t);
 #define	CMD_MEM_WRT_INVALIDATE	0x0010	/* BIT_4 */
 #define	PCI_COMMAND_REGISTER	0x04
 #define	PCI_EX_CONF_CAP		0xE0
-#define	MAX_NUM_UNICAST_ADDRESSES 0x10
-#define	MAX_NUM_MULTICAST_ADDRESSES 0x1000
 #define	SPEED_10GB		10000
 #define	SPEED_1GB		1000
 #define	SPEED_100		100
@@ -84,9 +83,15 @@ void ixgbe_write_pci_cfg(struct ixgbe_hw *, uint32_t, uint32_t);
 	ddi_put32((OS_DEP(a))->reg_handle, \
 	    (uint32_t *)((uintptr_t)(a)->hw_addr + reg), (value))
 
+#define	IXGBE_WRITE_REG_ARRAY(a, reg, index, value)	\
+	IXGBE_WRITE_REG(a, ((reg) + ((index) << 2)), (value))
+
 #define	IXGBE_READ_REG(a, reg)	\
 	ddi_get32((OS_DEP(a))->reg_handle, \
 	    (uint32_t *)((uintptr_t)(a)->hw_addr + reg))
+
+#define	IXGBE_READ_REG_ARRAY(a, reg, index)	\
+	IXGBE_READ_REG(a, ((reg) + ((index) << 2)))
 
 #define	IXGBE_WRITE_REG64(hw, reg, value)	\
 	do {								\
