@@ -1,3 +1,9 @@
+sunwiscsitr (5.11.134-100) nexenta; urgency=high
+
+  * Issue 3660: Significant update to COMSTAR
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 19 Jan 2011 14:38:10 -0800
+
 sunwiscsitr (5.11.134-12a) nexenta; urgency=low
 
   * Patched iscsit_tgt.c ,backport Fix: 6936691

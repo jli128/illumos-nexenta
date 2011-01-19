@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/cpuvar.h>
@@ -30,6 +29,7 @@
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/modctl.h>
+#include <sys/scsi/generic/persist.h>
 
 #include <sys/socket.h>
 #include <sys/strsubr.h>
@@ -44,8 +44,8 @@
 #include <sys/idm/idm_text.h>
 
 #define	ISCSIT_LOGIN_SM_STRINGS
-#include <iscsit.h>
-#include <iscsit_auth.h>
+#include "iscsit.h"
+#include "iscsit_auth.h"
 
 typedef struct {
 	list_node_t		le_ctx_node;
@@ -193,6 +193,12 @@ static idm_status_t
 iscsit_add_declarative_keys(iscsit_conn_t *ict);
 
 uint64_t max_dataseglen_target = ISCSIT_MAX_RECV_DATA_SEGMENT_LENGTH;
+
+/*
+ * global mutex defined in iscsit.c to enforce
+ * login_sm_session_bind as a critical section
+ */
+extern kmutex_t login_sm_session_mutex;
 
 idm_status_t
 iscsit_login_sm_init(iscsit_conn_t *ict)
@@ -1276,6 +1282,18 @@ login_sm_session_bind(iscsit_conn_t *ict)
 	uint8_t			error_detail;
 
 	/*
+	 * The multi-threaded execution of binding login sessions to target
+	 * introduced race conditions in the session creation/binding and
+	 * allowed duplicate sessions to tbe created. The addition of the
+	 * global mutex login_sm_session_mutex makes this function single
+	 * threaded to avoid such race conditions. Although this causes
+	 * a small portion of the login to be serialized, it is unlikely
+	 * that there would be numerous simultaneous logins to become a
+	 * performance issue.
+	 */
+	mutex_enter(&login_sm_session_mutex);
+
+	/*
 	 * Look up target and then check if there are sessions or connections
 	 * that match this request (see below).  Any holds taken on objects
 	 * must be released at the end of the function (let's keep things
@@ -1513,6 +1531,7 @@ login_sm_session_bind(iscsit_conn_t *ict)
 	if (existing_ict != NULL)
 		iscsit_conn_rele(existing_ict);
 
+	mutex_exit(&login_sm_session_mutex);
 	return (IDM_STATUS_SUCCESS);
 
 session_bind_error:
@@ -1527,6 +1546,7 @@ session_bind_error:
 	 * If session bind fails we will fail the login but don't destroy
 	 * the session until later.
 	 */
+	mutex_exit(&login_sm_session_mutex);
 	return (IDM_STATUS_FAIL);
 }
 
@@ -1715,6 +1735,8 @@ login_sm_session_register(iscsit_conn_t *ict)
 {
 	iscsit_sess_t		*ist = ict->ict_sess;
 	stmf_scsi_session_t	*ss;
+	iscsi_transport_id_t	*iscsi_tptid;
+	uint16_t		ident_len, adn_len, tptid_sz;
 
 	/*
 	 * Hold target mutex until we have finished registering with STMF
@@ -1736,14 +1758,26 @@ login_sm_session_register(iscsit_conn_t *ict)
 		return (IDM_STATUS_FAIL);
 	}
 
+	ident_len = strlen(ist->ist_initiator_name) + 1;
 	ss->ss_rport_id = kmem_zalloc(sizeof (scsi_devid_desc_t) +
-	    strlen(ist->ist_initiator_name) + 1, KM_SLEEP);
+	    ident_len, KM_SLEEP);
 	(void) strcpy((char *)ss->ss_rport_id->ident, ist->ist_initiator_name);
-	ss->ss_rport_id->ident_length = strlen(ist->ist_initiator_name);
+	ss->ss_rport_id->ident_length = ident_len - 1;
 	ss->ss_rport_id->protocol_id = PROTOCOL_iSCSI;
 	ss->ss_rport_id->piv = 1;
 	ss->ss_rport_id->code_set = CODE_SET_ASCII;
 	ss->ss_rport_id->association = ID_IS_TARGET_PORT;
+
+	/* adn_len should be 4 byte aligned, SPC3 rev 23, section 7.54.6 */
+	adn_len = (ident_len + 3) & ~ 3;
+	tptid_sz = sizeof (iscsi_transport_id_t) - 1 + adn_len;
+	ss->ss_rport = stmf_remote_port_alloc(tptid_sz);
+	ss->ss_rport->rport_tptid->protocol_id = PROTOCOL_iSCSI;
+	ss->ss_rport->rport_tptid->format_code = 0;
+	iscsi_tptid = (iscsi_transport_id_t *)ss->ss_rport->rport_tptid;
+	SCSI_WRITE16(&iscsi_tptid->add_len, adn_len);
+	(void) strlcpy((char *)iscsi_tptid->iscsi_name,
+	    ist->ist_initiator_name, ident_len);
 
 	ss->ss_lport = ist->ist_lport;
 
@@ -1753,6 +1787,7 @@ login_sm_session_register(iscsit_conn_t *ict)
 		kmem_free(ss->ss_rport_id,
 		    sizeof (scsi_devid_desc_t) +
 		    strlen(ist->ist_initiator_name) + 1);
+		stmf_remote_port_free(ss->ss_rport);
 		stmf_free(ss);
 		SET_LOGIN_ERROR(ict, ISCSI_STATUS_CLASS_TARGET_ERR,
 		    ISCSI_LOGIN_STATUS_TARGET_ERROR);
@@ -2460,8 +2495,10 @@ iscsit_handle_boolean(iscsit_conn_t *ict, nvpair_t *nvp, boolean_t value,
 		if (value != iscsit_value) {
 			/* Respond back to initiator with our value */
 			value = iscsit_value;
+			nvrc = nvlist_add_boolean_value(
+			    lsm->icl_negotiated_values,
+			    ikvx->ik_key_name, value);
 			lsm->icl_login_transit = B_FALSE;
-			nvrc = 0;
 		} else {
 			/* Add this to our negotiated values */
 			nvrc = nvlist_add_nvpair(lsm->icl_negotiated_values,
@@ -2500,8 +2537,9 @@ iscsit_handle_numerical(iscsit_conn_t *ict, nvpair_t *nvp, uint64_t value,
 		if (value > iscsit_max_value) {
 			/* Respond back to initiator with our value */
 			value = iscsit_max_value;
+			nvrc = nvlist_add_uint64(lsm->icl_negotiated_values,
+			    ikvx->ik_key_name, value);
 			lsm->icl_login_transit = B_FALSE;
-			nvrc = 0;
 		} else {
 			/* Add this to our negotiated values */
 			nvrc = nvlist_add_nvpair(lsm->icl_negotiated_values,

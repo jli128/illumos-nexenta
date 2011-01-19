@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/cpuvar.h>
@@ -40,9 +39,10 @@
 #include <sys/idm/idm_so.h>
 #include <sys/iscsit/iscsit_common.h>
 #include <sys/iscsit/isns_protocol.h>
-#include <iscsit.h>
-#include <iscsit_isns.h>
 #include <sys/ksocket.h>
+
+#include "iscsit.h"
+#include "iscsit_isns.h"
 
 /*
  * iscsit_isns.c -- isns client that is part of the iscsit server
@@ -456,7 +456,7 @@ isnst_config_merge(it_config_t *cfg)
 	/* Add new iSNS servers */
 	for (cfg_isns_svr = cfg->config_isns_svr_list;
 	    cfg_isns_svr != NULL;
-	    cfg_isns_svr = cfg_isns_svr->next) {
+	    cfg_isns_svr = cfg_isns_svr->portal_next) {
 		isns_svr = iscsit_isns_svr_lookup(&cfg_isns_svr->portal_addr);
 		if (isns_svr == NULL) {
 			iscsit_add_isns(cfg_isns_svr);

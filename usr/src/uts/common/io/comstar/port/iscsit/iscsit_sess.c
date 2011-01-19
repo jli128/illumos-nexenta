@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/cpuvar.h>
@@ -31,6 +30,7 @@
 #include <sys/sunddi.h>
 #include <sys/modctl.h>
 #include <sys/sysmacros.h>
+#include <sys/scsi/generic/persist.h>
 
 #include <sys/socket.h>
 #include <sys/strsubr.h>
@@ -43,7 +43,7 @@
 #include <sys/idm/idm.h>
 
 #define	ISCSIT_SESS_SM_STRINGS
-#include <iscsit.h>
+#include "iscsit.h"
 
 typedef struct {
 	list_node_t		se_ctx_node;
@@ -139,7 +139,7 @@ iscsit_sess_create(iscsit_tgt_t *tgt, iscsit_conn_t *ict,
 	}
 
 	idm_sm_audit_init(&result->ist_state_audit);
-	rw_init(&result->ist_sn_rwlock, NULL, RW_DRIVER, NULL);
+	mutex_init(&result->ist_sn_mutex, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&result->ist_mutex, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&result->ist_cv, NULL, CV_DEFAULT, NULL);
 	list_create(&result->ist_events, sizeof (sess_event_ctx_t),
@@ -148,7 +148,7 @@ iscsit_sess_create(iscsit_tgt_t *tgt, iscsit_conn_t *ict,
 	    offsetof(iscsit_conn_t, ict_sess_ln));
 	avl_create(&result->ist_task_list, iscsit_task_itt_compare,
 	    sizeof (iscsit_task_t), offsetof(iscsit_task_t, it_sess_ln));
-
+	result->ist_rxpdu_queue = kmem_zalloc(sizeof (iscsit_cbuf_t), KM_SLEEP);
 	result->ist_state = SS_Q1_FREE;
 	result->ist_last_state = SS_Q1_FREE;
 	bcopy(isid, result->ist_isid, ISCSI_ISID_LEN);
@@ -209,6 +209,7 @@ static void
 iscsit_sess_unref(void *ist_void)
 {
 	iscsit_sess_t *ist = ist_void;
+	stmf_scsi_session_t *iss;
 
 	/*
 	 * State machine has run to completion, destroy session
@@ -221,13 +222,13 @@ iscsit_sess_unref(void *ist_void)
 	 */
 	mutex_enter(&ist->ist_mutex);
 	ASSERT(ist->ist_conn_count == 0);
-	if (ist->ist_stmf_sess != NULL) {
-		stmf_deregister_scsi_session(ist->ist_lport,
-		    ist->ist_stmf_sess);
-		kmem_free(ist->ist_stmf_sess->ss_rport_id,
-		    sizeof (scsi_devid_desc_t) +
+	iss = ist->ist_stmf_sess;
+	if (iss != NULL) {
+		stmf_deregister_scsi_session(ist->ist_lport, iss);
+		kmem_free(iss->ss_rport_id, sizeof (scsi_devid_desc_t) +
 		    strlen(ist->ist_initiator_name) + 1);
-		stmf_free(ist->ist_stmf_sess);
+		stmf_remote_port_free(iss->ss_rport);
+		stmf_free(iss);
 	}
 	mutex_exit(&ist->ist_mutex);
 
@@ -252,11 +253,12 @@ iscsit_sess_destroy(iscsit_sess_t *ist)
 		kmem_free(ist->ist_target_alias,
 		    strlen(ist->ist_target_alias) + 1);
 	avl_destroy(&ist->ist_task_list);
+	kmem_free(ist->ist_rxpdu_queue, sizeof (iscsit_cbuf_t));
 	list_destroy(&ist->ist_conn_list);
 	list_destroy(&ist->ist_events);
 	cv_destroy(&ist->ist_cv);
 	mutex_destroy(&ist->ist_mutex);
-	rw_destroy(&ist->ist_sn_rwlock);
+	mutex_destroy(&ist->ist_sn_mutex);
 	kmem_free(ist, sizeof (*ist));
 }
 
@@ -317,6 +319,20 @@ void
 iscsit_sess_rele(iscsit_sess_t *ist)
 {
 	idm_refcnt_rele(&ist->ist_refcnt);
+}
+
+idm_status_t
+iscsit_sess_check_hold(iscsit_sess_t *ist)
+{
+	mutex_enter(&ist->ist_mutex);
+	if (ist->ist_state != SS_Q6_DONE &&
+	    ist->ist_state != SS_Q7_ERROR) {
+		idm_refcnt_hold(&ist->ist_refcnt);
+		mutex_exit(&ist->ist_mutex);
+		return (IDM_STATUS_SUCCESS);
+	}
+	mutex_exit(&ist->ist_mutex);
+	return (IDM_STATUS_FAIL);
 }
 
 iscsit_conn_t *
@@ -562,6 +578,8 @@ sess_sm_q1_free(iscsit_sess_t *ist, sess_event_ctx_t *ctx)
 static void
 sess_sm_q2_active(iscsit_sess_t *ist, sess_event_ctx_t *ctx)
 {
+	iscsit_conn_t	*ict;
+
 	switch (ctx->se_ctx_event) {
 	case SE_CONN_LOGGED_IN:
 		/* N2 track FFP connections */
@@ -577,6 +595,19 @@ sess_sm_q2_active(iscsit_sess_t *ist, sess_event_ctx_t *ctx)
 		break;
 	case SE_SESSION_REINSTATE:
 		/* N11 */
+		/*
+		 * Shutdown the iSCSI connections by
+		 * sending an implicit logout to all
+		 * the IDM connections and transition
+		 * the session to SS_Q6_DONE state.
+		 */
+		mutex_enter(&ist->ist_mutex);
+		for (ict = list_head(&ist->ist_conn_list);
+		    ict != NULL;
+		    ict = list_next(&ist->ist_conn_list, ict)) {
+			iscsit_conn_logout(ict);
+		}
+		mutex_exit(&ist->ist_mutex);
 		sess_sm_new_state(ist, ctx, SS_Q6_DONE);
 		break;
 	default:
@@ -588,7 +619,7 @@ sess_sm_q2_active(iscsit_sess_t *ist, sess_event_ctx_t *ctx)
 static void
 sess_sm_q3_logged_in(iscsit_sess_t *ist, sess_event_ctx_t *ctx)
 {
-	iscsit_conn_t *ict;
+	iscsit_conn_t	*ict;
 
 	switch (ctx->se_ctx_event) {
 	case SE_CONN_IN_LOGIN:
@@ -645,8 +676,7 @@ sess_sm_q3_logged_in(iscsit_sess_t *ist, sess_event_ctx_t *ctx)
 				 */
 				continue;
 			}
-			idm_conn_event(ict->ict_ic, CE_LOGOUT_SESSION_SUCCESS,
-			    NULL);
+			iscsit_conn_logout(ict);
 		}
 		mutex_exit(&ist->ist_mutex);
 

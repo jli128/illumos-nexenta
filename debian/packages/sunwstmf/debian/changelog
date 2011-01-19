@@ -1,9 +1,10 @@
-sunwstmf (5.11.134-100) nexenta; urgency=low
+sunwstmf (5.11.134-100) nexenta; urgency=high
 
   * Issue 2626: Fix for zfs panic in dmu_objset_stats
   * Issue 3417: backport several ZIL related fixes
+  * Issue 3660: Significant update to COMSTAR
 
- -- Nexenta Systems <support@nexenta.com>  Thu, 23 Dec 2010 08:22:22 -0800
+ -- Nexenta Systems <support@nexenta.com>  Wed, 19 Jan 2011 14:36:24 -0800
 
 sunwstmf (5.11.134-12) nexenta; urgency=low
 

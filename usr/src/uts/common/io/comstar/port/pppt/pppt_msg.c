@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/cpuvar.h>
@@ -39,7 +38,8 @@
 #include <sys/stmf.h>
 #include <sys/stmf_ioctl.h>
 #include <sys/portif.h>
-#include <pppt.h>
+
+#include "pppt.h"
 
 static void pppt_msg_tgt_register(stmf_ic_msg_t *reg_port);
 
@@ -116,7 +116,6 @@ pppt_msg_tgt_register(stmf_ic_msg_t *msg)
 	stmf_status_t		stmf_status;
 
 	reg_port = msg->icm_msg;
-
 
 	PPPT_GLOBAL_LOCK();
 	if (pppt_global.global_svc_state != PSS_ENABLED) {
@@ -215,7 +214,7 @@ pppt_msg_session_destroy(stmf_ic_msg_t *msg)
 	 * Look for existing session for this ID
 	 */
 	ps = pppt_sess_lookup_locked(sess_destroy->icscd_session_id,
-	    sess_destroy->icscd_tgt_devid, sess_destroy->icscd_ini_devid);
+	    sess_destroy->icscd_tgt_devid, sess_destroy->icscd_rport);
 
 	if (ps == NULL) {
 		PPPT_GLOBAL_UNLOCK();
@@ -278,7 +277,8 @@ pppt_msg_scsi_cmd(stmf_ic_msg_t *msg)
 	 * IT nexus
 	 */
 	pppt_sess = pppt_sess_lookup_create(scmd->icsc_tgt_devid,
-	    scmd->icsc_ini_devid, scmd->icsc_session_id, &stmf_status);
+	    scmd->icsc_ini_devid, scmd->icsc_rport,
+	    scmd->icsc_session_id, &stmf_status);
 	if (pppt_sess == NULL) {
 		pppt_task_free(ptask);
 		pppt_msg_tx_status(msg, stmf_status);
@@ -349,13 +349,15 @@ pppt_msg_scsi_cmd(stmf_ic_msg_t *msg)
 	 */
 	task->task_mgmt_function = scmd->icsc_task_mgmt_function;
 
-	task->task_max_nbufs = STMF_BUFS_MAX; /* Or protocol value */
+	task->task_max_nbufs = 1; /* Don't allow parallel xfers */
 	task->task_cmd_seq_no = msg->icm_msgid;
 	task->task_expected_xfer_length =
 	    scmd->icsc_task_expected_xfer_length;
 
-	bcopy(scmd->icsc_task_cdb, task->task_cdb,
-	    scmd->icsc_task_cdb_length);
+	if (scmd->icsc_task_cdb_length) {
+		bcopy(scmd->icsc_task_cdb, task->task_cdb,
+		    scmd->icsc_task_cdb_length);
+	}
 	bcopy(scmd->icsc_lun_id, ptask->pt_lun_id, 16);
 
 	if (scmd->icsc_immed_data_len) {

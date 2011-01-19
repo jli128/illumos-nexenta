@@ -36,13 +36,14 @@
 #include <sys/sdt.h>
 #include <sys/dkio.h>
 
-#include <stmf.h>
-#include <lpif.h>
-#include <portif.h>
-#include <stmf_ioctl.h>
-#include <stmf_sbd.h>
-#include <stmf_sbd_ioctl.h>
-#include <sbd_impl.h>
+#include <sys/stmf.h>
+#include <sys/lpif.h>
+#include <sys/portif.h>
+#include <sys/stmf_ioctl.h>
+#include <sys/stmf_sbd_ioctl.h>
+
+#include "stmf_sbd.h"
+#include "sbd_impl.h"
 
 extern dev_info_t *stmf_sbd_dip;
 
@@ -97,6 +98,7 @@ void sbd_handle_short_write_transfers(scsi_task_t *task,
 void sbd_handle_mode_select_xfer(scsi_task_t *task, uint8_t *buf,
     uint32_t buflen);
 void sbd_handle_mode_select(scsi_task_t *task, stmf_data_buf_t *dbuf);
+void sbd_handle_identifying_info(scsi_task_t *task, stmf_data_buf_t *dbuf);
 
 extern void sbd_pgr_initialize_it(scsi_task_t *, sbd_it_data_t *);
 extern int sbd_pgr_reservation_conflict(scsi_task_t *);
@@ -2113,6 +2115,73 @@ mode_sel_param_field_err:
 }
 
 /*
+ * Command support added from SPC-4 r24
+ * Supports info type 0, 2, 127
+ */
+void
+sbd_handle_identifying_info(struct scsi_task *task,
+    stmf_data_buf_t *initial_dbuf)
+{
+	sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private;
+	uint8_t *cdb;
+	uint32_t cmd_size;
+	uint32_t param_len;
+	uint32_t xfer_size;
+	uint8_t info_type;
+	uint8_t *buf, *p;
+
+	cdb = &task->task_cdb[0];
+	cmd_size = READ_SCSI32(&cdb[6], uint32_t);
+	info_type = cdb[10]>>1;
+
+	/* Validate the command */
+	if (cmd_size < 4) {
+		stmf_scsilib_send_status(task, STATUS_CHECK,
+		    STMF_SAA_INVALID_FIELD_IN_CDB);
+		return;
+	}
+
+	p = buf = kmem_zalloc(260, KM_SLEEP);
+
+	switch (info_type) {
+		case 0:
+			/*
+			 * No value is supplied but this info type
+			 * is mandatory.
+			 */
+			xfer_size = 4;
+			break;
+		case 2:
+			mutex_enter(&sl->sl_lock);
+			param_len = strlcpy((char *)(p+4), sl->sl_alias, 256);
+			mutex_exit(&sl->sl_lock);
+			/* text info must be null terminated */
+			if (++param_len > 256)
+				param_len = 256;
+			SCSI_WRITE16(p+2, param_len);
+			xfer_size = param_len + 4;
+			break;
+		case 127:
+			/* 0 and 2 descriptor supported */
+			SCSI_WRITE16(p+2, 8); /* set param length */
+			p += 8;
+			*p = 4; /* set type to 2 (7 hi bits) */
+			p += 2;
+			SCSI_WRITE16(p, 256); /* 256 max length */
+			xfer_size = 12;
+			break;
+		default:
+			stmf_scsilib_send_status(task, STATUS_CHECK,
+			    STMF_SAA_INVALID_FIELD_IN_CDB);
+			kmem_free(buf, 260);
+			return;
+	}
+	sbd_handle_short_read_transfers(task, initial_dbuf, buf,
+	    cmd_size, xfer_size);
+	kmem_free(buf, 260);
+}
+
+/*
  * This function parse through a string, passed to it as a pointer to a string,
  * by adjusting the pointer to the first non-space character and returns
  * the count/length of the first bunch of non-space characters. Multiple
@@ -2552,10 +2621,10 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 			it->sbd_it_ua_conditions = SBD_UA_POR;
 		}
 	} else if (it->sbd_it_flags & SBD_IT_PGR_CHECK_FLAG) {
-		sbd_pgr_initialize_it(task, it);
 		mutex_enter(&sl->sl_lock);
 		it->sbd_it_flags &= ~SBD_IT_PGR_CHECK_FLAG;
 		mutex_exit(&sl->sl_lock);
+		sbd_pgr_initialize_it(task, it);
 	}
 
 	if (task->task_mgmt_function) {
@@ -2664,8 +2733,16 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 		    cdb0 != SCMD_PERSISTENT_RESERVE_IN &&
 		    cdb0 != SCMD_REQUEST_SENSE &&
 		    cdb0 != SCMD_READ_CAPACITY &&
+		    cdb0 != SCMD_TEST_UNIT_READY &&
+		    cdb0 != SCMD_START_STOP &&
+		    cdb0 != SCMD_READ &&
+		    cdb0 != SCMD_READ_G1 &&
+		    cdb0 != SCMD_READ_G4 &&
+		    cdb0 != SCMD_READ_G5 &&
 		    !(cdb0 == SCMD_SVC_ACTION_IN_G4 &&
 		    cdb1 == SSVC_ACTION_READ_CAPACITY_G4) &&
+		    !(cdb0 == SCMD_MAINTENANCE_IN &&
+		    (cdb1 & 0x1F) == 0x05) &&
 		    !(cdb0 == SCMD_MAINTENANCE_IN &&
 		    (cdb1 & 0x1F) == 0x0A)) {
 			stmf_scsilib_send_status(task, STATUS_CHECK,
@@ -2800,6 +2877,13 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	if ((cdb0 == SCMD_MAINTENANCE_IN) &&
 	    ((cdb1 & 0x1F) == 0x0A)) {
 		stmf_scsilib_handle_report_tpgs(task, initial_dbuf);
+		return;
+	}
+
+	/* Report Identifying Information */
+	if ((cdb0 == SCMD_MAINTENANCE_IN) &&
+	    ((cdb1 & 0x1F) == 0x05)) {
+		sbd_handle_identifying_info(task, initial_dbuf);
 		return;
 	}
 

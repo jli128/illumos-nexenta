@@ -6,7 +6,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwsrptr
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-12), sunwkvm (>=5.11.134-12), sunwcsr (>=5.11.134-12), sunwckr (>=5.11.134-12), sunwcnetr (>=5.11.134-12), sunwcsu (>=5.11.134-12), sunwcsd (>=5.11.134-12), sunwcsl (>=5.11.134-12), sunwcar (>=5.11.134-12), sunwstmf (>=5.11.134-12), sunwibdmar (>=5.11.134-12)
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-12), sunwkvm (>=5.11.134-12), sunwcsr (>=5.11.134-100), sunwckr (>=5.11.134-100), sunwcnetr (>=5.11.134-12), sunwcsu (>=5.11.134-100), sunwcsd (>=5.11.134-12), sunwcsl (>=5.11.134-100), sunwcar (>=5.11.134-12), sunwstmf (>=5.11.134-100), sunwibdmar (>=5.11.134-12)
 Description: Sun SRP COMSTAR Port Provider (Root)
  Sun SRP COMSTAR Port Provider (Root)
  .

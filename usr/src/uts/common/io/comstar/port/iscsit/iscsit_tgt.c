@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/cpuvar.h>
@@ -42,8 +41,8 @@
 #include <sys/idm/idm.h>
 
 #define	ISCSIT_TGT_SM_STRINGS
-#include <iscsit.h>
-#include <iscsit_isns.h>
+#include "iscsit.h"
+#include "iscsit_isns.h"
 
 typedef struct {
 	list_node_t		te_ctx_node;
@@ -1231,9 +1230,7 @@ iscsit_tgt_lookup_sess(iscsit_tgt_t *tgt, char *initiator_name,
 
 	result = avl_find(sess_avl, &tmp_sess, &where);
 	if (result != NULL) {
-		iscsit_sess_hold(result);
-		UNLOCK_FOR_SESS_LOOKUP(tgt);
-		return (result);
+		goto found_result;
 	}
 
 	/*
@@ -1245,9 +1242,7 @@ iscsit_tgt_lookup_sess(iscsit_tgt_t *tgt, char *initiator_name,
 	    (strcmp(result->ist_initiator_name, initiator_name) == 0) &&
 	    (memcmp(result->ist_isid, isid, ISCSI_ISID_LEN) == 0) &&
 	    (result->ist_tpgt_tag == tag)) {
-		iscsit_sess_hold(result);
-		UNLOCK_FOR_SESS_LOOKUP(tgt);
-		return (result);
+		goto found_result;
 	}
 
 	result = avl_nearest(sess_avl, where, AVL_AFTER);
@@ -1255,14 +1250,18 @@ iscsit_tgt_lookup_sess(iscsit_tgt_t *tgt, char *initiator_name,
 	    (strcmp(result->ist_initiator_name, initiator_name) == 0) &&
 	    (memcmp(result->ist_isid, isid, ISCSI_ISID_LEN) == 0) &&
 	    (result->ist_tpgt_tag == tag)) {
-		iscsit_sess_hold(result);
-		UNLOCK_FOR_SESS_LOOKUP(tgt);
-		return (result);
+		goto found_result;
 	}
 
-	UNLOCK_FOR_SESS_LOOKUP(tgt);
+	result = NULL;
 
-	return (NULL);
+found_result:
+	if ((result != NULL) &&
+	    (iscsit_sess_check_hold(result) != IDM_STATUS_SUCCESS)) {
+		result = NULL;
+	}
+	UNLOCK_FOR_SESS_LOOKUP(tgt);
+	return (result);
 }
 
 static idm_status_t
@@ -1637,7 +1636,7 @@ iscsit_tpg_modify(iscsit_tpg_t *tpg, it_tpg_t *cfg_tpg)
 
 	for (cfg_portal = cfg_tpg->tpg_portal_list;
 	    cfg_portal != NULL;
-	    cfg_portal = cfg_portal->next) {
+	    cfg_portal = cfg_portal->portal_next) {
 		if ((portal = iscsit_tpg_portal_lookup_locked(tpg,
 		    &cfg_portal->portal_addr)) == NULL) {
 			(void) iscsit_portal_create(tpg,
