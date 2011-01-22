@@ -25,7 +25,7 @@
 
 include ../Makefile.com
 
-DATAFILES += i.manifest r.manifest
+DATAFILES += i.manifest r.manifest i.renamenew
 
 .KEEP_STATE:
 

@@ -39,12 +39,13 @@ i postinstall
 i preremove
 i i.manifest
 i r.manifest
+i i.renamenew
 
 d none kernel 0755 root sys
 d none kernel/drv 0755 root sys
 f none kernel/drv/fct.conf 0644 root sys
 f none kernel/drv/qlt.conf 0644 root sys
-f none kernel/drv/stmf_sbd.conf 0644 root sys
+e renamenew kernel/drv/stmf_sbd.conf 0644 root sys
 f none kernel/drv/stmf.conf 0644 root sys
 f none kernel/drv/pppt.conf 0644 root sys
 d none kernel/kmdb 755 root sys
