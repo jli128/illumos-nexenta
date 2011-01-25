@@ -2,7 +2,7 @@ sunwcsr (5.11.134-100) nexenta; urgency=high
 
   * Issue 3320: svc.configd leaks severely on 'svcadm refresh some-service'
 
- -- Gordon Ross <gordon.ross@nexenta.com> Tue Dec 28 17:14:29 -0500
+ -- Gate Keeper <maintainer@nexenta.com> Tue, 28 Dec 2010 17:14:29 -0500
 
 sunwcsr (5.11.134-13) nexenta; urgency=low
 

@@ -2,7 +2,7 @@ sunwsmbskr (5.11.134-100) nexenta; urgency=high
 
   * Issue 3393: smbsrv overflows kernel stack
 
- -- Gordon Ross <gordon.ross@nexenta.com> Tue Dec 28 16:26:32 2010 -0500
+ -- Gate Keeper <maintainer@nexenta.com> Tue, 28 Dec 2010 16:26:32 -0500
 
 sunwsmbskr (5.11.134-12) nexenta; urgency=low
 
