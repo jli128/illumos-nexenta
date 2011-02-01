@@ -94,21 +94,28 @@ build-stamp:
 	echo 'sunw:Version=$(CORE_BUILD_REVISION)' >> debian/$(PACKAGE).substvars
 	touch $@
 
-unpatch:
-	hg qpop -a
-	rm -rf opensolaris.sh patch-stamp
+# This target needs the patches to be still applied.
+# If patch-stamp is not there, do nothing.
+clobber_on:
+	if test -f patch-stamp -a -d $(GATEROOT) ;then \
+		cd $(GATEROOT) ; \
+		/opt/onbld/bin/bldenv ./opensolaris.sh \
+		  'cd usr/src ; dmake clobber' ;\
+	fi
+
+rm_log_proto:
 	if test -d "onnv-gate/log" ; then \
 			rm -r onnv-gate/log; \
 	else \
 			echo "no logs present"; \
-	fi		
+	fi
 	if test -d "onnv-gate/proto" ; then \
 			rm -r onnv-gate/proto; \
 	else \
 			echo "no proto-dir present"; \
 	fi
 
-clean: unpatch
+clean: clobber_on rm_log_proto
 	dh_testdir
 	dh_testroot
 	dh_clean -d
@@ -116,6 +123,7 @@ clean: unpatch
 		cd $(GATEROOT) ; \
 		hg qpop -a ;  \
 	fi
+	rm -f opensolaris.sh patch-stamp
 	rm -f build-on-stamp build-stamp upload-packages-stamp build-packages-stamp debian/files
 
 

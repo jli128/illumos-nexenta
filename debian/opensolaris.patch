@@ -5,7 +5,7 @@
  #	build and use this workspace's tools in $SRC/tools (-t)
  #
 -NIGHTLY_OPTIONS="-FNnaCDlmrt";		export NIGHTLY_OPTIONS
-+NIGHTLY_OPTIONS="-Nndr";		export NIGHTLY_OPTIONS
++NIGHTLY_OPTIONS="-Nndri";		export NIGHTLY_OPTIONS
 +CW_NO_SHADOW=1; export CW_NO_SHADOW; SUN_PERSONALITY=1; export SUN_PERSONALITY
  
  # This is a variable for the rest of the script - GATE doesn't matter to
