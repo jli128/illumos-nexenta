@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -1078,6 +1079,11 @@ load_cfg_in_state(lookup_state_t *state)
 	state->eph_map_unres_sids = 0;
 	if (_idmapdstate.cfg->pgcfg.eph_map_unres_sids)
 		state->eph_map_unres_sids = 1;
+
+	state->id_cache_timeout =
+	    _idmapdstate.cfg->pgcfg.id_cache_timeout;
+	state->name_cache_timeout =
+	    _idmapdstate.cfg->pgcfg.name_cache_timeout;
 
 	state->directory_based_mapping =
 	    _idmapdstate.cfg->pgcfg.directory_based_mapping;
@@ -3472,12 +3478,13 @@ update_cache_pid2sid(lookup_state_t *state,
 	    "map_type, map_dn, map_attr, map_value, map_windomain, "
 	    "map_winname, map_unixname, map_is_nt4) "
 	    "VALUES(%Q, %u, %Q, %Q, %u, %Q, %d, %d, "
-	    "strftime('%%s','now') + 600, %q, 1, "
+	    "strftime('%%s','now') + %u, %q, 1, "
 	    "%d, %Q, %Q, %Q, %Q, %Q, %Q, %d); ",
 	    res->id.idmap_id_u.sid.prefix, res->id.idmap_id_u.sid.rid,
 	    req->id2domain, req->id2name, req->id1.idmap_id_u.uid,
 	    req->id1name, (req->id1.idtype == IDMAP_UID) ? 1 : 0,
 	    (res->id.idtype == IDMAP_USID) ? 1 : 0,
+	    state->id_cache_timeout,
 	    (res->direction == 0) ? "1" : NULL,
 	    res->info.how.map_type, map_dn, map_attr, map_value,
 	    map_windomain, map_winname, map_unixname, map_is_nt4);
@@ -3505,10 +3512,11 @@ update_cache_pid2sid(lookup_state_t *state,
 
 	sql = sqlite_mprintf("INSERT OR REPLACE into name_cache "
 	    "(sidprefix, rid, canon_name, domain, type, expiration) "
-	    "VALUES(%Q, %u, %Q, %Q, %d, strftime('%%s','now') + 3600); ",
+	    "VALUES(%Q, %u, %Q, %Q, %d, strftime('%%s','now') + %u); ",
 	    res->id.idmap_id_u.sid.prefix, res->id.idmap_id_u.sid.rid,
 	    req->id2name, req->id2domain,
-	    (res->id.idtype == IDMAP_USID) ? _IDMAP_T_USER : _IDMAP_T_GROUP);
+	    (res->id.idtype == IDMAP_USID) ? _IDMAP_T_USER : _IDMAP_T_GROUP,
+	    state->name_cache_timeout);
 
 	if (sql == NULL) {
 		retcode = IDMAP_ERR_INTERNAL;
@@ -3622,13 +3630,14 @@ update_cache_sid2pid(lookup_state_t *state,
 	    "map_type, map_dn, map_attr, map_value, map_windomain, "
 	    "map_winname, map_unixname, map_is_nt4) "
 	    "VALUES(%Q, %u, %Q, %Q, %u, %Q, %d, %d, "
-	    "strftime('%%s','now') + 600, 1, %q, "
+	    "strftime('%%s','now') + %u, 1, %q, "
 	    "%d, %Q, %Q, %Q, %Q, %Q, %Q, %d);",
 	    req->id1.idmap_id_u.sid.prefix, req->id1.idmap_id_u.sid.rid,
 	    (req->id1domain != NULL) ? req->id1domain : "", req->id1name,
 	    res->id.idmap_id_u.uid, req->id2name,
 	    (res->id.idtype == IDMAP_UID) ? 1 : 0,
 	    (req->id1.idtype == IDMAP_USID) ? 1 : 0,
+	    state->id_cache_timeout,
 	    (res->direction == 0) ? "1" : NULL,
 	    res->info.how.map_type, map_dn, map_attr, map_value,
 	    map_windomain, map_winname, map_unixname, map_is_nt4);
@@ -3656,10 +3665,11 @@ update_cache_sid2pid(lookup_state_t *state,
 
 	sql = sqlite_mprintf("INSERT OR REPLACE into name_cache "
 	    "(sidprefix, rid, canon_name, domain, type, expiration) "
-	    "VALUES(%Q, %u, %Q, %Q, %d, strftime('%%s','now') + 3600); ",
+	    "VALUES(%Q, %u, %Q, %Q, %d, strftime('%%s','now') + %u); ",
 	    req->id1.idmap_id_u.sid.prefix, req->id1.idmap_id_u.sid.rid,
 	    req->id1name, req->id1domain,
-	    (req->id1.idtype == IDMAP_USID) ? _IDMAP_T_USER : _IDMAP_T_GROUP);
+	    (req->id1.idtype == IDMAP_USID) ? _IDMAP_T_USER : _IDMAP_T_GROUP,
+	    state->name_cache_timeout);
 
 	if (sql == NULL) {
 		retcode = IDMAP_ERR_INTERNAL;
