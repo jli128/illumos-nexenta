@@ -2,8 +2,10 @@ sunwiscsitr (5.11.134-100) nexenta; urgency=high
 
   * Issue 3660: Significant update to COMSTAR
   * Issue 3832: iscsit responses truncated to 1 PDU
+  * Issue 3833: stmfadm doesn't display target and initiator aliases for
+    iscsit
 
- -- Albert Lee <trisk@nexenta.com>  Wed, 02 Feb 2011 18:01:57 -0500
+ -- Albert Lee <trisk@nexenta.com>  Thu, 03 Feb 2011 14:45:52 -0500
 
 sunwiscsitr (5.11.134-12a) nexenta; urgency=low
 
