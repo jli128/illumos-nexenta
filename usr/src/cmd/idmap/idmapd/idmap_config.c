@@ -20,7 +20,6 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 
@@ -49,14 +48,6 @@
 #define	GENERAL_PG		"general"
 #define	RECONFIGURE		1
 #define	POKE_AUTO_DISCOVERY	2
-
-/*
- * Default cache timeouts.  Can override via svccfg
- * config/id_cache_timeout = count: seconds
- * config/name_cache_timeout = count: seconds
- */
-#define	ID_CACHE_TMO_DEFAULT	600
-#define	NAME_CACHE_TMO_DEFAULT	3600
 
 enum event_type {
 	EVENT_NOTHING,	/* Woke up for no good reason */
@@ -609,22 +600,6 @@ update_bool(boolean_t *value, boolean_t *new, char *name)
 	return (1);
 }
 
-
-/*
- * This function updates a uint64_t value.
- * If nothing has changed it returns 0 else 1
- */
-static int
-update_uint64(uint64_t *value, uint64_t *new, char *name)
-{
-	if (*value == *new)
-		return (0);
-
-	idmapdlog(LOG_INFO, "change %s=%llu", name, *new);
-
-	*value = *new;
-	return (1);
-}
 
 /*
  * This function updates a string value.
@@ -1269,20 +1244,6 @@ idmap_cfg_load_smf(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 	if (rc != 0)
 		(*errors)++;
 
-	rc = get_val_int(handles, "id_cache_timeout",
-	    &pgcfg->id_cache_timeout, SCF_TYPE_COUNT);
-	if (rc != 0)
-		(*errors)++;
-	if (pgcfg->id_cache_timeout == 0)
-		pgcfg->id_cache_timeout = ID_CACHE_TMO_DEFAULT;
-
-	rc = get_val_int(handles, "name_cache_timeout",
-	    &pgcfg->name_cache_timeout, SCF_TYPE_COUNT);
-	if (rc != 0)
-		(*errors)++;
-	if (pgcfg->name_cache_timeout == 0)
-		pgcfg->name_cache_timeout = NAME_CACHE_TMO_DEFAULT;
-
 	rc = get_val_astring(handles, "domain_name",
 	    &pgcfg->domain_name);
 	if (rc != 0)
@@ -1650,17 +1611,13 @@ idmap_cfg_load(idmap_cfg_t *cfg, int flags)
 		idmap_cfg_discover(&cfg->handles, &new_pgcfg);
 
 	WRLOCK_CONFIG();
+	if (live_pgcfg->list_size_limit != new_pgcfg.list_size_limit) {
+		idmapdlog(LOG_INFO, "change list_size=%d",
+		    new_pgcfg.list_size_limit);
+		live_pgcfg->list_size_limit = new_pgcfg.list_size_limit;
+	}
+
 	/* Non-discoverable props updated here */
-
-	changed += update_uint64(&live_pgcfg->list_size_limit,
-	    &new_pgcfg.list_size_limit, "list_size_limit");
-
-	changed += update_uint64(&live_pgcfg->id_cache_timeout,
-	    &new_pgcfg.id_cache_timeout, "id_cache_timeout");
-
-	changed += update_uint64(&live_pgcfg->name_cache_timeout,
-	    &new_pgcfg.name_cache_timeout, "name_cache_timeout");
-
 	changed += update_string(&live_pgcfg->machine_sid,
 	    &new_pgcfg.machine_sid, "machine_sid");
 
