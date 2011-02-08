@@ -2,8 +2,9 @@ sunwcsr (5.11.134-100) nexenta; urgency=low
 
   * Issue 3320: svc.configd leaks severely on 'svcadm refresh some-service'
   * Issue 3726: backport 6859862 Move pfexec into the kernel (partial)
+  * Issue 3868: AD connectivitiy diagnostics
 
- -- Gate Keeper <maintainer@nexenta.com> Tue, 25 Jan 2011 15:31:10 -0500
+ -- Gate Keeper <maintainer@nexenta.com> Fri, 04 Feb 2011 16:26:32 -0500
 
 sunwcsr (5.11.134-13) nexenta; urgency=low
 
