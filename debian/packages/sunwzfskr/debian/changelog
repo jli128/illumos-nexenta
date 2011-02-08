@@ -33,8 +33,9 @@ sunwzfskr (5.11.134-100) nexenta; urgency=high
   * Issue 3451: read only zpools
   * Issue 3617: zdb -vvv regression from zfs diff
   * Issue 3726: backport 6859862 Move pfexec into the kernel
+  * Issue 3886: zfs_putpage() optimization
 
- -- Nexenta Systems <support@nexenta.com>  Fri, 28 Jan 2011 15:27:52 -0500
+ -- Nexenta Systems <support@nexenta.com>  Mon, 07 Feb 2011 23:51:30 -0800
 
 sunwzfskr (5.11.134-13) nexenta; urgency=low
 
