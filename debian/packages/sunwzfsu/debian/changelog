@@ -1,8 +1,9 @@
-sunwzfsu (5.11.134-100) nexenta; urgency=low
+sunwzfsu (5.11.134-100) nexenta; urgency=high
 
   * Issue 2626: Fix for zfs panic in dmu_objset_stat
+  * Issue 3888: backport 6942439 Sporadic complete I/O halts
 
- -- Vineeth Pillai <vineeth@nexenta.com>  Fri, 01 Oct 2010 23:23:40 +0530
+ -- Nexenta Systems <support@nexenta.com>  Tue, 08 Feb 2011 14:42:39 -0800
 
 sunwzfsu (5.11.134-12) nexenta; urgency=low
 

@@ -1,10 +1,11 @@
-sunwckr (5.11.134-100) nexenta; urgency=low
+sunwckr (5.11.134-100) nexenta; urgency=high
 
   * Issue 3238: backport dnode related improvements
   * Issue 3449: zfs diff
   * Issue 3726: backport 6859862 Move pfexec into the kernel
+  * Issue 3888: backport 6942439 Sporadic complete I/O halts
 
- -- Nexenta Systems <support@nexenta.com>  Fri, 28 Jan 2011 15:21:11 -0500
+ -- Nexenta Systems <support@nexenta.com>  Tue, 08 Feb 2011 14:40:38 -0800
 
 sunwckr (5.11.134-12a) nexenta; urgency=low
 
