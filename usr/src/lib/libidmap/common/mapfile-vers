@@ -58,7 +58,6 @@ SUNWprivate {
 	directory_sid_from_group_name;
 	directory_sid_from_name;
 	directory_sid_from_user_name;
-	idmap_cache_get_data;
 	idmap_fini;
 	idmap_flush;
 	idmap_free;
@@ -108,7 +107,6 @@ SUNWprivate {
 	idmap_udt_get_error_index;
 	idmap_udt_get_error_rule;
 	idmap_udt_rm_namerule;
-	memdup;
 	sid_free;
 	sid_from_le;
 	sid_fromstr;
@@ -118,9 +116,6 @@ SUNWprivate {
 	sized_array;
 	sized_array_free;
 	sized_array_n;
-	strcaseeq;
-	streq;
-	strndup;
 	xdr_directory_entry_rpc;
 	xdr_directory_get_common_1_argument;
 	xdr_directory_results_rpc;

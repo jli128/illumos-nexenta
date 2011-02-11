@@ -2,8 +2,9 @@ sunwsmbsu (5.11.134-100) nexenta; urgency=high
 
   * Issue 2611: Fix memory leak in smbd/libsmb smb_idmap_getsid
   * Issue 3868: AD connectivitiy diagnostics
+  * Issue 3901: backport 6952831 SMB level II oplocks (etc.)
 
- -- Gate Keeper <maintainer@nexenta.com> Fri, 04 Feb 2011 16:26:32 -0500
+ -- Gate Keeper <maintainer@nexenta.com> Thu, 10 Feb 2011 11:59:15 -0500
 
 sunwsmbsu (5.11.134-12) nexenta; urgency=low
 

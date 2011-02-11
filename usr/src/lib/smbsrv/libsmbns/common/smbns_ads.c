@@ -1837,7 +1837,6 @@ smb_ads_computer_op(smb_ads_handle_t *ah, int op, int dclevel, char *dn)
 	attrs[++j]->mod_op = op;
 	attrs[j]->mod_type = SMB_ADS_ATTR_CTL;
 	usrctl_flags |= (SMB_ADS_USER_ACCT_CTL_WKSTATION_TRUST_ACCT |
-	    SMB_ADS_USER_ACCT_CTL_PASSWD_NOTREQD |
 	    SMB_ADS_USER_ACCT_CTL_ACCOUNTDISABLE);
 	(void) snprintf(usrctl_buf, sizeof (usrctl_buf), "%d", usrctl_flags);
 	ctl_val[0] = usrctl_buf;

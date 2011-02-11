@@ -585,7 +585,7 @@ libdtrace_jni:	libuutil libdtrace
 libefi:		libuuid
 libfstyp:	libnvpair
 libelfsign:	libcryptoutil libkmf
-libidmap:	libadutils libldap5 libavl libsldap
+libidmap:	libadutils libldap5 libavl libsldap libuutil
 libinetcfg:	libnsl libsocket libdlpi
 libiscsit:	libc libnvpair libstmf libuuid libnsl
 libkmf:		libcryptoutil pkcs11

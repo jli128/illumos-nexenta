@@ -96,10 +96,6 @@
 			name='value_authorization'
 			type='astring'
 			value='solaris.smf.value.idmap' />
-		<propval
-			name='unresolvable_sid_mapping'
-			type='boolean'
-			value='true' />
 	</property_group>
 
 	<property_group name='debug' type='application' >
@@ -114,6 +110,10 @@
 			name='value_authorization'
 			type='astring'
 			value='solaris.smf.value.idmap' />
+		<propval
+			name='unresolvable_sid_mapping'
+			type='boolean'
+			value='true' />
 	</property_group>
 
 	<stability value='Unstable' />

@@ -67,6 +67,7 @@ SUNWprivate_1.1 {
 	uu_dprintf_create;
 	uu_dprintf_destroy;
 	uu_dprintf_getname;
+	uu_dump;
 	uu_error;
 	uu_exit_fatal;
 	uu_exit_ok;
@@ -96,11 +97,16 @@ SUNWprivate_1.1 {
 	uu_list_walk_end;
 	uu_list_walk_next;
 	uu_list_walk_start;
+	uu_memdup;
 	uu_msprintf;
 	uu_open_tmp;
 	uu_setpname;
+	uu_strbw;
+	uu_strcaseeq;
 	uu_strdup;
+	uu_streq;
 	uu_strerror;
+	uu_strndup;
 	uu_strtoint;
 	uu_strtouint;
 	uu_vdie;

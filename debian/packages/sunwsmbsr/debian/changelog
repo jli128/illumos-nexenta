@@ -1,3 +1,10 @@
+sunwsmbsr (5.11.134-100) nexenta; urgency=high
+
+  * Issue 3868: AD connectivitiy diagnostics
+  * Issue 3901: backport 6952831 SMB level II oplocks (etc.)
+
+ -- Gate Keeper <maintainer@nexenta.com> Thu, 10 Feb 2011 11:59:15 -0500
+
 sunwsmbsr (5.11.134-12) nexenta; urgency=low
 
   * Synchronized with OpenSolaris code (5.11 build 134)
