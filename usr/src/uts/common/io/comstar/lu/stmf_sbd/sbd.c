@@ -20,6 +20,8 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ *
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/conf.h>
@@ -83,7 +85,8 @@ int sbd_get_global_props(sbd_global_props_t *oslp, uint32_t oslp_sz,
     uint32_t *err_ret);
 int sbd_get_lu_props(sbd_lu_props_t *islp, uint32_t islp_sz,
     sbd_lu_props_t *oslp, uint32_t oslp_sz, uint32_t *err_ret);
-char *sbd_get_zvol_name(sbd_lu_t *sl);
+static int sbd_get_unmap_props(sbd_unmap_props_t *sup, sbd_unmap_props_t *osup,
+    uint32_t *err_ret);
 sbd_status_t sbd_create_zfs_meta_object(sbd_lu_t *sl);
 sbd_status_t sbd_open_zfs_meta(sbd_lu_t *sl);
 sbd_status_t sbd_read_zfs_meta(sbd_lu_t *sl, uint8_t *buf, uint64_t sz,
@@ -96,6 +99,8 @@ int sbd_zvolget(char *zvol_name, char **comstarprop);
 int sbd_zvolset(char *zvol_name, char *comstarprop);
 char sbd_ctoi(char c);
 void sbd_close_lu(sbd_lu_t *sl);
+static nvlist_t *sbd_zvol_get_props(char *zvol_name);
+static int sbd_zvol_set_props(char *zvol_name, nvlist_t *nv);
 
 static ldi_ident_t	sbd_zfs_ident;
 static stmf_lu_provider_t *sbd_lp;
@@ -447,6 +452,18 @@ stmf_sbd_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
 		mutex_exit(&sbd_lock);
 		ret = 0;
 		iocd->stmf_error = 0;
+		break;
+	case SBD_IOCTL_GET_UNMAP_PROPS:
+		if (iocd->stmf_ibuf_size < sizeof (sbd_unmap_props_t)) {
+			ret = EFAULT;
+			break;
+		}
+		if (iocd->stmf_obuf_size < sizeof (sbd_unmap_props_t)) {
+			ret = EINVAL;
+			break;
+		}
+		ret = sbd_get_unmap_props((sbd_unmap_props_t *)ibuf,
+		    (sbd_unmap_props_t *)obuf, &iocd->stmf_error);
 		break;
 	default:
 		ret = ENOTTY;
@@ -1372,11 +1389,67 @@ sbd_write_lu_info(sbd_lu_t *sl)
 	return (ret);
 }
 
+/*
+ * Will scribble SL_UNMAP_ENABLED into sl_flags if we succeed.
+ */
+static void
+do_unmap_setup(sbd_lu_t *sl)
+{
+	char *file = NULL;
+	nvlist_t *nv = NULL, *nv2 = NULL;
+	boolean_t already_compressing;
+	uint64_t val;
+
+	ASSERT((sl->sl_flags & SL_UNMAP_ENABLED) == 0);
+
+	if ((sl->sl_flags & SL_ZFS_META) == 0)
+		return;	/* No UNMAP for you. */
+
+	file = sbd_get_zvol_name(sl);
+	if (file == NULL) {
+		cmn_err(CE_WARN, "sbd has zfs meta but no zvol name");
+		return;	/* No UNMAP for you. */
+	}
+	nv = sbd_zvol_get_props(file);
+	if (nv == NULL) {
+		cmn_err(CE_WARN, "unable to get zvol props");
+		kmem_free(file, strlen(file) + 1);
+		return;	/* No UNMAP for you. */
+	}
+
+	/* See if compression is supported, but turned off on this dataset. */
+	if (nvlist_lookup_nvlist(nv, "compression", &nv2) == 0 &&
+	    nvlist_lookup_uint64(nv2, ZPROP_VALUE, &val) == 0) {
+		already_compressing = (val != ZIO_COMPRESS_OFF);
+	} else {
+		cmn_err(CE_WARN, "prop lookup for compression failed");
+		already_compressing = B_FALSE;
+	}
+
+	sl->sl_flags |= SL_UNMAP_ENABLED;
+	if (!already_compressing) {
+		nvlist_free(nv);
+		nv = NULL;
+		if (nvlist_alloc(&nv, NV_UNIQUE_NAME, KM_SLEEP) != 0 ||
+		    nvlist_add_uint64(nv, "compression", ZIO_COMPRESS_ZLE) != 0 ||
+		    sbd_zvol_set_props(file, nv)) {
+			cmn_err(CE_WARN, "Setting zle compression "
+			    "failed for zvol %s", file);
+		}
+	}
+
+	if (nv != NULL)	/* In case the nvlist_alloc() right above us failed. */
+		nvlist_free(nv);
+	kmem_free(file, strlen(file) + 1);
+}
+
 int
 sbd_populate_and_register_lu(sbd_lu_t *sl, uint32_t *err_ret)
 {
 	stmf_lu_t *lu = sl->sl_lu;
 	stmf_status_t ret;
+
+	do_unmap_setup(sl);
 
 	lu->lu_id = (scsi_devid_desc_t *)sl->sl_device_id;
 	if (sl->sl_alias) {
@@ -3135,6 +3208,46 @@ sbd_get_global_props(sbd_global_props_t *oslp, uint32_t oslp_sz,
 	return (0);
 }
 
+static int
+sbd_get_unmap_props(sbd_unmap_props_t *sup,
+    sbd_unmap_props_t *osup, uint32_t *err_ret)
+{
+	sbd_status_t sret;
+	sbd_lu_t *sl = NULL;
+
+	if (sup->sup_guid_valid) {
+		sret = sbd_find_and_lock_lu(sup->sup_guid,
+		    NULL, SL_OP_LU_PROPS, &sl);
+	} else {
+		sret = sbd_find_and_lock_lu(NULL,
+		    (uint8_t *)sup->sup_zvol_path, SL_OP_LU_PROPS,
+		    &sl);
+	}
+	if (sret != SBD_SUCCESS) {
+		if (sret == SBD_BUSY) {
+			*err_ret = SBD_RET_LU_BUSY;
+			return (EBUSY);
+		} else if (sret == SBD_NOT_FOUND) {
+			*err_ret = SBD_RET_NOT_FOUND;
+			return (ENOENT);
+		}
+		return (EIO);
+	}
+
+	sup->sup_found_lu = 1;
+	sup->sup_guid_valid = 1;
+	bcopy(sl->sl_device_id + 4, sup->sup_guid, 16);
+	if (sl->sl_flags & SL_UNMAP_ENABLED)
+		sup->sup_unmap_enabled = 1;
+	else
+		sup->sup_unmap_enabled = 0;
+
+	*osup = *sup;
+	sl->sl_trans_op = SL_OP_NONE;
+
+	return (0);
+}
+
 int
 sbd_get_lu_props(sbd_lu_props_t *islp, uint32_t islp_sz,
     sbd_lu_props_t *oslp, uint32_t oslp_sz, uint32_t *err_ret)
@@ -3623,6 +3736,90 @@ sbd_zvolset(char *zvol_name, char *comstarprop)
 		kmem_free(packed, len);
 out:
 	nvlist_free(nv);
+	(void) ldi_close(zfs_lh, FREAD|FWRITE, kcred);
+	return (rc);
+}
+
+static nvlist_t *
+sbd_zvol_get_props(char *zvol_name)
+{
+	ldi_handle_t	zfs_lh;
+	nvlist_t	*nv = NULL;
+	zfs_cmd_t	*zc;
+	int size = 4096;
+	int unused;
+	int rc;
+
+	if ((rc = ldi_open_by_name("/dev/zfs", FREAD | FWRITE, kcred,
+	    &zfs_lh, sbd_zfs_ident)) != 0) {
+		cmn_err(CE_WARN, "ldi_open %d", rc);
+		return (NULL);
+	}
+
+	zc = kmem_zalloc(sizeof (zfs_cmd_t), KM_SLEEP);
+	(void) strlcpy(zc->zc_name, zvol_name, sizeof (zc->zc_name));
+szg_again:
+	zc->zc_nvlist_dst = (uint64_t)(intptr_t)kmem_alloc(size,
+	    KM_SLEEP);
+	zc->zc_nvlist_dst_size = size;
+	rc = ldi_ioctl(zfs_lh, ZFS_IOC_OBJSET_STATS, (intptr_t)zc,
+	    FKIOCTL, kcred, &unused);
+	/*
+	 * ENOMEM means the list is larger than what we've allocated
+	 * ldi_ioctl will fail with ENOMEM only once
+	 */
+	if (rc == ENOMEM) {
+		int newsize;
+		newsize = zc->zc_nvlist_dst_size;
+		kmem_free((void *)(uintptr_t)zc->zc_nvlist_dst, size);
+		size = newsize;
+		goto szg_again;
+	} else if (rc != 0) {
+		goto szg_out;
+	}
+	rc = nvlist_unpack((char *)(uintptr_t)zc->zc_nvlist_dst,
+	    zc->zc_nvlist_dst_size, &nv, 0);
+	ASSERT(rc == 0);	/* nvlist_unpack should not fail */
+szg_out:
+	kmem_free((void *)(uintptr_t)zc->zc_nvlist_dst, size);
+	kmem_free(zc, sizeof (zfs_cmd_t));
+	(void) ldi_close(zfs_lh, FREAD|FWRITE, kcred);
+
+	return (nv);
+}
+
+static int
+sbd_zvol_set_props(char *zvol_name, nvlist_t *nv)
+{
+	ldi_handle_t	zfs_lh;
+	char		*packed = NULL;
+	size_t		len;
+	zfs_cmd_t	*zc;
+	int unused;
+	int rc;
+
+	if ((rc = ldi_open_by_name("/dev/zfs", FREAD | FWRITE, kcred,
+	    &zfs_lh, sbd_zfs_ident)) != 0) {
+		cmn_err(CE_WARN, "ldi_open %d", rc);
+		return (ENXIO);
+	}
+	if ((rc = nvlist_pack(nv, &packed, &len, NV_ENCODE_NATIVE, KM_SLEEP))) {
+		goto szs_out;
+	}
+
+	zc = kmem_zalloc(sizeof (zfs_cmd_t), KM_SLEEP);
+	(void) strlcpy(zc->zc_name, zvol_name, sizeof (zc->zc_name));
+	zc->zc_nvlist_src = (uint64_t)(intptr_t)packed;
+	zc->zc_nvlist_src_size = len;
+	rc = ldi_ioctl(zfs_lh, ZFS_IOC_SET_PROP, (intptr_t)zc,
+	    FKIOCTL, kcred, &unused);
+	if (rc != 0) {
+		cmn_err(CE_NOTE, "ioctl failed %d", rc);
+	}
+	kmem_free(zc, sizeof (zfs_cmd_t));
+	if (packed)
+		kmem_free(packed, len);
+szs_out:
 	(void) ldi_close(zfs_lh, FREAD|FWRITE, kcred);
 	return (rc);
 }

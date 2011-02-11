@@ -4,8 +4,9 @@ sunwstmf (5.11.134-100) nexenta; urgency=high
   * Issue 3417: backport several ZIL related fixes
   * Issue 3660: Significant update to COMSTAR
   * Issue 3218: sbd serial number not preserved by stmf upgrades
+  * Issue 2482: COMSTAR SCSI UNMAP
 
- -- Albert Lee <trisk@nexenta.com>  Fri, 21 Jan 2011 21:00:00 -0500
+ -- Nexenta Systems <support@nexenta.com>  Fri, 11 Feb 2011 06:41:28 -0800
 
 sunwstmf (5.11.134-12) nexenta; urgency=low
 

@@ -1,8 +1,9 @@
 sunwhea (5.11.134-100) nexenta; urgency=low
 
-  *  Issue 3446: zpool cannot replace a replacing device
+  * Issue 3446: zpool cannot replace a replacing device
+  * Issue 2842: COMSTAR SCSI UNMAP
 
- -- Nexenta Systems <support@nexenta.com>  Fri, 24 Dec 2010 16:05:39 -0800
+ -- Nexenta Systems <support@nexenta.com>  Fri, 11 Feb 2011 06:40:36 -0800
 
 sunwhea (5.11.134-12) nexenta; urgency=low
 
