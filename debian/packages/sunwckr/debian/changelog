@@ -4,8 +4,9 @@ sunwckr (5.11.134-100) nexenta; urgency=high
   * Issue 3449: zfs diff
   * Issue 3726: backport 6859862 Move pfexec into the kernel
   * Issue 3888: backport 6942439 Sporadic complete I/O halts
+  * Issue 3914: backport several NFS fixes
 
- -- Nexenta Systems <support@nexenta.com>  Tue, 08 Feb 2011 14:40:38 -0800
+ -- Nexenta Systems <support@nexenta.com>  Wed, 09 Feb 2011 15:21:11 -0500
 
 sunwckr (5.11.134-12a) nexenta; urgency=low
 

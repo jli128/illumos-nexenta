@@ -2,8 +2,9 @@ sunwcsu (5.11.134-100) nexenta; urgency=low
 
   * Issue 2636 lofiadm/pktool changes for ZFS crypto over lofi devices.
   * Issue 677: Allow adjustment of cache timeout in idmapd
+  * Issue 3914: backport several NFS fixes
 
- -- Gate Keeper <maintainer@nexenta.com>  Wed, 02 Feb 2011 11:59:15 -0500
+ -- Gate Keeper <maintainer@nexenta.com>  Wed, 09 Feb 2011 15:59:15 -0500
 
 sunwcsu (5.11.134-13) nexenta; urgency=low
 

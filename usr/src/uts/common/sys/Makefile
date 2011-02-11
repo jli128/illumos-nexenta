@@ -429,6 +429,7 @@ CHKHDRS=			\
 	pg.h			\
 	pghw.h			\
 	physmem.h		\
+	pkp_hash.h		\
 	pm.h			\
 	policy.h		\
 	poll.h			\
