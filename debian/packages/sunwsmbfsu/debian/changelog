@@ -1,4 +1,4 @@
-sunwcsu (5.11.134-100) nexenta; urgency=low
+sunwsmbfsu (5.11.134-100) nexenta; urgency=low
 
   * Issue 3846: need smbfs backports
 

@@ -116,7 +116,6 @@ smb_com_open_print_file(smb_request_t *sr)
 		    ERRDOS, ERROR_BAD_DEV_TYPE);
 		return (SDRC_ERROR);
 	}
-
 	if ((rc = smb_common_create(sr)) != NT_STATUS_SUCCESS) {
 		cmn_err(CE_WARN, "smb_com_open_print_file: error rc=%d", rc);
 		return (SDRC_ERROR);

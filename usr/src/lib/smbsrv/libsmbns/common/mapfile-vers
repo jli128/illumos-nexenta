@@ -40,6 +40,7 @@
 SUNWprivate {
     global:
 	dyndns_clear_zones;
+	dyndns_publisher;
 	dyndns_start;
 	dyndns_stop;
 	dyndns_update;

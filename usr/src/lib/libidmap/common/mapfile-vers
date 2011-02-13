@@ -58,7 +58,7 @@ SUNWprivate {
 	directory_sid_from_group_name;
 	directory_sid_from_name;
 	directory_sid_from_user_name;
-	idmap_fini;
+	idmap_cache_get_data;		# used by idmap test suite
 	idmap_flush;
 	idmap_free;
 	idmap_get_create;
@@ -85,7 +85,6 @@ SUNWprivate {
 	idmap_how_clear;
 	idmap_info_free;
 	idmap_info_mov;
-	idmap_init;
 	idmap_iter_destroy;
 	idmap_iter_mappings;
 	idmap_iter_namerules;

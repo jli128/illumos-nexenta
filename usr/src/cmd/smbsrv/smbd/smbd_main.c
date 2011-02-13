@@ -49,10 +49,6 @@
 #include <pwd.h>
 #include <grp.h>
 
-#ifdef	ENABLE_SPOOLSS
-#include <cups/cups.h>
-#endif
-
 #include <smbsrv/smb_door.h>
 #include <smbsrv/smb_ioctl.h>
 #include <smbsrv/string.h>
@@ -61,15 +57,10 @@
 #include <smbsrv/libmlsvc.h>
 #include "smbd.h"
 
-#define	SMB_CUPS_DOCNAME "generic_doc"
+#define	SMBD_ONLINE_WAIT_INTERVAL	10
+#define	SMBD_REFRESH_INTERVAL		10
 #define	DRV_DEVICE_PATH	"/devices/pseudo/smbsrv@0:smbsrv"
 #define	SMB_DBDIR "/var/smb"
-#define	SMB_SPOOL_WAIT 2
-
-static void *smbd_nbt_listener(void *);
-static void *smbd_tcp_listener(void *);
-static void *smbd_nbt_receiver(void *);
-static void *smbd_tcp_receiver(void *);
 
 static int smbd_daemonize_init(void);
 static void smbd_daemonize_fini(int, int);
@@ -89,40 +80,20 @@ static void smbd_report(const char *fmt, ...);
 static void smbd_sig_handler(int sig);
 
 static int32_t smbd_gmtoff(void);
-static int smbd_localtime_init(void);
+static void smbd_localtime_init(void);
 static void *smbd_localtime_monitor(void *arg);
 
-static pthread_t localtime_thr;
-
-#ifdef	ENABLE_SPOOLSS
-static int smbd_spool_init(void);
-static void *smbd_spool_monitor(void *arg);
-static pthread_t smbd_spool_thr;
-#endif
+static void smbd_dyndns_init(void);
+static void smbd_load_shares(void);
 
 static int smbd_refresh_init(void);
 static void smbd_refresh_fini(void);
 static void *smbd_refresh_monitor(void *);
-static void smbd_refresh_dc(void);
 
-static void *smbd_nbt_receiver(void *);
-static void *smbd_nbt_listener(void *);
-
-static void *smbd_tcp_receiver(void *);
-static void *smbd_tcp_listener(void *);
-
-static int smbd_start_listeners(void);
-static void smbd_stop_listeners(void);
 static int smbd_kernel_start(void);
 
-static void smbd_fatal_error(const char *);
-
-static pthread_t refresh_thr;
 static pthread_cond_t refresh_cond;
 static pthread_mutex_t refresh_mutex;
-
-static cond_t listener_cv;
-static mutex_t listener_mutex;
 
 /*
  * Mutex to ensure that smbd_service_fini() and smbd_service_init()
@@ -500,10 +471,14 @@ smbd_service_init(void)
 	smbd.s_loghd = smb_log_create(SMBD_LOGSIZE, SMBD_LOGNAME);
 	smb_codepage_init();
 
+	rc = smbd_cups_init();
+	if (smb_config_getbool(SMB_CI_PRINT_ENABLE))
+		smbd_report("print service %savailable", (rc == 0) ? "" : "un");
+
 	if (smbd_nicmon_start(SMBD_DEFAULT_INSTANCE_FMRI) != 0)
 		smbd_report("NIC monitor failed to start");
 
-	(void) dyndns_start();
+	smbd_dyndns_init();
 	smb_ipc_init();
 
 	if (smb_netbios_start() != 0)
@@ -521,16 +496,15 @@ smbd_service_init(void)
 		}
 	}
 
-	smb_ads_init();
+	if (smbd_dc_monitor_init() != 0)
+		smbd_report("DC monitor initialization failed %s",
+		    strerror(errno));
+
 	if (mlsvc_init() != 0) {
 		smbd_report("msrpc initialization failed");
 		(void) mutex_unlock(&smbd_service_mutex);
 		return (-1);
 	}
-
-	if (smbd.s_secmode == SMB_SECMODE_DOMAIN)
-		if (smbd_locate_dc_start() != 0)
-			smbd_report("dc discovery failed %s", strerror(errno));
 
 	smbd.s_door_srv = smbd_door_start();
 	smbd.s_door_opipe = smbd_opipe_start();
@@ -546,7 +520,7 @@ smbd_service_init(void)
 	}
 
 	dyndns_update_zones();
-	(void) smbd_localtime_init();
+	smbd_localtime_init();
 	(void) smb_lgrp_start();
 	smb_pwd_init(B_TRUE);
 
@@ -565,21 +539,8 @@ smbd_service_init(void)
 		return (-1);
 	}
 
-	if (smb_shr_load() != 0) {
-		smbd_report("failed to start loading shares: %s",
-		    strerror(errno));
-		(void) mutex_unlock(&smbd_service_mutex);
-		return (-1);
-	}
-
-#ifdef	ENABLE_SPOOLSS
-	if (smbd_spool_init() != 0) {
-		smbd_report("failed to start print monitor: %s",
-		    strerror(errno));
-		(void) mutex_unlock(&smbd_service_mutex);
-		return (-1);
-	}
-#endif
+	smbd_load_shares();
+	smbd_load_printers();
 
 	smbd.s_initialized = B_TRUE;
 	smbd_report("service initialized");
@@ -630,8 +591,8 @@ smbd_service_fini(void)
 	smb_pwd_fini();
 	smb_domain_fini();
 	mlsvc_fini();
-	smb_ads_fini();
 	smb_netbios_stop();
+	smbd_cups_fini();
 
 	smbd.s_initialized = B_FALSE;
 	smbd_report("service terminated");
@@ -661,9 +622,13 @@ smbd_refresh_init()
 
 	(void) pthread_attr_init(&tattr);
 	(void) pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
-	rc = pthread_create(&refresh_thr, &tattr, smbd_refresh_monitor, 0);
+	rc = pthread_create(&smbd.s_refresh_tid, &tattr, smbd_refresh_monitor,
+	    NULL);
 	(void) pthread_attr_destroy(&tattr);
 
+	if (rc != 0)
+		smbd_report("unable to start refresh monitor: %s",
+		    strerror(errno));
 	return (rc);
 }
 
@@ -675,28 +640,29 @@ smbd_refresh_init()
 static void
 smbd_refresh_fini()
 {
-	if (pthread_self() != refresh_thr) {
-		(void) pthread_cancel(refresh_thr);
+	if ((pthread_self() != smbd.s_refresh_tid) &&
+	    (smbd.s_refresh_tid != 0)) {
+		(void) pthread_cancel(smbd.s_refresh_tid);
 		(void) pthread_cond_destroy(&refresh_cond);
 		(void) pthread_mutex_destroy(&refresh_mutex);
 	}
 }
 
 /*
- * smbd_refresh_monitor()
- *
- * Wait for a refresh event. When this thread wakes up, update the
- * smbd configuration from the SMF config information then go back to
- * wait for the next refresh.
+ * Wait for refresh events.  When woken up, update the smbd configuration
+ * from SMF and check for changes that require service reconfiguration.
+ * Throttling is applied to coallesce multiple refresh events when the
+ * service is being refreshed repeatedly.
  */
 /*ARGSUSED*/
 static void *
 smbd_refresh_monitor(void *arg)
 {
-	smb_kmod_cfg_t	cfg;
-	int		error;
+	smbd_online_wait("smbd_refresh_monitor");
 
 	while (!smbd.s_shutting_down) {
+		(void) sleep(SMBD_REFRESH_INTERVAL);
+
 		(void) pthread_mutex_lock(&refresh_mutex);
 		while ((atomic_swap_uint(&smbd.s_refreshes, 0) == 0) &&
 		    (!smbd.s_shutting_down))
@@ -710,81 +676,30 @@ smbd_refresh_monitor(void *arg)
 
 		(void) mutex_lock(&smbd_service_mutex);
 
-		/*
-		 * We've been woken up by a refresh event so go do
-		 * what is necessary.
-		 */
-		smb_ads_refresh();
+		smbd_dc_monitor_refresh();
 		smb_ccache_remove(SMB_CCACHE_PATH);
 
 		/*
-		 * Start the dyndns thread, if required.
 		 * Clear the DNS zones for the existing interfaces
 		 * before updating the NIC interface list.
 		 */
-		(void) dyndns_start();
 		dyndns_clear_zones();
 
 		if (smbd_nicmon_refresh() != 0)
 			smbd_report("NIC monitor refresh failed");
+
 		smb_netbios_name_reconfig();
 		smb_browser_reconfig();
-		smbd_refresh_dc();
 		dyndns_update_zones();
+		(void) smbd_kernel_bind();
+		smbd_load_shares();
+		smbd_load_printers();
 
 		(void) mutex_unlock(&smbd_service_mutex);
-
-		if (smbd_set_netlogon_cred()) {
-			/*
-			 * Restart required because the domain changed
-			 * or the credential chain setup failed.
-			 */
-			if (smb_smf_restart_service() != 0) {
-				syslog(LOG_ERR,
-				    "unable to restart smb/server. "
-				    "Run 'svcs -xv smb/server' for more "
-				    "information.");
-				smbd_service_fini();
-				/*NOTREACHED*/
-			}
-
-			break;
-		}
-
-		if (!smbd.s_kbound) {
-			if ((error = smbd_kernel_bind()) == 0)
-				(void) smb_shr_load();
-
-			continue;
-		}
-
-		(void) smb_shr_load();
-
-		smb_load_kconfig(&cfg);
-		error = smb_kmod_setcfg(&cfg);
-		if (error < 0)
-			smbd_report("configuration update failed: %s",
-			    strerror(error));
 	}
 
+	smbd.s_refresh_tid = 0;
 	return (NULL);
-}
-
-/*
- * Update DC information on a refresh.
- */
-static void
-smbd_refresh_dc(void)
-{
-	char fqdomain[MAXHOSTNAMELEN];
-	if (smb_config_get_secmode() != SMB_SECMODE_DOMAIN)
-		return;
-
-	if (smb_getfqdomainname(fqdomain, MAXHOSTNAMELEN))
-		return;
-
-	if (!smb_locate_dc(fqdomain, "", NULL))
-		smbd_report("DC refresh failed");
 }
 
 void
@@ -812,6 +727,23 @@ boolean_t
 smbd_online(void)
 {
 	return (smbd.s_initialized && !smbd.s_shutting_down);
+}
+
+/*
+ * Wait until the service is online.  Provided for threads that
+ * should wait until the service has been fully initialized before
+ * they start performing operations.
+ */
+void
+smbd_online_wait(const char *text)
+{
+	while (!smbd_online())
+		(void) sleep(SMBD_ONLINE_WAIT_INTERVAL);
+
+	if (text != NULL) {
+		smb_log(smbd.s_loghd, LOG_DEBUG, "%s: online", text);
+		(void) fprintf(stderr, "%s: online\n", text);
+	}
 }
 
 /*
@@ -845,14 +777,26 @@ smbd_already_running(void)
 /*
  * smbd_kernel_bind
  *
- * This function open the smbsrv device and start the kernel service.
+ * If smbsrv is already bound, reload the configuration and update smbsrv.
+ * Otherwise, open the smbsrv device and start the kernel service.
  */
 static int
 smbd_kernel_bind(void)
 {
-	int rc;
+	smb_kmod_cfg_t	cfg;
+	int		rc;
 
-	smbd_kernel_unbind();
+	if (smbd.s_kbound) {
+		smb_load_kconfig(&cfg);
+		rc = smb_kmod_setcfg(&cfg);
+		if (rc < 0)
+			smbd_report("kernel configuration update failed: %s",
+			    strerror(errno));
+		return (rc);
+	}
+
+	if (smb_kmod_isbound())
+		smbd_kernel_unbind();
 
 	if ((rc = smb_kmod_bind()) == 0) {
 		rc = smbd_kernel_start();
@@ -884,13 +828,11 @@ smbd_kernel_start(void)
 
 	rc = smb_kmod_start(smbd.s_door_opipe, smbd.s_door_lmshr,
 	    smbd.s_door_srv);
+
 	if (rc != 0)
 		return (rc);
 
-	rc = smbd_start_listeners();
-	if (rc != 0)
-		return (rc);
-
+	smbd_spool_init();
 	return (0);
 }
 
@@ -900,99 +842,80 @@ smbd_kernel_start(void)
 static void
 smbd_kernel_unbind(void)
 {
-	smbd_stop_listeners();
+	smbd_spool_fini();
 	smb_kmod_unbind();
 	smbd.s_kbound = B_FALSE;
 }
 
-#ifdef	ENABLE_SPOOLSS
-
 /*
- * Initialization of the spool thread.
- * Returns 0 on success, an error number if thread creation fails.
+ * Create the Dynamic DNS publisher thread.
  */
-
-static int
-smbd_spool_init(void)
+static void
+smbd_dyndns_init(void)
 {
-	pthread_attr_t tattr;
-	int rc;
+	pthread_t	tid;
+	pthread_attr_t	attr;
+	int		rc;
 
-	(void) pthread_attr_init(&tattr);
-	(void) pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
-	rc = pthread_create(&smbd_spool_thr, &tattr, smbd_spool_monitor, 0);
-	(void) pthread_attr_destroy(&tattr);
+	dyndns_start();
 
-	return (rc);
+	(void) pthread_attr_init(&attr);
+	(void) pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+	rc = pthread_create(&tid, &attr, dyndns_publisher, NULL);
+	(void) pthread_attr_destroy(&attr);
+
+	if (rc != 0)
+		smbd_report("unable to start dyndns publisher: %s",
+		    strerror(errno));
 }
 
 /*
- * This user thread blocks waiting for close print file
- * in the kernel. It then uses the data returned from the ioctl
- * to copy the spool file into the cups spooler.
- * This function is really only used by Vista and Win7 clients,
- * other versions of windows create only a zero size file and this
- * be removed by spoolss_copy_spool_file function.
+ * Launches a thread to populate the share cache by share information
+ * stored in sharemgr
  */
-
-/*ARGSUSED*/
-static void *
-smbd_spool_monitor(void *arg)
+static void
+smbd_load_shares(void)
 {
-	uint32_t spool_num;
-	char username[MAXNAMELEN];
-	char path[MAXPATHLEN];
-	smb_inaddr_t ipaddr;
-	int error_retry_cnt = 5;
+	pthread_t	tid;
+	pthread_attr_t	attr;
+	int		rc;
 
-	while (!smbd.s_shutting_down && (error_retry_cnt > 0)) {
-		errno = 0;
+	(void) pthread_attr_init(&attr);
+	(void) pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+	rc = pthread_create(&tid, &attr, smb_shr_load, NULL);
+	(void) pthread_attr_destroy(&attr);
 
-		if (smb_kmod_get_spool_doc(&spool_num, username,
-		    path, &ipaddr) == 0) {
-			spoolss_copy_spool_file(&ipaddr,
-			    username, path, SMB_CUPS_DOCNAME);
-			error_retry_cnt = 5;
-		} else {
-			if (errno == ECANCELED)
-				break;
-
-			(void) sleep(SMB_SPOOL_WAIT);
-			error_retry_cnt--;
-		}
-	}
-	return (NULL);
+	if (rc != 0)
+		smbd_report("unable to load disk shares: %s", strerror(errno));
 }
-
-#endif	/* ENABLE_SPOOLSS */
 
 /*
  * Initialization of the localtime thread.
  * Returns 0 on success, an error number if thread creation fails.
  */
 
-int
+static void
 smbd_localtime_init(void)
 {
-	pthread_attr_t tattr;
-	int rc;
+	pthread_attr_t	attr;
+	int		rc;
 
-	(void) pthread_attr_init(&tattr);
-	(void) pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
-	rc = pthread_create(&localtime_thr, &tattr, smbd_localtime_monitor, 0);
-	(void) pthread_attr_destroy(&tattr);
-	return (rc);
+	(void) pthread_attr_init(&attr);
+	(void) pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+	rc = pthread_create(&smbd.s_localtime_tid, &attr,
+	    smbd_localtime_monitor, NULL);
+	(void) pthread_attr_destroy(&attr);
+
+	if (rc != 0)
+		smbd_report("unable to monitor localtime: %s", strerror(errno));
 }
 
 /*
- * Local time thread to kernel land.
- * Send local gmtoff to kernel module one time at startup
- * and each time it changes (up to twice a year).
- * Local gmtoff is checked once every 15 minutes and
- * since some timezones are aligned on half and qtr hour boundaries,
- * once an hour would likely suffice.
+ * Send local gmtoff to the kernel module one time at startup and each
+ * time it changes (up to twice a year).
+ * Local gmtoff is checked once every 15 minutes since some timezones
+ * are aligned on half and quarter hour boundaries.
  */
-
 /*ARGSUSED*/
 static void *
 smbd_localtime_monitor(void *arg)
@@ -1002,6 +925,8 @@ smbd_localtime_monitor(void *arg)
 	int32_t gmtoff, last_gmtoff = -1;
 	int timeout;
 	int error;
+
+	smbd_online_wait("smbd_localtime_monitor");
 
 	for (;;) {
 		gmtoff = smbd_gmtoff();
@@ -1134,181 +1059,6 @@ smbd_report(const char *fmt, ...)
 	va_end(ap);
 
 	(void) fprintf(stderr, "smbd: %s\n", buf);
-}
-
-static int
-smbd_start_listeners(void)
-{
-	int		rc1;
-	int		rc2;
-	pthread_attr_t	tattr;
-
-	(void) pthread_attr_init(&tattr);
-
-	if (!smbd.s_nbt_listener_running) {
-		rc1 = pthread_create(&smbd.s_nbt_listener_id, &tattr,
-		    smbd_nbt_listener, NULL);
-		if (rc1 != 0)
-			smbd_report("unable to start NBT service");
-		else
-			smbd.s_nbt_listener_running = B_TRUE;
-	}
-
-	if (!smbd.s_tcp_listener_running) {
-		rc2 = pthread_create(&smbd.s_tcp_listener_id, &tattr,
-		    smbd_tcp_listener, NULL);
-		if (rc2 != 0)
-			smbd_report("unable to start TCP service");
-		else
-			smbd.s_tcp_listener_running = B_TRUE;
-	}
-
-	(void) pthread_attr_destroy(&tattr);
-
-	if (rc1 != 0)
-		return (rc1);
-	return (rc2);
-}
-
-/*
- * Stop the listener threads.  In an attempt to ensure that the listener
- * threads get the signal, we use the timed wait loop to harass the
- * threads into terminating.  Then, if they are still running, we make
- * one final attempt to deliver the signal before calling thread join
- * to wait for them.  Note: if these threads don't terminate, smbd will
- * hang here and SMF will probably end up killing the contract.
- */
-static void
-smbd_stop_listeners(void)
-{
-	void		*status;
-	timestruc_t	delay;
-	int		rc = 0;
-
-	(void) mutex_lock(&listener_mutex);
-
-	while ((smbd.s_nbt_listener_running || smbd.s_tcp_listener_running) &&
-	    (rc != ETIME)) {
-		if (smbd.s_nbt_listener_running)
-			(void) pthread_kill(smbd.s_nbt_listener_id, SIGTERM);
-
-		if (smbd.s_tcp_listener_running)
-			(void) pthread_kill(smbd.s_tcp_listener_id, SIGTERM);
-
-		delay.tv_sec = 3;
-		delay.tv_nsec = 0;
-		rc = cond_reltimedwait(&listener_cv, &listener_mutex, &delay);
-	}
-
-	(void) mutex_unlock(&listener_mutex);
-
-	if (smbd.s_nbt_listener_running) {
-		syslog(LOG_WARNING, "NBT listener still running");
-		(void) pthread_kill(smbd.s_nbt_listener_id, SIGTERM);
-		(void) pthread_join(smbd.s_nbt_listener_id, &status);
-		smbd.s_nbt_listener_running = B_FALSE;
-	}
-
-	if (smbd.s_tcp_listener_running) {
-		syslog(LOG_WARNING, "TCP listener still running");
-		(void) pthread_kill(smbd.s_tcp_listener_id, SIGTERM);
-		(void) pthread_join(smbd.s_tcp_listener_id, &status);
-		smbd.s_tcp_listener_running = B_FALSE;
-	}
-}
-
-/*
- * Perform fatal error exit.
- */
-static void
-smbd_fatal_error(const char *msg)
-{
-	if (msg == NULL)
-		msg = "Fatal error";
-
-	smbd_report("%s", msg);
-	smbd.s_fatal_error = B_TRUE;
-	(void) kill(smbd.s_pid, SIGTERM);
-}
-
-/*ARGSUSED*/
-static void *
-smbd_nbt_receiver(void *arg)
-{
-	(void) smb_kmod_nbtreceive();
-	return (NULL);
-}
-
-/*ARGSUSED*/
-static void *
-smbd_nbt_listener(void *arg)
-{
-	pthread_attr_t	tattr;
-	sigset_t	set;
-	sigset_t	oset;
-	pthread_t	tid;
-	int		error = 0;
-
-	(void) sigfillset(&set);
-	(void) sigdelset(&set, SIGTERM);
-	(void) sigdelset(&set, SIGINT);
-	(void) pthread_sigmask(SIG_SETMASK, &set, &oset);
-	(void) pthread_attr_init(&tattr);
-	(void) pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
-
-	while (smb_kmod_nbtlisten(error) == 0)
-		error = pthread_create(&tid, &tattr, smbd_nbt_receiver, NULL);
-
-	(void) pthread_attr_destroy(&tattr);
-
-	if (!smbd.s_shutting_down)
-		smbd_fatal_error("NBT listener thread terminated unexpectedly");
-
-	(void) mutex_lock(&listener_mutex);
-	smbd.s_nbt_listener_running = B_FALSE;
-	(void) cond_broadcast(&listener_cv);
-	(void) mutex_unlock(&listener_mutex);
-	return (NULL);
-}
-
-/*ARGSUSED*/
-static void *
-smbd_tcp_receiver(void *arg)
-{
-	(void) smb_kmod_tcpreceive();
-	return (NULL);
-}
-
-/*ARGSUSED*/
-static void *
-smbd_tcp_listener(void *arg)
-{
-	pthread_attr_t	tattr;
-	sigset_t	set;
-	sigset_t	oset;
-	pthread_t	tid;
-	int		error = 0;
-
-	(void) sigfillset(&set);
-	(void) sigdelset(&set, SIGTERM);
-	(void) sigdelset(&set, SIGINT);
-	(void) pthread_sigmask(SIG_SETMASK, &set, &oset);
-	(void) pthread_attr_init(&tattr);
-	(void) pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
-
-	while (smb_kmod_tcplisten(error) == 0)
-		error = pthread_create(&tid, &tattr, smbd_tcp_receiver, NULL);
-
-	(void) pthread_attr_destroy(&tattr);
-
-	if (!smbd.s_shutting_down)
-		smbd_fatal_error("TCP listener thread terminated unexpectedly");
-
-	(void) mutex_lock(&listener_mutex);
-	smbd.s_tcp_listener_running = B_FALSE;
-	(void) cond_broadcast(&listener_cv);
-	(void) mutex_unlock(&listener_mutex);
-	return (NULL);
 }
 
 /*

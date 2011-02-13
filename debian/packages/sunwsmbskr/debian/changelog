@@ -3,8 +3,9 @@ sunwsmbskr (5.11.134-100) nexenta; urgency=high
   * Issue 3393: smbsrv overflows kernel stack
   * Issue 3868: AD connectivitiy diagnostics
   * Issue 3901: backport 6952831 SMB level II oplocks (etc.)
+  * Issue 3287: CIFS needs domain controller "hot fail over"
 
- -- Gate Keeper <maintainer@nexenta.com> Thu, 10 Feb 2011 11:59:15 -0500
+ -- Gate Keeper <maintainer@nexenta.com> Fri, 11 Feb 2011 11:59:15 -0500
 
 sunwsmbskr (5.11.134-12) nexenta; urgency=low
 

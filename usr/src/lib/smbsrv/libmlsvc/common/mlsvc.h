@@ -79,8 +79,6 @@ void smb_quota_fini(void);
 void smb_quota_add_fs(const char *);
 void smb_quota_remove_fs(const char *);
 
-struct smb_cups_ops *spoolss_cups_ops(void);
-
 #ifdef __cplusplus
 }
 #endif

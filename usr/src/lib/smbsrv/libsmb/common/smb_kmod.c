@@ -63,6 +63,12 @@ smb_kmod_bind(void)
 	return (0);
 }
 
+boolean_t
+smb_kmod_isbound(void)
+{
+	return ((smbdrv_fd == -1) ? B_FALSE : B_TRUE);
+}
+
 int
 smb_kmod_setcfg(smb_kmod_cfg_t *cfg)
 {
@@ -127,40 +133,6 @@ smb_kmod_event_notify(uint32_t txid)
 
 	ioc.txid = txid;
 	return (smb_kmod_ioctl(SMB_IOC_EVENT, &ioc.hdr, sizeof (ioc)));
-}
-
-int
-smb_kmod_tcplisten(int error)
-{
-	smb_ioc_listen_t ioc;
-
-	ioc.error = error;
-	return (smb_kmod_ioctl(SMB_IOC_TCP_LISTEN, &ioc.hdr, sizeof (ioc)));
-}
-
-int
-smb_kmod_nbtlisten(int error)
-{
-	smb_ioc_listen_t ioc;
-
-	ioc.error = error;
-	return (smb_kmod_ioctl(SMB_IOC_NBT_LISTEN, &ioc.hdr, sizeof (ioc)));
-}
-
-int
-smb_kmod_tcpreceive(void)
-{
-	smb_ioc_header_t ioc;
-
-	return (smb_kmod_ioctl(SMB_IOC_TCP_RECEIVE, &ioc, sizeof (ioc)));
-}
-
-int
-smb_kmod_nbtreceive(void)
-{
-	smb_ioc_header_t ioc;
-
-	return (smb_kmod_ioctl(SMB_IOC_NBT_RECEIVE, &ioc, sizeof (ioc)));
 }
 
 int

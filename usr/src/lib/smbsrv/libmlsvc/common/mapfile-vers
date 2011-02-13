@@ -40,13 +40,14 @@ SUNWprivate {
     global:
 	dfs_get_referrals;
 	dfs_info_free;
+	dssetup_check_service;
 	dssetup_clear_domain_info;
 	lsa_lookup_name;
 	lsa_lookup_sid;
 	mlsvc_disconnect;
 	mlsvc_fini;
 	mlsvc_init;
-	mlsvc_join;	
+	mlsvc_join;
 	mlsvc_netlogon;
 	smb_autohome_add;
 	smb_autohome_remove;
@@ -73,7 +74,7 @@ SUNWprivate {
 	smb_shr_stop;
 	smb_token_destroy;
 	smb_token_log;
-	spoolss_copy_spool_file;
+	spoolss_register_copyfile;
     local:
 	*;
 };
