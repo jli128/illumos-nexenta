@@ -1047,6 +1047,7 @@ ql_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		switch (ha->device_id) {
 		case 0x2300:
 		case 0x2312:
+		case 0x2322:
 #if !defined(__sparc) || defined(QL_DEBUG_ROUTINES)
 		/*
 		 * per marketing, fibre-lite HBA's are not supported
@@ -1058,7 +1059,7 @@ ql_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			if (ql_pci_config_get8(ha, PCI_CONF_IPIN) == 2) {
 				ha->flags |= FUNCTION_1;
 			}
-			if (ha->device_id == 0x6322) {
+			if (ha->device_id == 0x6322 || ha->device_id == 0x2322) {
 				ha->cfg_flags |= CFG_CTRL_6322;
 				ha->fw_class = 0x6322;
 				ha->risc_dump_size = QL_6322_FW_DUMP_SIZE;
