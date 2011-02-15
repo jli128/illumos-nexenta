@@ -6,7 +6,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: cpqary3
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-9), sunwkvm (>=5.11.134-9), sunwcsr (>=5.11.134-9), sunwckr (>=5.11.134-9), sunwcnetr (>=5.11.134-9), sunwcsu (>=5.11.134-9), sunwcsd (>=5.11.134-9), sunwcsl (>=5.11.134-9), sunwcar (>=5.11.134-9), sunwcslr (>=5.11.134-9)
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-31-0-0), sunwkvm (>=5.11.134-31-0-0), sunwcsr (>=5.11.134-31-0-0), sunwckr (>=5.11.134-31-0-0), sunwcnetr (>=5.11.134-31-0-0), sunwcsu (>=5.11.134-31-0-0), sunwcsd (>=5.11.134-31-0-0), sunwcsl (>=5.11.134-31-0-0), sunwcar (>=5.11.134-31-0-0), sunwcslr (>=5.11.134-31-0-0)
 Description: HP Smart Array HBA Driver 2.2.0.1
  HP Smart Array HBA Driver 2.2.0.1
  .

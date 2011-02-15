@@ -1,7 +1,7 @@
 Source: sunwslpu
 Section: net
 Priority: optional
-Maintainer: Mac <mac@gnusolaris.org>
+Maintainer: Nexenta Systems <support@nexenta.com>
 Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwslpu
@@ -9,7 +9,7 @@ Architecture: solaris-i386
 Conflicts: libslp1
 Replaces: libslp1
 Provides: libslp1
-Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-12), sunwkvm (>=5.11.134-12), sunwcsr (>=5.11.134-12), sunwckr (>=5.11.134-12), sunwcnetr (>=5.11.134-12), sunwcsu (>=5.11.134-12), sunwcsl (>=5.11.134-12), sunwcsd (>=5.11.134-12), sunwj5rt | sunwjre1.5, sunwslpr (>=5.11.134-12)
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-31-0-0), sunwkvm (>=5.11.134-31-0-0), sunwcsr (>=5.11.134-31-0-0), sunwckr (>=5.11.134-31-0-0), sunwcnetr (>=5.11.134-31-0-0), sunwcsu (>=5.11.134-31-0-0), sunwcsl (>=5.11.134-31-0-0), sunwcsd (>=5.11.134-31-0-0), sunwj5rt | sunwjre1.5, sunwslpr (>=5.11.134-31-0-0)
 Description: SLP, (Usr)
  Usr filesystem portion of the Service Location Protocol (SLP) framework. Included are C and Java developer libraries and a daemon which can act as a directory agent (DA).
  .

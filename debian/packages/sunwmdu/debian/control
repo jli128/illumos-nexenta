@@ -1,12 +1,12 @@
 Source: sunwmdu
 Section: base
 Priority: optional
-Maintainer: Erast Benson <erast@gnusolaris.org>
+Maintainer: Nexenta Systems <support@nexenta.com>
 Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwmdu
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwcsr (>=5.11.134-12), sunwckr (>=5.11.134-12), sunwcnetr (>=5.11.134-12), sunwcsd (>=5.11.134-12), sunwcsu (>=5.11.134-12), sunwcakr (>=5.11.134-12), sunwkvm (>=5.11.134-12), sunwmdr (>=5.11.134-12)
+Depends: ${shlibs:Depends}, sunwcsr (>=5.11.134-31-0-0), sunwckr (>=5.11.134-31-0-0), sunwcnetr (>=5.11.134-31-0-0), sunwcsd (>=5.11.134-31-0-0), sunwcsu (>=5.11.134-31-0-0), sunwcakr (>=5.11.134-31-0-0), sunwkvm (>=5.11.134-31-0-0), sunwmdr (>=5.11.134-31-0-0)
 Description: Solaris Volume Manager, (Usr)
  Solaris Volume Manager commands
  .

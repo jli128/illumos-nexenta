@@ -1,12 +1,12 @@
 Source: sunwpcan
 Section: net
 Priority: required
-Maintainer: Mac <mac@gnusolaris.org>
+Maintainer: Nexenta Systems <support@nexenta.com>
 Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwpcan
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-12), sunwkvm (>=5.11.134-12), sunwcsr (>=5.11.134-12), sunwckr (>=5.11.134-12), sunwcnetr (>=5.11.134-12), sunwcsu (>=5.11.134-12), sunwcsd (>=5.11.134-12), sunwcsl (>=5.11.134-12)
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-31-0-0), sunwkvm (>=5.11.134-31-0-0), sunwcsr (>=5.11.134-31-0-0), sunwckr (>=5.11.134-31-0-0), sunwcnetr (>=5.11.134-31-0-0), sunwcsu (>=5.11.134-31-0-0), sunwcsd (>=5.11.134-31-0-0), sunwcsl (>=5.11.134-31-0-0)
 Description: Cisco-Aironet 802.11b driver
  Cisco-Aironet 802.11b driver
  .

@@ -1,4 +1,4 @@
-sunwcsu (5.11.134-100) nexenta; urgency=low
+sunwcsu (5.11.134-31-0-0) nexenta; urgency=low
 
   * Issue 2636: lofiadm/pktool changes for ZFS crypto over lofi devices.
   * Issue 3647: Increase Cache Time for IDMAP Mappings

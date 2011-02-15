@@ -1,7 +1,7 @@
 Source: libsunw-perl
 Section: perl
 Priority: required
-Maintainer: Erast Benson <erast@gnusolaris.org>
+Maintainer: Nexenta Systems <support@nexenta.com>
 Uploaders: Erast Benson <erast@gnusolaris.org>
 Standards-Version: 3.6.1
 Build-Depends: debhelper (>= 4.1), perl (>= 5.8.0-3), perl-modules

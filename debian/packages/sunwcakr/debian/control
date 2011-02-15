@@ -1,13 +1,13 @@
 Source: sunwcakr
 Section: base
 Priority: required
-Maintainer: Erast Benson <erast@gnusolaris.org>
+Maintainer: Nexenta Systems <support@nexenta.com>
 Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwcakr
 XBS-PKG: sunwcakr.i
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, coreutils, diff, ed, findutils, gawk, grep, sed, nexenta-lu (>=5.11.134-12)
+Depends: ${shlibs:Depends}, coreutils, diff, ed, findutils, gawk, grep, sed, nexenta-lu (>=5.11.134-31-0-0)
 Essential: Yes
 Description: Core Solaris Kernel Architecture (Root)
  core kernel software for a specific hardware platform group

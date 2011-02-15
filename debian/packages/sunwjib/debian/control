@@ -1,12 +1,12 @@
 Source: sunwjib
 Section: libs
 Priority: optional
-Maintainer: Mac <mac@gnusolaris.org>
+Maintainer: Nexenta Systems <support@nexenta.com>
 Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwjib
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwjcom (>=5.11.134-12)
+Depends: ${shlibs:Depends}, sunwjcom (>=5.11.134-31-0-0)
 Description: iButton OCF CT Driver
  Dallas Semiconductor serial iButton OCF Card Terminal Driver
  .

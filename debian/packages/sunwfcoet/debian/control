@@ -6,7 +6,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwfcoet
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-12), sunwkvm (>=5.11.134-12), sunwcsr (>=5.11.134-100), sunwckr (>=5.11.134-100), sunwcnetr (>=5.11.134-12), sunwcsu (>=5.11.134-100), sunwcsd (>=5.11.134-12), sunwcsl (>=5.11.134-100), sunwcar (>=5.11.134-12), sunwcslr (>=5.11.134-12), sunwfcoe (>=5.11.134-100), sunwstmf (>=5.11.134-100)
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-31-0-0), sunwkvm (>=5.11.134-31-0-0), sunwcsr (>=5.11.134-100), sunwckr (>=5.11.134-100), sunwcnetr (>=5.11.134-31-0-0), sunwcsu (>=5.11.134-100), sunwcsd (>=5.11.134-31-0-0), sunwcsl (>=5.11.134-100), sunwcar (>=5.11.134-31-0-0), sunwcslr (>=5.11.134-31-0-0), sunwfcoe (>=5.11.134-100), sunwstmf (>=5.11.134-100)
 Description: Sun FCoE COMSTAR Driver
  Sun FCoE (Fibre Channel over Ethernet) COMSTAR Driver
  .

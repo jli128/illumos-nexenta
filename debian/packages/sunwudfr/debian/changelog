@@ -1,7 +1,6 @@
-sunwudfr (5.11.134-100) nexenta; urgency=low
+sunwudfr (5.11.134-31-0-0) nexenta; urgency=low
 
   * Issue 3725: backport 4455694 udf_access does not lock inode for reading
-  *   and 6918785 udfs allows file names longer than 254 characters
 
  -- Gate Keeper <maintainer@nexenta.com>  Tue, 25 Jan 2011 15:13:56 -0500
 

@@ -1,12 +1,12 @@
 Source: sunwdhcm
 Section: net
 Priority: optional
-Maintainer: Mac <mac@gnusolaris.org>
+Maintainer: Nexenta Systems <support@nexenta.com>
 Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwdhcm
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwdhcsr (>=5.11.134-12), sunwdhcsu (>=5.11.134-12), sunwj5rt | sunwjre1.5
+Depends: ${shlibs:Depends}, sunwdhcsr (>=5.11.134-31-0-0), sunwdhcsu (>=5.11.134-31-0-0), sunwj5rt | sunwjre1.5
 Description: DHCP Manager
  Graphical management interface for the DHCP server
  .

@@ -1,13 +1,13 @@
 Source: sunwcar
 Section: base
 Priority: required
-Maintainer: Mac <mac@gnusolaris.org>
+Maintainer: Nexenta Systems <support@nexenta.com>
 Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwcar
 XBS-PKG: sunwcar.i
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, nexenta-lu (>=5.11.134-12)
+Depends: ${shlibs:Depends}, nexenta-lu (>=5.11.134-31-0-0)
 Essential: Yes
 Description: Core Architecture, (Root)
  core software for a specific hardware platform group

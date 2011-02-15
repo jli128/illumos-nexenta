@@ -1,12 +1,12 @@
 Source: sunwrcapr
 Section: base
 Priority: optional
-Maintainer: Mac <mac@gnusolaris.org>
+Maintainer: Nexenta Systems <support@nexenta.com>
 Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwrcapr
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwcsr (>=5.11.134-12), sunwckr (>=5.11.134-12), sunwcnetr (>=5.11.134-12), sunwcsd (>=5.11.134-12)
+Depends: ${shlibs:Depends}, sunwcsr (>=5.11.134-31-0-0), sunwckr (>=5.11.134-31-0-0), sunwcnetr (>=5.11.134-31-0-0), sunwcsd (>=5.11.134-31-0-0)
 Description: Solaris Resource Capping Daemon (Root)
  Solaris Resource Capping Daemon (Root)
  .

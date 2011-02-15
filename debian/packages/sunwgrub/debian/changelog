@@ -1,4 +1,4 @@
-sunwgrub (5.11.134-100) nexenta; urgency=high
+sunwgrub (5.11.134-31-0-0) nexenta; urgency=low
 
   * Issue 3247: zfs recursive snapshots take a long time
   * Issue 3446: zpool cannot replace a replacing device

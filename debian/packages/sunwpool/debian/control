@@ -1,12 +1,12 @@
 Source: sunwpool
 Section: base
 Priority: required
-Maintainer: Mac <mac@gnusolaris.org>
+Maintainer: Nexenta Systems <support@nexenta.com>
 Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwpool
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwcsl (>=5.11.134-12), libxml2, sunwpoolr (>=5.11.134-12)
+Depends: ${shlibs:Depends}, sunwcsl (>=5.11.134-31-0-0), libxml2, sunwpoolr (>=5.11.134-31-0-0)
 Description: Resource Pools
  core software for resource pools
  .

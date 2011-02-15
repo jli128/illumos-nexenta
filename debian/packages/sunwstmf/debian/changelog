@@ -1,4 +1,4 @@
-sunwstmf (5.11.134-100) nexenta; urgency=high
+sunwstmf (5.11.134-31-0-0) nexenta; urgency=low
 
   * Issue 2626: Fix for zfs panic in dmu_objset_stats
   * Issue 3417: backport several ZIL related fixes

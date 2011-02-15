@@ -24,31 +24,6 @@ SIGNATURE=" -- ${DEBFULLNAME} <${DEBEMAIL}>  ${DATE}"
 
 TMP_FILE=/tmp/tmp_file.$$
 
-function update_changelog
-{
-	pkg_name=`basename $1`
-	changelog="$pkg_name (${CORE_REVISION}) ${DISTRO}; urgency=${URG}"
-	comments="${changelog}\n\n${NOTE}\n\n${SIGNATURE}\n\n"
-
-	if [ -f $1/debian/changelog ]; then
-		file=$1/debian/changelog
-	else
-		echo "Error: ${pkg_name} changelog file not found."
-		return 1
-	fi
-
-	grep "$pkg_name (${CORE_REVISION})" ${file} >/dev/null 2>&1
-	if [ $? -eq 0 ]; then
-		return 1
-	fi
-
-	printf "${comments}" > ${TMP_FILE}
-	cat ${file} >> ${TMP_FILE}
-
-	mv ${TMP_FILE} ${file}
-	return 0
-}
-
 function update_control
 {
 	pkg_name=`basename $1`
@@ -60,8 +35,7 @@ function update_control
 		return 1
 	fi
 
-	sed -e "s/(>=${OS_REL}.${OLD_BUILD}-[1-9]\+)/(>=${CORE_REVISION})/g" \
-	    ${file} > ${TMP_FILE}
+	sed -e "s/^Maintainer: .*$/Maintainer: Nexenta Systems <support@nexenta.com>/g" ${file} > ${TMP_FILE}
 
 	mv ${TMP_FILE} ${file}
 	return 0
@@ -70,7 +44,7 @@ function update_control
 for f in `find . -maxdepth 1 -mindepth 1 -type d -name "sunw*" -o -type d -name "brcmbnx" -o -type d -name "libsunw-perl" -o -type d -name "nexenta-lu" -o -type d -name "nexenta-sunw" -o -type d -name "brcmbnxe" -o -type d -name cpqary3`; do
 	pkg_name=`basename $f`
 
-	if update_changelog $f && update_control $f; then
+	if update_control $f; then
 		echo "updating: ${pkg_name}"
 	fi
 done

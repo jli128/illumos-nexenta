@@ -1,12 +1,12 @@
 Source: sunwsshdu
 Section: net
 Priority: optional
-Maintainer: Mac <mac@gnusolaris.org>
+Maintainer: Nexenta Systems <support@nexenta.com>
 Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwsshdu
 Architecture: solaris-i386
-Depends: sunwcakr (>=5.11.134-12), sunwkvm (>=5.11.134-12), sunwcsr (>=5.11.134-12), sunwckr (>=5.11.134-12), sunwcnetr (>=5.11.134-12), sunwcsu (>=5.11.134-12), sunwcsl (>=5.11.134-12), sunwcsd (>=5.11.134-12), sunwgss (>=5.11.134-12), sunwsshdr (>=5.11.134-12), sunwsshcu (>=5.11.134-12), zlib1g, openssl, sunwzoneu
+Depends: sunwcakr (>=5.11.134-31-0-0), sunwkvm (>=5.11.134-31-0-0), sunwcsr (>=5.11.134-31-0-0), sunwckr (>=5.11.134-31-0-0), sunwcnetr (>=5.11.134-31-0-0), sunwcsu (>=5.11.134-31-0-0), sunwcsl (>=5.11.134-31-0-0), sunwcsd (>=5.11.134-31-0-0), sunwgss (>=5.11.134-31-0-0), sunwsshdr (>=5.11.134-31-0-0), sunwsshcu (>=5.11.134-31-0-0), zlib1g, openssl, sunwzoneu
 Description: SSH Server, (Usr)
  Secure Shell protocol Server
  .

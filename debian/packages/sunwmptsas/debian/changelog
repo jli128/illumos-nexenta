@@ -1,4 +1,4 @@
-sunwmptsas (5.11.134-100) nexenta; urgency=low
+sunwmptsas (5.11.134-31-0-0) nexenta; urgency=low
 
   * Issue 3586: mpt_sas needs to be updated
 

@@ -17,7 +17,7 @@ OS_REL=5.11
 #
 # The following variables can be left alone
 #
-CORE_PATCH_LEVEL=12
+CORE_PATCH_LEVEL=31-0-0
 CORE_REVISION="${OS_REL}.${BUILD}-${CORE_PATCH_LEVEL}"
 DISTRO=nexenta
 URG=low

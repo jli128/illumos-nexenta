@@ -1,13 +1,13 @@
 Source: sunwkvm
 Section: base
 Priority: required
-Maintainer: Erast Benson <erast@gnusolaris.org>
+Maintainer: Nexenta Systems <support@nexenta.com>
 Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwkvm
 XBS-PKG: sunwkvm.i
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-12), sunwcsr (>=5.11.134-12), nexenta-lu (>=5.11.134-12)
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-31-0-0), sunwcsr (>=5.11.134-31-0-0), nexenta-lu (>=5.11.134-31-0-0)
 Essential: Yes
 Description: Core Architecture, (Kvm)
  core software for a specific hardware platform group

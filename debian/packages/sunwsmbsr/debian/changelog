@@ -1,4 +1,4 @@
-sunwsmbsr (5.11.134-100) nexenta; urgency=high
+sunwsmbsr (5.11.134-31-0-0) nexenta; urgency=low
 
   * Issue 3868: AD connectivitiy diagnostics
   * Issue 3901: backport 6952831 SMB level II oplocks (etc.)

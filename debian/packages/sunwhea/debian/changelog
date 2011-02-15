@@ -1,4 +1,4 @@
-sunwhea (5.11.134-100) nexenta; urgency=low
+sunwhea (5.11.134-31-0-0) nexenta; urgency=low
 
   * Issue 3446: zpool cannot replace a replacing device
   * Issue 2842: COMSTAR SCSI UNMAP

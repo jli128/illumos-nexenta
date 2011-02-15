@@ -1,4 +1,4 @@
-sunwzfskr (5.11.134-100) nexenta; urgency=high
+sunwzfskr (5.11.134-31-0-0) nexenta; urgency=low
 
   * Issue 2611: Fix for zfs panic when accessing special files in snapshot
   * Issue 2626: Fix for zfs panic in dmu_objset_stat

@@ -1,12 +1,12 @@
 Source: sunwpsr
 Section: utils
 Priority: optional
-Maintainer: Mac <mac@gnusolaris.org>
+Maintainer: Nexenta Systems <support@nexenta.com>
 Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwpsr
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-12), sunwkvm (>=5.11.134-12), sunwcsr (>=5.11.134-12), sunwckr (>=5.11.134-12), sunwcnetr (>=5.11.134-12), sunwcsu (>=5.11.134-12), sunwcsd (>=5.11.134-12), sunwcsl (>=5.11.134-12), sunwpcr (>=5.11.134-12)
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-31-0-0), sunwkvm (>=5.11.134-31-0-0), sunwcsr (>=5.11.134-31-0-0), sunwckr (>=5.11.134-31-0-0), sunwcnetr (>=5.11.134-31-0-0), sunwcsu (>=5.11.134-31-0-0), sunwcsd (>=5.11.134-31-0-0), sunwcsl (>=5.11.134-31-0-0), sunwpcr (>=5.11.134-31-0-0)
 Description: Solaris Print - LP Server, (root)
  configuration and start-up files for the print service
  .

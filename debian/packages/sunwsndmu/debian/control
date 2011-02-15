@@ -1,7 +1,7 @@
 Source: sunwsndmu
 Section: mail
 Priority: optional
-Maintainer: Mac <mac@gnusolaris.org>
+Maintainer: Nexenta Systems <support@nexenta.com>
 Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwsndmu
@@ -9,7 +9,7 @@ Architecture: solaris-i386
 Conflicts: mail-transport-agent, pop3-server, finger-server
 Replaces: mail-transport-agent, pop3-server, finger-server
 Provides: mail-transport-agent, pop3-server, finger-server
-Depends: sunwcakr (>=5.11.134-12), sunwkvm (>=5.11.134-12), sunwcsr (>=5.11.134-12), sunwckr (>=5.11.134-12), sunwcnetr (>=5.11.134-12), sunwcsu (>=5.11.134-12), sunwcsd (>=5.11.134-12), sunwcsl (>=5.11.134-12), sunwperl584core, sunwperl584usr, sunwsndmr (>=5.11.134-12), openssl
+Depends: sunwcakr (>=5.11.134-31-0-0), sunwkvm (>=5.11.134-31-0-0), sunwcsr (>=5.11.134-31-0-0), sunwckr (>=5.11.134-31-0-0), sunwcnetr (>=5.11.134-31-0-0), sunwcsu (>=5.11.134-31-0-0), sunwcsd (>=5.11.134-31-0-0), sunwcsl (>=5.11.134-31-0-0), sunwperl584core, sunwperl584usr, sunwsndmr (>=5.11.134-31-0-0), openssl
 Description: Sendmail (/usr)
  Sendmail Utilities
  .

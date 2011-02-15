@@ -1,7 +1,7 @@
 Source: nexenta-lu
 Section: base
 Priority: required
-Maintainer: Erast Benson <erast@gnusolaris.org>
+Maintainer: Nexenta Systems <support@nexenta.com>
 Build-Depends: debhelper(>=4.9.3elatte)
 
 Package: nexenta-lu

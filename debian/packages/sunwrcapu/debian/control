@@ -1,12 +1,12 @@
 Source: sunwrcapu
 Section: base
 Priority: optional
-Maintainer: Mac <mac@gnusolaris.org>
+Maintainer: Nexenta Systems <support@nexenta.com>
 Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwrcapu
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwrcapr (>=5.11.134-12), sunwcsu (>=5.11.134-12), sunwcsl (>=5.11.134-12)
+Depends: ${shlibs:Depends}, sunwrcapr (>=5.11.134-31-0-0), sunwcsu (>=5.11.134-31-0-0), sunwcsl (>=5.11.134-31-0-0)
 Description: Solaris Resource Capping Daemon (Usr)
  Solaris Resource Capping Daemon (Usr)
  .

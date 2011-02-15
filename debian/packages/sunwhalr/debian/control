@@ -1,12 +1,12 @@
 Source: sunwhalr
 Section: base
 Priority: required
-Maintainer: Mac <mac@gnusolaris.org>
+Maintainer: Nexenta Systems <support@nexenta.com>
 Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwhalr
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-12), sunwkvm (>=5.11.134-12), sunwcsr (>=5.11.134-12), sunwckr (>=5.11.134-12), sunwcsu (>=5.11.134-12), sunwcsd (>=5.11.134-12), sunwcsl (>=5.11.134-12), dbus
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-31-0-0), sunwkvm (>=5.11.134-31-0-0), sunwcsr (>=5.11.134-31-0-0), sunwckr (>=5.11.134-31-0-0), sunwcsu (>=5.11.134-31-0-0), sunwcsd (>=5.11.134-31-0-0), sunwcsl (>=5.11.134-31-0-0), dbus
 Conflicts: hal-device-manager (<<5.11-2), libhal1 (<<5.11-2), hal (<<5.11-2), libhal-storage1 (<<5.11-2)
 Replaces: hal-device-manager, libhal1, hal, libhal-storage1
 Description: Hardware Abstraction Layer, HAL (freedesktop.org) (Root)
