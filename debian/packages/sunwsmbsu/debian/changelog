@@ -1,3 +1,9 @@
+sunwsmbsu (5.11.134-31-0-1) nexenta; urgency=low
+
+  * Issue 2976: Child folder visibility through shares
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 16 Feb 2011 13:25:13 -0800
+
 sunwsmbsu (5.11.134-31-0-0) nexenta; urgency=low
 
   * Issue 2611: Fix memory leak in smbd/libsmb smb_idmap_getsid

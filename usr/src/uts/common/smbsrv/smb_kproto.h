@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -477,6 +478,7 @@ int smb_pathname(smb_request_t *, char *, int, smb_node_t *,
 int smb_vfs_hold(smb_export_t *, vfs_t *);
 void smb_vfs_rele(smb_export_t *, vfs_t *);
 void smb_vfs_rele_all(smb_export_t *);
+int smb_vfs_is_compat(vfs_t *, vfs_t *);
 
 /* NOTIFY CHANGE */
 void smb_process_session_notify_change_queue(smb_session_t *, smb_tree_t *);

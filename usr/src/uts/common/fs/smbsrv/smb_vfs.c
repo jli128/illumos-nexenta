@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/vfs.h>
@@ -129,6 +130,36 @@ smb_vfs_rele_all(smb_export_t *se)
 		smb_vfs_destroy(se, smb_vfs);
 	}
 	smb_llist_exit(&se->e_vfs_list);
+}
+
+/*
+ * Tests whether the target filesystem and the share root filesystems are
+ * compatible in respect to CIFS semantics.
+ */
+int
+smb_vfs_is_compat(vfs_t *root_vfsp, vfs_t *target_vfsp)
+{
+	int i;
+	int compat;
+	vfs_feature_t features[] = {
+		VFSFT_CASEINSENSITIVE,
+		VFSFT_NOCASESENSITIVE,
+		VFSFT_ACLONCREATE,
+		VFSFT_ACEMASKONACCESS
+	};
+
+	ASSERT(root_vfsp);
+	ASSERT(target_vfsp);
+
+	compat = 1;	/* innocent until proven otherwise */
+	for (i = 0; i < sizeof (features)/sizeof (features[0]); i++) {
+		if (vfs_has_feature(root_vfsp, i) !=
+		    vfs_has_feature(target_vfsp, i)) {
+			compat = 0;
+		}
+	}
+
+	return (compat);
 }
 
 /*

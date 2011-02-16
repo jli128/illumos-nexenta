@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -1839,6 +1840,7 @@ smb_server_store_cfg(smb_server_t *sv, smb_ioc_cfg_t *ioc)
 	sv->sv_cfg.skc_secmode = ioc->secmode;
 	sv->sv_cfg.skc_ipv6_enable = ioc->ipv6_enable;
 	sv->sv_cfg.skc_print_enable = ioc->print_enable;
+	sv->sv_cfg.skc_traverse_mounts = ioc->traverse_mounts;
 	sv->sv_cfg.skc_execflags = ioc->exec_flags;
 	sv->sv_cfg.skc_version = ioc->version;
 	(void) strlcpy(sv->sv_cfg.skc_nbdomain, ioc->nbdomain,
