@@ -1,3 +1,9 @@
+sunwhea (5.11.134-31-0-1) nexenta; urgency=low
+
+  * Issue 3970: Offline and sparse attribute support 
+
+ -- Nexenta Systems <support@nexenta.com>  Tue, 15 Feb 2011 21:45:33 -0800
+
 sunwhea (5.11.134-31-0-0) nexenta; urgency=low
 
   * Issue 3446: zpool cannot replace a replacing device

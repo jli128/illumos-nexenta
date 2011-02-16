@@ -327,12 +327,8 @@ smb_vop_getattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *ret_attr,
 		XVA_SET_REQ(&tmp_xvattr, XAT_ARCHIVE);
 		XVA_SET_REQ(&tmp_xvattr, XAT_CREATETIME);
 		XVA_SET_REQ(&tmp_xvattr, XAT_REPARSE);
-#ifdef	XAT_OFFLINE
 		XVA_SET_REQ(&tmp_xvattr, XAT_OFFLINE);
-#endif
-#ifdef	XAT_SPARSE
 		XVA_SET_REQ(&tmp_xvattr, XAT_SPARSE);
-#endif
 
 		error = VOP_GETATTR(use_vp, &tmp_xvattr.xva_vattr, flags,
 		    cr, &smb_ct);
@@ -372,20 +368,16 @@ smb_vop_getattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *ret_attr,
 				    FILE_ATTRIBUTE_REPARSE_POINT;
 			}
 
-#ifdef	XAT_OFFLINE
 			if ((XVA_ISSET_RTN(&tmp_xvattr, XAT_OFFLINE)) &&
 			    (xoap->xoa_offline)) {
 				ret_attr->sa_dosattr |= FILE_ATTRIBUTE_OFFLINE;
 			}
-#endif
 
-#ifdef	XAT_SPARSE
 			if ((XVA_ISSET_RTN(&tmp_xvattr, XAT_SPARSE)) &&
 			    (xoap->xoa_sparse)) {
 				ret_attr->sa_dosattr |=
 				    FILE_ATTRIBUTE_SPARSE_FILE;
 			}
-#endif
 
 			ret_attr->sa_crtime = xoap->xoa_createtime;
 		} else {
@@ -881,12 +873,8 @@ smb_vop_setup_xvattr(smb_attr_t *smb_attr, xvattr_t *xvattr)
 		XVA_SET_REQ(xvattr, XAT_SYSTEM);
 		XVA_SET_REQ(xvattr, XAT_READONLY);
 		XVA_SET_REQ(xvattr, XAT_HIDDEN);
-#ifdef	XAT_OFFLINE
 		XVA_SET_REQ(xvattr, XAT_OFFLINE);
-#endif
-#ifdef	XAT_SPARSE
 		XVA_SET_REQ(xvattr, XAT_SPARSE);
-#endif
 
 		/*
 		 * smb_attr->sa_dosattr: If a given bit is not set,
@@ -907,14 +895,11 @@ smb_vop_setup_xvattr(smb_attr_t *smb_attr, xvattr_t *xvattr)
 		if (smb_attr->sa_dosattr & FILE_ATTRIBUTE_HIDDEN)
 			xoap->xoa_hidden = 1;
 
-#ifdef	XAT_OFFLINE
 		if (smb_attr->sa_dosattr & FILE_ATTRIBUTE_OFFLINE)
 			xoap->xoa_offline = 1;
-#endif
-#ifdef	XAT_SPARSE
+
 		if (smb_attr->sa_dosattr & FILE_ATTRIBUTE_SPARSE_FILE)
 			xoap->xoa_sparse = 1;
-#endif
 	}
 
 	if (smb_attr->sa_mask & SMB_AT_CRTIME) {
