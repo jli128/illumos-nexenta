@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -334,18 +333,17 @@ ptable_free(pfn_t pfn)
 	 * Get an exclusive lock, might have to wait for a kmem reader.
 	 */
 	if (!page_tryupgrade(pp)) {
+		u_offset_t off = pp->p_offset;
 		page_unlock(pp);
-		/*
-		 * RFE: we could change this to not loop forever
-		 * For now looping works - it's just like sfmmu.
-		 */
-		while (!page_lock(pp, SE_EXCL, (kmutex_t *)NULL, P_RECLAIM))
-			continue;
+		pp = page_lookup(&kvp, off, SE_EXCL);
+		if (pp == NULL)
+			panic("page not found");
 	}
 #ifdef __xpv
 	if (kpm_vbase && xen_kpm_page(pfn, PT_VALID | PT_WRITABLE) < 0)
 		panic("failure making kpm r/w pfn=0x%lx", pfn);
 #endif
+	page_hashout(pp, NULL);
 	page_free(pp, 1);
 	page_unresv(1);
 }
@@ -1477,6 +1475,26 @@ htable_attach(
 
 	pp = boot_claim_page(pfn);
 	ASSERT(pp != NULL);
+
+	/*
+	 * Page table pages that were allocated by dboot or
+	 * in very early startup didn't go through boot_mapin()
+	 * and so won't have vnode/offsets. Fix that here.
+	 */
+	if (pp->p_vnode == NULL) {
+		/* match offset calculation in page_get_physical() */
+		u_offset_t offset = (uintptr_t)ht;
+		if (offset > kernelbase)
+			offset -= kernelbase;
+		offset <<= MMU_PAGESHIFT;
+#if defined(__amd64)
+		offset += mmu.hole_start;	/* something in VA hole */
+#else
+		offset += 1ULL << 40;		/* something > 4 Gig */
+#endif
+		ASSERT(page_exists(&kvp, offset) == NULL);
+		(void) page_hashin(pp, &kvp, offset, NULL);
+	}
 	page_downgrade(pp);
 #if defined(__xpv) && defined(__amd64)
 	/*

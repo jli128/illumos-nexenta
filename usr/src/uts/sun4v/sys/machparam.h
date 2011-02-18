@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _SYS_MACHPARAM_H
@@ -59,7 +58,13 @@ extern "C" {
  */
 #ifndef NCPU
 #define	NCPU	512
+#define	NCPU_LOG2	9
+#elif (!defined(NCPU_LOG2))
+#error "Must define NCPU_LOG2 together with NCPU"
 #endif
+
+/* NCPU_P2 is NCPU rounded to a power of 2 */
+#define	NCPU_P2	(1 << NCPU_LOG2)
 
 /*
  * Maximum number of processors that we support.  With CMP processors, the

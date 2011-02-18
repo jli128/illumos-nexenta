@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1986, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -130,7 +129,7 @@ int anon_debug;
 
 kmutex_t	anoninfo_lock;
 struct		k_anoninfo k_anoninfo;
-ani_free_t	ani_free_pool[ANI_MAX_POOL];
+ani_free_t	*ani_free_pool;
 pad_mutex_t	anon_array_lock[ANON_LOCKSIZE];
 kcondvar_t	anon_array_cv[ANON_LOCKSIZE];
 
@@ -139,10 +138,24 @@ kcondvar_t	anon_array_cv[ANON_LOCKSIZE];
  */
 extern	int swap_maxcontig;
 size_t	anon_hash_size;
+unsigned int anon_hash_shift;
 struct anon **anon_hash;
 
 static struct kmem_cache *anon_cache;
 static struct kmem_cache *anonmap_cache;
+
+pad_mutex_t	*anonhash_lock;
+
+/*
+ * Used to make the increment of all refcnts of all anon slots of a large
+ * page appear to be atomic.  The lock is grabbed for the first anon slot of
+ * a large page.
+ */
+pad_mutex_t	*anonpages_hash_lock;
+
+#define	APH_MUTEX(vp, off)				\
+	(&anonpages_hash_lock[(ANON_HASH((vp), (off)) &	\
+	    (AH_LOCK_SIZE - 1))].pad_mutex)
 
 #ifdef VM_STATS
 static struct anonvmstats_str {
@@ -180,19 +193,33 @@ anonmap_cache_destructor(void *buf, void *cdrarg)
 	mutex_destroy(&amp->a_purgemtx);
 }
 
-kmutex_t	anonhash_lock[AH_LOCK_SIZE];
-kmutex_t	anonpages_hash_lock[AH_LOCK_SIZE];
-
 void
 anon_init(void)
 {
 	int i;
+	pad_mutex_t *tmp;
 
-	anon_hash_size = 1L << highbit(physmem / ANON_HASHAVELEN);
+	/* These both need to be powers of 2 so round up to the next power */
+	anon_hash_shift = highbit((physmem / ANON_HASHAVELEN) - 1);
+	anon_hash_size = 1L << anon_hash_shift;
+
+	/*
+	 * We need to align the anonhash_lock and anonpages_hash_lock arrays
+	 * to a 64B boundary to avoid false sharing.  We add 63B to our
+	 * allocation so that we can get a 64B aligned address to use.
+	 * We allocate both of these together to avoid wasting an additional
+	 * 63B.
+	 */
+	tmp = kmem_zalloc((2 * AH_LOCK_SIZE * sizeof (pad_mutex_t)) + 63,
+	    KM_SLEEP);
+	anonhash_lock = (pad_mutex_t *)P2ROUNDUP((uintptr_t)tmp, 64);
+	anonpages_hash_lock = anonhash_lock + AH_LOCK_SIZE;
 
 	for (i = 0; i < AH_LOCK_SIZE; i++) {
-		mutex_init(&anonhash_lock[i], NULL, MUTEX_DEFAULT, NULL);
-		mutex_init(&anonpages_hash_lock[i], NULL, MUTEX_DEFAULT, NULL);
+		mutex_init(&anonhash_lock[i].pad_mutex, NULL, MUTEX_DEFAULT,
+		    NULL);
+		mutex_init(&anonpages_hash_lock[i].pad_mutex, NULL,
+		    MUTEX_DEFAULT, NULL);
 	}
 
 	for (i = 0; i < ANON_LOCKSIZE; i++) {
@@ -204,12 +231,16 @@ anon_init(void)
 	anon_hash = (struct anon **)
 	    kmem_zalloc(sizeof (struct anon *) * anon_hash_size, KM_SLEEP);
 	anon_cache = kmem_cache_create("anon_cache", sizeof (struct anon),
-	    AN_CACHE_ALIGN, NULL, NULL, NULL, NULL, NULL, 0);
+	    AN_CACHE_ALIGN, NULL, NULL, NULL, NULL, NULL, KMC_PREFILL);
 	anonmap_cache = kmem_cache_create("anonmap_cache",
 	    sizeof (struct anon_map), 0,
 	    anonmap_cache_constructor, anonmap_cache_destructor, NULL,
 	    NULL, NULL, 0);
 	swap_maxcontig = (1024 * 1024) >> PAGESHIFT;	/* 1MB of pages */
+
+	tmp = kmem_zalloc((ANI_MAX_POOL * sizeof (ani_free_t)) + 63, KM_SLEEP);
+	/* Round ani_free_pool to cacheline boundary to avoid false sharing. */
+	ani_free_pool = (ani_free_t *)P2ROUNDUP((uintptr_t)tmp, 64);
 
 	anon_vp = vn_alloc(KM_SLEEP);
 	vn_setops(anon_vp, swap_vnodeops);
@@ -226,7 +257,7 @@ anon_addhash(struct anon *ap)
 {
 	int index;
 
-	ASSERT(MUTEX_HELD(&anonhash_lock[AH_LOCK(ap->an_vp, ap->an_off)]));
+	ASSERT(MUTEX_HELD(AH_MUTEX(ap->an_vp, ap->an_off)));
 	index = ANON_HASH(ap->an_vp, ap->an_off);
 	ap->an_hash = anon_hash[index];
 	anon_hash[index] = ap;
@@ -237,7 +268,7 @@ anon_rmhash(struct anon *ap)
 {
 	struct anon **app;
 
-	ASSERT(MUTEX_HELD(&anonhash_lock[AH_LOCK(ap->an_vp, ap->an_off)]));
+	ASSERT(MUTEX_HELD(AH_MUTEX(ap->an_vp, ap->an_off)));
 
 	for (app = &anon_hash[ANON_HASH(ap->an_vp, ap->an_off)];
 	    *app; app = &((*app)->an_hash)) {
@@ -700,19 +731,35 @@ anon_grow(struct anon_hdr *ahp, ulong_t *startidx_p, pgcnt_t oldseg_pgs,
 
 
 /*
- * Called from clock handler to sync ani_free value.
+ * Called to sync ani_free value.
  */
 
 void
 set_anoninfo(void)
 {
-	int	ix;
-	pgcnt_t	total = 0;
+	processorid_t	ix, max_seqid;
+	pgcnt_t		total = 0;
+	static clock_t	last_time;
+	clock_t		new_time;
 
-	for (ix = 0; ix < ANI_MAX_POOL; ix++) {
-		total += ani_free_pool[ix].ani_count;
+	if (ani_free_pool == NULL)
+		return;
+
+	/*
+	 * Recompute ani_free at most once per tick. Use max_cpu_seqid_ever to
+	 * identify the maximum number of CPUs were ever online.
+	 */
+	new_time = ddi_get_lbolt();
+	if (new_time > last_time) {
+
+		max_seqid = max_cpu_seqid_ever;
+		ASSERT(ANI_MAX_POOL > max_seqid);
+		for (ix = 0; ix <= max_seqid; ix++)
+			total += ani_free_pool[ix].ani_count;
+
+		last_time = new_time;
+		k_anoninfo.ani_free = total;
 	}
-	k_anoninfo.ani_free = total;
 }
 
 /*
@@ -943,7 +990,7 @@ anon_alloc(struct vnode *vp, anoff_t off)
 	ap->an_refcnt = 1;
 	ap->an_pvp = NULL;
 	ap->an_poff = 0;
-	ahm = &anonhash_lock[AH_LOCK(ap->an_vp, ap->an_off)];
+	ahm = AH_MUTEX(ap->an_vp, ap->an_off);
 	mutex_enter(ahm);
 	anon_addhash(ap);
 	mutex_exit(ahm);
@@ -976,7 +1023,7 @@ anon_swap_free(struct anon *ap, page_t *pp)
 		return;
 
 	page_io_lock(pp);
-	ahm = &anonhash_lock[AH_LOCK(ap->an_vp, ap->an_off)];
+	ahm = AH_MUTEX(ap->an_vp, ap->an_off);
 	mutex_enter(ahm);
 
 	ASSERT(ap->an_refcnt != 0);
@@ -1008,7 +1055,7 @@ anon_decref(struct anon *ap)
 	anoff_t off;
 	kmutex_t *ahm;
 
-	ahm = &anonhash_lock[AH_LOCK(ap->an_vp, ap->an_off)];
+	ahm = AH_MUTEX(ap->an_vp, ap->an_off);
 	mutex_enter(ahm);
 	ASSERT(ap->an_refcnt != 0);
 	if (ap->an_refcnt == 0)
@@ -1064,7 +1111,7 @@ anon_szcshare(struct anon_hdr *ahp, ulong_t anon_index)
 	if (ap == NULL)
 		return (0);
 
-	ahmpages = &anonpages_hash_lock[AH_LOCK(ap->an_vp, ap->an_off)];
+	ahmpages = APH_MUTEX(ap->an_vp, ap->an_off);
 	mutex_enter(ahmpages);
 	ASSERT(ap->an_refcnt >= 1);
 	if (ap->an_refcnt == 1) {
@@ -1129,7 +1176,7 @@ anon_decref_pages(
 	VM_STAT_ADD(anonvmstats.decrefpages[0]);
 
 	if (ap != NULL) {
-		ahmpages = &anonpages_hash_lock[AH_LOCK(ap->an_vp, ap->an_off)];
+		ahmpages = APH_MUTEX(ap->an_vp, ap->an_off);
 		mutex_enter(ahmpages);
 		ASSERT((refcnt = ap->an_refcnt) != 0);
 		VM_STAT_ADD(anonvmstats.decrefpages[1]);
@@ -1157,8 +1204,7 @@ anon_decref_pages(
 			pp = page_lookup(vp, (u_offset_t)off, SE_EXCL);
 			if (pp == NULL || pp->p_szc == 0) {
 				VM_STAT_ADD(anonvmstats.decrefpages[3]);
-				ahm = &anonhash_lock[AH_LOCK(ap->an_vp,
-				    ap->an_off)];
+				ahm = AH_MUTEX(ap->an_vp, ap->an_off);
 				(void) anon_set_ptr(ahp, an_idx + i, NULL,
 				    ANON_SLEEP);
 				mutex_enter(ahm);
@@ -1225,8 +1271,7 @@ anon_decref_pages(
 					ap = anon_get_ptr(ahp, an_idx + j);
 					ASSERT(ap != NULL &&
 					    ap->an_refcnt == 1);
-					ahm = &anonhash_lock[AH_LOCK(ap->an_vp,
-					    ap->an_off)];
+					ahm = AH_MUTEX(ap->an_vp, ap->an_off);
 					(void) anon_set_ptr(ahp, an_idx + j,
 					    NULL, ANON_SLEEP);
 					mutex_enter(ahm);
@@ -1263,7 +1308,7 @@ anon_decref_pages(
 		} else {
 			VM_STAT_ADD(anonvmstats.decrefpages[8]);
 			(void) anon_set_ptr(ahp, an_idx + i, NULL, ANON_SLEEP);
-			ahm = &anonhash_lock[AH_LOCK(ap->an_vp, ap->an_off)];
+			ahm = AH_MUTEX(ap->an_vp, ap->an_off);
 			mutex_enter(ahm);
 			ap->an_refcnt--;
 			mutex_exit(ahm);
@@ -1306,7 +1351,7 @@ anon_dup(struct anon_hdr *old, ulong_t old_idx, struct anon_hdr *new,
 			break;
 
 		(void) anon_set_ptr(new, new_idx + off, ap, ANON_SLEEP);
-		ahm = &anonhash_lock[AH_LOCK(ap->an_vp, ap->an_off)];
+		ahm = AH_MUTEX(ap->an_vp, ap->an_off);
 
 		mutex_enter(ahm);
 		ap->an_refcnt++;
@@ -1398,11 +1443,9 @@ anon_dup_fill_holes(
 				 * getting an anonpages_hash_lock for the
 				 * first anon slot of a large page.
 				 */
-				int hash = AH_LOCK(ap->an_vp, ap->an_off);
-
 				VM_STAT_ADD(anonvmstats.dupfillholes[2]);
 
-				ahmpages = &anonpages_hash_lock[hash];
+				ahmpages = APH_MUTEX(ap->an_vp, ap->an_off);
 				mutex_enter(ahmpages);
 				/*LINTED*/
 				ASSERT(refcnt = ap->an_refcnt);
@@ -1412,7 +1455,7 @@ anon_dup_fill_holes(
 			}
 			(void) anon_set_ptr(new, new_idx + off + i, ap,
 			    ANON_SLEEP);
-			ahm = &anonhash_lock[AH_LOCK(ap->an_vp, ap->an_off)];
+			ahm = AH_MUTEX(ap->an_vp, ap->an_off);
 			mutex_enter(ahm);
 			ASSERT(ahmpages != NULL || ap->an_refcnt == 1);
 			ASSERT(i == 0 || ahmpages == NULL ||
@@ -1681,7 +1724,7 @@ anon_disclaim(struct anon_map *amp, ulong_t index, size_t size)
 			continue;
 		}
 
-		ahm = &anonhash_lock[AH_LOCK(vp, off)];
+		ahm = AH_MUTEX(vp, off);
 		mutex_enter(ahm);
 		ASSERT(ap->an_refcnt != 0);
 		/*
@@ -1768,7 +1811,7 @@ anon_disclaim(struct anon_map *amp, ulong_t index, size_t size)
 				if (ap == NULL)
 					break;
 				swap_xlate(ap, &vp, &off);
-				ahm = &anonhash_lock[AH_LOCK(vp, off)];
+				ahm = AH_MUTEX(vp, off);
 				mutex_enter(ahm);
 				ASSERT(ap->an_refcnt != 0);
 
@@ -1831,7 +1874,7 @@ anon_getpage(
 	 * routine does.
 	 */
 	if (pl != NULL && (pp = page_lookup(vp, (u_offset_t)off, SE_SHARED))) {
-		ahm = &anonhash_lock[AH_LOCK(ap->an_vp, ap->an_off)];
+		ahm = AH_MUTEX(ap->an_vp, ap->an_off);
 		mutex_enter(ahm);
 		if (ap->an_refcnt == 1)
 			*protp = PROT_ALL;
@@ -1855,7 +1898,7 @@ anon_getpage(
 	    seg, addr, rw, cred, NULL);
 
 	if (err == 0 && pl != NULL) {
-		ahm = &anonhash_lock[AH_LOCK(ap->an_vp, ap->an_off)];
+		ahm = AH_MUTEX(ap->an_vp, ap->an_off);
 		mutex_enter(ahm);
 		if (ap->an_refcnt != 1)
 			*protp &= ~PROT_WRITE;	/* make read-only */
@@ -2512,8 +2555,7 @@ anon_map_privatepages(
 	 * first anon slot of a large page.
 	 */
 	if (ap != NULL) {
-		ahmpages = &anonpages_hash_lock[AH_LOCK(ap->an_vp,
-		    ap->an_off)];
+		ahmpages = APH_MUTEX(ap->an_vp, ap->an_off);
 		mutex_enter(ahmpages);
 		if (ap->an_refcnt == 1) {
 			VM_STAT_ADD(anonvmstats.privatepages[4]);
@@ -2821,8 +2863,7 @@ anon_map_createpages(
 			 */
 			if (ap->an_pvp != NULL) {
 				page_io_lock(pp);
-				ahm = &anonhash_lock[AH_LOCK(ap->an_vp,
-				    ap->an_off)];
+				ahm = AH_MUTEX(ap->an_vp, ap->an_off);
 				mutex_enter(ahm);
 				if (ap->an_pvp != NULL) {
 					swap_phys_free(ap->an_pvp,
@@ -3008,7 +3049,7 @@ anon_try_demote_pages(
 	ap = anon_get_ptr(ahp, sidx);
 	if (ap != NULL && private) {
 		VM_STAT_ADD(anonvmstats.demotepages[1]);
-		ahmpages = &anonpages_hash_lock[AH_LOCK(ap->an_vp, ap->an_off)];
+		ahmpages = APH_MUTEX(ap->an_vp, ap->an_off);
 		mutex_enter(ahmpages);
 	}
 

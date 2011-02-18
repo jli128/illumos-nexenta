@@ -1,3 +1,9 @@
+sunwnfsckr (5.11.134-31-0-1) nexenta; urgency=low
+
+  * Issue 3987: backport numerous VM subsystem fixes/improvements
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 16 Feb 2011 13:43:52 -0800
+
 sunwnfsckr (5.11.134-31-0-0) nexenta; urgency=low
 
   * Issue 3914: backport several NFS fixes

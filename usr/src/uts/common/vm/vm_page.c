@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1986, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989  AT&T	*/
@@ -1475,6 +1474,14 @@ page_create_throttle(pgcnt_t npages, int flags)
 	pgcnt_t tf;	/* effective value of throttlefree */
 
 	/*
+	 * Normal priority allocations.
+	 */
+	if ((flags & (PG_WAIT | PG_NORMALPRI)) == PG_NORMALPRI) {
+		ASSERT(!(flags & (PG_PANIC | PG_PUSHPAGE)));
+		return (freemem >= npages + throttlefree);
+	}
+
+	/*
 	 * Never deny pages when:
 	 * - it's a thread that cannot block [NOMEMWAIT()]
 	 * - the allocation cannot block and must not fail
@@ -2142,7 +2149,7 @@ page_create_va_large(vnode_t *vp, u_offset_t off, size_t bytes, uint_t flags,
 	ASSERT(vp != NULL);
 
 	ASSERT((flags & ~(PG_EXCL | PG_WAIT |
-	    PG_NORELOC | PG_PANIC | PG_PUSHPAGE)) == 0);
+	    PG_NORELOC | PG_PANIC | PG_PUSHPAGE | PG_NORMALPRI)) == 0);
 	/* but no others */
 
 	ASSERT((flags & PG_EXCL) == PG_EXCL);
@@ -2277,7 +2284,7 @@ page_create_va(vnode_t *vp, u_offset_t off, size_t bytes, uint_t flags,
 		/*NOTREACHED*/
 	}
 	ASSERT((flags & ~(PG_EXCL | PG_WAIT |
-	    PG_NORELOC | PG_PANIC | PG_PUSHPAGE)) == 0);
+	    PG_NORELOC | PG_PANIC | PG_PUSHPAGE | PG_NORMALPRI)) == 0);
 	    /* but no others */
 
 	pages_req = npages = btopr(bytes);
@@ -3970,11 +3977,27 @@ page_pp_useclaim(
 	uint_t	write_perm) 	/* set if vpage has PROT_WRITE */
 {
 	int payback = 0;
+	int nidx, oidx;
 
 	ASSERT(PAGE_LOCKED(opp));
 	ASSERT(PAGE_LOCKED(npp));
 
-	page_struct_lock(opp);
+	/*
+	 * Since we have two pages we probably have two locks.  We need to take
+	 * them in a defined order to avoid deadlocks.  It's also possible they
+	 * both hash to the same lock in which case this is a non-issue.
+	 */
+	nidx = PAGE_LLOCK_HASH(PP_PAGEROOT(npp));
+	oidx = PAGE_LLOCK_HASH(PP_PAGEROOT(opp));
+	if (nidx < oidx) {
+		page_struct_lock(npp);
+		page_struct_lock(opp);
+	} else if (oidx < nidx) {
+		page_struct_lock(opp);
+		page_struct_lock(npp);
+	} else {	/* The pages hash to the same lock */
+		page_struct_lock(npp);
+	}
 
 	ASSERT(npp->p_cowcnt == 0);
 	ASSERT(npp->p_lckcnt == 0);
@@ -4010,7 +4033,16 @@ page_pp_useclaim(
 		pages_useclaim--;
 		mutex_exit(&freemem_lock);
 	}
-	page_struct_unlock(opp);
+
+	if (nidx < oidx) {
+		page_struct_unlock(opp);
+		page_struct_unlock(npp);
+	} else if (oidx < nidx) {
+		page_struct_unlock(npp);
+		page_struct_unlock(opp);
+	} else {	/* The pages hash to the same lock */
+		page_struct_unlock(npp);
+	}
 }
 
 /*
@@ -4096,21 +4128,27 @@ page_subclaim(page_t *pp)
 	return (r);
 }
 
+/*
+ * Variant of page_addclaim(), where ppa[] contains the pages of a single large
+ * page.
+ */
 int
 page_addclaim_pages(page_t  **ppa)
 {
-
 	pgcnt_t	lckpgs = 0, pg_idx;
 
 	VM_STAT_ADD(pagecnt.pc_addclaim_pages);
 
-	mutex_enter(&page_llock);
+	/*
+	 * Only need to take the page struct lock on the large page root.
+	 */
+	page_struct_lock(ppa[0]);
 	for (pg_idx = 0; ppa[pg_idx] != NULL; pg_idx++) {
 
 		ASSERT(PAGE_LOCKED(ppa[pg_idx]));
 		ASSERT(ppa[pg_idx]->p_lckcnt != 0);
 		if (ppa[pg_idx]->p_cowcnt == (ushort_t)PAGE_LOCK_MAXIMUM) {
-			mutex_exit(&page_llock);
+			page_struct_unlock(ppa[0]);
 			return (0);
 		}
 		if (ppa[pg_idx]->p_lckcnt > 1)
@@ -4124,7 +4162,7 @@ page_addclaim_pages(page_t  **ppa)
 			pages_claimed += lckpgs;
 		} else {
 			mutex_exit(&freemem_lock);
-			mutex_exit(&page_llock);
+			page_struct_unlock(ppa[0]);
 			return (0);
 		}
 		mutex_exit(&freemem_lock);
@@ -4134,10 +4172,14 @@ page_addclaim_pages(page_t  **ppa)
 		ppa[pg_idx]->p_lckcnt--;
 		ppa[pg_idx]->p_cowcnt++;
 	}
-	mutex_exit(&page_llock);
+	page_struct_unlock(ppa[0]);
 	return (1);
 }
 
+/*
+ * Variant of page_subclaim(), where ppa[] contains the pages of a single large
+ * page.
+ */
 int
 page_subclaim_pages(page_t  **ppa)
 {
@@ -4145,13 +4187,16 @@ page_subclaim_pages(page_t  **ppa)
 
 	VM_STAT_ADD(pagecnt.pc_subclaim_pages);
 
-	mutex_enter(&page_llock);
+	/*
+	 * Only need to take the page struct lock on the large page root.
+	 */
+	page_struct_lock(ppa[0]);
 	for (pg_idx = 0; ppa[pg_idx] != NULL; pg_idx++) {
 
 		ASSERT(PAGE_LOCKED(ppa[pg_idx]));
 		ASSERT(ppa[pg_idx]->p_cowcnt != 0);
 		if (ppa[pg_idx]->p_lckcnt == (ushort_t)PAGE_LOCK_MAXIMUM) {
-			mutex_exit(&page_llock);
+			page_struct_unlock(ppa[0]);
 			return (0);
 		}
 		if (ppa[pg_idx]->p_lckcnt != 0)
@@ -4170,7 +4215,7 @@ page_subclaim_pages(page_t  **ppa)
 		ppa[pg_idx]->p_lckcnt++;
 
 	}
-	mutex_exit(&page_llock);
+	page_struct_unlock(ppa[0]);
 	return (1);
 }
 
@@ -5337,7 +5382,6 @@ page_mark_migrate(struct seg *seg, caddr_t addr, size_t len,
 	struct anon	*ap;
 	vnode_t		*curvp;
 	lgrp_t		*from;
-	pgcnt_t		i;
 	pgcnt_t		nlocked;
 	u_offset_t	off;
 	pfn_t		pfn;
@@ -5345,9 +5389,7 @@ page_mark_migrate(struct seg *seg, caddr_t addr, size_t len,
 	size_t		segpgsz;
 	pgcnt_t		pages;
 	uint_t		pszc;
-	page_t		**ppa;
-	pgcnt_t		ppa_nentries;
-	page_t		*pp;
+	page_t		*pp0, *pp;
 	caddr_t		va;
 	ulong_t		an_idx;
 	anon_sync_obj_t	cookie;
@@ -5368,13 +5410,6 @@ page_mark_migrate(struct seg *seg, caddr_t addr, size_t len,
 	addr = (caddr_t)P2ALIGN((uintptr_t)addr, segpgsz);
 	if (rflag)
 		len = P2ROUNDUP(len, segpgsz);
-
-	/*
-	 * Allocate page array to accommodate largest page size
-	 */
-	pgsz = page_get_pagesize(page_num_pagesizes() - 1);
-	ppa_nentries = btop(pgsz);
-	ppa = kmem_zalloc(ppa_nentries * sizeof (page_t *), KM_SLEEP);
 
 	/*
 	 * Do one (large) page at a time
@@ -5432,10 +5467,10 @@ page_mark_migrate(struct seg *seg, caddr_t addr, size_t len,
 		    pgsz > segpgsz) {
 			pgsz = MIN(pgsz, segpgsz);
 			page_unlock(pp);
-			i = btop(P2END((uintptr_t)va, pgsz) -
+			pages = btop(P2END((uintptr_t)va, pgsz) -
 			    (uintptr_t)va);
 			va = (caddr_t)P2END((uintptr_t)va, pgsz);
-			lgrp_stat_add(from->lgrp_id, LGRP_PMM_FAIL_PGS, i);
+			lgrp_stat_add(from->lgrp_id, LGRP_PMM_FAIL_PGS, pages);
 			continue;
 		}
 
@@ -5450,10 +5485,7 @@ page_mark_migrate(struct seg *seg, caddr_t addr, size_t len,
 			continue;
 		}
 
-		/*
-		 * Remember pages locked exclusively and how many
-		 */
-		ppa[0] = pp;
+		pp0 = pp++;
 		nlocked = 1;
 
 		/*
@@ -5464,8 +5496,7 @@ page_mark_migrate(struct seg *seg, caddr_t addr, size_t len,
 			 * Lock all constituents except root page, since it
 			 * should be locked already.
 			 */
-			for (i = 1; i < pages; i++) {
-				pp++;
+			for (; nlocked < pages; nlocked++) {
 				if (!page_trylock(pp, SE_EXCL)) {
 					break;
 				}
@@ -5478,8 +5509,7 @@ page_mark_migrate(struct seg *seg, caddr_t addr, size_t len,
 					page_unlock(pp);
 					break;
 				}
-				ppa[nlocked] = pp;
-				nlocked++;
+				pp++;
 			}
 		}
 
@@ -5487,9 +5517,10 @@ page_mark_migrate(struct seg *seg, caddr_t addr, size_t len,
 		 * If all constituent pages couldn't be locked,
 		 * unlock pages locked so far and skip to next page.
 		 */
-		if (nlocked != pages) {
-			for (i = 0; i < nlocked; i++)
-				page_unlock(ppa[i]);
+		if (nlocked < pages) {
+			while (pp0 < pp) {
+				page_unlock(pp0++);
+			}
 			va += pgsz;
 			lgrp_stat_add(from->lgrp_id, LGRP_PMM_FAIL_PGS,
 			    btop(pgsz));
@@ -5509,18 +5540,16 @@ page_mark_migrate(struct seg *seg, caddr_t addr, size_t len,
 		 * constituent pages, so a fault will occur on any part of the
 		 * large page
 		 */
-		PP_SETMIGRATE(ppa[0]);
-		for (i = 0; i < nlocked; i++) {
-			pp = ppa[i];
-			(void) hat_pageunload(pp, HAT_FORCE_PGUNLOAD);
-			ASSERT(hat_page_getshare(pp) == 0);
-			page_unlock(pp);
+		PP_SETMIGRATE(pp0);
+		while (pp0 < pp) {
+			(void) hat_pageunload(pp0, HAT_FORCE_PGUNLOAD);
+			ASSERT(hat_page_getshare(pp0) == 0);
+			page_unlock(pp0++);
 		}
 		lgrp_stat_add(from->lgrp_id, LGRP_PMM_PGS, nlocked);
 
 		va += pgsz;
 	}
-	kmem_free(ppa, ppa_nentries * sizeof (page_t *));
 }
 
 /*
@@ -6229,13 +6258,21 @@ struct page_capture_callback pc_cb[PC_NUM_CALLBACKS];
 /* Note that this is a circular linked list */
 typedef struct page_capture_hash_bucket {
 	page_t *pp;
-	uint_t szc;
+	uchar_t szc;
+	uchar_t pri;
 	uint_t flags;
 	clock_t expires;	/* lbolt at which this request expires. */
 	void *datap;		/* Cached data passed in for callback */
 	struct page_capture_hash_bucket *next;
 	struct page_capture_hash_bucket *prev;
 } page_capture_hash_bucket_t;
+
+#define	PC_PRI_HI	0	/* capture now */
+#define	PC_PRI_LO	1	/* capture later */
+#define	PC_NUM_PRI	2
+
+#define	PAGE_CAPTURE_PRIO(pp) (PP_ISRAF(pp) ? PC_PRI_LO : PC_PRI_HI)
+
 
 /*
  * Each hash bucket will have it's own mutex and two lists which are:
@@ -6257,7 +6294,7 @@ typedef struct page_capture_hash_bucket {
  */
 typedef struct page_capture_hash_head {
 	kmutex_t pchh_mutex;
-	uint_t num_pages;
+	uint_t num_pages[PC_NUM_PRI];
 	page_capture_hash_bucket_t lists[2]; /* sentinel nodes */
 } page_capture_hash_head_t;
 
@@ -6333,7 +6370,8 @@ page_capture_unregister_callback(uint_t index)
 					 * hold appropriate locks here.
 					 */
 					page_clrtoxic(head->pp, PR_CAPTURE);
-					page_capture_hash[i].num_pages--;
+					page_capture_hash[i].
+					    num_pages[bp2->pri]--;
 					continue;
 				}
 				bp1 = bp1->next;
@@ -6379,8 +6417,20 @@ page_capture_move_to_walked(page_t *pp)
 			bp->prev = &page_capture_hash[index].lists[1];
 			page_capture_hash[index].lists[1].next = bp;
 			bp->next->prev = bp;
-			mutex_exit(&page_capture_hash[index].pchh_mutex);
 
+			/*
+			 * There is a small probability of page on a free
+			 * list being retired while being allocated
+			 * and before P_RAF is set on it. The page may
+			 * end up marked as high priority request instead
+			 * of low priority request.
+			 * If P_RAF page is not marked as low priority request
+			 * change it to low priority request.
+			 */
+			page_capture_hash[index].num_pages[bp->pri]--;
+			bp->pri = PAGE_CAPTURE_PRIO(pp);
+			page_capture_hash[index].num_pages[bp->pri]++;
+			mutex_exit(&page_capture_hash[index].pchh_mutex);
 			return (1);
 		}
 		bp = bp->next;
@@ -6404,6 +6454,7 @@ page_capture_add_hash(page_t *pp, uint_t szc, uint_t flags, void *datap)
 	int index;
 	int cb_index;
 	int i;
+	uchar_t pri;
 #ifdef DEBUG
 	page_capture_hash_bucket_t *tp1;
 	int l;
@@ -6469,11 +6520,13 @@ page_capture_add_hash(page_t *pp, uint_t szc, uint_t flags, void *datap)
 
 #endif
 		page_settoxic(pp, PR_CAPTURE);
+		pri = PAGE_CAPTURE_PRIO(pp);
+		bp1->pri = pri;
 		bp1->next = page_capture_hash[index].lists[0].next;
 		bp1->prev = &page_capture_hash[index].lists[0];
 		bp1->next->prev = bp1;
 		page_capture_hash[index].lists[0].next = bp1;
-		page_capture_hash[index].num_pages++;
+		page_capture_hash[index].num_pages[pri]++;
 		if (flags & CAPTURE_RETIRE) {
 			page_retire_incr_pend_count(datap);
 		}
@@ -6801,7 +6854,8 @@ page_capture_take_action(page_t *pp, uint_t flags, void *datap)
 				if (bp1->pp == pp) {
 					bp1->next->prev = bp1->prev;
 					bp1->prev->next = bp1->next;
-					page_capture_hash[index].num_pages--;
+					page_capture_hash[index].
+					    num_pages[bp1->pri]--;
 					page_clrtoxic(pp, PR_CAPTURE);
 					found = 1;
 					break;
@@ -6882,8 +6936,9 @@ page_capture_take_action(page_t *pp, uint_t flags, void *datap)
 		bp1->next = page_capture_hash[index].lists[1].next;
 		bp1->prev = &page_capture_hash[index].lists[1];
 		bp1->next->prev = bp1;
+		bp1->pri = PAGE_CAPTURE_PRIO(pp);
 		page_capture_hash[index].lists[1].next = bp1;
-		page_capture_hash[index].num_pages++;
+		page_capture_hash[index].num_pages[bp1->pri]++;
 		mutex_exit(&page_capture_hash[index].pchh_mutex);
 		return (ret);
 	}
@@ -6913,6 +6968,9 @@ page_capture_take_action(page_t *pp, uint_t flags, void *datap)
 						bp2->datap = bp1->datap;
 					}
 				}
+				page_capture_hash[index].num_pages[bp2->pri]--;
+				bp2->pri = PAGE_CAPTURE_PRIO(pp);
+				page_capture_hash[index].num_pages[bp2->pri]++;
 				mutex_exit(&page_capture_hash[index].
 				    pchh_mutex);
 				kmem_free(bp1, sizeof (*bp1));
@@ -7142,10 +7200,16 @@ page_retire_mdboot()
 	page_t *pp;
 	int i, j;
 	page_capture_hash_bucket_t *bp;
+	uchar_t pri;
 
 	/* walk lists looking for pages to scrub */
 	for (i = 0; i < NUM_PAGE_CAPTURE_BUCKETS; i++) {
-		if (page_capture_hash[i].num_pages == 0)
+		for (pri = 0; pri < PC_NUM_PRI; pri++) {
+			if (page_capture_hash[i].num_pages[pri] != 0) {
+				break;
+			}
+		}
+		if (pri == PC_NUM_PRI)
 			continue;
 
 		mutex_enter(&page_capture_hash[i].pchh_mutex);
@@ -7182,11 +7246,17 @@ page_capture_async()
 	uint_t szc;
 	uint_t flags;
 	void *datap;
+	uchar_t pri;
 
 	/* If there are outstanding pages to be captured, get to work */
 	for (i = 0; i < NUM_PAGE_CAPTURE_BUCKETS; i++) {
-		if (page_capture_hash[i].num_pages == 0)
+		for (pri = 0; pri < PC_NUM_PRI; pri++) {
+			if (page_capture_hash[i].num_pages[pri] != 0)
+				break;
+		}
+		if (pri == PC_NUM_PRI)
 			continue;
+
 		/* Append list 1 to list 0 and then walk through list 0 */
 		mutex_enter(&page_capture_hash[i].pchh_mutex);
 		bp1 = &page_capture_hash[i].lists[1];
@@ -7211,7 +7281,7 @@ page_capture_async()
 				page_capture_hash[i].lists[0].next = bp1->next;
 				bp1->next->prev =
 				    &page_capture_hash[i].lists[0];
-				page_capture_hash[i].num_pages--;
+				page_capture_hash[i].num_pages[bp1->pri]--;
 
 				/*
 				 * We can safely remove the PR_CAPTURE bit
@@ -7348,28 +7418,35 @@ static void
 page_capture_thread(void)
 {
 	callb_cpr_t c;
-	int outstanding;
 	int i;
+	int high_pri_pages;
+	int low_pri_pages;
+	clock_t timeout;
 
 	CALLB_CPR_INIT(&c, &pc_thread_mutex, callb_generic_cpr, "page_capture");
 
 	mutex_enter(&pc_thread_mutex);
 	for (;;) {
-		outstanding = 0;
-		for (i = 0; i < NUM_PAGE_CAPTURE_BUCKETS; i++)
-			outstanding += page_capture_hash[i].num_pages;
-		if (outstanding) {
-			page_capture_handle_outstanding();
-			CALLB_CPR_SAFE_BEGIN(&c);
-			(void) cv_reltimedwait(&pc_cv, &pc_thread_mutex,
-			    pc_thread_shortwait, TR_CLOCK_TICK);
-			CALLB_CPR_SAFE_END(&c, &pc_thread_mutex);
-		} else {
-			CALLB_CPR_SAFE_BEGIN(&c);
-			(void) cv_reltimedwait(&pc_cv, &pc_thread_mutex,
-			    pc_thread_longwait, TR_CLOCK_TICK);
-			CALLB_CPR_SAFE_END(&c, &pc_thread_mutex);
+		high_pri_pages = 0;
+		low_pri_pages = 0;
+		for (i = 0; i < NUM_PAGE_CAPTURE_BUCKETS; i++) {
+			high_pri_pages +=
+			    page_capture_hash[i].num_pages[PC_PRI_HI];
+			low_pri_pages +=
+			    page_capture_hash[i].num_pages[PC_PRI_LO];
 		}
+
+		timeout = pc_thread_longwait;
+		if (high_pri_pages != 0) {
+			timeout = pc_thread_shortwait;
+			page_capture_handle_outstanding();
+		} else if (low_pri_pages != 0) {
+			page_capture_async();
+		}
+		CALLB_CPR_SAFE_BEGIN(&c);
+		(void) cv_reltimedwait(&pc_cv, &pc_thread_mutex,
+		    timeout, TR_CLOCK_TICK);
+		CALLB_CPR_SAFE_END(&c, &pc_thread_mutex);
 	}
 	/*NOTREACHED*/
 }

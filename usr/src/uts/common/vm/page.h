@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1986, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -103,10 +102,43 @@ typedef int	selock_t;
 #ifdef _KERNEL
 
 /*
- * Macros to acquire and release the page logical lock.
+ * PAGE_LLOCK_SIZE is 2 * NCPU, but no smaller than 128.
+ * PAGE_LLOCK_SHIFT is log2(PAGE_LLOCK_SIZE).
+ *
+ * We use ? : instead of #if because <vm/page.h> is included everywhere;
+ * NCPU_P2 is only a constant in the "unix" module.
+ *
  */
-#define	page_struct_lock(pp)	mutex_enter(&page_llock)
-#define	page_struct_unlock(pp)	mutex_exit(&page_llock)
+#define	PAGE_LLOCK_SHIFT \
+	    ((unsigned)(((2*NCPU_P2) > 128) ? NCPU_LOG2 + 1 : 7))
+
+#define	PAGE_LLOCK_SIZE (1ul << PAGE_LLOCK_SHIFT)
+
+/*
+ * The number of low order 0 (or less variable) bits in the page_t address.
+ */
+#if defined(__sparc)
+#define	PP_SHIFT		7
+#else
+#define	PP_SHIFT		6
+#endif
+
+/*
+ * pp may be the root of a large page, and many low order bits will be 0.
+ * Shift and XOR multiple times to capture the good bits across the range of
+ * possible page sizes.
+ */
+#define	PAGE_LLOCK_HASH(pp)	\
+	(((((uintptr_t)(pp) >> PP_SHIFT) ^ \
+	((uintptr_t)(pp) >> (PAGE_LLOCK_SHIFT + PP_SHIFT))) ^ \
+	((uintptr_t)(pp) >> ((PAGE_LLOCK_SHIFT * 2) + PP_SHIFT)) ^ \
+	((uintptr_t)(pp) >> ((PAGE_LLOCK_SHIFT * 3) + PP_SHIFT))) & \
+	(PAGE_LLOCK_SIZE - 1))
+
+#define	page_struct_lock(pp)	\
+	mutex_enter(&page_llocks[PAGE_LLOCK_HASH(PP_PAGEROOT(pp))].pad_mutex)
+#define	page_struct_unlock(pp)	\
+	mutex_exit(&page_llocks[PAGE_LLOCK_HASH(PP_PAGEROOT(pp))].pad_mutex)
 
 #endif	/* _KERNEL */
 
@@ -172,7 +204,7 @@ struct as;
  *				p_next
  *				p_prev
  *
- * The following fields are protected by the global page_llock:
+ * The following fields are protected by the global page_llocks[]:
  *
  *				p_lckcnt
  *				p_cowcnt
@@ -349,8 +381,11 @@ struct as;
  *							    sleep while holding
  *							    this lock.
  *	=====================================================================
- *	p_lckcnt	p_selock(E,S)	p_selock(E) &&
- *	p_cowcnt			page_llock
+ *	p_lckcnt	p_selock(E,S)	p_selock(E)
+ *					    OR
+ *					p_selock(S) &&
+ *					page_llocks[]
+ *	p_cowcnt
  *	=====================================================================
  *	p_nrm		hat layer lock	hat layer lock
  *	p_mapping
@@ -536,45 +571,52 @@ typedef	page_t	devpage_t;
  * resulting hashed value.  Note that this will perform quickly, since the
  * shifting/summing are fast register to register operations with no additional
  * memory references).
+ *
+ * PH_SHIFT_SIZE is the amount to use for the successive shifts in the hash
+ * function below.  The actual value is LOG2(PH_TABLE_SIZE), so that as many
+ * bits as possible will filter thru PAGE_HASH_FUNC() and PAGE_HASH_MUTEX().
+ *
+ * We use ? : instead of #if because <vm/page.h> is included everywhere;
+ * NCPU maps to a global variable outside of the "unix" module.
  */
 #if defined(_LP64)
-
-#if NCPU < 4
-#define	PH_TABLE_SIZE	128
-#define	VP_SHIFT	7
-#else
-#define	PH_TABLE_SIZE	1024
-#define	VP_SHIFT	9
-#endif
-
+#define	PH_SHIFT_SIZE	((NCPU < 4) ? 7		: (NCPU_LOG2 + 1))
 #else	/* 32 bits */
-
-#if NCPU < 4
-#define	PH_TABLE_SIZE	16
-#define	VP_SHIFT	7
-#else
-#define	PH_TABLE_SIZE	128
-#define	VP_SHIFT	9
-#endif
-
+#define	PH_SHIFT_SIZE	((NCPU < 4) ? 4		: 7)
 #endif	/* _LP64 */
 
+#define	PH_TABLE_SIZE	(1ul << PH_SHIFT_SIZE)
+
 /*
- * The amount to use for the successive shifts in the hash function below.
- * The actual value is LOG2(PH_TABLE_SIZE), so that as many bits as
- * possible will filter thru PAGE_HASH_FUNC() and PAGE_HASH_MUTEX().
+ *
+ * We take care to get as much randomness as possible from both the vp and
+ * the offset.  Workloads can have few vnodes with many offsets, many vnodes
+ * with few offsets or a moderate mix of both.  This hash should perform
+ * equally well for each of these possibilities and for all types of memory
+ * allocations.
+ *
+ * vnodes representing files are created over a long period of time and
+ * have good variation in the upper vp bits, and the right shifts below
+ * capture these bits.  However, swap vnodes are created quickly in a
+ * narrow vp* range.  Refer to comments at swap_alloc: vnum has exactly
+ * AN_VPSHIFT bits, so the kmem_alloc'd vnode addresses have approximately
+ * AN_VPSHIFT bits of variation above their VNODE_ALIGN low order 0 bits.
+ * Spread swap vnodes widely in the hash table by XOR'ing a term with the
+ * vp bits of variation left shifted to the top of the range.
  */
-#define	PH_SHIFT_SIZE   (7)
 
 #define	PAGE_HASHSZ	page_hashsz
 #define	PAGE_HASHAVELEN		4
 #define	PAGE_HASH_FUNC(vp, off) \
-	((((uintptr_t)(off) >> PAGESHIFT) + \
-		((uintptr_t)(off) >> (PAGESHIFT + PH_SHIFT_SIZE)) + \
-		((uintptr_t)(vp) >> 3) + \
-		((uintptr_t)(vp) >> (3 + PH_SHIFT_SIZE)) + \
-		((uintptr_t)(vp) >> (3 + 2 * PH_SHIFT_SIZE))) & \
-		(PAGE_HASHSZ - 1))
+	(((((uintptr_t)(off) >> PAGESHIFT) ^ \
+	    ((uintptr_t)(off) >> (PAGESHIFT + PH_SHIFT_SIZE))) ^ \
+	    (((uintptr_t)(vp) >> 3) ^ \
+	    ((uintptr_t)(vp) >> (3 + PH_SHIFT_SIZE)) ^ \
+	    ((uintptr_t)(vp) >> (3 + 2 * PH_SHIFT_SIZE)) ^ \
+	    ((uintptr_t)(vp) << \
+	    (page_hashsz_shift - AN_VPSHIFT - VNODE_ALIGN_LOG2)))) & \
+	    (PAGE_HASHSZ - 1))
+
 #ifdef _KERNEL
 
 /*
@@ -589,23 +631,17 @@ typedef	page_t	devpage_t;
  * Since sizeof (kmutex_t) is 8, we shift an additional 3 to skew to a different
  * 64 byte sub-block.
  */
-typedef struct pad_mutex {
-	kmutex_t	pad_mutex;
-#ifdef _LP64
-	char		pad_pad[64 - sizeof (kmutex_t)];
-#endif
-} pad_mutex_t;
 extern pad_mutex_t ph_mutex[];
 
 #define	PAGE_HASH_MUTEX(x) \
-	&(ph_mutex[((x) + ((x) >> VP_SHIFT) + ((x) << 3)) & \
+	&(ph_mutex[((x) ^ ((x) >> PH_SHIFT_SIZE) + ((x) << 3)) & \
 		(PH_TABLE_SIZE - 1)].pad_mutex)
 
 /*
  * Flags used while creating pages.
  */
 #define	PG_EXCL		0x0001
-#define	PG_WAIT		0x0002
+#define	PG_WAIT		0x0002		/* Blocking memory allocations */
 #define	PG_PHYSCONTIG	0x0004		/* NOT SUPPORTED */
 #define	PG_MATCH_COLOR	0x0008		/* SUPPORTED by free list routines */
 #define	PG_NORELOC	0x0010		/* Non-relocatable alloc hint. */
@@ -613,7 +649,8 @@ extern pad_mutex_t ph_mutex[];
 #define	PG_PANIC	0x0020		/* system will panic if alloc fails */
 #define	PG_PUSHPAGE	0x0040		/* alloc may use reserve */
 #define	PG_LOCAL	0x0080		/* alloc from given lgrp only */
-
+#define	PG_NORMALPRI	0x0100		/* PG_WAIT like priority, but */
+					/* non-blocking */
 /*
  * When p_selock has the SE_EWANTED bit set, threads waiting for SE_EXCL
  * access are given priority over all other waiting threads.
@@ -626,9 +663,10 @@ extern pad_mutex_t ph_mutex[];
 	((se) == SE_EXCL ? PAGE_EXCL(pp) : PAGE_SHARED(pp))
 
 extern	long page_hashsz;
+extern	unsigned int page_hashsz_shift;
 extern	page_t **page_hash;
 
-extern	kmutex_t page_llock;		/* page logical lock mutex */
+extern	pad_mutex_t page_llocks[];	/* page logical lock mutex */
 extern	kmutex_t freemem_lock;		/* freemem lock */
 
 extern	pgcnt_t	total_pages;		/* total pages in the system */
@@ -893,6 +931,7 @@ int	page_szc_user_filtered(size_t);
 #define	P_MIGRATE	0x20		/* Migrate page on next touch */
 #define	P_SWAP		0x10		/* belongs to vnode that is V_ISSWAP */
 #define	P_BOOTPAGES	0x08		/* member of bootpages list */
+#define	P_RAF		0x04		/* page retired at free */
 
 #define	PP_ISFREE(pp)		((pp)->p_state & P_FREE)
 #define	PP_ISAGED(pp)		(((pp)->p_state & P_FREE) && \
@@ -903,6 +942,7 @@ int	page_szc_user_filtered(size_t);
 #define	PP_ISMIGRATE(pp)	((pp)->p_state & P_MIGRATE)
 #define	PP_ISSWAP(pp)		((pp)->p_state & P_SWAP)
 #define	PP_ISBOOTPAGES(pp)	((pp)->p_state & P_BOOTPAGES)
+#define	PP_ISRAF(pp)		((pp)->p_state & P_RAF)
 
 #define	PP_SETFREE(pp)		((pp)->p_state = ((pp)->p_state & ~P_MIGRATE) \
 				| P_FREE)
@@ -911,6 +951,7 @@ int	page_szc_user_filtered(size_t);
 #define	PP_SETMIGRATE(pp)	((pp)->p_state |= P_MIGRATE)
 #define	PP_SETSWAP(pp)		((pp)->p_state |= P_SWAP)
 #define	PP_SETBOOTPAGES(pp)	((pp)->p_state |= P_BOOTPAGES)
+#define	PP_SETRAF(pp)		((pp)->p_state |= P_RAF)
 
 #define	PP_CLRFREE(pp)		((pp)->p_state &= ~P_FREE)
 #define	PP_CLRAGED(pp)		ASSERT(!PP_ISAGED(pp))
@@ -918,6 +959,7 @@ int	page_szc_user_filtered(size_t);
 #define	PP_CLRMIGRATE(pp)	((pp)->p_state &= ~P_MIGRATE)
 #define	PP_CLRSWAP(pp)		((pp)->p_state &= ~P_SWAP)
 #define	PP_CLRBOOTPAGES(pp)	((pp)->p_state &= ~P_BOOTPAGES)
+#define	PP_CLRRAF(pp)		((pp)->p_state &= ~P_RAF)
 
 /*
  * Flags for page_t p_toxic, for tracking memory hardware errors.
@@ -965,7 +1007,7 @@ int	page_szc_user_filtered(size_t);
 #define	PR_UE		0x02	/* page has an unhandled UE */
 #define	PR_UE_SCRUBBED	0x04	/* page has seen a UE but was cleaned */
 #define	PR_FMA		0x08	/* A DE wants this page retired */
-#define	PR_CAPTURE	0x10	/* Generic page capture flag */
+#define	PR_CAPTURE	0x10	/* page is hashed on page_capture_hash[] */
 #define	PR_RESV		0x20	/* Reserved for future use */
 #define	PR_MSG		0x40	/* message(s) already printed for this page */
 #define	PR_RETIRED	0x80	/* This page has been retired */

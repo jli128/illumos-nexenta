@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /* Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
@@ -54,6 +53,7 @@
 #include <sys/exechdr.h>
 #include <sys/debug.h>
 #include <sys/vmsystm.h>
+#include <sys/swap.h>
 #include <sys/dumphdr.h>
 
 #include <vm/hat.h>
@@ -3792,7 +3792,6 @@ page_get_physical(uintptr_t seed)
 	    &tmpseg, (caddr_t)(ctr += MMU_PAGESIZE));	/* changing VA usage */
 	if (pp != NULL) {
 		page_io_unlock(pp);
-		page_hashout(pp, NULL);
 		page_downgrade(pp);
 	}
 	return (pp);

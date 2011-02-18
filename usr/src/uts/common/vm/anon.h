@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1986, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
@@ -38,8 +37,6 @@
 
 #ifndef	_VM_ANON_H
 #define	_VM_ANON_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/cred.h>
 #include <sys/zone.h>
@@ -94,6 +91,11 @@ struct anon {
 	int an_refcnt;		/* # of people sharing slot */
 };
 
+#define	AN_CACHE_ALIGN_LOG2	4	/* log2(AN_CACHE_ALIGN) */
+#define	AN_CACHE_ALIGN	(1U << AN_CACHE_ALIGN_LOG2) /* anon address aligned */
+						/* 16 bytes */
+
+
 #ifdef _KERNEL
 /*
  * The swapinfo_lock protects:
@@ -116,7 +118,7 @@ struct anon {
  */
 extern kmutex_t anoninfo_lock;
 extern kmutex_t swapinfo_lock;
-extern kmutex_t anonhash_lock[];
+extern pad_mutex_t *anonhash_lock;
 extern pad_mutex_t anon_array_lock[];
 extern kcondvar_t anon_array_cv[];
 
@@ -124,14 +126,30 @@ extern kcondvar_t anon_array_cv[];
  * Global hash table to provide a function from (vp, off) -> ap
  */
 extern size_t anon_hash_size;
+extern unsigned int anon_hash_shift;
 extern struct anon **anon_hash;
 #define	ANON_HASH_SIZE	anon_hash_size
 #define	ANON_HASHAVELEN	4
-#define	ANON_HASH(VP, OFF)	\
-((((uintptr_t)(VP) >> 7)  ^ ((OFF) >> PAGESHIFT)) & (ANON_HASH_SIZE - 1))
+/*
+ * Try to use as many bits of randomness from both vp and off as we can.
+ * This should help spreading evenly for a variety of workloads.  See comments
+ * for PAGE_HASH_FUNC for more explanation.
+ */
+#define	ANON_HASH(vp, off)	\
+	(((((uintptr_t)(off) >> PAGESHIFT) ^ \
+		((uintptr_t)(off) >> (PAGESHIFT + anon_hash_shift))) ^ \
+		(((uintptr_t)(vp) >> 3) ^ \
+		((uintptr_t)(vp) >> (3 + anon_hash_shift)) ^ \
+		((uintptr_t)(vp) >> (3 + 2 * anon_hash_shift)) ^ \
+		((uintptr_t)(vp) << \
+		    (anon_hash_shift - AN_VPSHIFT - VNODE_ALIGN_LOG2)))) & \
+		(anon_hash_size - 1))
 
-#define	AH_LOCK_SIZE	64
-#define	AH_LOCK(vp, off) (ANON_HASH((vp), (off)) & (AH_LOCK_SIZE -1))
+#define	AH_LOCK_SIZE	(2 << NCPU_LOG2)
+
+#define	AH_MUTEX(vp, off)				\
+	(&anonhash_lock[(ANON_HASH((vp), (off)) &	\
+	    (AH_LOCK_SIZE - 1))].pad_mutex)
 
 #endif	/* _KERNEL */
 
@@ -180,24 +198,27 @@ struct anoninfo32 {
  */
 
 typedef	struct	ani_free {
-	kmutex_t	ani_lock;
 	pgcnt_t		ani_count;
-	uchar_t		pad[64 - sizeof (kmutex_t) - sizeof (pgcnt_t)];
+	uchar_t		pad[64 - sizeof (pgcnt_t)];
 			/* XXX 64 = cacheline size */
 } ani_free_t;
 
-#define	ANI_MAX_POOL	128
-extern	ani_free_t	ani_free_pool[];
+#define	ANI_MAX_POOL	(NCPU_P2)
+extern	ani_free_t	*ani_free_pool;
 
+/*
+ * Since each CPU has its own bucket in ani_free_pool, there should be no
+ * contention here.
+ */
 #define	ANI_ADD(inc)	{ \
-	ani_free_t	*anifp; \
-	int		index; \
-	index = (CPU->cpu_id & (ANI_MAX_POOL - 1)); \
-	anifp = &ani_free_pool[index]; \
-	mutex_enter(&anifp->ani_lock); \
-	anifp->ani_count += inc; \
-	mutex_exit(&anifp->ani_lock); \
+	pgcnt_t	*ani_countp; \
+	int	index; \
+	index = (CPU->cpu_seqid & (ANI_MAX_POOL - 1)); \
+	ani_countp = &ani_free_pool[index].ani_count; \
+	atomic_add_long(ani_countp, inc); \
 }
+
+extern void	set_anoninfo(void);
 
 /*
  * Anon array pointers are allocated in chunks. Each chunk

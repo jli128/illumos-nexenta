@@ -1387,7 +1387,6 @@ f none usr/include/sys/vm_usage.h 644 root bin
 f none usr/include/sys/vmem.h 644 root bin
 f none usr/include/sys/vmem_impl.h 644 root bin
 f none usr/include/sys/vmem_impl_user.h 644 root bin
-f none usr/include/sys/vmmeter.h 644 root bin
 f none usr/include/sys/vmparam.h 644 root bin
 f none usr/include/sys/vmsystm.h 644 root bin
 f none usr/include/sys/vnode.h 644 root bin
