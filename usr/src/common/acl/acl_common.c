@@ -1571,26 +1571,26 @@ void
 acl_trivial_access_masks(mode_t mode, uint32_t *allow0, uint32_t *deny1,
     uint32_t *deny2, uint32_t *owner, uint32_t *group, uint32_t *everyone)
 {
-	*deny1 = *deny2 = *allow0 = *group = 0;
+	*deny1 = *deny2 = *allow0 = 0;
 
 	if (!(mode & S_IRUSR) && (mode & (S_IRGRP|S_IROTH)))
 		*deny1 |= ACE_READ_DATA;
 	if (!(mode & S_IWUSR) && (mode & (S_IWGRP|S_IWOTH)))
-		*deny1 |= ACE_WRITE_DATA;
+		*deny1 |= ACE_WRITE_DATA|ACE_APPEND_DATA;
 	if (!(mode & S_IXUSR) && (mode & (S_IXGRP|S_IXOTH)))
 		*deny1 |= ACE_EXECUTE;
 
 	if (!(mode & S_IRGRP) && (mode & S_IROTH))
 		*deny2 = ACE_READ_DATA;
 	if (!(mode & S_IWGRP) && (mode & S_IWOTH))
-		*deny2 |= ACE_WRITE_DATA;
+		*deny2 |= ACE_WRITE_DATA|ACE_APPEND_DATA;
 	if (!(mode & S_IXGRP) && (mode & S_IXOTH))
 		*deny2 |= ACE_EXECUTE;
 
 	if ((mode & S_IRUSR) && (!(mode & S_IRGRP) && (mode & S_IROTH)))
 		*allow0 |= ACE_READ_DATA;
 	if ((mode & S_IWUSR) && (!(mode & S_IWGRP) && (mode & S_IWOTH)))
-		*allow0 |= ACE_WRITE_DATA;
+		*allow0 |= ACE_WRITE_DATA|ACE_APPEND_DATA;
 	if ((mode & S_IXUSR) && (!(mode & S_IXGRP) && (mode & S_IXOTH)))
 		*allow0 |= ACE_EXECUTE;
 
@@ -1714,10 +1714,17 @@ ace_trivial_common(void *acep, int aclcnt,
 			return (1);
 
 		/*
-		 * Delete permissions are never set by default
+		 * Delete permission is never set by default
 		 */
-		if (mask & (ACE_DELETE|ACE_DELETE_CHILD))
+		if (mask & ACE_DELETE)
 			return (1);
+
+		/*
+		 * Child delete permission should be accompanied by write
+		 */
+		if (mask & ACE_DELETE_CHILD && !(mask & ACE_WRITE_DATA))
+			return (1);
+
 		/*
 		 * only allow owner@ to have
 		 * write_acl/write_owner/write_attributes/write_xattr/

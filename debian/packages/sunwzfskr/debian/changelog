@@ -1,3 +1,10 @@
+sunwzfskr (5.11.134-31-0-4) nexenta; urgency=high
+
+  * Issue 2399: Editing a file with vi strips inherited ACLs
+  * Issue 2752: dD flags are missing
+
+ -- Albert Lee <trisk@nexenta.com>  Wed, 16 Feb 2011 02:10:44 -0500
+
 sunwzfskr (5.11.134-31-0-3) nexenta; urgency=low
 
   * Issue 3974: a couple more ZFS backports

@@ -33,8 +33,6 @@
 extern "C" {
 #endif
 
-extern ace_t trivial_acl[6];
-
 extern int acltrivial(const char *);
 extern void adjust_ace_pair(ace_t *pair, mode_t mode);
 extern void adjust_ace_pair_common(void *, size_t, size_t, mode_t);
