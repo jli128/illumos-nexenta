@@ -1424,19 +1424,8 @@ zfs_acl_chmod(zfsvfs_t *zfsvfs, vtype_t vtype, uint64_t mode, boolean_t trim,
 			 * Limit permissions to be no greater than
 			 * group permissions
 			 */
-			if (type == ALLOW && trim) {
-				if (!(mode & S_IRGRP))
-					access_mask &= ~ACE_READ_DATA;
-				if (!(mode & S_IWGRP))
-					access_mask &=
-					    ~(ACE_WRITE_DATA|ACE_APPEND_DATA|
-					    ACE_DELETE_CHILD);
-				if (!(mode & S_IXGRP))
-					access_mask &= ~ACE_EXECUTE;
-				access_mask &=
-				    ~(ACE_WRITE_OWNER|ACE_WRITE_ACL|
-				    ACE_WRITE_ATTRIBUTES|ACE_WRITE_NAMED_ATTRS);
-			}
+			if (type == ALLOW && trim)
+				access_mask &= group;
 		}
 		zfs_set_ace(aclp, zacep, access_mask, type, who, iflags);
 		ace_size = aclp->z_ops.ace_size(acep);

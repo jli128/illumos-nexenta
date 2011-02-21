@@ -1,3 +1,9 @@
+sunwzfskr (5.11.134-31-0-5) nexenta; urgency=high
+
+  * Issue 4019: aclinherit=restricted does not "trim" ACEs quite right
+
+ -- Albert Lee <trisk@nexenta.com>  Mon, 21 Feb 2011 17:45:52 -0500
+
 sunwzfskr (5.11.134-31-0-4) nexenta; urgency=high
 
   * Issue 2399: Editing a file with vi strips inherited ACLs
