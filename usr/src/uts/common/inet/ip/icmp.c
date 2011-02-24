@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -680,6 +679,7 @@ rawip_do_connect(conn_t *connp, const struct sockaddr *sa, socklen_t len,
 	in6_addr_t	v6dst;
 	uint32_t	flowinfo;
 	ip_xmit_attr_t	*ixa;
+	ip_xmit_attr_t	*oldixa;
 	uint_t		scopeid = 0;
 	uint_t		srcid = 0;
 	in6_addr_t	v6src = connp->conn_saddr_v6;
@@ -735,13 +735,12 @@ rawip_do_connect(conn_t *connp, const struct sockaddr *sa, socklen_t len,
 	 * conn_ixa and prevent any other thread from using/changing it.
 	 * Once connect() is done other threads can use conn_ixa since the
 	 * refcnt will be back at one.
+	 * We defer updating conn_ixa until later to handle any concurrent
+	 * conn_ixa_cleanup thread.
 	 */
-	ixa = conn_get_ixa(connp, B_TRUE);
+	ixa = conn_get_ixa(connp, B_FALSE);
 	if (ixa == NULL)
 		return (ENOMEM);
-
-	ASSERT(ixa->ixa_refcnt >= 2);
-	ASSERT(ixa == connp->conn_ixa);
 
 	mutex_enter(&connp->conn_lock);
 	/*
@@ -800,6 +799,15 @@ rawip_do_connect(conn_t *connp, const struct sockaddr *sa, socklen_t len,
 		connp->conn_flowinfo = flowinfo;
 	}
 
+	/*
+	 * We update our cred/cpid based on the caller of connect
+	 */
+	if (connp->conn_cred != cr) {
+		crhold(cr);
+		crfree(connp->conn_cred);
+		connp->conn_cred = cr;
+	}
+	connp->conn_cpid = pid;
 	ixa->ixa_cred = cr;
 	ixa->ixa_cpid = pid;
 	if (is_system_labeled()) {
@@ -856,7 +864,10 @@ rawip_do_connect(conn_t *connp, const struct sockaddr *sa, socklen_t len,
 	connp->conn_lastsrcid = srcid;
 	/* Also remember a source to use together with lastdst */
 	connp->conn_v6lastsrc = v6src;
+
+	oldixa = conn_replace_ixa(connp, ixa);
 	mutex_exit(&connp->conn_lock);
+	ixa_refrele(oldixa);
 
 	ixa_refrele(ixa);
 	return (0);
@@ -1547,7 +1558,7 @@ icmp_tpi_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
 	connp = rawip_do_open(family, credp, &error, KM_SLEEP);
 	if (connp == NULL) {
 		ASSERT(error != 0);
-		inet_minor_free(ip_minor_arena_sa, connp->conn_dev);
+		inet_minor_free(ip_minor_arena_sa, conn_dev);
 		return (error);
 	}
 
@@ -3050,6 +3061,8 @@ icmp_output_hdrincl(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid)
 	/* Get a copy of conn_xmit_ipp since the TX label might change it */
 	ipp = kmem_zalloc(sizeof (*ipp), KM_NOSLEEP);
 	if (ipp == NULL) {
+		ixa->ixa_cred = connp->conn_cred;	/* Restore */
+		ixa->ixa_cpid = connp->conn_cpid;
 		ixa_refrele(ixa);
 		BUMP_MIB(&is->is_rawip_mib, rawipOutErrors);
 		freemsg(mp);
@@ -3273,6 +3286,8 @@ icmp_output_hdrincl(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid)
 		break;
 	}
 done:
+	ixa->ixa_cred = connp->conn_cred;	/* Restore */
+	ixa->ixa_cpid = connp->conn_cpid;
 	ixa_refrele(ixa);
 	ip_pkt_free(ipp);
 	kmem_free(ipp, sizeof (*ipp));
@@ -3352,6 +3367,8 @@ icmp_output_ancillary(conn_t *connp, sin_t *sin, sin6_t *sin6, mblk_t *mp,
 	/* Get a copy of conn_xmit_ipp since the options might change it */
 	ipp = kmem_zalloc(sizeof (*ipp), KM_NOSLEEP);
 	if (ipp == NULL) {
+		ixa->ixa_cred = connp->conn_cred;	/* Restore */
+		ixa->ixa_cpid = connp->conn_cpid;
 		ixa_refrele(ixa);
 		BUMP_MIB(&is->is_rawip_mib, rawipOutErrors);
 		freemsg(mp);
@@ -3581,6 +3598,8 @@ icmp_output_ancillary(conn_t *connp, sin_t *sin, sin6_t *sin6, mblk_t *mp,
 		break;
 	}
 done:
+	ixa->ixa_cred = connp->conn_cred;	/* Restore */
+	ixa->ixa_cpid = connp->conn_cpid;
 	ixa_refrele(ixa);
 	ip_pkt_free(ipp);
 	kmem_free(ipp, sizeof (*ipp));
@@ -3632,6 +3651,8 @@ icmp_output_connected(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid)
 	if (mp == NULL) {
 		ASSERT(error != 0);
 		mutex_exit(&connp->conn_lock);
+		ixa->ixa_cred = connp->conn_cred;	/* Restore */
+		ixa->ixa_cpid = connp->conn_cpid;
 		ixa_refrele(ixa);
 		BUMP_MIB(&is->is_rawip_mib, rawipOutErrors);
 		freemsg(mp);
@@ -3644,6 +3665,8 @@ icmp_output_connected(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid)
 		if (mp == NULL) {
 			mutex_exit(&connp->conn_lock);
 			BUMP_MIB(&is->is_rawip_mib, rawipOutErrors);
+			ixa->ixa_cred = connp->conn_cred;	/* Restore */
+			ixa->ixa_cpid = connp->conn_cpid;
 			ixa_refrele(ixa);
 			return (EHOSTUNREACH);	/* IPsec policy failure */
 		}
@@ -3698,6 +3721,8 @@ icmp_output_connected(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid)
 			/* FALLTHRU */
 		default:
 		failed:
+			ixa->ixa_cred = connp->conn_cred;	/* Restore */
+			ixa->ixa_cpid = connp->conn_cpid;
 			ixa_refrele(ixa);
 			BUMP_MIB(&is->is_rawip_mib, rawipOutErrors);
 			freemsg(mp);
@@ -3728,6 +3753,8 @@ icmp_output_connected(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid)
 		error = ENETUNREACH;
 		break;
 	}
+	ixa->ixa_cred = connp->conn_cred;	/* Restore */
+	ixa->ixa_cpid = connp->conn_cpid;
 	ixa_refrele(ixa);
 	return (error);
 }
@@ -3771,6 +3798,8 @@ icmp_output_lastdst(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid,
 	if (mp == NULL) {
 		ASSERT(error != 0);
 		mutex_exit(&connp->conn_lock);
+		ixa->ixa_cred = connp->conn_cred;	/* Restore */
+		ixa->ixa_cpid = connp->conn_cpid;
 		ixa_refrele(ixa);
 		BUMP_MIB(&is->is_rawip_mib, rawipOutErrors);
 		freemsg(mp);
@@ -3783,6 +3812,8 @@ icmp_output_lastdst(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid,
 		if (mp == NULL) {
 			mutex_exit(&connp->conn_lock);
 			BUMP_MIB(&is->is_rawip_mib, rawipOutErrors);
+			ixa->ixa_cred = connp->conn_cred;	/* Restore */
+			ixa->ixa_cpid = connp->conn_cpid;
 			ixa_refrele(ixa);
 			return (EHOSTUNREACH);	/* IPsec policy failure */
 		}
@@ -3837,6 +3868,8 @@ icmp_output_lastdst(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid,
 			/* FALLTHRU */
 		default:
 		failed:
+			ixa->ixa_cred = connp->conn_cred;	/* Restore */
+			ixa->ixa_cpid = connp->conn_cpid;
 			ixa_refrele(ixa);
 			BUMP_MIB(&is->is_rawip_mib, rawipOutErrors);
 			freemsg(mp);
@@ -3879,6 +3912,8 @@ icmp_output_lastdst(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid,
 		mutex_exit(&connp->conn_lock);
 		break;
 	}
+	ixa->ixa_cred = connp->conn_cred;	/* Restore */
+	ixa->ixa_cpid = connp->conn_cpid;
 	ixa_refrele(ixa);
 	return (error);
 }
@@ -4593,12 +4628,15 @@ icmp_output_newdst(conn_t *connp, mblk_t *data_mp, sin_t *sin, sin6_t *sin6,
 		break;
 	}
 done:
+	ixa->ixa_cred = connp->conn_cred;	/* Restore */
+	ixa->ixa_cpid = connp->conn_cpid;
 	ixa_refrele(ixa);
 	return (error);
 
 ud_error:
-	if (ixa != NULL)
-		ixa_refrele(ixa);
+	ixa->ixa_cred = connp->conn_cred;	/* Restore */
+	ixa->ixa_cpid = connp->conn_cpid;
+	ixa_refrele(ixa);
 
 	BUMP_MIB(&is->is_rawip_mib, rawipOutErrors);
 	freemsg(data_mp);

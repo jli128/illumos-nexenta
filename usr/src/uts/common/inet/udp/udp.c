@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -3128,6 +3127,8 @@ udp_output_ancillary(conn_t *connp, sin_t *sin, sin6_t *sin6, mblk_t *mp,
 	/* Get a copy of conn_xmit_ipp since the options might change it */
 	ipp = kmem_zalloc(sizeof (*ipp), KM_NOSLEEP);
 	if (ipp == NULL) {
+		ixa->ixa_cred = connp->conn_cred;	/* Restore */
+		ixa->ixa_cpid = connp->conn_cpid;
 		ixa_refrele(ixa);
 		BUMP_MIB(&us->us_udp_mib, udpOutErrors);
 		freemsg(mp);
@@ -3356,6 +3357,8 @@ udp_output_ancillary(conn_t *connp, sin_t *sin, sin6_t *sin6, mblk_t *mp,
 		break;
 	}
 done:
+	ixa->ixa_cred = connp->conn_cred;	/* Restore */
+	ixa->ixa_cpid = connp->conn_cpid;
 	ixa_refrele(ixa);
 	ip_pkt_free(ipp);
 	kmem_free(ipp, sizeof (*ipp));
@@ -3396,6 +3399,8 @@ udp_output_connected(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid)
 	if (mp == NULL) {
 		ASSERT(error != 0);
 		mutex_exit(&connp->conn_lock);
+		ixa->ixa_cred = connp->conn_cred;	/* Restore */
+		ixa->ixa_cpid = connp->conn_cpid;
 		ixa_refrele(ixa);
 		BUMP_MIB(&us->us_udp_mib, udpOutErrors);
 		freemsg(mp);
@@ -3451,6 +3456,8 @@ udp_output_connected(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid)
 			/* FALLTHRU */
 		default:
 		failed:
+			ixa->ixa_cred = connp->conn_cred;	/* Restore */
+			ixa->ixa_cpid = connp->conn_cpid;
 			ixa_refrele(ixa);
 			freemsg(mp);
 			BUMP_MIB(&us->us_udp_mib, udpOutErrors);
@@ -3482,6 +3489,8 @@ udp_output_connected(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid)
 		error = ENETUNREACH;
 		break;
 	}
+	ixa->ixa_cred = connp->conn_cred;	/* Restore */
+	ixa->ixa_cpid = connp->conn_cpid;
 	ixa_refrele(ixa);
 	return (error);
 }
@@ -3513,6 +3522,8 @@ udp_output_lastdst(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid,
 	if (mp == NULL) {
 		ASSERT(error != 0);
 		mutex_exit(&connp->conn_lock);
+		ixa->ixa_cred = connp->conn_cred;	/* Restore */
+		ixa->ixa_cpid = connp->conn_cpid;
 		ixa_refrele(ixa);
 		BUMP_MIB(&us->us_udp_mib, udpOutErrors);
 		freemsg(mp);
@@ -3568,6 +3579,8 @@ udp_output_lastdst(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid,
 			/* FALLTHRU */
 		default:
 		failed:
+			ixa->ixa_cred = connp->conn_cred;	/* Restore */
+			ixa->ixa_cpid = connp->conn_cpid;
 			ixa_refrele(ixa);
 			freemsg(mp);
 			BUMP_MIB(&us->us_udp_mib, udpOutErrors);
@@ -3611,6 +3624,8 @@ udp_output_lastdst(conn_t *connp, mblk_t *mp, cred_t *cr, pid_t pid,
 		mutex_exit(&connp->conn_lock);
 		break;
 	}
+	ixa->ixa_cred = connp->conn_cred;	/* Restore */
+	ixa->ixa_cpid = connp->conn_cpid;
 	ixa_refrele(ixa);
 	return (error);
 }
@@ -4407,12 +4422,15 @@ udp_output_newdst(conn_t *connp, mblk_t *data_mp, sin_t *sin, sin6_t *sin6,
 		mutex_exit(&connp->conn_lock);
 		break;
 	}
+	ixa->ixa_cred = connp->conn_cred;	/* Restore */
+	ixa->ixa_cpid = connp->conn_cpid;
 	ixa_refrele(ixa);
 	return (error);
 
 ud_error:
-	if (ixa != NULL)
-		ixa_refrele(ixa);
+	ixa->ixa_cred = connp->conn_cred;	/* Restore */
+	ixa->ixa_cpid = connp->conn_cpid;
+	ixa_refrele(ixa);
 
 	freemsg(data_mp);
 	BUMP_MIB(&us->us_udp_mib, udpOutErrors);
@@ -6054,6 +6072,7 @@ udp_do_connect(conn_t *connp, const struct sockaddr *sa, socklen_t len,
 	int		error;
 	conn_t		*connp1;
 	ip_xmit_attr_t	*ixa;
+	ip_xmit_attr_t	*oldixa;
 	uint_t		scopeid = 0;
 	uint_t		srcid = 0;
 	in6_addr_t	v6src = connp->conn_saddr_v6;
@@ -6124,13 +6143,12 @@ udp_do_connect(conn_t *connp, const struct sockaddr *sa, socklen_t len,
 	 * conn_ixa and prevent any other thread from using/changing it.
 	 * Once connect() is done other threads can use conn_ixa since the
 	 * refcnt will be back at one.
+	 * We defer updating conn_ixa until later to handle any concurrent
+	 * conn_ixa_cleanup thread.
 	 */
-	ixa = conn_get_ixa(connp, B_TRUE);
+	ixa = conn_get_ixa(connp, B_FALSE);
 	if (ixa == NULL)
 		return (ENOMEM);
-
-	ASSERT(ixa->ixa_refcnt >= 2);
-	ASSERT(ixa == connp->conn_ixa);
 
 	mutex_enter(&connp->conn_lock);
 	/*
@@ -6198,6 +6216,15 @@ udp_do_connect(conn_t *connp, const struct sockaddr *sa, socklen_t len,
 	}
 	mutex_exit(&udpf->uf_lock);
 
+	/*
+	 * We update our cred/cpid based on the caller of connect
+	 */
+	if (connp->conn_cred != cr) {
+		crhold(cr);
+		crfree(connp->conn_cred);
+		connp->conn_cred = cr;
+	}
+	connp->conn_cpid = pid;
 	ixa->ixa_cred = cr;
 	ixa->ixa_cpid = pid;
 	if (is_system_labeled()) {
@@ -6253,7 +6280,10 @@ udp_do_connect(conn_t *connp, const struct sockaddr *sa, socklen_t len,
 	connp->conn_lastsrcid = srcid;
 	/* Also remember a source to use together with lastdst */
 	connp->conn_v6lastsrc = v6src;
+
+	oldixa = conn_replace_ixa(connp, ixa);
 	mutex_exit(&connp->conn_lock);
+	ixa_refrele(oldixa);
 
 	/*
 	 * We've picked a source address above. Now we can
