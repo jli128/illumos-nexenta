@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -83,7 +83,7 @@ cat >> $dest <<EOM
 # CRYPT_ALGORITHMS_ALLOW specifies the algorithms that are allowed to
 # be used for new passwords.  This is enforced only in crypt_gensalt(3c).
 #
-CRYPT_ALGORITHMS_ALLOW=1,2a,md5
+CRYPT_ALGORITHMS_ALLOW=1,2a,md5,5,6
 
 # To deprecate use of the traditional unix algorithm, uncomment below
 # and change CRYPT_DEFAULT= to another algorithm.  For example,
@@ -91,11 +91,12 @@ CRYPT_ALGORITHMS_ALLOW=1,2a,md5
 #
 #CRYPT_ALGORITHMS_DEPRECATE=__unix__
 
-# The Solaris default is the traditional UNIX algorithm.  This is not
+# Newer systems use SHA256 for password encryption.
+# The older default is the traditional UNIX algorithm.  This is not
 # listed in crypt.conf(4) since it is internal to libc.  The reserved
 # name __unix__ is used to refer to it.
 #
-CRYPT_DEFAULT=__unix__
+CRYPT_DEFAULT=5
 EOM
 		fi
 		grep PRIV_ $dest >/dev/null 2>&1
