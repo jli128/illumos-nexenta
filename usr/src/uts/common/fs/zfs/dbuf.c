@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -1300,12 +1301,15 @@ dbuf_undirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 	 * it, since one of the current holders may be in the
 	 * middle of an update.  Note that users of dbuf_undirty()
 	 * should not place a hold on the dbuf before the call.
+	 * Also note: we can get here with a spill block, so
+	 * test for that similar to how dbuf_dirty does it.
 	 */
 	if (refcount_count(&db->db_holds) > db->db_dirtycnt) {
 		mutex_exit(&db->db_mtx);
 		/* Make sure we don't toss this buffer at sync phase */
 		mutex_enter(&dn->dn_mtx);
-		dnode_clear_range(dn, db->db_blkid, 1, tx);
+		if (db->db_blkid != DMU_SPILL_BLKID)
+			dnode_clear_range(dn, db->db_blkid, 1, tx);
 		mutex_exit(&dn->dn_mtx);
 		DB_DNODE_EXIT(db);
 		return (0);
@@ -1319,11 +1323,17 @@ dbuf_undirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 
 	*drp = dr->dr_next;
 
+	/*
+	 * Note that db may refer to a spill block, so test for that
+	 * similarly to how dbuf_dirty() does when adding these to
+	 * the dn_dirty_records list, and do the removal here.
+	 */
 	if (dr->dr_parent) {
 		mutex_enter(&dr->dr_parent->dt.di.dr_mtx);
 		list_remove(&dr->dr_parent->dt.di.dr_children, dr);
 		mutex_exit(&dr->dr_parent->dt.di.dr_mtx);
-	} else if (db->db_level+1 == dn->dn_nlevels) {
+	} else if (db->db_level+1 == dn->dn_nlevels ||
+	    db->db_blkid == DMU_SPILL_BLKID) {
 		ASSERT(db->db_blkptr == NULL || db->db_parent == dn->dn_dbuf);
 		mutex_enter(&dn->dn_mtx);
 		list_remove(&dn->dn_dirty_records[txg & TXG_MASK], dr);

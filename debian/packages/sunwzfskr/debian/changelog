@@ -1,3 +1,9 @@
+sunwzfskr (5.11.134-31-0-6) nexenta; urgency=low
+
+  * Issue 3539: NULL pointer panic in zfs:dbuf_sync_list
+
+ -- Nexenta Systems <support@nexenta.com>  Fri, 04 Mar 2011 11:13:45 -0500
+
 sunwzfskr (5.11.134-31-0-5) nexenta; urgency=high
 
   * Issue 4019: aclinherit=restricted does not "trim" ACEs quite right
