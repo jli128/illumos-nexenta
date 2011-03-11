@@ -1,3 +1,9 @@
+sunwckr (5.11.134-31-0-6) nexenta; urgency=high
+
+  * Issue 4403: Kernel panic in ip_input.c
+
+ -- Nexenta Systems <support@nexenta.com>  Fri, 11 Mar 2011 11:58:20 -0500
+
 sunwckr (5.11.134-31-0-5) nexenta; urgency=low
 
   * Issue 4054: Backport important ip stack fixes
