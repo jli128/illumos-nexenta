@@ -1,3 +1,9 @@
+sunwhermon (5.11.134-31-0-10) nexenta; urgency=low
+
+  * Synchronized with OpenSolaris code (5.11 build 134)
+
+ -- Gate Keeper <support@nexenta.com>  Thu, 24 Mar 2011 22:15:52 -0700
+
 sunwhermon (5.11.134-31-0-0) nexenta; urgency=low
 
   * Synchronized with OpenSolaris code (5.11 build 134)

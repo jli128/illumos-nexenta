@@ -1,16 +1,10 @@
 #!/bin/bash
 #
-# Copyright 2005 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# $Id$
 
 . ./RELEASE
-
-if ! test -e $GATEROOT/usr/src/pkgdefs; then
-	echo "Cannot find $GATEROOT/usr/src/pkgdefs. GATEROOT is not defined?"
-	exit 1
-fi
 
 #
 # Until we find a cleaner solution, this script should be used
