@@ -1,3 +1,9 @@
+sunwckr (5.11.134-31-0-11) nexenta; urgency=low
+
+  * Issue 4578: squeue_synch_{enter,exit}() are unaware of squeue switching 
+
+ -- Nexenta Systems <support@nexenta.com>  Sat, 26 Mar 2011 16:16:55 -0700
+
 sunwckr (5.11.134-31-0-10) nexenta; urgency=low
 
   * Synchronized with OpenSolaris code (5.11 build 134)

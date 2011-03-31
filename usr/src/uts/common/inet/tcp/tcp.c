@@ -20,8 +20,7 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -8231,7 +8230,6 @@ tcp_getsockopt(sock_lower_handle_t proto_handle, int level, int option_name,
     void *optvalp, socklen_t *optlen, cred_t *cr)
 {
 	conn_t		*connp = (conn_t *)proto_handle;
-	squeue_t	*sqp = connp->conn_sqp;
 	int		error;
 	t_uscalar_t	max_optbuf_len;
 	void		*optvalp_buf;
@@ -8252,14 +8250,14 @@ tcp_getsockopt(sock_lower_handle_t proto_handle, int level, int option_name,
 
 	optvalp_buf = kmem_alloc(max_optbuf_len, KM_SLEEP);
 
-	error = squeue_synch_enter(sqp, connp, NULL);
+	error = squeue_synch_enter(connp, NULL);
 	if (error == ENOMEM) {
 		kmem_free(optvalp_buf, max_optbuf_len);
 		return (ENOMEM);
 	}
 
 	len = tcp_opt_get(connp, level, option_name, optvalp_buf);
-	squeue_synch_exit(sqp, connp);
+	squeue_synch_exit(connp);
 
 	if (len == -1) {
 		kmem_free(optvalp_buf, max_optbuf_len);
@@ -8717,7 +8715,6 @@ tcp_setsockopt(sock_lower_handle_t proto_handle, int level, int option_name,
     const void *optvalp, socklen_t optlen, cred_t *cr)
 {
 	conn_t		*connp = (conn_t *)proto_handle;
-	squeue_t	*sqp = connp->conn_sqp;
 	int		error;
 
 	ASSERT(connp->conn_upper_handle != NULL);
@@ -8741,7 +8738,7 @@ tcp_setsockopt(sock_lower_handle_t proto_handle, int level, int option_name,
 		}
 	}
 
-	error = squeue_synch_enter(sqp, connp, NULL);
+	error = squeue_synch_enter(connp, NULL);
 	if (error == ENOMEM) {
 		return (ENOMEM);
 	}
@@ -8755,14 +8752,14 @@ tcp_setsockopt(sock_lower_handle_t proto_handle, int level, int option_name,
 		if (error < 0) {
 			error = proto_tlitosyserr(-error);
 		}
-		squeue_synch_exit(sqp, connp);
+		squeue_synch_exit(connp);
 		return (error);
 	}
 
 	error = tcp_opt_set(connp, SETFN_OPTCOM_NEGOTIATE, level, option_name,
 	    optlen, (uchar_t *)optvalp, (uint_t *)&optlen, (uchar_t *)optvalp,
 	    NULL, cr);
-	squeue_synch_exit(sqp, connp);
+	squeue_synch_exit(connp);
 
 	ASSERT(error >= 0);
 
@@ -20796,15 +20793,13 @@ tcp_bind(sock_lower_handle_t proto_handle, struct sockaddr *sa,
 {
 	int 		error;
 	conn_t		*connp = (conn_t *)proto_handle;
-	squeue_t	*sqp = connp->conn_sqp;
 
 	/* All Solaris components should pass a cred for this operation. */
 	ASSERT(cr != NULL);
 
-	ASSERT(sqp != NULL);
 	ASSERT(connp->conn_upper_handle != NULL);
 
-	error = squeue_synch_enter(sqp, connp, NULL);
+	error = squeue_synch_enter(connp, NULL);
 	if (error != 0) {
 		/* failed to enter */
 		return (ENOSR);
@@ -20820,7 +20815,7 @@ tcp_bind(sock_lower_handle_t proto_handle, struct sockaddr *sa,
 		error = tcp_do_bind(connp, sa, len, cr, B_TRUE);
 	}
 
-	squeue_synch_exit(sqp, connp);
+	squeue_synch_exit(connp);
 
 	if (error < 0) {
 		if (error == -TOUTSTATE)
@@ -21062,7 +21057,6 @@ tcp_connect(sock_lower_handle_t proto_handle, const struct sockaddr *sa,
     socklen_t len, sock_connid_t *id, cred_t *cr)
 {
 	conn_t		*connp = (conn_t *)proto_handle;
-	squeue_t	*sqp = connp->conn_sqp;
 	int		error;
 
 	ASSERT(connp->conn_upper_handle != NULL);
@@ -21075,7 +21069,7 @@ tcp_connect(sock_lower_handle_t proto_handle, const struct sockaddr *sa,
 		return (error);
 	}
 
-	error = squeue_synch_enter(sqp, connp, NULL);
+	error = squeue_synch_enter(connp, NULL);
 	if (error != 0) {
 		/* failed to enter */
 		return (ENOSR);
@@ -21118,7 +21112,7 @@ tcp_connect(sock_lower_handle_t proto_handle, const struct sockaddr *sa,
 		    connp->conn_upper_handle, &sopp);
 	}
 done:
-	squeue_synch_exit(sqp, connp);
+	squeue_synch_exit(connp);
 
 	return ((error == 0) ? EINPROGRESS : error);
 }
@@ -21554,7 +21548,7 @@ tcp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
 	/*
 	 * Enter the squeue so that no new packets can come in
 	 */
-	error = squeue_synch_enter(connp->conn_sqp, connp, NULL);
+	error = squeue_synch_enter(connp, NULL);
 	if (error != 0) {
 		/* failed to enter, free all the pre-allocated messages. */
 		freeb(stropt_mp);
@@ -21597,7 +21591,7 @@ tcp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
 	 * There should be atleast two ref's (IP + TCP)
 	 */
 	ASSERT(connp->conn_ref >= 2);
-	squeue_synch_exit(connp->conn_sqp, connp);
+	squeue_synch_exit(connp);
 
 	return (0);
 }
@@ -21676,14 +21670,13 @@ tcp_listen(sock_lower_handle_t proto_handle, int backlog, cred_t *cr)
 {
 	conn_t	*connp = (conn_t *)proto_handle;
 	int 	error;
-	squeue_t *sqp = connp->conn_sqp;
 
 	ASSERT(connp->conn_upper_handle != NULL);
 
 	/* All Solaris components should pass a cred for this operation. */
 	ASSERT(cr != NULL);
 
-	error = squeue_synch_enter(sqp, connp, NULL);
+	error = squeue_synch_enter(connp, NULL);
 	if (error != 0) {
 		/* failed to enter */
 		return (ENOBUFS);
@@ -21699,7 +21692,7 @@ tcp_listen(sock_lower_handle_t proto_handle, int backlog, cred_t *cr)
 		else
 			error = proto_tlitosyserr(-error);
 	}
-	squeue_synch_exit(sqp, connp);
+	squeue_synch_exit(connp);
 	return (error);
 }
 
@@ -21892,7 +21885,7 @@ tcp_clr_flowctrl(sock_lower_handle_t proto_handle)
 	tcp->tcp_rsrv_mp = NULL;
 	mutex_exit(&tcp->tcp_rsrv_mp_lock);
 
-	error = squeue_synch_enter(connp->conn_sqp, connp, mp);
+	error = squeue_synch_enter(connp, mp);
 	ASSERT(error == 0);
 
 	mutex_enter(&tcp->tcp_rsrv_mp_lock);
@@ -21917,7 +21910,7 @@ tcp_clr_flowctrl(sock_lower_handle_t proto_handle)
 		}
 	}
 
-	squeue_synch_exit(connp->conn_sqp, connp);
+	squeue_synch_exit(connp);
 }
 
 /* ARGSUSED */
