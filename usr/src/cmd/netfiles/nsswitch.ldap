@@ -38,20 +38,19 @@
 passwd:     files ldap
 group:      files ldap
 
-# consult /etc "files" only if ldap is down. 
-hosts:      ldap [NOTFOUND=return] files
+hosts:      files dns ldap mdns
 
 # Note that IPv4 addresses are searched for in all of the ipnodes databases
 # before searching the hosts databases.
-ipnodes:    ldap [NOTFOUND=return] files
+ipnodes:    files dns ldap mdns
 
-networks:   ldap [NOTFOUND=return] files
-protocols:  ldap [NOTFOUND=return] files
-rpc:        ldap [NOTFOUND=return] files
-ethers:     ldap [NOTFOUND=return] files
-netmasks:   ldap [NOTFOUND=return] files
-bootparams: ldap [NOTFOUND=return] files
-publickey:  ldap [NOTFOUND=return] files
+networks:   files ldap
+protocols:  files ldap
+rpc:        files ldap
+ethers:     files ldap
+netmasks:   files ldap
+bootparams: files ldap
+publickey:  files ldap
 
 netgroup:   ldap
 

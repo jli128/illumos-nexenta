@@ -39,20 +39,19 @@
 passwd:     files nis
 group:      files nis
 
-# consult /etc "files" only if nis is down. 
-hosts:      nis [NOTFOUND=return] files
+hosts:      files dns nis mdns
 
 # Note that IPv4 addresses are searched for in all of the ipnodes databases
 # before searching the hosts databases.
-ipnodes:    nis [NOTFOUND=return] files
+ipnodes:    files dns nis mdns
 
-networks:   nis [NOTFOUND=return] files
-protocols:  nis [NOTFOUND=return] files
-rpc:        nis [NOTFOUND=return] files
-ethers:     nis [NOTFOUND=return] files
-netmasks:   nis [NOTFOUND=return] files
-bootparams: nis [NOTFOUND=return] files
-publickey:  nis [NOTFOUND=return] files
+networks:   files nis
+protocols:  files nis
+rpc:        files nis
+ethers:     files nis
+netmasks:   files nis
+bootparams: files nis
+publickey:  files nis
 
 netgroup:   nis
 

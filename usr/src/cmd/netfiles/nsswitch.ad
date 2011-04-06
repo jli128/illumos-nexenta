@@ -51,8 +51,8 @@ group:      files ad
 
 # Note that IPv4 addresses are searched for in all of the ipnodes databases
 # before searching the hosts databases.
-hosts:      files dns
-ipnodes:   files dns
+hosts:      files dns mdns
+ipnodes:   files dns mdns
 
 networks:   files
 protocols:  files
