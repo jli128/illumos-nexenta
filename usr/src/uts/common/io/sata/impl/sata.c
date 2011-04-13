@@ -22,7 +22,9 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
-
+/*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 /*
  * SATA Framework
@@ -3499,15 +3501,16 @@ sata_txlt_nodata_cmd_immediate(sata_pkt_txlate_t *spx)
 {
 	int rval;
 	int reason;
+	kmutex_t *cport_mutex =  &(SATA_TXLT_CPORT_MUTEX(spx));
 
-	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
+	mutex_enter(cport_mutex);
 
 	if (((rval = sata_txlt_generic_pkt_info(spx, &reason, 0)) !=
 	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		mutex_exit(cport_mutex);
 		return (rval);
 	}
-	mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+	mutex_exit(cport_mutex);
 
 	spx->txlt_scsi_pkt->pkt_state = STATE_GOT_BUS | STATE_GOT_TARGET |
 	    STATE_SENT_CMD | STATE_GOT_STATUS;
@@ -3572,12 +3575,13 @@ sata_txlt_inquiry(sata_pkt_txlate_t *spx)
 	uint8_t page_buf[0xff]; /* Max length */
 	int rval, reason;
 	ushort_t rate;
+	kmutex_t *cport_mutex = &(SATA_TXLT_CPORT_MUTEX(spx));
 
-	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
+	mutex_enter(cport_mutex);
 
 	if (((rval = sata_txlt_generic_pkt_info(spx, &reason, 0)) !=
 	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		mutex_exit(cport_mutex);
 		return (rval);
 	}
 
@@ -3765,7 +3769,7 @@ sata_txlt_inquiry(sata_pkt_txlate_t *spx)
 		    scsipkt->pkt_cdbp[4] - count : 0;
 	}
 done:
-	mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+	mutex_exit(cport_mutex);
 
 	SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
 	    "Scsi_pkt completion reason %x\n",
@@ -3812,12 +3816,14 @@ sata_txlt_request_sense(sata_pkt_txlate_t *spx)
 	sata_drive_info_t *sdinfo;
 	sata_cmd_t *scmd = &spx->txlt_sata_pkt->satapkt_cmd;
 	int rval, reason, power_state = 0;
+	kmutex_t *cport_mutex;
 
-	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
+	cport_mutex = &(SATA_TXLT_CPORT_MUTEX(spx));
+	mutex_enter(cport_mutex);
 
 	if (((rval = sata_txlt_generic_pkt_info(spx, &reason, 1)) !=
 	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		mutex_exit(cport_mutex);
 		return (rval);
 	}
 
@@ -3831,7 +3837,7 @@ sata_txlt_request_sense(sata_pkt_txlate_t *spx)
 	 * return ILLEGAL_REQUEST
 	 */
 	if (scsipkt->pkt_cdbp[5] & CTL_BYTE_NACA_MASK) {
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		mutex_exit(cport_mutex);
 		return (sata_txlt_check_condition(spx, KEY_ILLEGAL_REQUEST,
 		    SD_SCSI_ASC_CMD_SEQUENCE_ERR));
 	}
@@ -3846,14 +3852,13 @@ sata_txlt_request_sense(sata_pkt_txlate_t *spx)
 	scmd->satacmd_flags.sata_copy_out_sec_count_lsb = B_TRUE;
 	scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
 	if (sata_hba_start(spx, &rval) != 0) {
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		mutex_exit(cport_mutex);
 		return (rval);
-	} else {
-		if (scmd->satacmd_error_reg != 0) {
-			mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
-			return (sata_txlt_check_condition(spx, KEY_NO_SENSE,
-			    SD_SCSI_ASC_NO_ADD_SENSE));
-		}
+	}
+	if (scmd->satacmd_error_reg != 0) {
+		mutex_exit(cport_mutex);
+		return (sata_txlt_check_condition(spx, KEY_NO_SENSE,
+		    SD_SCSI_ASC_NO_ADD_SENSE));
 	}
 
 	switch (scmd->satacmd_sec_count_lsb) {
@@ -3880,7 +3885,7 @@ sata_txlt_request_sense(sata_pkt_txlate_t *spx)
 		break;
 	}
 
-	mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+	mutex_exit(cport_mutex);
 
 	if (bp != NULL && bp->b_un.b_addr && bp->b_bcount) {
 		/*
@@ -3955,12 +3960,13 @@ sata_txlt_test_unit_ready(sata_pkt_txlate_t *spx)
 	sata_drive_info_t *sdinfo;
 	int power_state;
 	int rval, reason;
+	kmutex_t *cport_mutex =  &(SATA_TXLT_CPORT_MUTEX(spx));
 
-	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
+	mutex_enter(cport_mutex);
 
 	if (((rval = sata_txlt_generic_pkt_info(spx, &reason, 1)) !=
 	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		mutex_exit(cport_mutex);
 		return (rval);
 	}
 
@@ -3975,14 +3981,14 @@ sata_txlt_test_unit_ready(sata_pkt_txlate_t *spx)
 	scmd->satacmd_flags.sata_copy_out_sec_count_lsb = B_TRUE;
 	scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
 	if (sata_hba_start(spx, &rval) != 0) {
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		mutex_exit(cport_mutex);
 		return (rval);
-	} else {
-		if (scmd->satacmd_error_reg != 0) {
-			mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
-			return (sata_txlt_check_condition(spx, KEY_NOT_READY,
-			    SD_SCSI_ASC_LU_NOT_RESPONSE));
-		}
+	}
+
+	if (scmd->satacmd_error_reg != 0) {
+		mutex_exit(cport_mutex);
+		return (sata_txlt_check_condition(spx, KEY_NOT_READY,
+		    SD_SCSI_ASC_LU_NOT_RESPONSE));
 	}
 
 	power_state = scmd->satacmd_sec_count_lsb;
@@ -4007,7 +4013,7 @@ sata_txlt_test_unit_ready(sata_pkt_txlate_t *spx)
 	scsipkt->pkt_state = STATE_GOT_BUS | STATE_GOT_TARGET |
 	    STATE_SENT_CMD | STATE_GOT_STATUS;
 
-	mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+	mutex_exit(cport_mutex);
 
 	SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
 	    "Scsi_pkt completion reason %x\n", scsipkt->pkt_reason);
@@ -4061,26 +4067,25 @@ sata_txlt_start_stop_unit(sata_pkt_txlate_t *spx)
 {
 	struct scsi_pkt *scsipkt = spx->txlt_scsi_pkt;
 	sata_cmd_t *scmd = &spx->txlt_sata_pkt->satapkt_cmd;
-	sata_hba_inst_t *shi = SATA_TXLT_HBA_INST(spx);
-	int cport = SATA_TXLT_CPORT(spx);
 	int rval, reason;
 	sata_drive_info_t *sdinfo;
 	sata_id_t *sata_id;
+	kmutex_t *cport_mutex = &(SATA_TXLT_CPORT_MUTEX(spx));
 
 	SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
 	    "sata_txlt_start_stop_unit: %d\n", scsipkt->pkt_scbp[4] & 1);
 
-	mutex_enter(&SATA_CPORT_MUTEX(shi, cport));
+	mutex_enter(cport_mutex);
 
 	if (((rval = sata_txlt_generic_pkt_info(spx, &reason, 1)) !=
 	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		mutex_exit(cport_mutex);
 		return (rval);
 	}
 
 	if (scsipkt->pkt_cdbp[1] & START_STOP_IMMED_MASK) {
 		/* IMMED bit - not supported */
-		mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+		mutex_exit(cport_mutex);
 		return (sata_txlt_check_condition(spx, KEY_ILLEGAL_REQUEST,
 		    SD_SCSI_ASC_INVALID_FIELD_IN_CDB));
 	}
@@ -4106,12 +4111,11 @@ sata_txlt_start_stop_unit(sata_pkt_txlate_t *spx)
 			/* Transfer command to HBA */
 			if (sata_hba_start(spx, &rval) != 0) {
 				/* Pkt not accepted for execution */
-				mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+				mutex_exit(cport_mutex);
 				return (rval);
-			} else {
-				if (scmd->satacmd_error_reg != 0) {
-					goto err_out;
-				}
+			}
+			if (scmd->satacmd_error_reg != 0) {
+				goto err_out;
 			}
 			sdinfo->satadrv_power_level = SATA_POWER_ACTIVE;
 		} else {
@@ -4119,7 +4123,7 @@ sata_txlt_start_stop_unit(sata_pkt_txlate_t *spx)
 			sata_build_generic_cmd(scmd, SATAC_FLUSH_CACHE);
 			scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
 			if (sata_hba_start(spx, &rval) != 0) {
-				mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+				mutex_exit(cport_mutex);
 				return (rval);
 			} else {
 				if (scmd->satacmd_error_reg != 0) {
@@ -4130,12 +4134,11 @@ sata_txlt_start_stop_unit(sata_pkt_txlate_t *spx)
 			sata_build_generic_cmd(scmd, SATAC_STANDBY_IM);
 			scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
 			if (sata_hba_start(spx, &rval) != 0) {
-				mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+				mutex_exit(cport_mutex);
 				return (rval);
-			} else {
-				if (scmd->satacmd_error_reg != 0) {
-					goto err_out;
-				}
+			}
+			if (scmd->satacmd_error_reg != 0) {
+				goto err_out;
 			}
 			sdinfo->satadrv_power_level = SATA_POWER_STOPPED;
 		}
@@ -4144,19 +4147,18 @@ sata_txlt_start_stop_unit(sata_pkt_txlate_t *spx)
 		sata_build_generic_cmd(scmd, SATAC_IDLE);
 		scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
 		if (sata_hba_start(spx, &rval) != 0) {
-			mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+			mutex_exit(cport_mutex);
 			return (rval);
-		} else {
-			if (scmd->satacmd_error_reg != 0) {
-				goto err_out;
-			}
+		}
+		if (scmd->satacmd_error_reg != 0) {
+			goto err_out;
 		}
 		sata_build_read_verify_cmd(scmd, 1, 5);
 		scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
 		/* Transfer command to HBA */
 		if (sata_hba_start(spx, &rval) != 0) {
 			/* Pkt not accepted for execution */
-			mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+			mutex_exit(cport_mutex);
 			return (rval);
 		} else {
 			if (scmd->satacmd_error_reg != 0) {
@@ -4170,23 +4172,21 @@ sata_txlt_start_stop_unit(sata_pkt_txlate_t *spx)
 		scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
 		if (!(scsipkt->pkt_cdbp[4] & START_STOP_NOFLUSH_MASK)) {
 			if (sata_hba_start(spx, &rval) != 0) {
-				mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+				mutex_exit(cport_mutex);
 				return (rval);
-			} else {
-				if (scmd->satacmd_error_reg != 0) {
-					goto err_out;
-				}
+			}
+			if (scmd->satacmd_error_reg != 0) {
+				goto err_out;
 			}
 		}
 		sata_build_generic_cmd(scmd, SATAC_IDLE);
 		scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
 		if (sata_hba_start(spx, &rval) != 0) {
-			mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+			mutex_exit(cport_mutex);
 			return (rval);
-		} else {
-			if (scmd->satacmd_error_reg != 0) {
-				goto err_out;
-			}
+		}
+		if (scmd->satacmd_error_reg != 0) {
+			goto err_out;
 		}
 		if ((scsipkt->pkt_cdbp[3] & START_STOP_MODIFIER_MASK)) {
 			/*
@@ -4206,12 +4206,11 @@ sata_txlt_start_stop_unit(sata_pkt_txlate_t *spx)
 			scmd->satacmd_lba_high_lsb = 0x55;
 			scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
 			if (sata_hba_start(spx, &rval) != 0) {
-				mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+				mutex_exit(cport_mutex);
 				return (rval);
-			} else {
-				if (scmd->satacmd_error_reg != 0) {
-					goto err_out;
-				}
+			}
+			if (scmd->satacmd_error_reg != 0) {
+				goto err_out;
 			}
 		}
 		sdinfo->satadrv_power_level = SATA_POWER_IDLE;
@@ -4221,23 +4220,21 @@ sata_txlt_start_stop_unit(sata_pkt_txlate_t *spx)
 		scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
 		if (!(scsipkt->pkt_cdbp[4] & START_STOP_NOFLUSH_MASK)) {
 			if (sata_hba_start(spx, &rval) != 0) {
-				mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+				mutex_exit(cport_mutex);
 				return (rval);
-			} else {
-				if (scmd->satacmd_error_reg != 0) {
-					goto err_out;
-				}
+			}
+			if (scmd->satacmd_error_reg != 0) {
+				goto err_out;
 			}
 		}
 		sata_build_generic_cmd(scmd, SATAC_STANDBY);
 		scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
 		if (sata_hba_start(spx, &rval) != 0) {
-			mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+			mutex_exit(cport_mutex);
 			return (rval);
-		} else {
-			if (scmd->satacmd_error_reg != 0) {
-				goto err_out;
-			}
+		}
+		if (scmd->satacmd_error_reg != 0) {
+			goto err_out;
 		}
 		sdinfo->satadrv_power_level = SATA_POWER_STANDBY;
 		break;
@@ -4246,12 +4243,11 @@ sata_txlt_start_stop_unit(sata_pkt_txlate_t *spx)
 		scmd->satacmd_flags.sata_copy_out_sec_count_lsb = B_TRUE;
 		scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
 		if (sata_hba_start(spx, &rval) != 0) {
-			mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+			mutex_exit(cport_mutex);
 			return (rval);
-		} else {
-			if (scmd->satacmd_error_reg != 0) {
-				goto err_out;
-			}
+		}
+		if (scmd->satacmd_error_reg != 0) {
+			goto err_out;
 		}
 		switch (scmd->satacmd_sec_count_lsb) {
 		case SATA_PWRMODE_STANDBY:
@@ -4260,7 +4256,7 @@ sata_txlt_start_stop_unit(sata_pkt_txlate_t *spx)
 			    sdinfo->satadrv_standby_timer);
 			scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
 			if (sata_hba_start(spx, &rval) != 0) {
-				mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+				mutex_exit(cport_mutex);
 				return (rval);
 			} else {
 				if (scmd->satacmd_error_reg != 0) {
@@ -4274,7 +4270,7 @@ sata_txlt_start_stop_unit(sata_pkt_txlate_t *spx)
 			    sdinfo->satadrv_standby_timer);
 			scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
 			if (sata_hba_start(spx, &rval) != 0) {
-				mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+				mutex_exit(cport_mutex);
 				return (rval);
 			} else {
 				if (scmd->satacmd_error_reg != 0) {
@@ -4290,22 +4286,20 @@ sata_txlt_start_stop_unit(sata_pkt_txlate_t *spx)
 			    sdinfo->satadrv_standby_timer);
 			scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
 			if (sata_hba_start(spx, &rval) != 0) {
-				mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+				mutex_exit(cport_mutex);
 				return (rval);
-			} else {
-				if (scmd->satacmd_error_reg != 0) {
-					goto err_out;
-				}
+			}
+			if (scmd->satacmd_error_reg != 0) {
+				goto err_out;
 			}
 			sata_build_read_verify_cmd(scmd, 1, 5);
 			scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
 			if (sata_hba_start(spx, &rval) != 0) {
-				mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+				mutex_exit(cport_mutex);
 				return (rval);
-			} else {
-				if (scmd->satacmd_error_reg != 0) {
-					goto err_out;
-				}
+			}
+			if (scmd->satacmd_error_reg != 0) {
+				goto err_out;
 			}
 			break;
 		default:
@@ -4315,7 +4309,7 @@ sata_txlt_start_stop_unit(sata_pkt_txlate_t *spx)
 	case 0xb:
 		if ((sata_get_standby_timer(sdinfo->satadrv_standby_timer) ==
 		    0) || (!(sata_id->ai_cap & SATA_STANDBYTIMER))) {
-			mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+			mutex_exit(cport_mutex);
 			return (sata_txlt_check_condition(spx,
 			    KEY_ILLEGAL_REQUEST,
 			    SD_SCSI_ASC_INVALID_FIELD_IN_CDB));
@@ -4324,29 +4318,27 @@ sata_txlt_start_stop_unit(sata_pkt_txlate_t *spx)
 		scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
 		if (!(scsipkt->pkt_cdbp[4] & START_STOP_NOFLUSH_MASK)) {
 			if (sata_hba_start(spx, &rval) != 0) {
-				mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+				mutex_exit(cport_mutex);
 				return (rval);
-			} else {
-				if (scmd->satacmd_error_reg != 0) {
-					goto err_out;
-				}
+			}
+			if (scmd->satacmd_error_reg != 0) {
+				goto err_out;
 			}
 			sata_build_generic_cmd(scmd, SATAC_STANDBY_IM);
 			scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
 			if (sata_hba_start(spx, &rval) != 0) {
-				mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+				mutex_exit(cport_mutex);
 				return (rval);
-			} else {
-				if (scmd->satacmd_error_reg != 0) {
-					goto err_out;
-				}
+			}
+			if (scmd->satacmd_error_reg != 0) {
+				goto err_out;
 			}
 		}
 		bzero(sdinfo->satadrv_standby_timer, sizeof (uchar_t) * 4);
 		break;
 	default:
 err_out:
-		mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+		mutex_exit(cport_mutex);
 		return (sata_txlt_check_condition(spx, KEY_ILLEGAL_REQUEST,
 		    SD_SCSI_ASC_INVALID_FIELD_IN_CDB));
 	}
@@ -4355,7 +4347,7 @@ err_out:
 	 * Since it was a synchronous command,
 	 * a callback function will be called directly.
 	 */
-	mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+	mutex_exit(cport_mutex);
 	SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
 	    "synchronous execution status %x\n",
 	    spx->txlt_sata_pkt->satapkt_reason);
@@ -4403,15 +4395,16 @@ sata_txlt_read_capacity(sata_pkt_txlate_t *spx)
 	uint64_t val;
 	uchar_t *rbuf;
 	int rval, reason;
+	kmutex_t *cport_mutex = &(SATA_TXLT_CPORT_MUTEX(spx));
 
 	SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
 	    "sata_txlt_read_capacity: ", NULL);
 
-	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
+	mutex_enter(cport_mutex);
 
 	if (((rval = sata_txlt_generic_pkt_info(spx, &reason, 0)) !=
 	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		mutex_exit(cport_mutex);
 		return (rval);
 	}
 
@@ -4455,7 +4448,7 @@ sata_txlt_read_capacity(sata_pkt_txlate_t *spx)
 		SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst, "%d\n",
 		    sdinfo->satadrv_capacity -1);
 	}
-	mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+	mutex_exit(cport_mutex);
 	/*
 	 * If a callback was requested, do it now.
 	 */
@@ -4500,15 +4493,16 @@ sata_txlt_read_capacity16(sata_pkt_txlate_t *spx)
 	uint16_t l2p_exp;
 	uchar_t *rbuf;
 	int rval, reason;
+	kmutex_t *cport_mutex = &(SATA_TXLT_CPORT_MUTEX(spx));
 
 	SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
 	    "sata_txlt_read_capacity: ", NULL);
 
-	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
+	mutex_enter(cport_mutex);
 
 	if (((rval = sata_txlt_generic_pkt_info(spx, &reason, 0)) !=
 	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		mutex_exit(cport_mutex);
 		return (rval);
 	}
 
@@ -4527,7 +4521,7 @@ sata_txlt_read_capacity16(sata_pkt_txlate_t *spx)
 		/* Check SERVICE ACTION field */
 		if ((scsipkt->pkt_cdbp[1] & 0x1f) !=
 		    SSVC_ACTION_READ_CAPACITY_G4) {
-			mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+			mutex_exit(cport_mutex);
 			return (sata_txlt_check_condition(spx,
 			    KEY_ILLEGAL_REQUEST,
 			    SD_SCSI_ASC_INVALID_FIELD_IN_CDB));
@@ -4542,7 +4536,7 @@ sata_txlt_read_capacity16(sata_pkt_txlate_t *spx)
 		    (scsipkt->pkt_cdbp[7] != 0) ||
 		    (scsipkt->pkt_cdbp[8] != 0) ||
 		    (scsipkt->pkt_cdbp[9] != 0)) {
-			mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+			mutex_exit(cport_mutex);
 			return (sata_txlt_check_condition(spx,
 			    KEY_ILLEGAL_REQUEST,
 			    SD_SCSI_ASC_INVALID_FIELD_IN_CDB));
@@ -4550,7 +4544,7 @@ sata_txlt_read_capacity16(sata_pkt_txlate_t *spx)
 
 		/* Check PMI bit */
 		if (scsipkt->pkt_cdbp[14] & 0x1) {
-			mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+			mutex_exit(cport_mutex);
 			return (sata_txlt_check_condition(spx,
 			    KEY_ILLEGAL_REQUEST,
 			    SD_SCSI_ASC_INVALID_FIELD_IN_CDB));
@@ -4618,7 +4612,7 @@ sata_txlt_read_capacity16(sata_pkt_txlate_t *spx)
 		    sdinfo->satadrv_capacity -1);
 	}
 
-	mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+	mutex_exit(cport_mutex);
 
 	/*
 	 * If a callback was requested, do it now.
@@ -4670,6 +4664,7 @@ sata_txlt_mode_sense(sata_pkt_txlate_t *spx)
 	int		pc;	/* Page Control code */
 	uint8_t		*buf;	/* mode sense buffer */
 	int		rval, reason;
+	kmutex_t	*cport_mutex = &(SATA_TXLT_CPORT_MUTEX(spx));
 
 	SATADBG2(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
 	    "sata_txlt_mode_sense, pc %x page code 0x%02x\n",
@@ -4685,11 +4680,11 @@ sata_txlt_mode_sense(sata_pkt_txlate_t *spx)
 		buf = kmem_zalloc(1024, KM_SLEEP);
 	}
 
-	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
+	mutex_enter(cport_mutex);
 
 	if (((rval = sata_txlt_generic_pkt_info(spx, &reason, 0)) !=
 	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		mutex_exit(cport_mutex);
 		kmem_free(buf, 1024);
 		return (rval);
 	}
@@ -4906,7 +4901,7 @@ sata_txlt_mode_sense(sata_pkt_txlate_t *spx)
 	}
 	*scsipkt->pkt_scbp = STATUS_GOOD;
 done:
-	mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+	mutex_exit(cport_mutex);
 	(void) kmem_free(buf, 1024);
 
 	SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
@@ -4969,17 +4964,18 @@ sata_txlt_mode_select(sata_pkt_txlate_t *spx)
 	int rval, stat, reason;
 	uint_t nointr_flag;
 	int dmod = 0;
+	kmutex_t *cport_mutex = &(SATA_TXLT_CPORT_MUTEX(spx));
 
 	SATADBG2(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
 	    "sata_txlt_mode_select, pc %x page code 0x%02x\n",
 	    spx->txlt_scsi_pkt->pkt_cdbp[2] >> 6,
 	    spx->txlt_scsi_pkt->pkt_cdbp[2] & 0x3f);
 
-	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
+	mutex_enter(cport_mutex);
 
 	if (((rval = sata_txlt_generic_pkt_info(spx, &reason, 1)) !=
 	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		mutex_exit(cport_mutex);
 		return (rval);
 	}
 
@@ -5174,7 +5170,7 @@ sata_txlt_mode_select(sata_pkt_txlate_t *spx)
 		}
 	}
 done:
-	mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+	mutex_exit(cport_mutex);
 	/*
 	 * If device parameters were modified, fetch and store the new
 	 * Identify Device data. Since port mutex could have been released
@@ -5195,7 +5191,7 @@ done:
 		rv = sata_fetch_device_identify_data(spx->txlt_sata_hba_inst,
 		    &new_sdinfo);
 
-		mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		mutex_enter(cport_mutex);
 		/*
 		 * Since port mutex could have been released when
 		 * accessing HBA driver, we need to re-check that the
@@ -5231,7 +5227,7 @@ done:
 			scsipkt->pkt_reason = CMD_INCOMPLETE;
 			rval = TRAN_ACCEPT;
 		}
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		mutex_exit(cport_mutex);
 	}
 	/* Restore the scsi pkt flags */
 	scsipkt->pkt_flags &= ~FLAG_NOINTR;
@@ -5279,12 +5275,13 @@ sata_txlt_ata_pass_thru(sata_pkt_txlate_t *spx)
 	uint16_t feature, sec_count;
 	int t_len, synch;
 	int rval, reason;
+	kmutex_t *cport_mutex = &(SATA_TXLT_CPORT_MUTEX(spx));
 
-	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
+	mutex_enter(cport_mutex);
 
 	rval = sata_txlt_generic_pkt_info(spx, &reason, 1);
 	if ((rval != TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		mutex_exit(cport_mutex);
 		return (rval);
 	}
 
@@ -5296,13 +5293,13 @@ sata_txlt_ata_pass_thru(sata_pkt_txlate_t *spx)
 
 	/* MULTIPLE_COUNT field.  If non-zero, invalid command (for now). */
 	if (((scsipkt->pkt_cdbp[1] >> 5) & 0x7) != 0) {
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		mutex_exit(cport_mutex);
 		return (sata_txlt_ata_pass_thru_illegal_cmd(spx));
 	}
 
 	/* OFFLINE field. If non-zero, invalid command (for now). */
 	if (((scsipkt->pkt_cdbp[2] >> 6) & 0x3) != 0) {
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		mutex_exit(cport_mutex);
 		return (sata_txlt_ata_pass_thru_illegal_cmd(spx));
 	}
 
@@ -5320,7 +5317,7 @@ sata_txlt_ata_pass_thru(sata_pkt_txlate_t *spx)
 	case SATL_APT_P_RET_RESP:
 		/* Not yet implemented */
 	default:
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		mutex_exit(cport_mutex);
 		return (sata_txlt_ata_pass_thru_illegal_cmd(spx));
 
 	case SATL_APT_P_NON_DATA:
@@ -5330,7 +5327,7 @@ sata_txlt_ata_pass_thru(sata_pkt_txlate_t *spx)
 	case SATL_APT_P_PIO_DATA_IN:
 		/* If PROTOCOL disagrees with T_DIR, invalid command */
 		if (scmd->satacmd_flags.sata_data_direction == SATA_DIR_WRITE) {
-			mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+			mutex_exit(cport_mutex);
 			return (sata_txlt_ata_pass_thru_illegal_cmd(spx));
 		}
 
@@ -5339,7 +5336,7 @@ sata_txlt_ata_pass_thru(sata_pkt_txlate_t *spx)
 			sata_scsi_dmafree(NULL, scsipkt);
 		} else {
 			/* if there is no buffer, how do you PIO in? */
-			mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+			mutex_exit(cport_mutex);
 			return (sata_txlt_ata_pass_thru_illegal_cmd(spx));
 		}
 
@@ -5348,7 +5345,7 @@ sata_txlt_ata_pass_thru(sata_pkt_txlate_t *spx)
 	case SATL_APT_P_PIO_DATA_OUT:
 		/* If PROTOCOL disagrees with T_DIR, invalid command */
 		if (scmd->satacmd_flags.sata_data_direction == SATA_DIR_READ) {
-			mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+			mutex_exit(cport_mutex);
 			return (sata_txlt_ata_pass_thru_illegal_cmd(spx));
 		}
 
@@ -5357,7 +5354,7 @@ sata_txlt_ata_pass_thru(sata_pkt_txlate_t *spx)
 			sata_scsi_dmafree(NULL, scsipkt);
 		} else {
 			/* if there is no buffer, how do you PIO out? */
-			mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+			mutex_exit(cport_mutex);
 			return (sata_txlt_ata_pass_thru_illegal_cmd(spx));
 		}
 
@@ -5486,11 +5483,11 @@ sata_txlt_ata_pass_thru(sata_pkt_txlate_t *spx)
 	}
 
 	if (sata_hba_start(spx, &rval) != 0) {
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		mutex_exit(cport_mutex);
 		return (rval);
 	}
 
-	mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+	mutex_exit(cport_mutex);
 
 	if (synch) {
 		sata_txlt_apt_completion(spx->txlt_sata_pkt);
@@ -5515,6 +5512,7 @@ sata_txlt_log_sense(sata_pkt_txlate_t *spx)
 	uint8_t		*buf;	/* log sense buffer */
 	int		rval, reason;
 #define	MAX_LOG_SENSE_PAGE_SIZE	512
+	kmutex_t	*cport_mutex = &(SATA_TXLT_CPORT_MUTEX(spx));
 
 	SATADBG2(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
 	    "sata_txlt_log_sense, pc 0x%x, page code 0x%x\n",
@@ -5530,11 +5528,11 @@ sata_txlt_log_sense(sata_pkt_txlate_t *spx)
 		buf = kmem_zalloc(MAX_LOG_SENSE_PAGE_SIZE, KM_SLEEP);
 	}
 
-	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
+	mutex_enter(cport_mutex);
 
 	if (((rval = sata_txlt_generic_pkt_info(spx, &reason, 1)) !=
 	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		mutex_exit(cport_mutex);
 		kmem_free(buf, MAX_LOG_SENSE_PAGE_SIZE);
 		return (rval);
 	}
@@ -5734,7 +5732,7 @@ no_header:
 	}
 	*scsipkt->pkt_scbp = STATUS_GOOD;
 done:
-	mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+	mutex_exit(cport_mutex);
 	(void) kmem_free(buf, MAX_LOG_SENSE_PAGE_SIZE);
 
 	SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
@@ -5808,17 +5806,17 @@ sata_txlt_read(sata_pkt_txlate_t *spx)
 	sata_cmd_t *scmd = &spx->txlt_sata_pkt->satapkt_cmd;
 	sata_drive_info_t *sdinfo;
 	sata_hba_inst_t *shi = SATA_TXLT_HBA_INST(spx);
-	int cport = SATA_TXLT_CPORT(spx);
+	kmutex_t *cport_mutex = &(SATA_TXLT_CPORT_MUTEX(spx));
 	uint16_t sec_count;
 	uint64_t lba;
 	int rval, reason;
 	int synch;
 
-	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
+	mutex_enter(cport_mutex);
 
 	if (((rval = sata_txlt_generic_pkt_info(spx, &reason, 0)) !=
 	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		mutex_exit(cport_mutex);
 		return (rval);
 	}
 
@@ -5875,7 +5873,7 @@ sata_txlt_read(sata_pkt_txlate_t *spx)
 		break;
 	default:
 		/* Unsupported command */
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		mutex_exit(cport_mutex);
 		return (sata_txlt_invalid_command(spx));
 	}
 
@@ -5885,7 +5883,7 @@ sata_txlt_read(sata_pkt_txlate_t *spx)
 	if ((lba >= sdinfo->satadrv_capacity) ||
 	    ((lba + sec_count) > sdinfo->satadrv_capacity)) {
 		/* LBA out of range */
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		mutex_exit(cport_mutex);
 		return (sata_txlt_lba_out_of_range(spx));
 	}
 
@@ -5895,7 +5893,7 @@ sata_txlt_read(sata_pkt_txlate_t *spx)
 	 * No DMA resources were allocated.
 	 */
 	if (spx->txlt_dma_cookie_list == NULL) {
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		mutex_exit(cport_mutex);
 		return (sata_emul_rw_completion(spx));
 	}
 
@@ -6022,10 +6020,10 @@ sata_txlt_read(sata_pkt_txlate_t *spx)
 	/* Transfer command to HBA */
 	if (sata_hba_start(spx, &rval) != 0) {
 		/* Pkt not accepted for execution */
-		mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+		mutex_exit(cport_mutex);
 		return (rval);
 	}
-	mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+	mutex_exit(cport_mutex);
 	/*
 	 * If execution is non-synchronous,
 	 * a callback function will handle potential errors, translate
@@ -6077,17 +6075,17 @@ sata_txlt_write(sata_pkt_txlate_t *spx)
 	sata_cmd_t *scmd = &spx->txlt_sata_pkt->satapkt_cmd;
 	sata_drive_info_t *sdinfo;
 	sata_hba_inst_t *shi = SATA_TXLT_HBA_INST(spx);
-	int cport = SATA_TXLT_CPORT(spx);
 	uint16_t sec_count;
 	uint64_t lba;
 	int rval, reason;
 	int synch;
+	kmutex_t *cport_mutex = &(SATA_TXLT_CPORT_MUTEX(spx));
 
-	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
+	mutex_enter(cport_mutex);
 
 	if (((rval = sata_txlt_generic_pkt_info(spx, &reason, 0)) !=
 	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		mutex_exit(cport_mutex);
 		return (rval);
 	}
 
@@ -6144,7 +6142,7 @@ sata_txlt_write(sata_pkt_txlate_t *spx)
 		break;
 	default:
 		/* Unsupported command */
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		mutex_exit(cport_mutex);
 		return (sata_txlt_invalid_command(spx));
 	}
 
@@ -6154,7 +6152,7 @@ sata_txlt_write(sata_pkt_txlate_t *spx)
 	if ((lba >= sdinfo->satadrv_capacity) ||
 	    ((lba + sec_count) > sdinfo->satadrv_capacity)) {
 		/* LBA out of range */
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		mutex_exit(cport_mutex);
 		return (sata_txlt_lba_out_of_range(spx));
 	}
 
@@ -6164,7 +6162,7 @@ sata_txlt_write(sata_pkt_txlate_t *spx)
 	 * No DMA resources were allocated.
 	 */
 	if (spx->txlt_dma_cookie_list == NULL) {
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		mutex_exit(cport_mutex);
 		return (sata_emul_rw_completion(spx));
 	}
 
@@ -6286,10 +6284,10 @@ sata_txlt_write(sata_pkt_txlate_t *spx)
 	/* Transfer command to HBA */
 	if (sata_hba_start(spx, &rval) != 0) {
 		/* Pkt not accepted for execution */
-		mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+		mutex_exit(cport_mutex);
 		return (rval);
 	}
-	mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+	mutex_exit(cport_mutex);
 
 	/*
 	 * If execution is non-synchronous,
@@ -6317,7 +6315,6 @@ sata_txlt_write_buffer(sata_pkt_txlate_t *spx)
 #define	WB_DOWNLOAD_MICROCODE_AND_REVERT_MODE			4
 #define	WB_DOWNLOAD_MICROCODE_AND_SAVE_MODE			5
 
-	sata_hba_inst_t *sata_hba_inst = SATA_TXLT_HBA_INST(spx);
 	struct scsi_pkt *scsipkt = spx->txlt_scsi_pkt;
 	struct sata_pkt *sata_pkt = spx->txlt_sata_pkt;
 	sata_cmd_t *scmd = &spx->txlt_sata_pkt->satapkt_cmd;
@@ -6325,18 +6322,18 @@ sata_txlt_write_buffer(sata_pkt_txlate_t *spx)
 	struct buf *bp = spx->txlt_sata_pkt->satapkt_cmd.satacmd_bp;
 	struct scsi_extended_sense *sense;
 	int rval, mode, sector_count, reason;
-	int cport = SATA_TXLT_CPORT(spx);
+	kmutex_t *cport_mutex = &(SATA_TXLT_CPORT_MUTEX(spx));
 
 	mode = scsipkt->pkt_cdbp[1] & 0x1f;
 
 	SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
 	    "sata_txlt_write_buffer, mode 0x%x\n", mode);
 
-	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
+	mutex_enter(cport_mutex);
 
 	if ((rval = sata_txlt_generic_pkt_info(spx, &reason, 1)) !=
 	    TRAN_ACCEPT) {
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		mutex_exit(cport_mutex);
 		return (rval);
 	}
 
@@ -6392,11 +6389,11 @@ sata_txlt_write_buffer(sata_pkt_txlate_t *spx)
 	/* Transfer command to HBA */
 	if (sata_hba_start(spx, &rval) != 0) {
 		/* Pkt not accepted for execution */
-		mutex_exit(&SATA_CPORT_MUTEX(sata_hba_inst, cport));
+		mutex_exit(cport_mutex);
 		return (rval);
 	}
 
-	mutex_exit(&SATA_CPORT_MUTEX(sata_hba_inst, cport));
+	mutex_exit(cport_mutex);
 
 	/* Then we need synchronous check the status of the disk */
 	scsipkt->pkt_state = STATE_GOT_BUS | STATE_GOT_TARGET |
@@ -6470,7 +6467,7 @@ sata_txlt_write_buffer(sata_pkt_txlate_t *spx)
 	return (TRAN_ACCEPT);
 
 bad_param:
-	mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+	mutex_exit(cport_mutex);
 	*scsipkt->pkt_scbp = STATUS_CHECK;
 	sense = sata_arq_sense(spx);
 	sense->es_key = KEY_ILLEGAL_REQUEST;
@@ -6574,16 +6571,15 @@ static 	int
 sata_txlt_synchronize_cache(sata_pkt_txlate_t *spx)
 {
 	sata_cmd_t *scmd = &spx->txlt_sata_pkt->satapkt_cmd;
-	sata_hba_inst_t *shi = SATA_TXLT_HBA_INST(spx);
-	int cport = SATA_TXLT_CPORT(spx);
+	kmutex_t *cport_mutex = &(SATA_TXLT_CPORT_MUTEX(spx));
 	int rval, reason;
 	int synch;
 
-	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
+	mutex_enter(cport_mutex);
 
 	if (((rval = sata_txlt_generic_pkt_info(spx, &reason, 1)) !=
 	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		mutex_exit(cport_mutex);
 		return (rval);
 	}
 
@@ -6612,10 +6608,10 @@ sata_txlt_synchronize_cache(sata_pkt_txlate_t *spx)
 	/* Transfer command to HBA */
 	if (sata_hba_start(spx, &rval) != 0) {
 		/* Pkt not accepted for execution */
-		mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+		mutex_exit(cport_mutex);
 		return (rval);
 	}
-	mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+	mutex_exit(cport_mutex);
 
 	/*
 	 * If execution non-synchronous, it had to be completed
@@ -6720,7 +6716,6 @@ sata_hba_start(sata_pkt_txlate_t *spx, int *rval)
 
 	stat = (*SATA_START_FUNC(sata_hba_inst))(SATA_DIP(sata_hba_inst),
 	    spx->txlt_sata_pkt);
-
 	mutex_enter(&(SATA_CPORT_MUTEX(sata_hba_inst, cport)));
 	/*
 	 * If sata pkt was accepted and executed in asynchronous mode, i.e.
@@ -7734,7 +7729,7 @@ sata_build_msense_page_1a(sata_drive_info_t *sdinfo, int pcntrl, uint8_t *buf)
 	page->mode_page.code = MODEPAGE_POWER_COND;
 	page->mode_page.length = sizeof (struct mode_info_power_cond);
 
-	if (sata_id->ai_cap && SATA_STANDBYTIMER) {
+	if (sata_id->ai_cap & SATA_STANDBYTIMER) {
 		page->standby = 1;
 		bcopy(sdinfo->satadrv_standby_timer, page->standby_cond_timer,
 		    sizeof (uchar_t) * 4);
@@ -8140,7 +8135,7 @@ sata_mode_select_page_1a(sata_pkt_txlate_t *spx, struct
 
 	/* If parmlen is too short or the feature is not supported, drop it */
 	if ((len < parmlen) || (page->idle == 1) ||
-	    (!(sata_id->ai_cap && SATA_STANDBYTIMER) && page->standby == 1)) {
+	    (!(sata_id->ai_cap & SATA_STANDBYTIMER) && page->standby == 1)) {
 		*scsipkt->pkt_scbp = STATUS_CHECK;
 		sense = sata_arq_sense(spx);
 		sense->es_key = KEY_ILLEGAL_REQUEST;
@@ -8958,17 +8953,17 @@ sata_txlt_atapi(sata_pkt_txlate_t *spx)
 	sata_hba_inst_t *sata_hba = SATA_TXLT_HBA_INST(spx);
 	sata_drive_info_t *sdinfo = sata_get_device_info(sata_hba,
 	    &spx->txlt_sata_pkt->satapkt_device);
-	int cport = SATA_TXLT_CPORT(spx);
+	kmutex_t *cport_mutex = &(SATA_TXLT_CPORT_MUTEX(spx));
 	int cdblen;
 	int rval, reason;
 	int synch;
 	union scsi_cdb *cdbp = (union scsi_cdb *)scsipkt->pkt_cdbp;
 
-	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
+	mutex_enter(cport_mutex);
 
 	if (((rval = sata_txlt_generic_pkt_info(spx, &reason, 0)) !=
 	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		mutex_exit(cport_mutex);
 		return (rval);
 	}
 
@@ -8993,7 +8988,7 @@ sata_txlt_atapi(sata_pkt_txlate_t *spx)
 		 * opcodes 0x7e and 0x7f identify variable-length CDBs and
 		 * therefore require special handling.  Return failure, for now.
 		 */
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		mutex_exit(cport_mutex);
 		return (TRAN_BADPKT);
 
 	case CDB_GROUPID_6:   /* Vendor-specific, per SPC-4 */
@@ -9012,7 +9007,7 @@ sata_txlt_atapi(sata_pkt_txlate_t *spx)
 		sata_log(NULL, CE_WARN,
 		    "sata: invalid ATAPI cdb length %d",
 		    cdblen);
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		mutex_exit(cport_mutex);
 		return (TRAN_BADPKT);
 	}
 
@@ -9105,10 +9100,10 @@ sata_txlt_atapi(sata_pkt_txlate_t *spx)
 	/* Transfer command to HBA */
 	if (sata_hba_start(spx, &rval) != 0) {
 		/* Pkt not accepted for execution */
-		mutex_exit(&SATA_CPORT_MUTEX(sata_hba, cport));
+		mutex_exit(cport_mutex);
 		return (rval);
 	}
-	mutex_exit(&SATA_CPORT_MUTEX(sata_hba, cport));
+	mutex_exit(cport_mutex);
 	/*
 	 * If execution is non-synchronous,
 	 * a callback function will handle potential errors, translate
@@ -9512,6 +9507,7 @@ sata_get_atapi_inquiry_data(sata_hba_inst_t *sata_hba,
 #ifdef SATA_DEBUG
 	char msg_buf[MAXPATHLEN];
 #endif
+	kmutex_t *cport_mutex;
 
 	ASSERT(sata_hba != NULL);
 
@@ -9552,12 +9548,13 @@ sata_get_atapi_inquiry_data(sata_hba_inst_t *sata_hba,
 	scmd->satacmd_flags.sata_data_direction = SATA_DIR_READ;
 	scmd->satacmd_flags.sata_ignore_dev_reset = B_TRUE;
 
-	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
+	cport_mutex = &(SATA_CPORT_MUTEX(sata_hba, saddr->cport));
+	mutex_enter(cport_mutex);
 	sdinfo = sata_get_device_info(sata_hba,
 	    &spx->txlt_sata_pkt->satapkt_device);
 	if (sdinfo == NULL) {
 		/* we have to be carefull about the disapearing device */
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		mutex_exit(cport_mutex);
 		rval = SATA_FAILURE;
 		goto cleanup;
 	}
@@ -9584,11 +9581,11 @@ sata_get_atapi_inquiry_data(sata_hba_inst_t *sata_hba,
 		SATADBG1(SATA_DBG_ATAPI, sata_hba,
 		    "sata_get_atapi_inquiry_data: "
 		    "Packet not accepted for execution - ret: %02x", rval);
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		mutex_exit(cport_mutex);
 		rval = SATA_FAILURE;
 		goto cleanup;
 	}
-	mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+	mutex_exit(cport_mutex);
 
 	if (spkt->satapkt_reason == SATA_PKT_COMPLETED) {
 		SATADBG1(SATA_DBG_ATAPI, sata_hba,
@@ -11893,7 +11890,7 @@ sata_validate_scsi_address(sata_hba_inst_t *sata_hba_inst,
 			}
 
 			if ((SATA_PMPORT_DEV_TYPE(sata_hba_inst, cport,
-			    pmport) && SATA_VALID_DEV_TYPE) == 0) {
+			    pmport) & SATA_VALID_DEV_TYPE) == 0) {
 				rval = -1;
 				goto out;
 			}
