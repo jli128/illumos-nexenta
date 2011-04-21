@@ -1,3 +1,9 @@
+sunwspsvu (5.11.134-31-0-11) nexenta; urgency=low
+
+  * Issue 4101: Crash Dump Analyzer Output Review - Results when Auto-CDP/Auto-Sync Services interact
+
+ -- Gate Keeper <support@nexenta.com>  Wed, 20 Apr 2011 17:31:44 -0700
+
 sunwspsvu (5.11.134-31-0-10) nexenta; urgency=low
 
   * Synchronized with OpenSolaris code (5.11 build 134)
