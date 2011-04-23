@@ -142,7 +142,7 @@ static pthread_rwlock_t fmd_msg_rwlock = PTHREAD_RWLOCK_INITIALIZER;
 static const char FMD_MSG_DOMAIN[] = "FMD";
 static const char FMD_MSG_TEMPLATE[] = "syslog-msgs-message-template";
 static const char FMD_MSG_URLKEY[] = "syslog-url";
-static const char FMD_MSG_URLBASE[] = "http://sun.com/msg/";
+static const char FMD_MSG_URLBASE[] = "http://nexenta.com/msg/";
 static const char FMD_MSG_NLSPATH[] = "NLSPATH=/usr/lib/fm/fmd/fmd.cat";
 static const char FMD_MSG_MISSING[] = "-";
 
