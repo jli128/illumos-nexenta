@@ -1,3 +1,9 @@
+sunwzfskr (5.11.134-31-0-12) nexenta; urgency=low
+
+  * Issue 4949: disable the zfs vdev_cache by default
+
+ -- Nexenta Systems <support@nexenta.com>  Mon, 25 Apr 2011 20:31:39 -0700
+
 sunwzfskr (5.11.134-31-0-11) nexenta; urgency=low
 
   * Issue 2952: ZFS send w/dedup (-D) generates corrupted stream 

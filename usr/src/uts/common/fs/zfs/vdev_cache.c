@@ -73,7 +73,7 @@
  * vdev's vdev_cache.
  */
 int zfs_vdev_cache_max = 1<<14;			/* 16KB */
-int zfs_vdev_cache_size = 10ULL << 20;		/* 10MB */
+int zfs_vdev_cache_size = 0;			/* Disabled by default. */
 int zfs_vdev_cache_bshift = 16;
 
 #define	VCBS (1 << zfs_vdev_cache_bshift)	/* 64KB */
