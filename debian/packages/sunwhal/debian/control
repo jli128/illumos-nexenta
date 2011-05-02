@@ -6,7 +6,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwhal
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-31-0-0), sunwkvm (>=5.11.134-31-0-0), sunwcsr (>=5.11.134-31-0-0), sunwckr (>=5.11.134-31-0-0), sunwcsu (>=5.11.134-31-0-0), sunwcsd (>=5.11.134-31-0-0), sunwcsl (>=5.11.134-31-0-0), sunwhwdata (>=5.11.134-31-0-0), sunwhalr (>=5.11.134-31-0-0), sunwpolkit (>=5.11.134-31-0-0), libexpat1, libxml2, libdbus-1-3
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-31-0-100), sunwkvm (>=5.11.134-31-0-100), sunwcsr (>=5.11.134-31-0-100), sunwckr (>=5.11.134-31-0-100), sunwcsu (>=5.11.134-31-0-100), sunwcsd (>=5.11.134-31-0-100), sunwcsl (>=5.11.134-31-0-100), sunwhwdata (>=5.11.134-31-0-100), sunwhalr (>=5.11.134-31-0-100), sunwpolkit (>=5.11.134-31-0-100), libexpat1, libxml2, libdbus-1-3
 Description: Hardware Abstraction Layer, HAL (freedesktop.org)
  Hardware Abstraction Layer, HAL (freedesktop.org)
  .

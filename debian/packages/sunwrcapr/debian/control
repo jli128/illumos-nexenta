@@ -6,7 +6,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwrcapr
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwcsr (>=5.11.134-31-0-0), sunwckr (>=5.11.134-31-0-0), sunwcnetr (>=5.11.134-31-0-0), sunwcsd (>=5.11.134-31-0-0)
+Depends: ${shlibs:Depends}, sunwcsr (>=5.11.134-31-0-100), sunwckr (>=5.11.134-31-0-100), sunwcnetr (>=5.11.134-31-0-100), sunwcsd (>=5.11.134-31-0-100)
 Description: Solaris Resource Capping Daemon (Root)
  Solaris Resource Capping Daemon (Root)
  .

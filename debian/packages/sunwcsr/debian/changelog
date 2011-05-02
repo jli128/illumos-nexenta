@@ -1,3 +1,9 @@
+sunwcsr (5.11.134-31-0-100) nexenta; urgency=low
+
+  * Renumber packages in preparation for 3.1 release
+
+ -- Gate Keeper <support@nexenta.com>  Mon, 02 May 2011 12:08:55 -0700
+
 sunwcsr (5.11.134-31-0-11) nexenta; urgency=low
 
   * Issue 2243: default nsswitch.conf for LDAP is not appropriate for clusters

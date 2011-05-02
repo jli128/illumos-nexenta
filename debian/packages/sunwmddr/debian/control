@@ -6,7 +6,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwmddr
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwmdr (>=5.11.134-31-0-0), sunwcsl (>=5.11.134-31-0-0)
+Depends: ${shlibs:Depends}, sunwmdr (>=5.11.134-31-0-100), sunwcsl (>=5.11.134-31-0-100)
 Description: SVM RCM Module
  reconfiguration coordination manager module for SVM
  .

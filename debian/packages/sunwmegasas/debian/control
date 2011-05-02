@@ -8,7 +8,7 @@ Package: sunwmegasas
 Architecture: solaris-i386
 Conflicts: lsi-mega-sas
 Replaces: lsi-mega-sas
-Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-31-0-0), sunwkvm (>=5.11.134-31-0-0), sunwcsr (>=5.11.134-31-0-0), sunwckr (>=5.11.134-31-0-0), sunwcnetr (>=5.11.134-31-0-0), sunwcsu (>=5.11.134-31-0-0), sunwcsd (>=5.11.134-31-0-0), sunwcsl (>=5.11.134-31-0-0)
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-31-0-100), sunwkvm (>=5.11.134-31-0-100), sunwcsr (>=5.11.134-31-0-100), sunwckr (>=5.11.134-31-0-100), sunwcnetr (>=5.11.134-31-0-100), sunwcsu (>=5.11.134-31-0-100), sunwcsd (>=5.11.134-31-0-100), sunwcsl (>=5.11.134-31-0-100)
 Description: LSI MegaSAS RAID Controller HBA Driver
  LSI MegaSAS RAID Controller HBA Driver
  .

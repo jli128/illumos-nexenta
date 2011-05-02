@@ -6,7 +6,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwdhcm
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwdhcsr (>=5.11.134-31-0-0), sunwdhcsu (>=5.11.134-31-0-0), sunwj5rt | sunwjre1.5
+Depends: ${shlibs:Depends}, sunwdhcsr (>=5.11.134-31-0-100), sunwdhcsu (>=5.11.134-31-0-100), sunwj5rt | sunwjre1.5
 Description: DHCP Manager
  Graphical management interface for the DHCP server
  .

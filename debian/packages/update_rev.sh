@@ -33,7 +33,7 @@ function update_changelog
 
 	grep "$pkg_name (${CORE_REVISION})" ${file} >/dev/null 2>&1
 	if [ $? -eq 0 ]; then
-		return 1
+		return 0
 	fi
 
 	printf "${comments}" > ${TMP_FILE}
@@ -54,14 +54,14 @@ function update_control
 		return 1
 	fi
 
-	sed -e "s/(>=${OS_REL}.${OLD_BUILD}-[1-9]\+)/(>=${CORE_REVISION})/g" \
+	sed -e "s/(>=${OS_REL}.${OLD_BUILD}-[0-9-]\+)/(>=${CORE_REVISION})/g" \
 	    ${file} > ${TMP_FILE}
 
 	mv ${TMP_FILE} ${file}
 	return 0
 }
 
-for f in `find . -maxdepth 1 -mindepth 1 -type d -name "sunw*" -o -type d -name "brcmbnx" -o -type d -name "libsunw-perl" -o -type d -name "nexenta-lu" -o -type d -name "nexenta-sunw" -o -type d -name "brcmbnxe" -o -type d -name cpqary3`; do
+for f in `find . -maxdepth 1 -mindepth 1 -type d`; do
 	pkg_name=`basename $f`
 
 	if update_changelog $f && update_control $f; then

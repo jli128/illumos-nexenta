@@ -6,7 +6,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwmrsas
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-31-0-0), sunwkvm (>=5.11.134-31-0-0), sunwcsr (>=5.11.134-31-0-0), sunwckr (>=5.11.134-31-0-0), sunwcnetr (>=5.11.134-31-0-0), sunwcsu (>=5.11.134-31-0-0), sunwcsd (>=5.11.134-31-0-0), sunwcsl (>=5.11.134-31-0-0), sunwcar (>=5.11.134-31-0-0), sunwcslr (>=5.11.134-31-0-0)
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-31-0-100), sunwkvm (>=5.11.134-31-0-100), sunwcsr (>=5.11.134-31-0-100), sunwckr (>=5.11.134-31-0-100), sunwcnetr (>=5.11.134-31-0-100), sunwcsu (>=5.11.134-31-0-100), sunwcsd (>=5.11.134-31-0-100), sunwcsl (>=5.11.134-31-0-100), sunwcar (>=5.11.134-31-0-100), sunwcslr (>=5.11.134-31-0-100)
 Description: LSI MegaRAID SAS2.0 HBA Driver
  LSI MegaRAID SAS2.0 Controller HBA Driver
  .

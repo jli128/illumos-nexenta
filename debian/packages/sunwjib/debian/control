@@ -6,7 +6,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwjib
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwjcom (>=5.11.134-31-0-0)
+Depends: ${shlibs:Depends}, sunwjcom (>=5.11.134-31-0-100)
 Description: iButton OCF CT Driver
  Dallas Semiconductor serial iButton OCF Card Terminal Driver
  .
