@@ -1,3 +1,9 @@
+sunwzfskr (5.11.134-31-0-100a) nexenta; urgency=low
+
+  * Issue 5389: possible pool corruption with SLOG
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 01 Jun 2011 23:03:17 -0700
+
 sunwzfskr (5.11.134-31-0-100) nexenta; urgency=low
 
   * Renumber packages in preparation for 3.1 release
