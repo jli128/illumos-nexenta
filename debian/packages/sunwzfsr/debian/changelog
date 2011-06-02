@@ -1,3 +1,9 @@
+sunwzfsr (5.11.134-31-0-100a) nexenta; urgency=low
+
+  * Issue 5332: can't import pools with more than 13 disks
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 01 Jun 2011 21:33:49 -0700
+
 sunwzfsr (5.11.134-31-0-100) nexenta; urgency=low
 
   * Renumber packages in preparation for 3.1 release

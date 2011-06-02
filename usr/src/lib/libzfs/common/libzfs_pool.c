@@ -1477,7 +1477,7 @@ zpool_import_props(libzfs_handle_t *hdl, nvlist_t *config, const char *newname,
 		nvlist_free(props);
 		return (-1);
 	}
-	if (zcmd_alloc_dst_nvlist(hdl, &zc, 0) != 0) {
+	if (zcmd_alloc_dst_nvlist(hdl, &zc, zc.zc_nvlist_conf_size * 2) != 0) {
 		nvlist_free(props);
 		return (-1);
 	}
@@ -2924,7 +2924,7 @@ zpool_clear(zpool_handle_t *zhp, const char *path, nvlist_t *rewindnvl)
 	zpool_get_rewind_policy(rewindnvl, &policy);
 	zc.zc_cookie = policy.zrp_request;
 
-	if (zcmd_alloc_dst_nvlist(hdl, &zc, 0) != 0)
+	if (zcmd_alloc_dst_nvlist(hdl, &zc, zhp->zpool_config_size * 2) != 0)
 		return (-1);
 
 	if (zcmd_write_src_nvlist(hdl, &zc, rewindnvl) != 0)
