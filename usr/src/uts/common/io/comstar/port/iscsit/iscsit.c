@@ -21,6 +21,9 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #include <sys/cpuvar.h>
 #include <sys/types.h>
@@ -2188,8 +2191,12 @@ iscsit_deferred_dispatch(idm_pdu_t *rx_pdu)
 	iscsit_conn_dispatch_hold(ict);
 	mutex_exit(&ict->ict_mutex);
 
+#ifdef _KERNEL
+	taskq_dispatch_ent(iscsit_global.global_dispatch_taskq,
+	    iscsit_deferred, rx_pdu, 0, &rx_pdu->isp_tqent);
+#else
 	if (taskq_dispatch(iscsit_global.global_dispatch_taskq,
-	    iscsit_deferred, rx_pdu, DDI_NOSLEEP) == NULL) {
+	    iscsit_deferred, rx_pdu, TQ_SLEEP) == NULL) {
 		/*
 		 * In the unlikely scenario that we couldn't get the resources
 		 * to dispatch the PDU then just drop it.
@@ -2198,6 +2205,7 @@ iscsit_deferred_dispatch(idm_pdu_t *rx_pdu)
 		idm_conn_event(ict->ict_ic, CE_TRANSPORT_FAIL, NULL);
 		iscsit_conn_dispatch_rele(ict);
 	}
+#endif
 }
 
 static void

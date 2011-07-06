@@ -22,6 +22,9 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #ifndef _ZIO_H
 #define	_ZIO_H
@@ -32,6 +35,9 @@
 #include <sys/avl.h>
 #include <sys/fs/zfs.h>
 #include <sys/zio_impl.h>
+#ifdef _KERNEL
+#include <sys/taskq_impl.h>
+#endif
 
 #ifdef	__cplusplus
 extern "C" {
@@ -417,6 +423,11 @@ struct zio {
 	/* FMA state */
 	zio_cksum_report_t *io_cksum_report;
 	uint64_t	io_ena;
+
+	/* Taskq dispatching state - only for kernel */
+#ifdef	_KERNEL
+	taskq_ent_t	io_tqent;
+#endif
 };
 
 extern zio_t *zio_null(zio_t *pio, spa_t *spa, vdev_t *vd,
