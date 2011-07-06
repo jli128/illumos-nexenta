@@ -24,11 +24,13 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ */
+
+/*
  *	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T
  *		All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/errno.h>
 #include <sys/param.h>
@@ -292,7 +294,7 @@ nfstsize(void)
  */
 
 /* this should reflect the largest transfer size possible */
-static int nfs3_max_transfer_size = 1024 * 1024;
+int nfs3_max_transfer_size = 1024 * 1024;
 
 int
 nfs3tsize(void)
@@ -304,9 +306,9 @@ nfs3tsize(void)
 	return (nfs3_max_transfer_size);
 }
 
-static uint_t nfs3_max_transfer_size_clts = 32 * 1024;
-static uint_t nfs3_max_transfer_size_cots = 1024 * 1024;
-static uint_t nfs3_max_transfer_size_rdma = 1024 * 1024;
+uint_t nfs3_max_transfer_size_clts = 32 * 1024;
+uint_t nfs3_max_transfer_size_cots = 1024 * 1024;
+uint_t nfs3_max_transfer_size_rdma = 1024 * 1024;
 
 uint_t
 nfs3_tsize(struct knetconfig *knp)
