@@ -21,6 +21,9 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ */
 #ifndef	_IDM_IMPL_H_
 #define	_IDM_IMPL_H_
 
@@ -30,6 +33,10 @@ extern "C" {
 
 #include <sys/avl.h>
 #include <sys/socket_impl.h>
+#ifdef _KERNEL
+#include <sys/taskq_impl.h>
+#endif
+
 
 /*
  * IDM lock order:
@@ -373,6 +380,11 @@ typedef struct idm_pdu_s {
 	uint_t		isp_hdrbuflen;
 	uint_t		isp_databuflen;
 	time_t		isp_queue_time;
+
+	/* Taskq dispatching state for deferred PDU - only for kernel */
+#ifdef _KERNEL
+	taskq_ent_t	isp_tqent;
+#endif
 } idm_pdu_t;
 
 /*

@@ -21,6 +21,9 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #include <sys/zfs_context.h>
 #include <sys/fm/fs/zfs.h>
@@ -1072,7 +1075,7 @@ zio_taskq_dispatch(zio_t *zio, enum zio_taskq_type q, boolean_t cutinline)
 {
 	spa_t *spa = zio->io_spa;
 	zio_type_t t = zio->io_type;
-	int flags = TQ_SLEEP | (cutinline ? TQ_FRONT : 0);
+	int flags = (cutinline ? TQ_FRONT : 0);
 
 	/*
 	 * If we're a config writer or a probe, the normal issue and
@@ -1096,8 +1099,20 @@ zio_taskq_dispatch(zio_t *zio, enum zio_taskq_type q, boolean_t cutinline)
 		q++;
 
 	ASSERT3U(q, <, ZIO_TASKQ_TYPES);
+
+	/*
+	 * NB: We are assuming that the zio can only be dispatched
+	 * to a single taskq at a time.  It would be a grievous error
+	 * to dispatch the zio to another taskq at the same time.
+	 */
+#ifdef	_KERNEL
+	ASSERT(zio->io_tqent.tqent_next == NULL);
+	taskq_dispatch_ent(spa->spa_zio_taskq[t][q],
+	    (task_func_t *)zio_execute, zio, flags, &zio->io_tqent);
+#else
 	(void) taskq_dispatch(spa->spa_zio_taskq[t][q],
 	    (task_func_t *)zio_execute, zio, flags);
+#endif
 }
 
 static boolean_t
@@ -2888,9 +2903,17 @@ zio_done(zio_t *zio)
 			 * Reexecution is potentially a huge amount of work.
 			 * Hand it off to the otherwise-unused claim taskq.
 			 */
+#ifdef	_KERNEL
+			ASSERT(zio->io_tqent.tqent_next == NULL);
+			(void) taskq_dispatch_ent(
+			    spa->spa_zio_taskq[ZIO_TYPE_CLAIM][ZIO_TASKQ_ISSUE],
+			    (task_func_t *)zio_reexecute, zio, 0,
+			    &zio->io_tqent);
+#else
 			(void) taskq_dispatch(
 			    spa->spa_zio_taskq[ZIO_TYPE_CLAIM][ZIO_TASKQ_ISSUE],
 			    (task_func_t *)zio_reexecute, zio, TQ_SLEEP);
+#endif
 		}
 		return (ZIO_PIPELINE_STOP);
 	}

@@ -24,6 +24,10 @@
  */
 
 /*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ */
+
+/*
  * Kernel task queues: general-purpose asynchronous task scheduling.
  *
  * A common problem in kernel programming is the need to schedule tasks
@@ -1118,7 +1122,6 @@ taskq_bucket_dispatch(taskq_bucket_t *b, task_func_t func, void *arg)
  *	    Actual return value is the pointer to taskq entry that was used to
  *	    dispatch a task. This is useful for debugging.
  */
-/* ARGSUSED */
 taskqid_t
 taskq_dispatch(taskq_t *tq, task_func_t func, void *arg, uint_t flags)
 {
@@ -1134,7 +1137,7 @@ taskq_dispatch(taskq_t *tq, task_func_t func, void *arg, uint_t flags)
 		/*
 		 * TQ_NOQUEUE flag can't be used with non-dynamic task queues.
 		 */
-		ASSERT(! (flags & TQ_NOQUEUE));
+		ASSERT(!(flags & TQ_NOQUEUE));
 		/*
 		 * Enqueue the task to the underlying queue.
 		 */
@@ -1146,6 +1149,9 @@ taskq_dispatch(taskq_t *tq, task_func_t func, void *arg, uint_t flags)
 			mutex_exit(&tq->tq_lock);
 			return (NULL);
 		}
+		/* Make sure we start without any flags */
+		tqe->tqent_un.tqent_flags = 0;
+
 		if (flags & TQ_FRONT) {
 			TQ_ENQUEUE_FRONT(tq, tqe, func, arg);
 		} else {
@@ -1271,6 +1277,31 @@ taskq_dispatch(taskq_t *tq, task_func_t func, void *arg, uint_t flags)
 	mutex_exit(&tq->tq_lock);
 
 	return ((taskqid_t)tqe);
+}
+
+void
+taskq_dispatch_ent(taskq_t *tq, task_func_t func, void *arg, uint_t flags,
+    taskq_ent_t *tqe)
+{
+	ASSERT(func != NULL);
+	ASSERT(!(tq->tq_flags & TASKQ_DYNAMIC));
+
+	/*
+	 * Mark it as a prealloc'd task.  This is important
+	 * to ensure that we don't free it later.
+	 */
+	tqe->tqent_un.tqent_flags |= TQENT_FLAG_PREALLOC;
+	/*
+	 * Enqueue the task to the underlying queue.
+	 */
+	mutex_enter(&tq->tq_lock);
+
+	if (flags & TQ_FRONT) {
+		TQ_ENQUEUE_FRONT(tq, tqe, func, arg);
+	} else {
+		TQ_ENQUEUE(tq, tqe, func, arg);
+	}
+	mutex_exit(&tq->tq_lock);
 }
 
 /*
@@ -1460,6 +1491,7 @@ taskq_thread(void *arg)
 	taskq_ent_t *tqe;
 	callb_cpr_t cprinfo;
 	hrtime_t start, end;
+	boolean_t freeit;
 
 	curthread->t_taskq = tq;	/* mark ourselves for taskq_member() */
 
@@ -1546,6 +1578,23 @@ taskq_thread(void *arg)
 		tqe->tqent_next->tqent_prev = tqe->tqent_prev;
 		mutex_exit(&tq->tq_lock);
 
+		/*
+		 * For prealloc'd tasks, we don't free anything.  We
+		 * have to check this now, because once we call the
+		 * function for a prealloc'd taskq, we can't touch the
+		 * tqent any longer (calling the function returns the
+		 * ownershp of the tqent back to caller of
+		 * taskq_dispatch.)
+		 */
+		if ((!(tq->tq_flags & TASKQ_DYNAMIC)) &&
+		    (tqe->tqent_un.tqent_flags & TQENT_FLAG_PREALLOC)) {
+			/* clear pointers to assist assertion checks */
+			tqe->tqent_next = tqe->tqent_prev = NULL;
+			freeit = B_FALSE;
+		} else {
+			freeit = B_TRUE;
+		}
+
 		rw_enter(&tq->tq_threadlock, RW_READER);
 		start = gethrtime();
 		DTRACE_PROBE2(taskq__exec__start, taskq_t *, tq,
@@ -1560,7 +1609,8 @@ taskq_thread(void *arg)
 		tq->tq_totaltime += end - start;
 		tq->tq_executed++;
 
-		taskq_ent_free(tq, tqe);
+		if (freeit)
+			taskq_ent_free(tq, tqe);
 	}
 
 	if (tq->tq_nthreads_max == 1)
@@ -1600,7 +1650,7 @@ taskq_thread(void *arg)
 static void
 taskq_d_thread(taskq_ent_t *tqe)
 {
-	taskq_bucket_t	*bucket = tqe->tqent_bucket;
+	taskq_bucket_t	*bucket = tqe->tqent_un.tqent_bucket;
 	taskq_t		*tq = bucket->tqbucket_taskq;
 	kmutex_t	*lock = &bucket->tqbucket_lock;
 	kcondvar_t	*cv = &tqe->tqent_cv;
@@ -2115,7 +2165,7 @@ taskq_bucket_extend(void *arg)
 
 	ASSERT(tqe->tqent_thread == NULL);
 
-	tqe->tqent_bucket = b;
+	tqe->tqent_un.tqent_bucket = b;
 
 	/*
 	 * Create a thread in a TS_STOPPED state first. If it is successfully
