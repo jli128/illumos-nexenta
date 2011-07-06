@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 /*
  * This is the loadable module wrapper.
@@ -59,9 +62,9 @@ struct modlfs modlfs4 = {
 	&vfw4
 };
 
-static uint_t nfs4_max_transfer_size = 32 * 1024;
-static uint_t nfs4_max_transfer_size_cots = 1024 * 1024;
-static uint_t nfs4_max_transfer_size_rdma = 1024 * 1024;
+uint_t nfs4_max_transfer_size = 32 * 1024;
+uint_t nfs4_max_transfer_size_cots = 1024 * 1024;
+uint_t nfs4_max_transfer_size_rdma = 1024 * 1024;
 
 int
 nfs4tsize(void)
