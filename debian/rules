@@ -42,7 +42,18 @@ patch-stamp:
 	cp $(GATEROOT)/usr/src/tools/env/opensolaris.sh $(GATEROOT)
 	cd $(GATEROOT) && cat $(CURDIR)/debian/opensolaris.patch | patch -p1
 	cd $(GATEROOT) && sed -i -e "s#__GATEROOT__#$(GATEROOT)#" opensolaris.sh
-	if test ! -L $(GATEROOT)/.hg/patches; then cd $(GATEROOT) && ln -s ../../patches .hg/patches; fi
+	if test -L $(GATEROOT)/.hg/patches; then \
+		rm $(GATEROOT)/.hg/patches; \
+	fi
+	if test ! -d $(GATEROOT)/.hg/patches; then \
+		mkdir $(GATEROOT)/.hg/patches; \
+	fi;
+	if test -d $(GATEROOT)/../patches; then \
+		cd $(GATEROOT)/.hg/patches && ln -sf ../../../patches/* . ; \
+	fi
+	if test -d $(GATEROOT)/../closed; then \
+		cd $(GATEROOT)/.hg/patches && ln -sf ../../../closed/* . ; \
+	fi
 	cd $(GATEROOT) && hg qpush -a
 	touch $@
 
