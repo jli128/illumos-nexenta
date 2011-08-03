@@ -8419,3 +8419,66 @@ stmf_remote_port_free(stmf_remote_port_t *rpt)
 	 */
 	kmem_free(rpt, sizeof (stmf_remote_port_t) + rpt->rport_tptid_sz);
 }
+
+stmf_lu_t *
+stmf_check_and_hold_lu(scsi_task_t *task, uint8_t *guid)
+{
+	stmf_i_scsi_session_t *iss;
+	stmf_lu_t *lu;
+	stmf_i_lu_t *ilu = NULL;
+	stmf_lun_map_t *sm;
+	stmf_lun_map_ent_t *lme;
+	int i;
+
+	iss = (stmf_i_scsi_session_t *)task->task_session->ss_stmf_private;
+	rw_enter(iss->iss_lockp, RW_READER);
+	sm = iss->iss_sm;
+
+	for (i = 0; i < sm->lm_nentries; i++) {
+		if (sm->lm_plus[i] == NULL)
+			continue;
+		lme = (stmf_lun_map_ent_t *)sm->lm_plus[i];
+		lu = lme->ent_lu;
+		if (bcmp(lu->lu_id->ident, guid, 16) == 0) {
+			break;
+		}
+		lu = NULL;
+	}
+
+	if (!lu) {
+		goto hold_lu_done;
+	}
+
+	ilu = lu->lu_stmf_private;
+	mutex_enter(&ilu->ilu_task_lock);
+	ilu->ilu_additional_ref++;
+	mutex_exit(&ilu->ilu_task_lock);
+
+hold_lu_done:
+	rw_exit(iss->iss_lockp);
+	return (lu);
+}
+
+void
+stmf_release_lu(stmf_lu_t *lu)
+{
+	stmf_i_lu_t *ilu;
+
+	ilu = lu->lu_stmf_private;
+	ASSERT(ilu->ilu_additional_ref != 0);
+	mutex_enter(&ilu->ilu_task_lock);
+	ilu->ilu_additional_ref--;
+	mutex_exit(&ilu->ilu_task_lock);
+}
+
+int
+stmf_is_task_being_aborted(scsi_task_t *task)
+{
+	stmf_i_scsi_task_t *itask;
+
+	itask = (stmf_i_scsi_task_t *)task->task_stmf_private;
+	if (itask->itask_flags & ITASK_BEING_ABORTED)
+		return (1);
+
+	return (0);
+}
