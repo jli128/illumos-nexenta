@@ -206,6 +206,8 @@ typedef struct sbd_cmd {
 	uint32_t	len;		/* len left */
 	uint32_t	current_ro;	/* running relative offset */
 	uint8_t		*trans_data;	/* Any transient data */
+	uint32_t	non_conflicting_ats;	/* if any */
+	uint32_t	rsvd;
 } sbd_cmd_t;
 
 /*
@@ -216,6 +218,7 @@ typedef struct sbd_cmd {
 #define	SBD_SCSI_CMD_XFER_FAIL		0x04
 #define	SBD_SCSI_CMD_SYNC_WRITE		0x08
 #define	SBD_SCSI_CMD_TRANS_DATA		0x10
+#define	SBD_SCSI_CMD_ATS_RELATED	0x20
 
 /*
  * cmd types
@@ -300,10 +303,13 @@ void sbd_send_status_done(struct scsi_task *task);
 void sbd_task_free(struct scsi_task *task);
 stmf_status_t sbd_abort(struct stmf_lu *lu, int abort_cmd, void *arg,
 							uint32_t flags);
+void sbd_task_poll(struct scsi_task *task);
 void sbd_dbuf_free(struct scsi_task *task, struct stmf_data_buf *dbuf);
 void sbd_ctl(struct stmf_lu *lu, int cmd, void *arg);
 stmf_status_t sbd_info(uint32_t cmd, stmf_lu_t *lu, void *arg,
 				uint8_t *buf, uint32_t *bufsizep);
+uint8_t sbd_get_lbasize_shift(stmf_lu_t *lu);
+int sbd_is_valid_lu(stmf_lu_t *lu);
 
 #ifdef	__cplusplus
 }
