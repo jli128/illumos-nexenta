@@ -19,10 +19,7 @@
  * CDDL HEADER END
  */
 
-/*
- * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to license terms.
- */
+/* Copyright © 2003-2011 Emulex. All rights reserved.  */
 
 /*
  * Header file containing the command structures for Hardware
@@ -39,24 +36,29 @@ extern "C" {
 
 #pragma pack(1)
 
+#define	OC_CNA_GEN2			0x2
+#define	OC_CNA_GEN3			0x3
+#define	DEVID_TIGERSHARK		0x700
+#define	DEVID_TOMCAT			0x710
+
 /* PCI CSR offsets */
-#define	PCICFG_F1_CSR		0x0 /* F1 for NIC */
-#define	PCICFG_SEMAPHORE	0xbc
-#define	PCICFG_SOFT_RESET	0x5c
+#define	PCICFG_F1_CSR			0x0 /* F1 for NIC */
+#define	PCICFG_SEMAPHORE		0xbc
+#define	PCICFG_SOFT_RESET		0x5c
 #define	PCICFG_UE_STATUS_HI_MASK	0xac
 #define	PCICFG_UE_STATUS_LO_MASK	0xa8
-#define	PCICFG_ONLINE0		0xb0
-#define	PCICFG_ONLINE1		0xb4
+#define	PCICFG_ONLINE0			0xb0
+#define	PCICFG_ONLINE1			0xb4
 #define	INTR_EN				0x20000000
-#define	IMAGE_TRANSFER_SIZE	(32 * 1024) /* 32K at a time */
+#define	IMAGE_TRANSFER_SIZE		(32 * 1024) /* 32K at a time */
 
 /* CSR register offsets */
-#define	MPU_EP_CONTROL		0
-#define	MPU_EP_SEMAPHORE	0xac
-#define	PCICFG_INTR_CTRL	0xfc
-#define	HOSTINTR_MASK		(1 << 29)
-#define	HOSTINTR_PFUNC_SHIFT	26
-#define	HOSTINTR_PFUNC_MASK	7
+#define	MPU_EP_CONTROL			0
+#define	MPU_EP_SEMAPHORE		0xac
+#define	PCICFG_INTR_CTRL		0xfc
+#define	HOSTINTR_MASK			(1 << 29)
+#define	HOSTINTR_PFUNC_SHIFT		26
+#define	HOSTINTR_PFUNC_MASK		7
 
 /* POST status reg struct */
 #define	POST_STAGE_POWER_ON_RESET	0x00
@@ -67,26 +69,26 @@ extern "C" {
 #define	POST_STAGE_ARMFW_UE		0xf000
 
 /* DOORBELL registers */
-#define	PD_RXULP_DB	0x0100
-#define	PD_TXULP_DB	0x0060
-#define	DB_RQ_ID_MASK	0x3FF
+#define	PD_RXULP_DB			0x0100
+#define	PD_TXULP_DB			0x0060
+#define	DB_RQ_ID_MASK			0x3FF
 
-#define	PD_CQ_DB	0x0120
-#define	PD_EQ_DB	PD_CQ_DB
-#define	PD_MPU_MBOX_DB	0x0160
-#define	PD_MQ_DB	0x0140
+#define	PD_CQ_DB			0x0120
+#define	PD_EQ_DB			PD_CQ_DB
+#define	PD_MPU_MBOX_DB			0x0160
+#define	PD_MQ_DB			0x0140
 
 /* EQE completion types */
 #define	EQ_MINOR_CODE_COMPLETION 	0x00
-#define	EQ_MINOR_CODE_OTHER			0x01
+#define	EQ_MINOR_CODE_OTHER		0x01
 #define	EQ_MAJOR_CODE_COMPLETION 	0x00
 
 /* Link Status field values */
-#define	PHY_LINK_FAULT_NONE			0x0
+#define	PHY_LINK_FAULT_NONE		0x0
 #define	PHY_LINK_FAULT_LOCAL		0x01
 #define	PHY_LINK_FAULT_REMOTE		0x02
 
-#define	PHY_LINK_SPEED_ZERO			0x0 /* No link */
+#define	PHY_LINK_SPEED_ZERO		0x0 /* No link */
 #define	PHY_LINK_SPEED_10MBPS		0x1 /* (10 Mbps) */
 #define	PHY_LINK_SPEED_100MBPS		0x2 /* (100 Mbps) */
 #define	PHY_LINK_SPEED_1GBPS		0x3 /* (1 Gbps) */
@@ -113,16 +115,16 @@ extern "C" {
 #define	MAC_ADDRESS_TYPE_FCOE		0x4 /* (FCoE MAC Address) */
 
 /* CREATE_IFACE capability and cap_en flags */
-#define	MBX_RX_IFACE_FLAGS_RSS				0x4
-#define	MBX_RX_IFACE_FLAGS_PROMISCUOUS		0x8
-#define	MBX_RX_IFACE_FLAGS_BROADCAST 		0x10
-#define	MBX_RX_IFACE_FLAGS_UNTAGGED			0x20
-#define	MBX_RX_IFACE_FLAGS_ULP				0x40
-#define	MBX_RX_IFACE_FLAGS_VLAN_PROMISCUOUS 0x80
-#define	MBX_RX_IFACE_FLAGS_VLAN				0x100
+#define	MBX_RX_IFACE_FLAGS_RSS		0x4
+#define	MBX_RX_IFACE_FLAGS_PROMISCUOUS	0x8
+#define	MBX_RX_IFACE_FLAGS_BROADCAST 	0x10
+#define	MBX_RX_IFACE_FLAGS_UNTAGGED	0x20
+#define	MBX_RX_IFACE_FLAGS_ULP		0x40
+#define	MBX_RX_IFACE_FLAGS_VLAN_PROMISCUOUS	0x80
+#define	MBX_RX_IFACE_FLAGS_VLAN			0x100
 #define	MBX_RX_IFACE_FLAGS_MCAST_PROMISCUOUS	0x200
-#define	MBX_RX_IFACE_FLAGS_PASS_L2				0x400
-#define	MBX_RX_IFACE_FLAGS_PASS_L3L4			0x800
+#define	MBX_RX_IFACE_FLAGS_PASS_L2	0x400
+#define	MBX_RX_IFACE_FLAGS_PASS_L3L4	0x800
 
 #define	MQ_RING_CONTEXT_SIZE_16		0x5 /* (16 entries) */
 #define	MQ_RING_CONTEXT_SIZE_32		0x6 /* (32 entries) */
@@ -130,11 +132,18 @@ extern "C" {
 #define	MQ_RING_CONTEXT_SIZE_128	0x8 /* (128 entries) */
 
 
-#define	MBX_DB_READY_BIT	0x1
-#define	MBX_DB_HI_BIT		0x2
+#define	MBX_DB_READY_BIT		0x1
+#define	MBX_DB_HI_BIT			0x2
 #define	ASYNC_EVENT_CODE_LINK_STATE	0x1
-#define	ASYNC_EVENT_LINK_UP			0x1
+#define	ASYNC_EVENT_LINK_UP		0x1
 #define	ASYNC_EVENT_LINK_DOWN		0x0
+
+/* port link_status */
+#define	ASYNC_EVENT_LOGICAL		0x02
+
+/* Logical Link Status */
+#define	NTWK_LOGICAL_LINK_DOWN		0
+#define	NTWK_LOGICAL_LINK_UP		1
 
 /* Rx filter bits */
 #define	NTWK_RX_FILTER_IP_CKSUM 	0x1
@@ -143,7 +152,7 @@ extern "C" {
 #define	NTWK_RX_FILTER_STRIP_CRC	0x8
 
 /* max SGE per mbx */
-#define	MAX_MBX_SGE	19
+#define	MAX_MBX_SGE			19
 
 /* physical address structure to be used in MBX */
 struct phys_addr {
@@ -812,17 +821,10 @@ struct mbx_set_common_iface_multicast {
 	struct mbx_hdr hdr;
 	union {
 		struct {
-#ifdef _BIG_ENDIAN
-			/* dw 0 */
-			uint8_t if_id;
-			uint8_t promiscuous;
-			uint16_t num_mac;
-#else
 			/* dw 0 */
 			uint16_t num_mac;
 			uint8_t promiscuous;
 			uint8_t if_id;
-#endif
 			/* dw 1-48 */
 			struct {
 				uint8_t byte[6];
@@ -1254,6 +1256,36 @@ struct mbx_common_read_write_flashrom {
 	uint8_t		data_buffer[4];  /* + IMAGE_TRANSFER_SIZE */
 };
 
+/* ULP MODE SUPPORTED */
+enum {
+	ULP_TOE_MODE = 0x1,
+	ULP_NIC_MODE = 0x2,
+	ULP_RDMA_MODE = 0x4,
+	ULP_ISCSI_INI_MODE = 0x10,
+	ULP_ISCSI_TGT_MODE = 0x20,
+	ULP_FCOE_INI_MODE = 0x40,
+	ULP_FCOE_TGT_MODE = 0x80,
+	ULP_DAL_MODE = 0x100,
+	ULP_LRO_MODE = 0x200
+};
+
+/* Function Mode Supported */
+enum {
+	TOE_MODE = 0x1, /* TCP offload  */
+	NIC_MODE = 0x2, /* Raw Ethernet  */
+	RDMA_MODE = 0x4, /*  RDMA  */
+	VM_MODE = 0x8,   /* VM  */
+	ISCSI_INI_MODE = 0x10, /*  iSCSI initiator */
+	ISCSI_TGT_MODE = 0x20, /* iSCSI target plus initiator */
+	FCOE_INI_MODE = 0x40, /* FCoE Initiator */
+	FCOE_TGT_MODE = 0x80, /* FCoE target */
+	DAL_MODE = 0x100, /* DAL */
+	LRO_MODE = 0x200, /* LRO */
+	FLEX10_MODE = 0x400, /*  FLEX-10  or VNIC */
+	NCSI_MODE = 0x800, /* NCSI */
+	INVALID_MODE = 0x8000 /* Invalid */
+};
+
 struct mbx_common_query_fw_config {
 	struct mbx_hdr hdr;
 	union {
@@ -1266,32 +1298,23 @@ struct mbx_common_query_fw_config {
 			uint32_t    asic_revision;
 			uint32_t    port_id; /* used for stats retrieval */
 			uint32_t    function_mode;
-			uint32_t    ulp0_mode;
-			uint32_t    ulp0_nic_wqid_base;
-			uint32_t    ulp0_nic_wq_tot;
-			uint32_t    ulp0_toe_wqid_base;
-			uint32_t    ulp0_toe_wq_tot;
-			uint32_t    ulp0_toe_rqid_base;
-			uint32_t    ulp0_toe_rqid_tot;
-			uint32_t    ulp0_toe_defrqid_base;
-			uint32_t    ulp0_toe_defrq_tot;
-			uint32_t    ulp0_lro_rqid_base;
-			uint32_t    ulp0_lro_rqid_tot;
-			uint32_t    ulp0_iscsi_icd_base;
-			uint32_t    ulp0_iscsi_icd_tot;
-			uint32_t    ulp1_mode;
-			uint32_t    ulp1_nic_wqid_base;
-			uint32_t    ulp1_wq_tot;
-			uint32_t    ulp1_toe_wqid_base;
-			uint32_t    ulp1_toe_wq_tot;
-			uint32_t    ulp1_toe_rqid_base;
-			uint32_t    ulp1_toe_rqid_tot;
-			uint32_t    ulp1_toe_defrqid_base;
-			uint32_t    ulp1_toe_defrq_tot;
-			uint32_t    ulp1_lro_rqid_base;
-			uint32_t    ulp1_lro_rqid_tot;
-			uint32_t    ulp1_iscsi_icd_base;
-			uint32_t    ulp1_iscsi_icd_tot;
+			struct {
+
+				uint32_t    mode;
+				uint32_t    wq_base;
+				uint32_t    wq_count;
+				uint32_t    sq_base;
+				uint32_t    sq_count;
+				uint32_t    rq_base;
+				uint32_t    rq_count;
+				uint32_t    dq_base;
+				uint32_t    dq_count;
+				uint32_t    lro_base;
+				uint32_t    lro_count;
+				uint32_t    icd_base;
+				uint32_t    icd_count;
+			} ulp[2];
+			uint32_t function_caps;
 		}rsp;
 	}params;
 };

@@ -19,10 +19,7 @@
  * CDDL HEADER END
  */
 
-/*
- * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to license terms.
- */
+/* Copyright © 2003-2011 Emulex. All rights reserved.  */
 
 /*
  * Source file containing the implementation of the driver entry points
@@ -36,19 +33,20 @@
 mac_priv_prop_t oce_priv_props[] = {
 	{"_tx_ring_size", MAC_PROP_PERM_READ},
 	{"_tx_bcopy_limit", MAC_PROP_PERM_RW},
-	{"_rx_bcopy_limit", MAC_PROP_PERM_RW},
 	{"_rx_ring_size", MAC_PROP_PERM_READ},
+        {"_rx_bcopy_limit", MAC_PROP_PERM_RW},
 };
+
 uint32_t oce_num_props = sizeof (oce_priv_props) / sizeof (mac_priv_prop_t);
 
+extern int pow10[];
 
 /* ---[ static function declarations ]----------------------------------- */
-static int oce_power10(int power);
 static int oce_set_priv_prop(struct oce_dev *dev, const char *name,
     uint_t size, const void *val);
 
 static int oce_get_priv_prop(struct oce_dev *dev, const char *name,
-    uint_t flags, uint_t size, void *val);
+                             uint_t flags, uint_t size, void *val);
 
 /* ---[ GLD entry points ]----------------------------------------------- */
 int
@@ -68,25 +66,6 @@ oce_m_start(void *arg)
 		mutex_exit(&dev->dev_lock);
 		return (EIO);
 	}
-
-	if (oce_fm_check_acc_handle(dev, dev->db_handle)) {
-		ddi_fm_service_impact(dev->dip, DDI_SERVICE_DEGRADED);
-		mutex_exit(&dev->dev_lock);
-		return (EIO);
-	}
-
-	if (oce_fm_check_acc_handle(dev, dev->csr_handle)) {
-		ddi_fm_service_impact(dev->dip, DDI_SERVICE_DEGRADED);
-		mutex_exit(&dev->dev_lock);
-		return (EIO);
-	}
-
-	if (oce_fm_check_acc_handle(dev, dev->cfg_handle)) {
-		ddi_fm_service_impact(dev->dip, DDI_SERVICE_DEGRADED);
-		mutex_exit(&dev->dev_lock);
-		return (EIO);
-	}
-
 	ret = oce_start(dev);
 	if (ret != DDI_SUCCESS) {
 		mutex_exit(&dev->dev_lock);
@@ -104,35 +83,25 @@ int
 oce_start(struct oce_dev *dev)
 {
 	int qidx = 0;
-	int ret;
+	struct link_status link = {0};
 
-	ret = oce_alloc_intr(dev);
-	if (ret != DDI_SUCCESS)
-		goto  start_fail;
-	ret = oce_setup_handlers(dev);
-	if (ret != DDI_SUCCESS) {
-		oce_log(dev, CE_WARN, MOD_CONFIG,
-		    "Interrupt handler setup failed with %d", ret);
-		(void) oce_teardown_intr(dev);
-		goto  start_fail;
-	}
 	/* get link status */
-	(void) oce_get_link_status(dev, &dev->link);
+	(void) oce_get_link_status(dev, &link);
 
-	if (dev->link.mac_speed == PHY_LINK_SPEED_ZERO) {
-		oce_log(dev, CE_NOTE, MOD_CONFIG,
-		    "LINK_DOWN: 0x%x", dev->link.mac_speed);
-		mac_link_update(dev->mac_handle, LINK_STATE_DOWN);
-	} else {
-		oce_log(dev, CE_NOTE, MOD_CONFIG,
-		    "(f,s,d,pp)=(0x%x, 0x%x, 0x%x, 0x%x)",
-		    dev->link.mac_fault, dev->link.mac_speed,
-		    dev->link.mac_duplex, dev->link.physical_port);
-		mac_link_update(dev->mac_handle, LINK_STATE_UP);
+	dev->link_status  = (link.logical_link_status == NTWK_LOGICAL_LINK_UP) ?
+	    LINK_STATE_UP : LINK_STATE_DOWN;
+
+	dev->link_speed = link.qos_link_speed ? link.qos_link_speed * 10 :
+	    pow10[link.mac_speed];
+
+	mac_link_update(dev->mac_handle, dev->link_status);
+
+	for (qidx = 0; qidx < dev->nwqs; qidx++) {
+		(void) oce_start_wq(dev->wq[qidx]);
 	}
-
-	(void) oce_start_wq(dev->wq[0]);
-	(void) oce_start_rq(dev->rq[0]);
+	for (qidx = 0; qidx < dev->nrqs; qidx++) {
+		(void) oce_start_rq(dev->rq[qidx]);
+	}
 	(void) oce_start_mq(dev->mq);
 	/* enable interrupts */
 	oce_ei(dev);
@@ -140,11 +109,8 @@ oce_start(struct oce_dev *dev)
 	for (qidx = 0; qidx < dev->neqs; qidx++) {
 		oce_arm_eq(dev, dev->eq[qidx]->eq_id, 0, B_TRUE, B_FALSE);
 	}
-
-	/* update state */
+	/* TODO update state */
 	return (DDI_SUCCESS);
-start_fail:
-	return (DDI_FAILURE);
 } /* oce_start */
 
 
@@ -169,30 +135,34 @@ oce_m_stop(void *arg)
 void
 oce_stop(struct oce_dev *dev)
 {
+	int qidx;
 	/* disable interrupts */
 	oce_di(dev);
-	oce_remove_handler(dev);
-	(void) oce_teardown_intr(dev);
-	mutex_enter(&dev->wq[0]->tx_lock);
-	mutex_enter(&dev->rq[0]->rx_lock);
+	for (qidx = 0; qidx < dev->nwqs; qidx++) {
+		mutex_enter(&dev->wq[qidx]->tx_lock);
+	}
 	mutex_enter(&dev->mq->lock);
 	/* complete the pending Tx */
-	oce_clean_wq(dev->wq[0]);
+	for (qidx = 0; qidx < dev->nwqs; qidx++)
+		oce_clean_wq(dev->wq[qidx]);
 	/* Release all the locks */
 	mutex_exit(&dev->mq->lock);
-	mutex_exit(&dev->rq[0]->rx_lock);
-	mutex_exit(&dev->wq[0]->tx_lock);
+	for (qidx = 0; qidx < dev->nwqs; qidx++)
+		mutex_exit(&dev->wq[qidx]->tx_lock);
+	if (dev->link_status == LINK_STATE_UP) {
+		dev->link_status = LINK_STATE_UNKNOWN;
+		mac_link_update(dev->mac_handle, dev->link_status);
+	}
 
 } /* oce_stop */
 
 int
 oce_m_multicast(void *arg, boolean_t add, const uint8_t *mca)
 {
-
 	struct oce_dev *dev = (struct oce_dev *)arg;
 	struct ether_addr  *mca_drv_list;
 	struct ether_addr  mca_hw_list[OCE_MAX_MCA];
-	uint16_t new_mcnt = 0;
+	uint16_t new_mcnt = dev->num_mca;
 	int ret;
 	int i;
 
@@ -207,7 +177,7 @@ oce_m_multicast(void *arg, boolean_t add, const uint8_t *mca)
 	DEV_LOCK(dev);
 	if (add) {
 		/* check if we exceeded hw max  supported */
-		if (dev->num_mca <= OCE_MAX_MCA) {
+		if (new_mcnt < OCE_MAX_MCA) {
 			/* copy entire dev mca to the mbx */
 			bcopy((void*)mca_drv_list,
 			    (void*)mca_hw_list,
@@ -216,7 +186,7 @@ oce_m_multicast(void *arg, boolean_t add, const uint8_t *mca)
 			bcopy(mca, &mca_hw_list[dev->num_mca],
 			    sizeof (struct ether_addr));
 		}
-		new_mcnt = dev->num_mca + 1;
+		new_mcnt++;
 	} else {
 		struct ether_addr *hwlistp = &mca_hw_list[0];
 		for (i = 0; i < dev->num_mca; i++) {
@@ -225,21 +195,25 @@ oce_m_multicast(void *arg, boolean_t add, const uint8_t *mca)
 				bcopy(mca_drv_list + i, hwlistp,
 				    ETHERADDRL);
 				hwlistp++;
+			} else {
+				new_mcnt--;
 			}
 		}
-		new_mcnt = dev->num_mca - 1;
 	}
 
 	if (dev->suspended) {
 		goto finish;
 	}
-	if (new_mcnt == 0 || new_mcnt > OCE_MAX_MCA) {
-		ret = oce_set_multicast_table(dev, dev->if_id, NULL, 0, B_TRUE);
+	if (new_mcnt > OCE_MAX_MCA) {
+		ret = oce_set_multicast_table(dev, dev->if_id, &mca_hw_list[0],
+		    OCE_MAX_MCA, B_TRUE);
 	} else {
 		ret = oce_set_multicast_table(dev, dev->if_id,
 		    &mca_hw_list[0], new_mcnt, B_FALSE);
 	}
-	if (ret != 0) {
+		if (ret != 0) {
+		oce_log(dev, CE_WARN, MOD_CONFIG,
+		    "mcast %s fails", add ? "ADD" : "DEL");
 		DEV_UNLOCK(dev);
 		return (EIO);
 	}
@@ -250,9 +224,15 @@ finish:
 	if (new_mcnt && new_mcnt <= OCE_MAX_MCA) {
 		bcopy(mca_hw_list, mca_drv_list,
 		    new_mcnt * sizeof (struct ether_addr));
+
+		dev->num_mca = (uint16_t)new_mcnt;
 	}
-	dev->num_mca = (uint16_t)new_mcnt;
 	DEV_UNLOCK(dev);
+	oce_log(dev, CE_NOTE, MOD_CONFIG,
+	    "mcast %s, addr=%02x:%02x:%02x:%02x:%02x:%02x, num_mca=%d",
+	    add ? "ADD" : "DEL",
+	    mca[0], mca[1], mca[2], mca[3], mca[4], mca[5],
+	    dev->num_mca);
 	return (0);
 } /* oce_m_multicast */
 
@@ -265,6 +245,7 @@ oce_m_unicast(void *arg, const uint8_t *uca)
 	DEV_LOCK(dev);
 	if (dev->suspended) {
 		bcopy(uca, dev->unicast_addr, ETHERADDRL);
+		dev->num_smac = 0;
 		DEV_UNLOCK(dev);
 		return (DDI_SUCCESS);
 	}
@@ -275,6 +256,8 @@ oce_m_unicast(void *arg, const uint8_t *uca)
 		DEV_UNLOCK(dev);
 		return (EIO);
 	}
+	dev->num_smac = 0;
+	bzero(dev->unicast_addr, ETHERADDRL);
 
 	/* Set the New MAC addr earlier is no longer valid */
 	ret = oce_add_mac(dev, dev->if_id, uca, &dev->pmac_id);
@@ -282,10 +265,16 @@ oce_m_unicast(void *arg, const uint8_t *uca)
 		DEV_UNLOCK(dev);
 		return (EIO);
 	}
+	bcopy(uca, dev->unicast_addr, ETHERADDRL);
+	dev->num_smac = 1;
 	DEV_UNLOCK(dev);
 	return (ret);
 } /* oce_m_unicast */
 
+/*
+ * Hashing policy for load balancing over the set of TX rings
+ * available to the driver.
+ */
 mblk_t *
 oce_m_send(void *arg, mblk_t *mp)
 {
@@ -301,7 +290,10 @@ oce_m_send(void *arg, mblk_t *mp)
 		return (NULL);
 	}
 	DEV_UNLOCK(dev);
-	wq = dev->wq[0];
+	/*
+	 * Hash to pick a wq
+	 */
+	wq = oce_get_wq(dev, mp);
 
 	while (mp != NULL) {
 		/* Save the Pointer since mp will be freed in case of copy */
@@ -444,14 +436,11 @@ oce_m_setprop(void *arg, const char *name, mac_prop_id_t id,
 	return (ret);
 } /* oce_m_setprop */
 
-int
-oce_m_getprop(void *arg, const char *name, mac_prop_id_t id,
+int oce_m_getprop(void *arg, const char *name, mac_prop_id_t id,
     uint_t flags, uint_t size, void *val, uint_t *perm)
 {
 	struct oce_dev *dev = arg;
 	uint32_t ret = 0;
-
-	*perm = MAC_PROP_PERM_READ;
 
 	switch (id) {
 	case MAC_PROP_AUTONEG:
@@ -470,53 +459,56 @@ oce_m_getprop(void *arg, const char *name, mac_prop_id_t id,
 	case MAC_PROP_EN_10HDX_CAP:
 	case MAC_PROP_ADV_100T4_CAP:
 	case MAC_PROP_EN_100T4_CAP: {
+		*perm = MAC_PROP_PERM_READ;
 		*(uint8_t *)val = 0x0;
 		break;
-	}
-
-	case MAC_PROP_ADV_10GFDX_CAP: {
+	}    
+  
+	case MAC_PROP_ADV_10GFDX_CAP:
+	case MAC_PROP_EN_10GFDX_CAP:
 		*(uint8_t *)val = 0x01;
+		*perm = MAC_PROP_PERM_READ;
 		break;
-	}
 
-	case MAC_PROP_EN_10GFDX_CAP: {
-		*(uint8_t *)val = 0x01;
-		break;
-	}
+          case MAC_PROP_DUPLEX: {
+                if (size >= sizeof (link_duplex_t)) {
+                        uint32_t *mode = (uint32_t *)val;
 
-	case MAC_PROP_DUPLEX: {
-		if (size >= sizeof (link_duplex_t)) {
-			uint32_t *mode = (uint32_t *)val;
-
-			*perm = MAC_PROP_PERM_READ;
-			if (dev->state & STATE_MAC_STARTED)
-				*mode = LINK_DUPLEX_FULL;
-			else
-				*mode = LINK_DUPLEX_UNKNOWN;
-
-		} else
-			ret = EINVAL;
+                        *perm = MAC_PROP_PERM_READ;
+                        if (dev->state & STATE_MAC_STARTED)
+                          *mode = LINK_DUPLEX_FULL;
+                        else
+                          *mode = LINK_DUPLEX_UNKNOWN;
+                } else
+                          ret = EINVAL;
 		break;
 	}
 
 	case MAC_PROP_SPEED: {
-		if (size >= sizeof (uint64_t)) {
-			uint64_t *speed = (uint64_t *)val;
+		uint64_t *speed = (uint64_t *)val;
+		struct link_status link = {0};
 
-			*perm = MAC_PROP_PERM_READ;
-			*speed = 0;
-			if ((dev->state & STATE_MAC_STARTED) &&
-			    (dev->link.mac_speed != 0)) {
-				*speed = 1000000ull *
-				    oce_power10(dev->link.mac_speed);
-			}
-		} else
-			ret = EINVAL;
+                if (size >= sizeof (uint64_t)) {
+                        *perm = MAC_PROP_PERM_READ;
+                        *speed = 0;
+
+                        if (dev->state & STATE_MAC_STARTED) {
+                                if (dev->link_speed < 0) {
+                                        (void) oce_get_link_status(dev, &link);
+                                        dev->link_speed = link.qos_link_speed ?
+                                          link.qos_link_speed * 10 :
+                                          pow10[link.mac_speed];
+                                }
+
+                                *speed = dev->link_speed * 1000000ull;
+                        }
+                } else
+                        ret = EINVAL;
 		break;
 	}
 
-	case MAC_PROP_MTU: {
-		mac_propval_range_t range;
+          case MAC_PROP_MTU: {
+                mac_propval_range_t range;
 
 		*perm = MAC_PROP_PERM_RW;
 		if (!(flags & MAC_PROP_POSSIBLE)) {
@@ -528,43 +520,97 @@ oce_m_getprop(void *arg, const char *name, mac_prop_id_t id,
 		range.range_uint32[0].mpur_min = OCE_MIN_MTU;
 		range.range_uint32[0].mpur_max = OCE_MAX_MTU;
 		bcopy(&range, val, sizeof (mac_propval_range_t));
-		break;
-	}
+                break;
+          }
 
 	case MAC_PROP_FLOWCTRL: {
 		link_flowctrl_t *fc = (link_flowctrl_t *)val;
 
-		if (size < sizeof (link_flowctrl_t)) {
+                if (size < sizeof (link_flowctrl_t)) {
 			ret = EINVAL;
 			break;
 		}
 
-		if (size >= sizeof (link_flowctrl_t)) {
-			if (dev->flow_control & OCE_FC_TX &&
-			    dev->flow_control & OCE_FC_RX)
-				*fc = LINK_FLOWCTRL_BI;
-			else if (dev->flow_control == OCE_FC_TX)
-				*fc = LINK_FLOWCTRL_TX;
-			else if (dev->flow_control == OCE_FC_RX)
-				*fc = LINK_FLOWCTRL_RX;
-			else if (dev->flow_control == 0)
-				*fc = LINK_FLOWCTRL_NONE;
-			else
-				ret = EINVAL;
-		}
+		if (dev->flow_control & OCE_FC_TX &&
+		    dev->flow_control & OCE_FC_RX)
+			*fc = LINK_FLOWCTRL_BI;
+		else if (dev->flow_control == OCE_FC_TX)
+			*fc = LINK_FLOWCTRL_TX;
+		else if (dev->flow_control == OCE_FC_RX)
+			*fc = LINK_FLOWCTRL_RX;
+		else if (dev->flow_control == 0)
+			*fc = LINK_FLOWCTRL_NONE;
+		else
+			ret = EINVAL;
 		break;
 	}
 
-	case MAC_PROP_PRIVATE: {
-		ret = oce_get_priv_prop(dev, name, flags, size, val);
+	case MAC_PROP_PRIVATE:
+                ret = oce_get_priv_prop(dev, name, flags, size, val);
 		break;
-	}
+
 	default:
 		ret = ENOTSUP;
 		break;
 	} /* switch id */
 	return (ret);
 } /* oce_m_getprop */
+
+#if 0 /* Deactivated for backward compatibility. */
+void
+oce_m_propinfo(void *arg, const char *name, mac_prop_id_t pr_num,
+    mac_prop_info_handle_t prh)
+{
+	_NOTE(ARGUNUSED(arg));
+
+	switch (pr_num) {
+	case MAC_PROP_AUTONEG:
+	case MAC_PROP_EN_AUTONEG:
+	case MAC_PROP_ADV_1000FDX_CAP:
+	case MAC_PROP_EN_1000FDX_CAP:
+	case MAC_PROP_ADV_1000HDX_CAP:
+	case MAC_PROP_EN_1000HDX_CAP:
+	case MAC_PROP_ADV_100FDX_CAP:
+	case MAC_PROP_EN_100FDX_CAP:
+	case MAC_PROP_ADV_100HDX_CAP:
+	case MAC_PROP_EN_100HDX_CAP:
+	case MAC_PROP_ADV_10FDX_CAP:
+	case MAC_PROP_EN_10FDX_CAP:
+	case MAC_PROP_ADV_10HDX_CAP:
+	case MAC_PROP_EN_10HDX_CAP:
+	case MAC_PROP_ADV_100T4_CAP:
+	case MAC_PROP_EN_100T4_CAP:
+	case MAC_PROP_ADV_10GFDX_CAP:
+	case MAC_PROP_EN_10GFDX_CAP:
+	case MAC_PROP_SPEED:
+	case MAC_PROP_DUPLEX:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		break;
+
+	case MAC_PROP_MTU:
+		mac_prop_info_set_range_uint32(prh, OCE_MIN_MTU, OCE_MAX_MTU);
+		break;
+
+	case MAC_PROP_PRIVATE: {
+		char valstr[64];
+		int value;
+
+		if (strcmp(name, "_tx_ring_size") == 0) {
+			value = OCE_DEFAULT_TX_RING_SIZE;
+		} else if (strcmp(name, "_rx_ring_size") == 0) {
+			value = OCE_DEFAULT_RX_RING_SIZE;
+		} else {
+			return;
+		}
+
+		(void) snprintf(valstr, sizeof (valstr), "%d", value);
+		mac_prop_info_set_default_str(prh, valstr);
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		break;
+	}
+	}
+} /* oce_m_propinfo */
+#endif
 
 /*
  * function to handle dlpi streams message from GLDv3 mac layer
@@ -594,11 +640,46 @@ oce_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 
 	case OCE_ISSUE_MBOX: {
 		ret = oce_issue_mbox(dev, wq, mp, &payload_length);
-		if (ret != 0) {
-			miocnak(wq, mp, payload_length, ret);
-		} else {
-			miocack(wq, mp, payload_length, 0);
+		miocack(wq, mp, payload_length, ret);
+		break;
+	}
+	case OCE_QUERY_DRIVER_DATA: {
+		struct oce_driver_query *drv_query =
+		    (struct oce_driver_query *)(void *)mp->b_cont->b_rptr;
+
+		/* if the driver version does not match bail */
+		if (drv_query->version != OCN_VERSION_SUPPORTED) {
+			oce_log(dev, CE_NOTE, MOD_CONFIG, "%s",
+			    "One Connect version mismatch");
+			miocnak(wq, mp, 0, ENOTSUP);
+			break;
 		}
+
+		/* fill the return values */
+		bcopy(OCE_MOD_NAME, drv_query->driver_name,
+		    (sizeof (OCE_MOD_NAME) > 32) ?
+		    31 : sizeof (OCE_MOD_NAME));
+		drv_query->driver_name[31] = '\0';
+
+		bcopy(OCE_VERSION, drv_query->driver_version,
+		    (sizeof (OCE_VERSION) > 32) ? 31 :
+		    sizeof (OCE_VERSION));
+		drv_query->driver_version[31] = '\0';
+
+		if (dev->num_smac == 0) {
+			drv_query->num_smac = 1;
+			bcopy(dev->mac_addr, drv_query->smac_addr[0],
+			    ETHERADDRL);
+		} else {
+			drv_query->num_smac = dev->num_smac;
+			bcopy(dev->unicast_addr, drv_query->smac_addr[0],
+			    ETHERADDRL);
+		}
+
+		bcopy(dev->mac_addr, drv_query->pmac_addr, ETHERADDRL);
+
+		payload_length = sizeof (struct oce_driver_query);
+		miocack(wq, mp, payload_length, 0);
 		break;
 	}
 
@@ -634,18 +715,6 @@ oce_m_promiscuous(void *arg, boolean_t enable)
 	DEV_UNLOCK(dev);
 	return (ret);
 } /* oce_m_promiscuous */
-
-static int
-oce_power10(int power)
-{
-	int ret = 1;
-
-	while (power) {
-		ret *= 10;
-		power--;
-	}
-	return (ret);
-}
 
 /*
  * function to set a private property.
@@ -701,7 +770,6 @@ oce_set_priv_prop(struct oce_dev *dev, const char *name,
  *
  * dev - software handle to the device
  * name - string containing the property name
- * flags - flags sent by the OS to get_prop
  * size - length of the string contained name
  * val - [OUT] pointer to the location where the result is returned
  *
@@ -709,46 +777,29 @@ oce_set_priv_prop(struct oce_dev *dev, const char *name,
  */
 static int
 oce_get_priv_prop(struct oce_dev *dev, const char *name,
-    uint_t flags, uint_t size, void *val)
+                  uint_t flags, uint_t size, void *val)
 {
-	int ret = ENOTSUP;
-	int value;
-	boolean_t is_default = (flags & MAC_PROP_DEFAULT);
+        int value;
+        boolean_t is_default = (flags & MAC_PROP_DEFAULT);
 
-	if (NULL == val) {
-		ret = EINVAL;
-		return (ret);
+        if (NULL == val) {
+		return (EINVAL);
 	}
 
 	if (strcmp(name, "_tx_ring_size") == 0) {
-		value = is_default ? OCE_DEFAULT_TX_RING_SIZE :
-		    dev->tx_ring_size;
-		ret = 0;
-		goto done;
-	}
-
-	if (strcmp(name, "_tx_bcopy_limit") == 0) {
+                value = is_default ? OCE_DEFAULT_TX_RING_SIZE :
+                    dev->tx_ring_size;
+	} else if (strcmp(name, "_tx_bcopy_limit") == 0) {
 		value = dev->tx_bcopy_limit;
-		ret = 0;
-		goto done;
-	}
-
-	if (strcmp(name, "_rx_bcopy_limit") == 0) {
-		value = dev->rx_bcopy_limit;
-		ret = 0;
-		goto done;
-	}
-
-	if (strcmp(name, "_rx_ring_size") == 0) {
-		value = is_default ? OCE_DEFAULT_RX_RING_SIZE :
+	} else if (strcmp(name, "_rx_ring_size") == 0) {
+                value = is_default ? OCE_DEFAULT_RX_RING_SIZE :
 		    dev->rx_ring_size;
-		ret = 0;
-		goto done;
+	} else if (strcmp(name, "_rx_bcopy_limit") == 0) {
+		value = dev->rx_bcopy_limit;
+	} else {
+		return (ENOTSUP);
 	}
 
-done:
-	if (ret == 0) {
-		(void) snprintf(val, size, "%d", value);
-	}
-	return (ret);
+        (void) snprintf(val, size, "%d", value);
+        return (0);
 } /* oce_get_priv_prop */

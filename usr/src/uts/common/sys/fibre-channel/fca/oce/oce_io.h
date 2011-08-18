@@ -19,10 +19,7 @@
  * CDDL HEADER END
  */
 
-/*
- * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to license terms.
- */
+/* Copyright © 2003-2011 Emulex. All rights reserved.  */
 
 /*
  * Header file defining the HW IO elements
@@ -45,7 +42,8 @@ extern "C" {
 #include <oce_buf.h>
 
 #define	DEFAULT_MQ_MBOX_TIMEOUT	(5 * 1000 * 1000) /* 5 sec (in usec) */
-#define	DEFAULT_DRAIN_TIME 200	/* Default Drain Time */
+#define	MBX_READY_TIMEOUT	(1 * 1000 * 1000) /* 1 sec (in usec) */
+#define	DEFAULT_DRAIN_TIME 	200	/* Default Drain Time */
 #define	MBX_TIMEOUT_SEC		5
 #define	STAT_TIMEOUT		2000000 /* update stats every 2 sec */
 
@@ -96,22 +94,22 @@ struct eq_config {
 };
 
 struct oce_eq {
-	/* configuration of this eq */
-	struct eq_config eq_cfg;
+	/* Lock for this queue */
+	kmutex_t lock;
 	/* id assigned by the hw to this eq */
 	uint32_t eq_id;
 	/* handle to the creating parent dev */
 	void *parent;
 	/* callback context */
 	void *cb_context;
-	/* reference count of this structure */
-	uint32_t ref_count;
 	/* ring buffer for this eq */
 	oce_ring_buffer_t *ring;
+	/* reference count of this structure */
+	uint32_t ref_count;
 	/* Queue state */
 	qstate_t qstate;
-	/* Lock for this queue */
-	kmutex_t lock;
+	/* configuration of this eq */
+	struct eq_config eq_cfg;
 };
 
 enum cq_len {
@@ -138,10 +136,8 @@ struct cq_config {
 typedef uint16_t (*cq_handler_t)(void *arg1);
 
 struct oce_cq {
-	/* configuration of this cq */
-	struct cq_config cq_cfg;
-	/* reference count of this structure */
-	uint32_t ref_count;
+	/* lock */
+	kmutex_t lock;
 	/* id given by the hardware */
 	uint32_t    cq_id;
 	/* parent device to which this cq belongs */
@@ -155,8 +151,10 @@ struct oce_cq {
 	oce_ring_buffer_t *ring;
 	/* Queue state */
 	qstate_t qstate;
-	/* lock */
-	kmutex_t lock;
+	/* configuration of this cq */
+	struct cq_config cq_cfg;
+	/* reference count of this structure */
+	uint32_t ref_count;
 };
 
 struct mq_config {
@@ -167,8 +165,8 @@ struct mq_config {
 };
 
 struct oce_mq {
-	/* configuration of this mq */
-	struct mq_config cfg;
+	/* lock for the mq */
+	kmutex_t lock;
 	/* handle to the parent device */
 	void *parent;
 	/* send queue */
@@ -181,8 +179,9 @@ struct oce_mq {
 	uint32_t mq_free;
 	/* Queue state */
 	qstate_t qstate;
-	/* lock for the mq */
-	kmutex_t lock;
+
+	/* configuration of this mq */
+	struct mq_config cfg;
 };
 
 
@@ -201,7 +200,8 @@ struct oce_mbx_ctx {
 struct wq_config {
 	/* qtype */
 	uint8_t wq_type;
-	uint8_t pad[3];
+	uint16_t buf_size;
+	uint8_t pad[1];
 	uint32_t q_len; /* number of wqes */
 	uint16_t pd_id; /* protection domain id */
 	uint16_t pci_fn_num; /* pci function number */
@@ -211,27 +211,26 @@ struct wq_config {
 };
 
 struct oce_wq {
-	struct wq_config cfg; /* q config */
-	void *parent; /* parent of this wq */
-	uint16_t wq_id; /* wq ID */
-	oce_ring_buffer_t *ring; /* ring buffer managing the wqes */
-	struct oce_cq	*cq; 	/* cq associated with this wq */
-	kmem_cache_t	*wqed_cache; /* packet desc cache */
-	OCE_LIST_T	wqe_desc_list; /* packet descriptor list */
-	oce_wq_bdesc_t  *wq_bdesc_array; /* buffer desc array */
-	OCE_LIST_T	wq_buf_list; /* buffer list */
-	OCE_LIST_T 	wq_mdesc_list; /* free list of memory handles */
-	oce_wq_mdesc_t  *wq_mdesc_array; /* preallocated memory handles */
-	uint32_t	wqm_used; /* memory handles uses */
-	boolean_t	resched; /* used for mac_tx_update */
-	uint32_t	wq_free; /* Wqe free */
-	uint32_t	tx_deferd; /* Wqe free */
-	uint32_t	pkt_drops; /* drops */
-	/* Queue state */
-	qstate_t qstate;
 	kmutex_t tx_lock; /* lock for the WQ */
 	kmutex_t txc_lock; /* tx compl lock */
-	kmutex_t resched_lock; /* tx compl lock */
+	void *parent; /* parent of this wq */
+	oce_ring_buffer_t *ring; /* ring buffer managing the wqes */
+	struct oce_cq *cq; 	/* cq associated with this wq */
+	kmem_cache_t *wqed_cache; /* packet desc cache */
+	oce_wq_bdesc_t *wq_bdesc_array; /* buffer desc array */
+	OCE_LIST_T wq_buf_list; /* buffer list */
+	OCE_LIST_T wqe_desc_list; /* packet descriptor list */
+	OCE_LIST_T wq_mdesc_list; /* free list of memory handles */
+	oce_wq_mdesc_t *wq_mdesc_array; /* preallocated memory handles */
+	uint32_t wqm_used; /* memory handles uses */
+	boolean_t resched; /* used for mac_tx_update */
+	uint32_t wq_free; /* Wqe free */
+	uint32_t tx_deferd; /* Wqe free */
+	uint32_t pkt_drops; /* drops */
+	/* Queue state */
+	qstate_t qstate;
+	uint16_t wq_id; /* wq ID */
+    struct wq_config cfg; /* q config */
 };
 
 struct rq_config {
@@ -259,14 +258,15 @@ struct oce_rq {
 	uint32_t rss_cpuid;
 	/* ring buffer managing the RQEs */
 	oce_ring_buffer_t *ring;
-	/* RQ Buffer cache  */
-	/* kmem_cache_t *rqb_cache; */
-	/* shadow list of mblk for rq ring */
-	struct rq_shadow_entry *shadow_ring;
 	/* cq associated with this queue */
 	struct oce_cq *cq;
 	oce_rq_bdesc_t  *rq_bdesc_array;
-	OCE_LIST_T rq_buf_list; /* Free list */
+	/* shadow list of mblk for rq ring */
+	oce_rq_bdesc_t **shadow_ring;
+	oce_rq_bdesc_t  **rqb_freelist;
+	uint32_t rqb_free;
+	uint32_t rqb_next_free; /* next free slot */
+	uint32_t rqb_rc_head; /* recycling  head */
 	uint32_t buf_avail; /* buffer avaialable with hw */
 	uint32_t pending; /* Buffers sent up */
 	/* Queue state */
@@ -285,11 +285,13 @@ struct link_status {
 	/* dw 1 */
 	uint8_t mgmt_mac_duplex;
 	uint8_t mgmt_mac_speed;
-	uint16_t rsvd0;
+	uint16_t qos_link_speed;
+	/* dw2 */
+	uint32_t logical_link_status;
 };
 
 oce_dma_buf_t *oce_alloc_dma_buffer(struct oce_dev *dev,
-    uint32_t size, uint32_t flags);
+    uint32_t size, ddi_dma_attr_t *dma_attr, uint32_t flags);
 void oce_free_dma_buffer(struct oce_dev *dev, oce_dma_buf_t *dbuf);
 
 oce_ring_buffer_t *create_ring_buffer(struct oce_dev *dev,
@@ -305,7 +307,7 @@ void oce_arm_eq(struct oce_dev *dev, int16_t qid, int npopped,
 void oce_arm_cq(struct oce_dev *dev, int16_t qid, int npopped,
     boolean_t rearm);
 void oce_drain_eq(struct oce_eq *eq);
-
+void oce_dev_rss_ready(struct oce_dev *dev);
 
 /* Bootstrap */
 int oce_mbox_init(struct oce_dev *dev);
@@ -342,7 +344,7 @@ uint16_t oce_drain_rq_cq(void *arg);
 int oce_start_rq(struct oce_rq *rq);
 void oce_clean_rq(struct oce_rq *rq);
 void oce_rq_discharge(struct oce_rq *rq);
-int oce_rx_pending(struct oce_dev *dev);
+int oce_rx_pending(struct oce_dev *dev, struct oce_rq *rq, int32_t timeout);
 
 /* event handling */
 uint16_t oce_drain_mq_cq(void *arg);
@@ -385,10 +387,10 @@ int oce_config_vlan(struct oce_dev *dev, uint32_t if_id,
     uint8_t vtag_cnt,  boolean_t untagged,
     boolean_t enable_promisc);
 int oce_config_link(struct oce_dev *dev, boolean_t enable);
-
+int oce_config_rss(struct oce_dev *dev, uint16_t if_id, char *hkey, char *itbl,
+    int  tbl_sz, uint16_t rss_type, uint8_t flush);
 int oce_issue_mbox(struct oce_dev *dev, queue_t *wq, mblk_t *mp,
     uint32_t *payload_length);
-
 #ifdef __cplusplus
 }
 #endif
