@@ -19,10 +19,8 @@
  * CDDL HEADER END
  */
 
-/*
- * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to license terms.
- */
+/* Copyright © 2003-2011 Emulex. All rights reserved.  */
+
 
 /*
  * Source file containing the implementation of MBOX
@@ -79,6 +77,7 @@ mbx_common_req_hdr_init(struct mbx_hdr *hdr,
 
 	hdr->u0.req.timeout = timeout;
 	hdr->u0.req.request_length = pyld_len - sizeof (struct mbx_hdr);
+	hdr->u0.req.rsvd0 = 0;
 } /* mbx_common_req_hdr_init */
 
 /*
@@ -111,6 +110,7 @@ oce_mbox_init(struct oce_dev *dev)
 	*ptr   = 0xff;
 
 	ret = oce_mbox_dispatch(dev, 0);
+
 	if (ret != 0)
 		oce_log(dev, CE_NOTE, MOD_CONFIG,
 		    "Failed to set endian %d", ret);
@@ -136,8 +136,11 @@ oce_mbox_wait(struct oce_dev *dev, uint32_t tmo_sec)
 	tmo = (tmo_sec > 0) ? drv_usectohz(tmo_sec * 1000000) :
 	    drv_usectohz(DEFAULT_MQ_MBOX_TIMEOUT);
 
+	/* Add the default timeout to wait for a mailbox to complete */
+	tmo += drv_usectohz(MBX_READY_TIMEOUT);
+
 	tstamp = ddi_get_lbolt();
-	do {
+	for (;;) {
 		now = ddi_get_lbolt();
 		if ((now - tstamp) >= tmo) {
 			tmo = 0;
@@ -145,12 +148,18 @@ oce_mbox_wait(struct oce_dev *dev, uint32_t tmo_sec)
 		}
 
 		mbox_db.dw0 = OCE_DB_READ32(dev, PD_MPU_MBOX_DB);
-		if (!mbox_db.bits.ready) {
-			drv_usecwait(5);
-		} else break;
-	} while (!mbox_db.bits.ready);
+		if (oce_fm_check_acc_handle(dev, dev->db_handle) != DDI_FM_OK) {
+			ddi_fm_service_impact(dev->dip, DDI_SERVICE_DEGRADED);
+			oce_fm_ereport(dev, DDI_FM_DEVICE_INVAL_STATE);
+		}
 
-	return ((tmo > 0) ? 0 : ETIMEDOUT);
+		if (mbox_db.bits.ready) {
+			return (0);
+		}
+			drv_usecwait(5);
+	}
+
+	return (ETIMEDOUT);
 } /* oce_mbox_wait */
 
 /*
@@ -167,6 +176,9 @@ oce_mbox_dispatch(struct oce_dev *dev, uint32_t tmo_sec)
 	uint32_t pa;
 	int ret;
 
+	/* sync the bmbx */
+	(void) DBUF_SYNC(dev->bmbx, DDI_DMA_SYNC_FORDEV);
+
 	/* write 30 bits of address hi dword */
 	pa = (uint32_t)(DBUF_PA(dev->bmbx) >> 34);
 	bzero(&mbox_db, sizeof (pd_mpu_mbox_db_t));
@@ -182,6 +194,10 @@ oce_mbox_dispatch(struct oce_dev *dev, uint32_t tmo_sec)
 
 	/* ring the doorbell */
 	OCE_DB_WRITE32(dev, PD_MPU_MBOX_DB, mbox_db.dw0);
+
+	if (oce_fm_check_acc_handle(dev, dev->db_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(dev->dip, DDI_SERVICE_DEGRADED);
+	}
 
 	/* wait for mbox ready */
 	ret = oce_mbox_wait(dev, tmo_sec);
@@ -202,17 +218,19 @@ oce_mbox_dispatch(struct oce_dev *dev, uint32_t tmo_sec)
 
 	/* ring the doorbell */
 	OCE_DB_WRITE32(dev, PD_MPU_MBOX_DB, mbox_db.dw0);
+	if (oce_fm_check_acc_handle(dev, dev->db_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(dev->dip, DDI_SERVICE_DEGRADED);
+	}
 
 	/* wait for mbox ready */
 	ret = oce_mbox_wait(dev, tmo_sec);
-	if (ret != 0) {
-		oce_log(dev, CE_NOTE, MOD_CONFIG,
-		    "BMBX TIMED OUT PROGRAMMING LO ADDR: %d", ret);
-		/* if mbx times out, hw is in invalid state */
+	/* sync */
+	(void) ddi_dma_sync(DBUF_DHDL(dev->bmbx), 0, 0,
+	    DDI_DMA_SYNC_FORKERNEL);
+	if (oce_fm_check_dma_handle(dev, DBUF_DHDL(dev->bmbx)) != DDI_FM_OK) {
 		ddi_fm_service_impact(dev->dip, DDI_SERVICE_DEGRADED);
-		oce_fm_ereport(dev, DDI_FM_DEVICE_INVAL_STATE);
+		return (EIO);
 	}
-
 	return (ret);
 } /* oce_mbox_dispatch */
 
@@ -250,23 +268,12 @@ oce_mbox_post(struct oce_dev *dev, struct oce_mbx *mbx,
 	/* now dispatch */
 	ret = oce_mbox_dispatch(dev, tmo);
 	if (ret != 0) {
-		int fm_status;
-
-		oce_log(dev, CE_NOTE, MOD_CONFIG,
-		    "Failure in mbox dispatch: tag=0x%x:0x%x",
-		    mbx->tag[0], mbx->tag[1]);
-
-		fm_status = oce_fm_check_dma_handle(dev, DBUF_DHDL(dev->bmbx));
-		if (fm_status != DDI_FM_OK) {
-			ddi_fm_service_impact(dev->dip, DDI_SERVICE_DEGRADED);
-			mutex_exit(&dev->bmbx_lock);
-			return (EIO);
-		}
 		mutex_exit(&dev->bmbx_lock);
 		return (ret);
 	}
 
 	/* sync */
+
 	(void) ddi_dma_sync(DBUF_DHDL(dev->bmbx), 0, 0,
 	    DDI_DMA_SYNC_FORKERNEL);
 	ret = oce_fm_check_dma_handle(dev, DBUF_DHDL(dev->bmbx));
@@ -283,6 +290,9 @@ oce_mbox_post(struct oce_dev *dev, struct oce_mbx *mbx,
 	mb_cqe = &mb->cqe;
 	DW_SWAP(u32ptr(&mb_cqe->u0.dw[0]), sizeof (struct oce_mq_cqe));
 
+	/* copy mbox mbx back */
+	bcopy(mb_mbx, mbx, sizeof (struct oce_mbx));
+
 	/* check mbox status */
 	if (mb_cqe->u0.s.completion_status != 0) {
 		oce_log(dev, CE_WARN, MOD_CONFIG,
@@ -293,8 +303,6 @@ oce_mbox_post(struct oce_dev *dev, struct oce_mbx *mbx,
 		return (EIO);
 	}
 
-	/* copy mbox mbx back */
-	bcopy(mb_mbx, mbx, sizeof (struct oce_mbx));
 	/*
 	 * store the mbx context in the cqe tag section so that
 	 * the upper layer handling the cqe can associate the mbx
@@ -609,7 +617,10 @@ oce_get_link_status(struct oce_dev *dev, struct link_status *link)
 	}
 
 	/* interpret response */
-	bcopy(&fwcmd->params.rsp, link, 8);
+	bcopy(&fwcmd->params.rsp, link, sizeof (struct link_status));
+	link->logical_link_status = LE_32(link->logical_link_status);
+	link->qos_link_speed = LE_16(link->qos_link_speed);
+
 	return (0);
 } /* oce_get_link_status */
 
@@ -744,6 +755,15 @@ oce_get_fw_config(struct oce_dev *dev)
 	dev->port_id = fwcmd->params.rsp.port_id;
 	dev->function_mode = fwcmd->params.rsp.function_mode;
 
+	/* get the max rings alloted for this function */
+	if (fwcmd->params.rsp.ulp[0].mode & ULP_NIC_MODE) {
+		dev->max_tx_rings = fwcmd->params.rsp.ulp[0].wq_count;
+		dev->max_rx_rings = fwcmd->params.rsp.ulp[0].rq_count;
+	} else {
+		dev->max_tx_rings = fwcmd->params.rsp.ulp[1].wq_count;
+		dev->max_rx_rings = fwcmd->params.rsp.ulp[1].rq_count;
+	}
+	dev->function_caps = fwcmd->params.rsp.function_caps;
 	return (0);
 } /* oce_get_fw_config */
 
@@ -781,8 +801,16 @@ oce_get_hw_stats(struct oce_dev *dev)
 
 	DW_SWAP(u32ptr(&mbx), sizeof (struct oce_mq_sge) + OCE_BMBX_RHDR_SZ);
 
+	bzero(&dev->hw_stats->params, sizeof (dev->hw_stats->params));
+
+	/* sync for device */
+	(void) DBUF_SYNC(dev->stats_dbuf, DDI_DMA_SYNC_FORDEV);
+
 	/* now post the command */
 	ret = oce_mbox_post(dev, &mbx, NULL);
+	/* sync the stats */
+	(void) DBUF_SYNC(dev->stats_dbuf, DDI_DMA_SYNC_FORKERNEL);
+
 	/* Check the mailbox status and command completion status */
 	if (ret != 0) {
 		return (ret);
@@ -1150,6 +1178,50 @@ oce_config_link(struct oce_dev *dev, boolean_t enable)
 	return (ret);
 } /* oce_config_link */
 
+int
+oce_config_rss(struct oce_dev *dev, uint16_t if_id, char *hkey, char *itbl,
+    int  tbl_sz, uint16_t rss_type, uint8_t flush)
+{
+	struct oce_mbx mbx;
+	struct mbx_config_nic_rss *fwcmd;
+	int i;
+	int ret = 0;
+
+	bzero(&mbx, sizeof (struct oce_mbx));
+	fwcmd = (struct mbx_config_nic_rss *)&mbx.payload;
+
+	/* initialize the ioctl header */
+	mbx_common_req_hdr_init(&fwcmd->hdr, 0, 0,
+	    MBX_SUBSYSTEM_NIC,
+	    OPCODE_CONFIG_NIC_RSS,
+	    MBX_TIMEOUT_SEC,
+	    sizeof (struct mbx_config_nic_rss));
+	fwcmd->params.req.enable_rss = LE_16(rss_type);
+	fwcmd->params.req.flush = flush;
+	fwcmd->params.req.if_id = LE_32(if_id);
+
+	if (hkey != NULL) {
+		bcopy(hkey, fwcmd->params.req.hash, OCE_HKEY_SIZE);
+	}
+
+
+	/* Fill the indirection table */
+	for (i = 0; i < tbl_sz; i++) {
+		fwcmd->params.req.cputable[i] = itbl[i];
+	}
+
+	fwcmd->params.req.cpu_tbl_sz_log2 = LE_16(OCE_LOG2(tbl_sz));
+
+	/* fill rest of mbx */
+	mbx.u0.s.embedded = B_TRUE;
+	mbx.payload_length = sizeof (struct mbx_config_nic_rss);
+	DW_SWAP(u32ptr(&mbx), (OCE_BMBX_RHDR_SZ + OCE_MBX_RRHDR_SZ));
+
+	/* post the command */
+	ret = oce_mbox_post(dev, &mbx, NULL);
+
+	return (ret);
+}
 
 /*
  * function called from the gld ioctl entry point to send a mbx to fw
@@ -1188,7 +1260,7 @@ oce_issue_mbox(struct oce_dev *dev, queue_t *wq, mblk_t *mp,
 
 	is_embedded = (payload_length <= sizeof (struct oce_mbx_payload));
 
-	alloc_len = MBLKL(mp->b_cont);
+	alloc_len = msgdsize(mp->b_cont);
 
 	oce_log(dev, CE_NOTE, MOD_CONFIG, "Mailbox: "
 	    "DW[0] 0x%x DW[1] 0x%x DW[2]0x%x DW[3]0x%x,"
@@ -1196,6 +1268,9 @@ oce_issue_mbox(struct oce_dev *dev, queue_t *wq, mblk_t *mp,
 	    hdr.u0.dw[0], hdr.u0.dw[1],
 	    hdr.u0.dw[2], hdr.u0.dw[3],
 	    MBLKL(mp->b_cont), alloc_len);
+
+	/* get the timeout from the command header */
+	mbx.tag[0] = hdr.u0.req.timeout;
 
 	if (hdr.u0.req.opcode == OPCODE_WRITE_COMMON_FLASHROM) {
 		struct mbx_common_read_write_flashrom *fwcmd =
@@ -1209,9 +1284,6 @@ oce_issue_mbox(struct oce_dev *dev, queue_t *wq, mblk_t *mp,
 			dev->cookie = hdr.u0.req.rsvd0;
 		hdr.u0.req.rsvd0 = 0;
 
-		/* get the timeout from the command header */
-		mbx.tag[0] = hdr.u0.req.timeout;
-
 		oce_log(dev, CE_NOTE, MOD_CONFIG, "Mailbox params:"
 		    "OPCODE(%d) OPTYPE = %d  SIZE = %d  OFFSET = %d",
 		    fwcmd->flash_op_code, fwcmd->flash_op_type,
@@ -1219,9 +1291,10 @@ oce_issue_mbox(struct oce_dev *dev, queue_t *wq, mblk_t *mp,
 	}
 
 	if (!is_embedded) {
-		mblk_t *mp_w = mp->b_cont;
+		mblk_t *tmp = NULL;
 		ddi_dma_cookie_t cookie;
 		uint32_t count = 0;
+		int offset = 0;
 
 		/* allocate dma handle */
 		ret = ddi_dma_alloc_handle(dev->dip,
@@ -1247,13 +1320,16 @@ oce_issue_mbox(struct oce_dev *dev, queue_t *wq, mblk_t *mp,
 			goto dma_alloc_fail;
 		}
 
-		bcopy((caddr_t)mp_w->b_rptr, sg_va, MBLKL(mp->b_cont));
+		for (tmp = mp->b_cont; tmp != NULL; tmp = tmp->b_cont) {
+			bcopy((caddr_t)tmp->b_rptr, sg_va + offset, MBLKL(tmp));
+			offset += MBLKL(tmp);
+		}
 
 		/* bind mblk mem to handle */
 		ret = ddi_dma_addr_bind_handle(
 		    dma_handle,
 		    (struct as *)0, sg_va,
-		    MBLKL(mp_w),
+		    alloc_len,
 		    DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
 		    DDI_DMA_DONTWAIT, NULL, &cookie, &count);
 		if (ret != DDI_DMA_MAPPED) {
@@ -1311,6 +1387,12 @@ oce_issue_mbox(struct oce_dev *dev, queue_t *wq, mblk_t *mp,
 		} else {
 			(void) ddi_dma_sync(dma_handle, 0, 0,
 			    DDI_DMA_SYNC_FORKERNEL);
+
+			if (oce_fm_check_dma_handle(dev, dma_handle) !=
+			    DDI_FM_OK) {
+				ddi_fm_service_impact(dev->dip,
+				    DDI_SERVICE_DEGRADED);
+			}
 			bcopy(sg_va, mp->b_cont->b_rptr,
 			    sizeof (struct mbx_hdr));
 			goto post_fail;
@@ -1333,12 +1415,20 @@ oce_issue_mbox(struct oce_dev *dev, queue_t *wq, mblk_t *mp,
 		bcopy(&mbx.payload, mp->b_cont->b_rptr,
 		    min(payload_length, MBLKL(mp->b_cont)));
 	} else {
+		mblk_t *tmp = NULL;
+		int offset = 0;
 		/* sync */
 		(void) ddi_dma_sync(dma_handle, 0, 0,
 		    DDI_DMA_SYNC_FORKERNEL);
+		if (oce_fm_check_dma_handle(dev, dma_handle) != DDI_FM_OK) {
+			ddi_fm_service_impact(dev->dip, DDI_SERVICE_DEGRADED);
+		}
 
 		/* copy back from kernel allocated buffer to user buffer  */
-		bcopy(sg_va, mp->b_cont->b_rptr, MBLKL(mp->b_cont));
+		for (tmp = mp->b_cont; tmp != NULL; tmp = tmp->b_cont) {
+			bcopy(sg_va + offset, tmp->b_rptr, MBLKL(tmp));
+			offset += MBLKL(tmp);
+		}
 
 		/* unbind and free dma handles */
 		(void) ddi_dma_unbind_handle(dma_handle);

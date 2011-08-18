@@ -19,10 +19,7 @@
  * CDDL HEADER END
  */
 
-/*
- * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to license terms.
- */
+/* Copyright © 2003-2011 Emulex. All rights reserved.  */
 
 /*
  * Source file containing the implementation of Driver buffer management
@@ -64,7 +61,7 @@ static ddi_device_acc_attr_t oce_dma_buf_accattr = {
  */
 oce_dma_buf_t *
 oce_alloc_dma_buffer(struct oce_dev *dev,
-    uint32_t size, uint32_t flags)
+    uint32_t size, ddi_dma_attr_t *dma_attr, uint32_t flags)
 {
 	oce_dma_buf_t  *dbuf;
 	ddi_dma_cookie_t cookie;
@@ -73,6 +70,10 @@ oce_alloc_dma_buffer(struct oce_dev *dev,
 	int ret = 0;
 
 	ASSERT(size > 0);
+	/* if NULL use default */
+	if (dma_attr == NULL) {
+		dma_attr = &oce_dma_buf_attr;
+	}
 
 	dbuf = kmem_zalloc(sizeof (oce_dma_buf_t), KM_NOSLEEP);
 	if (dbuf == NULL) {
@@ -80,12 +81,12 @@ oce_alloc_dma_buffer(struct oce_dev *dev,
 	}
 
 	/* allocate dma handle */
-	ret = ddi_dma_alloc_handle(dev->dip, &oce_dma_buf_attr,
+	ret = ddi_dma_alloc_handle(dev->dip, dma_attr,
 	    DDI_DMA_DONTWAIT, NULL, &dbuf->dma_handle);
 	if (ret != DDI_SUCCESS) {
 		oce_log(dev, CE_WARN, MOD_CONFIG, "%s",
 		    "Failed to allocate DMA handle");
-		goto alloc_fail;
+		goto handle_fail;
 	}
 	/* allocate the DMA-able memory */
 	ret = ddi_dma_mem_alloc(dbuf->dma_handle, size, &oce_dma_buf_accattr,
@@ -105,7 +106,7 @@ oce_alloc_dma_buffer(struct oce_dev *dev,
 	if (ret != DDI_DMA_MAPPED) {
 		oce_log(dev, CE_WARN, MOD_CONFIG, "%s",
 		    "Failed to bind dma handle");
-		goto alloc_fail;
+		goto bind_fail;
 	}
 	bzero(dbuf->base, actual_len);
 	dbuf->addr = cookie.dmac_laddress;
@@ -114,8 +115,13 @@ oce_alloc_dma_buffer(struct oce_dev *dev,
 	dbuf->len  = size;
 	dbuf->num_pages = OCE_NUM_PAGES(size);
 	return (dbuf);
+
+bind_fail:
+	ddi_dma_mem_free(&dbuf->acc_handle);
 alloc_fail:
-	oce_free_dma_buffer(dev, dbuf);
+	ddi_dma_free_handle(&dbuf->dma_handle);
+handle_fail:
+	kmem_free(dbuf, sizeof (oce_dma_buf_t));
 	return (NULL);
 } /* oce_dma_alloc_buffer */
 
@@ -172,7 +178,7 @@ create_ring_buffer(struct oce_dev *dev,
 
 	/* get the dbuf defining the ring */
 	size = num_items * item_size;
-	ring->dbuf = oce_alloc_dma_buffer(dev, size, flags);
+	ring->dbuf = oce_alloc_dma_buffer(dev, size, NULL, flags);
 	if (ring->dbuf  == NULL) {
 		oce_log(dev, CE_WARN, MOD_CONFIG, "%s",
 		    "Ring buffer allocation failed");
@@ -227,11 +233,7 @@ oce_set_dma_fma_flags(int fm_caps)
 		return;
 	}
 
-	if (DDI_FM_ACC_ERR_CAP(fm_caps)) {
-		oce_dma_buf_accattr.devacc_attr_access = DDI_FLAGERR_ACC;
-	} else {
-		oce_dma_buf_accattr.devacc_attr_access = DDI_DEFAULT_ACC;
-	}
+	oce_dma_buf_accattr.devacc_attr_access = DDI_DEFAULT_ACC;
 
 	if (DDI_FM_DMA_ERR_CAP(fm_caps)) {
 		oce_dma_buf_attr.dma_attr_flags |= DDI_DMA_FLAGERR;

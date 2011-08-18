@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Emulex.  All rights reserved.
+ * Copyright 2010 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,33 +38,27 @@ static uint32_t	emlxs_write_fcode_flash(emlxs_hba_t *hba,
 			PIMAGE_HDR ImageHdr, caddr_t Buffer);
 
 static int32_t	emlxs_build_parms(caddr_t Buffer, PWAKE_UP_PARMS AbsWakeUpParms,
-			uint32_t BufferSize, PAIF_HDR AifHeader,
-			int32_t DwcFile);
+			uint32_t BufferSize, PAIF_HDR AifHeader);
 static uint32_t	emlxs_validate_image(emlxs_hba_t *hba, caddr_t Buffer,
 			uint32_t Size, emlxs_fw_image_t *fw_image);
 static void	emlxs_format_dump(emlxs_hba_t *hba, MAILBOXQ *mbq,
 			uint32_t Type, uint32_t RegionId, uint32_t WordCnt,
 			uint32_t BaseAddr);
 static uint32_t	emlxs_start_abs_download(emlxs_hba_t *hba, PAIF_HDR AifHdr,
-			caddr_t Buffer, PWAKE_UP_PARMS WakeUpParms,
-			uint32_t MaxRbusSramSize, uint32_t MaxIbusSramSize,
-			PWAKE_UP_PARMS AbsWakeUpParms, int32_t DwcFile);
+			caddr_t Buffer, uint32_t len,
+			PWAKE_UP_PARMS WakeUpParms);
 static uint32_t	emlxs_start_abs_download_2mb(emlxs_hba_t *hba, caddr_t buffer,
 			uint32_t len, uint32_t offline,
 			emlxs_fw_image_t *fw_image);
-static uint32_t	emlxs_proc_abs_2mb(emlxs_hba_t *hba, PAIF_HDR AifHdr,
+static uint32_t	emlxs_proc_abs_2mb(emlxs_hba_t *hba,
 			caddr_t EntireBuffer, uint32_t FileType,
-			uint32_t BWCflag, uint32_t extType);
+			uint32_t extType);
 static void	emlxs_format_load_area_cmd(MAILBOXQ *mbq, uint32_t Base,
 			uint32_t DlByteCount, uint32_t Function,
 			uint32_t Complete, uint32_t DataOffset, uint32_t AreaId,
 			uint8_t MbxCmd, uint32_t StepCmd);
 static uint32_t	emlxs_build_parms_2mb_bwc(emlxs_hba_t *hba, PAIF_HDR AifHdr,
 			uint32_t extType, PWAKE_UP_PARMS AbsWakeUpParms);
-static uint32_t	emlxs_build_parms_2mb_dwc(emlxs_hba_t *hba, caddr_t Buffer,
-			uint32_t BufferSize, PAIF_HDR AifHeader,
-			PWAKE_UP_PARMS AbsWakeUpParms, uint32_t BWCflag,
-			uint32_t extType, uint32_t *numBootImage);
 static uint32_t	emlxs_update_exp_rom(emlxs_hba_t *hba,
 			PWAKE_UP_PARMS WakeUpParms);
 extern uint32_t	emlxs_get_max_sram(emlxs_hba_t *hba, uint32_t *MaxRbusSize,
@@ -72,7 +66,7 @@ extern uint32_t	emlxs_get_max_sram(emlxs_hba_t *hba, uint32_t *MaxRbusSize,
 static void	emlxs_format_prog_flash(MAILBOXQ *mbq, uint32_t Base,
 			uint32_t DlByteCount, uint32_t Function,
 			uint32_t Complete, uint32_t BdeAddress,
-			uint32_t BdeSize, PROG_ID *ProgId);
+			uint32_t BdeSize, PROG_ID *ProgId, uint32_t keep);
 static void	emlxs_format_update_parms(MAILBOXQ *mbq,
 			PWAKE_UP_PARMS WakeUpParms);
 static void	emlxs_format_update_pci_cfg(emlxs_hba_t *hba, MAILBOXQ *mbq,
@@ -95,7 +89,7 @@ static uint32_t	emlxs_update_sli4_wakeup_parms(emlxs_hba_t *hba,
 			PWAKE_UP_PARMS WakeUpParms, PROG_ID *id);
 static uint32_t	emlxs_start_rel_download(emlxs_hba_t *hba, PIMAGE_HDR ImageHdr,
 			caddr_t Buffer, PWAKE_UP_PARMS WakeUpParms,
-			uint32_t MaxRbusSramSize, uint32_t MaxIbusSramSize);
+			uint32_t dwc_flag);
 static uint32_t	emlxs_read_load_list(emlxs_hba_t *hba, LOAD_LIST *LoadList);
 
 static uint32_t	emlxs_valid_cksum(uint32_t *StartAddr, uint32_t *EndAddr);
@@ -104,10 +98,7 @@ static void	emlxs_disp_aif_header(emlxs_hba_t *hba, PAIF_HDR AifHdr);
 
 static void	emlxs_dump_image_header(emlxs_hba_t *hba, PIMAGE_HDR image);
 
-static uint32_t	emlxs_get_abs_image_type(caddr_t Buffer, uint32_t BufferSize);
 
-static uint32_t	emlxs_get_dwc_image_type(emlxs_hba_t *hba, caddr_t Buffer,
-			uint32_t BufferSize, PAIF_HDR AifHeader);
 static uint32_t	emlxs_type_check(uint32_t type);
 
 static uint32_t	emlxs_kern_check(emlxs_hba_t *hba, uint32_t version);
@@ -129,11 +120,12 @@ static uint32_t	emlxs_sbus_fcode_check(emlxs_hba_t *hba, uint32_t version);
 static uint32_t	emlxs_validate_version(emlxs_hba_t *hba,
 			emlxs_fw_file_t *file, uint32_t id, uint32_t type,
 			char *file_type);
-static uint32_t emlxs_sli4_validate_image(emlxs_hba_t *hba, caddr_t buffer,
+static uint32_t emlxs_be2_validate_image(emlxs_hba_t *hba, caddr_t buffer,
 			uint32_t len, emlxs_be_fw_image_t *fw_image);
-static int32_t emlxs_sli4_verify_image(emlxs_hba_t *hba, caddr_t buffer,
-			emlxs_be_fw_file_t *file,
-			MAILBOXQ *mbq, MATCHMAP *mp);
+static uint32_t emlxs_be3_validate_image(emlxs_hba_t *hba, caddr_t buffer,
+			uint32_t len, emlxs_be_fw_image_t *fw_image);
+
+
 static int32_t emlxs_sli4_verify_crc(emlxs_hba_t *hba,
 			emlxs_be_fw_file_t *file,
 			MAILBOXQ *mbq, MATCHMAP *mp);
@@ -141,6 +133,17 @@ static int32_t emlxs_sli4_flash_image(emlxs_hba_t *hba, caddr_t buffer,
 			emlxs_be_fw_file_t *file, MAILBOXQ *mbq, MATCHMAP *mp);
 static int32_t emlxs_sli4_fw_download(emlxs_hba_t *hba, caddr_t buffer,
 			uint32_t len, uint32_t offline);
+static uint32_t emlxs_be_version(caddr_t buffer, uint32_t size,
+			uint32_t *plus_flag);
+static uint32_t emlxs_proc_rel_2mb(emlxs_hba_t *hba, caddr_t buffer,
+			emlxs_fw_image_t *fw_image);
+static uint32_t emlxs_delete_load_entry(emlxs_hba_t *hba, PROG_ID *progId);
+
+static void emlxs_verify_image(emlxs_hba_t *hba, emlxs_fw_image_t *image);
+
+static uint32_t emlxs_clean_flash(emlxs_hba_t *hba,
+			PWAKE_UP_PARMS OldWakeUpParms,
+			PWAKE_UP_PARMS NewWakeUpParms);
 
 /* ************************************************************************* */
 
@@ -154,11 +157,6 @@ emlxs_fw_download(emlxs_hba_t *hba, caddr_t buffer, uint32_t len,
 	AIF_HDR AifHdr;
 	uint32_t ImageType;
 	WAKE_UP_PARMS WakeUpParms;
-	WAKE_UP_PARMS AbsWakeUpParms;
-	uint32_t MaxRbusSramSize;
-	uint32_t MaxIbusSramSize;
-	int32_t AbsChangeParams = 0;
-	int32_t DwcFile = FALSE;
 	uint32_t rval = 0;
 	emlxs_fw_image_t fw_image;
 	uint32_t i;
@@ -209,6 +207,9 @@ emlxs_fw_download(emlxs_hba_t *hba, caddr_t buffer, uint32_t len,
 		goto done;
 	}
 
+	/* Verify image */
+	emlxs_verify_image(hba, &fw_image);
+
 	/* Get image type */
 	Uptr = (uint32_t *)buffer;
 	ImageType = *Uptr;
@@ -239,26 +240,16 @@ emlxs_fw_download(emlxs_hba_t *hba, caddr_t buffer, uint32_t len,
 
 	/* Pre-pegasus adapters only */
 
-	/* Check for absolute image */
-	else if (ImageType == NOP_IMAGE_TYPE) {
+	/* Initialize headers */
+	if (ImageType == NOP_IMAGE_TYPE) {
 		bcopy(buffer, &AifHdr, sizeof (AIF_HDR));
 		bzero((void *)&ImageHdr, sizeof (IMAGE_HDR));
-
-		if (AifHdr.ImageBase && (AifHdr.ImageBase == 0x20000)) {
-			DwcFile = TRUE;
-		}
-
-		AbsChangeParams = emlxs_build_parms(buffer,
-		    &AbsWakeUpParms, len, &AifHdr, DwcFile);
-	} else {	/* (ImageType != NOP_IMAGE_TYPE) Relative image */
-
+	} else { /* PRG file */
 		bzero((void *)&AifHdr, sizeof (AIF_HDR));
 		bcopy(buffer, &ImageHdr, sizeof (IMAGE_HDR));
 	}
 
-	/*
-	 * Everything checks out, now to just do it
-	 */
+	/* Everything checks out, now to just do it */
 
 	if (offline) {
 		if (emlxs_offline(hba) != FC_SUCCESS) {
@@ -268,7 +259,6 @@ emlxs_fw_download(emlxs_hba_t *hba, caddr_t buffer, uint32_t len,
 			    "Unable to take adapter offline.");
 
 			rval = EMLXS_OFFLINE_FAILED;
-
 			goto SLI_DOWNLOAD_EXIT;
 		}
 
@@ -279,10 +269,11 @@ emlxs_fw_download(emlxs_hba_t *hba, caddr_t buffer, uint32_t len,
 			    "Unable to restart adapter.");
 
 			rval = EMLXS_OFFLINE_FAILED;
-
 			goto SLI_DOWNLOAD_EXIT;
 		}
 	}
+
+	/* Pre-pegasus adapters */
 
 	if (ImageHdr.Id.Type == SBUS_FCODE) {
 		/* Erase Flash */
@@ -291,7 +282,6 @@ emlxs_fw_download(emlxs_hba_t *hba, caddr_t buffer, uint32_t len,
 			    "Unable to erase flash.");
 
 			rval = EMLXS_IMAGE_FAILED;
-
 			goto SLI_DOWNLOAD_EXIT;
 		}
 
@@ -301,62 +291,47 @@ emlxs_fw_download(emlxs_hba_t *hba, caddr_t buffer, uint32_t len,
 			    "Unable to write flash.");
 
 			rval = EMLXS_IMAGE_FAILED;
-
 			goto SLI_DOWNLOAD_EXIT;
 		}
 
-	} else {	/* !SBUS_FCODE */
+		goto SLI_DOWNLOAD_EXIT;
+	}
 
+	/* Pre-pegasus PCI adapters */
 
-		if (emlxs_read_wakeup_parms(hba, &WakeUpParms, 1)) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_failed_msg,
-			    "Unable to get parameters.");
+	if (emlxs_read_wakeup_parms(hba, &WakeUpParms, 1)) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_failed_msg,
+		    "Unable to get parameters.");
+
+		rval = EMLXS_IMAGE_FAILED;
+
+		goto SLI_DOWNLOAD_EXIT;
+	}
+
+	if (ImageType == NOP_IMAGE_TYPE) {
+		if (emlxs_start_abs_download(hba, &AifHdr,
+		    buffer, len, &WakeUpParms)) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_download_failed_msg,
+			    "Failed to program flash.");
 
 			rval = EMLXS_IMAGE_FAILED;
 
 			goto SLI_DOWNLOAD_EXIT;
 		}
 
-		if (emlxs_get_max_sram(hba, &MaxRbusSramSize,
-		    &MaxIbusSramSize)) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_failed_msg,
-			    "Unable to get RAM size.");
+	} else { /* Relative PRG file */
+		if (emlxs_start_rel_download(hba, &ImageHdr, buffer,
+		    &WakeUpParms, 0)) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_download_failed_msg,
+			    "Failed to program flash.");
 
 			rval = EMLXS_IMAGE_FAILED;
 
 			goto SLI_DOWNLOAD_EXIT;
 		}
-
-		if (ImageType == NOP_IMAGE_TYPE) {
-			if (emlxs_start_abs_download(hba, &AifHdr, buffer,
-			    &WakeUpParms, MaxRbusSramSize, MaxIbusSramSize,
-			    (AbsChangeParams) ? &AbsWakeUpParms : NULL,
-			    DwcFile)) {
-				EMLXS_MSGF(EMLXS_CONTEXT,
-				    &emlxs_download_failed_msg,
-				    "Failed to program flash.");
-
-				rval = EMLXS_IMAGE_FAILED;
-
-				goto SLI_DOWNLOAD_EXIT;
-			}
-
-		} else {
-
-			if (emlxs_start_rel_download(hba, &ImageHdr, buffer,
-			    &WakeUpParms, MaxRbusSramSize, MaxIbusSramSize)) {
-				EMLXS_MSGF(EMLXS_CONTEXT,
-				    &emlxs_download_failed_msg,
-				    "Failed to program flash.");
-
-				rval = EMLXS_IMAGE_FAILED;
-
-				goto SLI_DOWNLOAD_EXIT;
-			}
-		}
-
-	}	/* !SBUS_FCODE */
-
+	}
 
 SLI_DOWNLOAD_EXIT:
 
@@ -381,7 +356,7 @@ done:
 } /* emlxs_fw_download */
 
 
-static void
+extern void
 emlxs_memset(uint8_t *buffer, uint8_t value, uint32_t size)
 {
 	while (size--) {
@@ -429,7 +404,7 @@ emlxs_sli4_flash_image(emlxs_hba_t *hba, caddr_t buffer,
 		xfer_size = min(BE_MAX_XFER_SIZE, block_size);
 
 		mb->un.varSLIConfig.be.embedded = 0;
-		mbq->nonembed = (uint8_t *)mp;
+		mbq->nonembed = (void *)mp;
 		mbq->mbox_cmpl = NULL;
 
 		mb->mbxCommand = MBX_SLI_CONFIG;
@@ -461,12 +436,12 @@ emlxs_sli4_flash_image(emlxs_hba_t *hba, caddr_t buffer,
 			image_ptr  += count;
 		}
 
-		/* Set last two words of last payload with */
-		/* image size and block crc */
 		if (flashrom->params.opcode == MGMT_FLASHROM_OPCODE_FLASH) {
-			wptr = (uint32_t *)&payload[(xfer_size - 8)];
-			wptr[0] = file->image_size;
-			wptr[1] = file->block_crc;
+			wptr = (uint32_t *)&payload[(xfer_size - 12)];
+
+			wptr[0] = file->load_address;
+			wptr[1] = file->image_size;
+			wptr[2] = file->block_crc;
 		}
 
 		/* Send write request */
@@ -492,131 +467,6 @@ done:
 } /* emlxs_sli4_flash_image() */
 
 
-static int32_t
-emlxs_sli4_verify_image(emlxs_hba_t *hba, caddr_t buffer,
-    emlxs_be_fw_file_t *file, MAILBOXQ *mbq, MATCHMAP *mp)
-{
-	emlxs_port_t *port = &PPORT;
-	uint8_t *image_ptr;
-	uint32_t *wptr;
-	uint32_t *wptr1;
-	uint8_t *payload;
-	MAILBOX4 *mb;
-	IOCTL_COMMON_FLASHROM *flashrom;
-	mbox_req_hdr_t	*hdr_req;
-	uint32_t	xfer_size;
-	uint32_t	block_size;
-	uint32_t	block_offset;
-	uint32_t	rval = 0;
-	uint32_t	i;
-	char signature[BE_SIGNATURE_SIZE];
-	uint32_t ufi_plus = 0;
-
-	/* Check for special deflated format */
-	(void) sprintf(signature, "%s+", BE_SIGNATURE);
-	if (strncmp(signature, buffer,
-	    sizeof (signature)-1) == 0) {
-		ufi_plus = 1;
-	}
-
-	image_ptr  = (uint8_t *)buffer + file->image_offset;
-	block_size = (ufi_plus)? file->image_size: file->block_size;
-	block_offset = 0;
-	mb = (MAILBOX4*)mbq;
-
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_msg,
-	    "%s: Verifying image...", file->label);
-
-	while (block_size) {
-		bzero((void *) mb, MAILBOX_CMD_SLI4_BSIZE);
-		bzero((void *) mp->virt, mp->size);
-
-		xfer_size = min(BE_MAX_XFER_SIZE, block_size);
-
-		mb->un.varSLIConfig.be.embedded = 0;
-		mbq->nonembed = (uint8_t *)mp;
-		mbq->mbox_cmpl = NULL;
-
-		mb->mbxCommand = MBX_SLI_CONFIG;
-		mb->mbxOwner = OWN_HOST;
-
-		hdr_req = (mbox_req_hdr_t *)mp->virt;
-		hdr_req->subsystem = IOCTL_SUBSYSTEM_COMMON;
-		hdr_req->opcode = COMMON_OPCODE_READ_FLASHROM;
-		hdr_req->timeout = 0;
-		hdr_req->req_length = sizeof (IOCTL_COMMON_FLASHROM) +
-		    xfer_size;
-
-		flashrom = (IOCTL_COMMON_FLASHROM *)(hdr_req + 1);
-		flashrom->params.opcode = MGMT_FLASHROM_OPCODE_REPORT;
-		flashrom->params.optype = file->type;
-		flashrom->params.data_buffer_size = xfer_size;
-		flashrom->params.offset = block_offset;
-
-		/* Send read request */
-		if (EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbq, MBX_WAIT, 0) !=
-		    MBX_SUCCESS) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_msg,
-			    "%s: Unable to read image. status=%x",
-			    file->label, mb->mbxStatus);
-
-			rval = EMLXS_IMAGE_FAILED;
-			goto done;
-		}
-
-		payload = (uint8_t *)(&flashrom->params.data_buffer);
-
-		BE_SWAP32_BUFFER(payload, xfer_size);
-
-		wptr = (uint32_t *)image_ptr;
-		wptr1 = (uint32_t *)payload;
-		for (i = 0; i < xfer_size; i += 4, wptr++, wptr1++) {
-			if (*wptr != *wptr1) {
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_msg,
-				    "%s: Image mismatch. [%08x] %x, %x",
-				    file->label, i,
-				    BE_MAX_XFER_SIZE, xfer_size);
-
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_msg,
-				    "%08x: %08x %08x %08x %08x %08x " \
-				    "%08x %08x %08x",
-				    i, wptr[0], wptr[1], wptr[2],
-				    wptr[3], wptr[4], wptr[5], wptr[6],
-				    wptr[7]);
-
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_msg,
-				    "%08x: %08x %08x %08x %08x %08x " \
-				    "%08x %08x %08x",
-				    i, wptr1[0], wptr1[1], wptr1[2],
-				    wptr1[3], wptr1[4], wptr1[5], wptr1[6],
-				    wptr1[7]);
-
-				rval = EMLXS_IMAGE_FAILED;
-				goto done;
-			}
-		}
-
-		bcopy((uint8_t *)(&flashrom->params.data_buffer), image_ptr,
-		    xfer_size);
-
-		block_size -= xfer_size;
-		block_offset += xfer_size;
-		image_ptr += xfer_size;
-	}
-
-	/* Verify CRC */
-	rval = emlxs_sli4_verify_crc(hba, file, mbq, mp);
-
-done:
-
-	if (rval == 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_msg,
-		    "%s: Image verified.", file->label);
-	}
-
-	return (rval);
-
-} /* emlxs_sli4_verify_image() */
 
 
 static int32_t
@@ -645,7 +495,7 @@ emlxs_sli4_verify_crc(emlxs_hba_t *hba,
 	bzero((void *) mp->virt, mp->size);
 
 	mb->un.varSLIConfig.be.embedded = 0;
-	mbq->nonembed = (uint8_t *)mp;
+	mbq->nonembed = (void *)mp;
 	mbq->mbox_cmpl = NULL;
 
 	mb->mbxCommand = MBX_SLI_CONFIG;
@@ -671,7 +521,7 @@ emlxs_sli4_verify_crc(emlxs_hba_t *hba,
 		    "%s: Unable to read CRC. status=%x",
 		    file->label, mb->mbxStatus);
 
-		rval = EMLXS_IMAGE_FAILED;
+		rval = 2;
 		goto done;
 	}
 
@@ -685,7 +535,7 @@ emlxs_sli4_verify_crc(emlxs_hba_t *hba,
 		    "%s: Image size mismatch. %08x != %08x",
 		    file->label, value, file->image_size);
 
-		rval = EMLXS_IMAGE_FAILED;
+		rval = 1;
 		goto done;
 	}
 
@@ -695,7 +545,7 @@ emlxs_sli4_verify_crc(emlxs_hba_t *hba,
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_msg,
 		    "%s: CRC mismatch. %08x != %08x",
 		    file->label, value, file->block_crc);
-		rval = EMLXS_IMAGE_FAILED;
+		rval = 1;
 	}
 
 done:
@@ -755,7 +605,7 @@ emlxs_sli4_read_fw_version(emlxs_hba_t *hba, emlxs_firmware_t *fw)
 	bzero((void *) mp->virt, mp->size);
 
 	mb->un.varSLIConfig.be.embedded = 0;
-	mbq->nonembed = (uint8_t *)mp;
+	mbq->nonembed = (void *)mp;
 	mbq->mbox_cmpl = NULL;
 
 	mb->mbxCommand = MBX_SLI_CONFIG;
@@ -801,7 +651,7 @@ emlxs_sli4_read_fw_version(emlxs_hba_t *hba, emlxs_firmware_t *fw)
 	bzero((void *) mp->virt, mp->size);
 
 	mb->un.varSLIConfig.be.embedded = 0;
-	mbq->nonembed = (uint8_t *)mp;
+	mbq->nonembed = (void *)mp;
 	mbq->mbox_cmpl = NULL;
 
 	mb->mbxCommand = MBX_SLI_CONFIG;
@@ -841,11 +691,11 @@ emlxs_sli4_read_fw_version(emlxs_hba_t *hba, emlxs_firmware_t *fw)
 done:
 
 	if (mbq) {
-		(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mbq);
+		emlxs_mem_put(hba, MEM_MBOX, (void *)mbq);
 	}
 
 	if (mp) {
-		(void) emlxs_mem_buf_free(hba, mp);
+		emlxs_mem_buf_free(hba, mp);
 	}
 
 	return (rval);
@@ -854,13 +704,53 @@ done:
 
 
 static uint32_t
-emlxs_sli4_validate_image(emlxs_hba_t *hba, caddr_t buffer,
+emlxs_be_version(caddr_t buffer, uint32_t size, uint32_t *plus_flag)
+{
+	emlxs_be2_ufi_header_t *ufi_hdr;
+	char signature[BE2_SIGNATURE_SIZE];
+	uint32_t be_version = 0;
+
+	if (size < sizeof (emlxs_be2_ufi_header_t)) {
+		return (0);
+	}
+	ufi_hdr = (emlxs_be2_ufi_header_t *)buffer;
+
+	(void) sprintf(signature, "%s+", BE_SIGNATURE);
+
+	/* Check if this is a UFI image */
+	if (strncmp(signature, (char *)ufi_hdr->signature,
+	    strlen(BE_SIGNATURE)) != 0) {
+		return (0);
+	}
+
+	/* Check if this is a UFI plus image */
+	if (plus_flag) {
+		/* Check if this is a UFI plus image */
+		if (strncmp(signature, (char *)ufi_hdr->signature,
+		    strlen(BE_SIGNATURE)+1) == 0) {
+			*plus_flag = 1;
+		} else {
+			*plus_flag = 0;
+		}
+	}
+
+	if ((ufi_hdr->build[0] >= '1') && (ufi_hdr->build[0] <= '9')) {
+		be_version = ufi_hdr->build[0] - '0';
+	}
+
+	return (be_version);
+
+} /* emlxs_be_version() */
+
+
+static uint32_t
+emlxs_be2_validate_image(emlxs_hba_t *hba, caddr_t buffer,
     uint32_t len, emlxs_be_fw_image_t *fw_image)
 {
 	emlxs_port_t *port = &PPORT;
-	emlxs_sli4_ufi_header_t *ufi_hdr;
-	emlxs_sli4_flash_dir_t *flash_dir;
-	emlxs_sli4_flash_entry_t *entry;
+	emlxs_be2_ufi_header_t *ufi_hdr;
+	emlxs_be2_flash_dir_t *flash_dir;
+	emlxs_be2_flash_entry_t *entry;
 	uint8_t *bptr;
 	uint32_t *wptr;
 	uint32_t i;
@@ -870,41 +760,37 @@ emlxs_sli4_validate_image(emlxs_hba_t *hba, caddr_t buffer,
 	uint32_t image_size;
 	emlxs_be_fw_file_t *file;
 	emlxs_be_fw_file_t *file2;
-	char signature[BE_SIGNATURE_SIZE];
 	uint32_t ufi_plus = 0;
+	uint32_t be_version = 0;
+	uint32_t found;
 
 	bzero(fw_image, sizeof (emlxs_be_fw_image_t));
 
-	if (hba->model_info.chip != EMLXS_BE_CHIP) {
+	if (hba->model_info.chip != EMLXS_BE2_CHIP) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_incompat_msg,
 		    "Invalid adapter model.");
 		return (EMLXS_IMAGE_INCOMPATIBLE);
 	}
 
-	if (len < (sizeof (emlxs_sli4_ufi_header_t) +
-	    sizeof (emlxs_sli4_flash_dir_t))) {
+	if (len < (sizeof (emlxs_be2_ufi_header_t) +
+	    sizeof (emlxs_be2_flash_dir_t))) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_bad_msg,
 		    "Image too small. (%d < %d)",
-		    len, (sizeof (emlxs_sli4_ufi_header_t) +
-		    sizeof (emlxs_sli4_flash_dir_t)));
+		    len, (sizeof (emlxs_be2_ufi_header_t) +
+		    sizeof (emlxs_be2_flash_dir_t)));
 		return (EMLXS_IMAGE_BAD);
 	}
-	ufi_hdr = (emlxs_sli4_ufi_header_t *)buffer;
 
-	/* Check if this is a standard UFI image */
-	if (strncmp(BE_SIGNATURE, ufi_hdr->signature,
-	    sizeof (BE_SIGNATURE)-1) != 0) {
+	be_version = emlxs_be_version(buffer, len, &ufi_plus);
+
+	/* Check if this is a standard BE2 image */
+	if (be_version != 2) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_incompat_msg,
 		    "Invalid image provided.");
 		return (EMLXS_IMAGE_INCOMPATIBLE);
 	}
 
-	/* Check for special deflated format */
-	(void) sprintf(signature, "%s+", BE_SIGNATURE);
-	if (strncmp(signature, ufi_hdr->signature,
-	    sizeof (signature)-1) == 0) {
-		ufi_plus = 1;
-	}
+	ufi_hdr = (emlxs_be2_ufi_header_t *)buffer;
 
 #ifdef EMLXS_BIG_ENDIAN
 	/* Big Endian Swapping */
@@ -945,7 +831,7 @@ emlxs_sli4_validate_image(emlxs_hba_t *hba, caddr_t buffer,
 	for (i = 0; i < len; i++, bptr++) {
 		if (strncmp((char *)bptr, BE_DIR_SIGNATURE,
 		    sizeof (BE_DIR_SIGNATURE)) == 0) {
-			flash_dir = (emlxs_sli4_flash_dir_t *)bptr;
+			flash_dir = (emlxs_be2_flash_dir_t *)bptr;
 			break;
 		}
 	}
@@ -998,7 +884,10 @@ emlxs_sli4_validate_image(emlxs_hba_t *hba, caddr_t buffer,
 		}
 
 		entry = &flash_dir->entry[i];
-		if (entry->image_size == 0) {
+
+		if ((entry->type == 0) ||
+		    (entry->type == (uint32_t)-1) ||
+		    (entry->image_size == 0)) {
 			continue;
 		}
 
@@ -1021,7 +910,25 @@ emlxs_sli4_validate_image(emlxs_hba_t *hba, caddr_t buffer,
 	}
 #endif /* EMLXS_BIG_ENDIAN */
 
+	/* Verify adapter model */
+	found = 0;
+	for (i = 0; i < BE_CONTROLLER_SIZE; i++) {
+		if (flash_dir->header.controller[i].device_id ==
+		    hba->model_info.device_id) {
+			found = 1;
+		}
+	}
+
+	if (!found) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_incompat_msg,
+		    "Invalid adapter device id=0x%x.",
+		    hba->model_info.device_id);
+		return (EMLXS_IMAGE_INCOMPATIBLE);
+	}
+
 	/* Build fw_image table */
+	fw_image->be_version = 2;
+	fw_image->ufi_plus = ufi_plus;
 	for (i = 0, mask = 1; i < BE_FLASH_ENTRIES; i++, mask <<= 1) {
 
 		if (!(flash_dir->header.valid_entry_mask & mask)) {
@@ -1029,7 +936,10 @@ emlxs_sli4_validate_image(emlxs_hba_t *hba, caddr_t buffer,
 		}
 
 		entry = &flash_dir->entry[i];
-		if (entry->image_size == 0) {
+
+		if ((entry->type == 0) ||
+		    (entry->type == (uint32_t)-1) ||
+		    (entry->image_size == 0)) {
 			continue;
 		}
 
@@ -1075,6 +985,8 @@ emlxs_sli4_validate_image(emlxs_hba_t *hba, caddr_t buffer,
 			continue;
 		}
 
+		file->be_version = fw_image->be_version;
+		file->ufi_plus = fw_image->ufi_plus;
 		file->image_size = entry->image_size;
 		image_size = BE_SWAP32(entry->image_size);
 
@@ -1082,9 +994,11 @@ emlxs_sli4_validate_image(emlxs_hba_t *hba, caddr_t buffer,
 			file->image_offset = entry->offset;
 			file->block_size   = entry->pad_size;
 			file->block_crc    = entry->checksum;
+			file->load_address = entry->entry_point;
+
 		} else {
 			file->image_offset = entry->offset +
-			    sizeof (emlxs_sli4_ufi_header_t);
+			    sizeof (emlxs_be2_ufi_header_t);
 
 			/* Get entry block size and crc */
 			k = file->image_offset + file->image_size;
@@ -1096,6 +1010,10 @@ emlxs_sli4_validate_image(emlxs_hba_t *hba, caddr_t buffer,
 					/* Calculate block_size */
 					file->block_size = (k + 8) -
 					    file->image_offset;
+
+					/* Read load_address */
+					value = *(wptr - 2);
+					file->load_address = BE_SWAP32(value);
 
 					/* Read block_crc */
 					value = *wptr;
@@ -1116,7 +1034,7 @@ emlxs_sli4_validate_image(emlxs_hba_t *hba, caddr_t buffer,
 		}
 
 		/* Make sure image will fit in block specified */
-		if (file->image_size + 8 > file->block_size) {
+		if (file->image_size + 12 > file->block_size) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_bad_msg,
 			    "%s: Image too large for block. image=%x block=%x",
 			    file->label, file->image_size, file->block_size);
@@ -1128,32 +1046,36 @@ emlxs_sli4_validate_image(emlxs_hba_t *hba, caddr_t buffer,
 		/* Automatically create a backup file entry for firmware */
 		if (file->type == MGMT_FLASHROM_OPTYPE_FCOE_FIRMWARE) {
 			file2 = &fw_image->file[FCOE_BACKUP_FLASHTYPE];
-			(void) strcpy(file2->label, "FCOE BACKUP");
+
+			bcopy((uint8_t *)file, (uint8_t *)file2,
+			    sizeof (emlxs_be_fw_file_t));
 			file2->type = MGMT_FLASHROM_OPTYPE_FCOE_BACKUP;
-			file2->image_offset = file->image_offset;
-			file2->image_size = file->image_size;
-			file2->block_size = file->block_size;
-			file2->block_crc = file->block_crc;
+			(void) strcpy(file2->label, "FCOE BACKUP");
 
 			/* Save FCOE version info */
 			bptr = (uint8_t *)buffer + file->image_offset + 0x30;
-			(void) strncpy(fw_image->label, (char *)bptr,
+			(void) strncpy(fw_image->fcoe_label, (char *)bptr,
 			    BE_VERSION_SIZE);
-			fw_image->version = file->block_crc;
+			fw_image->fcoe_version = file->block_crc;
 
 		} else if (file->type ==
 		    MGMT_FLASHROM_OPTYPE_ISCSI_FIRMWARE) {
 			file2 = &fw_image->file[ISCSI_BACKUP_FLASHTYPE];
-			(void) strcpy(file2->label, "ISCSI BACKUP");
+
+			bcopy((uint8_t *)file, (uint8_t *)file2,
+			    sizeof (emlxs_be_fw_file_t));
 			file2->type = MGMT_FLASHROM_OPTYPE_ISCSI_BACKUP;
-			file2->image_offset = file->image_offset;
-			file2->image_size = file->image_size;
-			file2->block_size = file->block_size;
-			file2->block_crc = file->block_crc;
+			(void) strcpy(file2->label, "ISCSI BACKUP");
+
+			/* Save ISCSI version info */
+			bptr = (uint8_t *)buffer + file->image_offset + 0x30;
+			(void) strncpy(fw_image->iscsi_label, (char *)bptr,
+			    BE_VERSION_SIZE);
+			fw_image->iscsi_version = file->block_crc;
 		}
 	}
 
-	if (fw_image->version == 0) {
+	if (fw_image->fcoe_version == 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_bad_msg,
 		    "Unable to find FCOE firmware component.");
 
@@ -1163,7 +1085,8 @@ emlxs_sli4_validate_image(emlxs_hba_t *hba, caddr_t buffer,
 
 	/* Display contents */
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_msg,
-	    "UFI Image: %08x, %s", fw_image->version, fw_image->label);
+	    "BE2 UFI Image: %08x, %s", fw_image->fcoe_version,
+	    fw_image->fcoe_label);
 
 	for (i = 0; i < BE_MAX_FLASHTYPES; i++) {
 		file = &fw_image->file[i];
@@ -1173,14 +1096,368 @@ emlxs_sli4_validate_image(emlxs_hba_t *hba, caddr_t buffer,
 		}
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_msg,
-		    "%s: type=%x block=%x image=%x offset=%x crc=%x",
-		    file->label, file->type, file->block_size,
-		    file->image_size, file->image_offset, file->block_crc);
+		    "%s: be=%x%s type=%x block=%x image=%x offset=%x crc=%x "
+		    "load=%x",
+		    file->label, file->be_version, (file->ufi_plus)?"+":"",
+		    file->type, file->block_size, file->image_size,
+		    file->image_offset, file->block_crc, file->load_address);
 	}
 
 	return (0);
 
-} /* emlxs_sli4_validate_image() */
+} /* emlxs_be2_validate_image() */
+
+
+static uint32_t
+emlxs_be3_validate_image(emlxs_hba_t *hba, caddr_t buffer,
+    uint32_t len, emlxs_be_fw_image_t *fw_image)
+{
+	emlxs_port_t *port = &PPORT;
+	emlxs_be3_ufi_header_t *ufi_hdr;
+	emlxs_be3_flash_dir_t *flash_dir;
+	emlxs_be3_flash_entry_t *entry;
+	emlxs_be3_image_header_t *flash_image_hdr;
+	emlxs_be3_image_header_t *image_hdr;
+	uint8_t *bptr;
+	uint32_t *wptr;
+	uint32_t i;
+	uint32_t value;
+	emlxs_be_fw_file_t *file;
+	emlxs_be_fw_file_t *file2;
+	uint32_t ufi_plus = 0;
+	uint32_t be_version = 0;
+	uint32_t found;
+
+	bzero(fw_image, sizeof (emlxs_be_fw_image_t));
+
+	if (hba->model_info.chip != EMLXS_BE3_CHIP) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_incompat_msg,
+		    "Invalid adapter model.");
+		return (EMLXS_IMAGE_INCOMPATIBLE);
+	}
+
+	if (len < (sizeof (emlxs_be3_ufi_header_t) +
+	    sizeof (emlxs_be3_flash_dir_t))) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_bad_msg,
+		    "Image too small. (%d < %d)",
+		    len, (sizeof (emlxs_be3_ufi_header_t) +
+		    sizeof (emlxs_be3_flash_dir_t)));
+		return (EMLXS_IMAGE_BAD);
+	}
+
+	be_version = emlxs_be_version(buffer, len, &ufi_plus);
+
+	/* Check if this is a standard BE3 image */
+	if (be_version != 3) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_incompat_msg,
+		    "Invalid image provided.");
+		return (EMLXS_IMAGE_INCOMPATIBLE);
+	}
+
+	ufi_hdr = (emlxs_be3_ufi_header_t *)buffer;
+
+#ifdef EMLXS_BIG_ENDIAN
+	/* Big Endian Swapping */
+	/* Swap ufi header */
+	ufi_hdr->ufi_version =
+	    SWAP32(ufi_hdr->ufi_version);
+	ufi_hdr->file_length =
+	    SWAP32(ufi_hdr->file_length);
+	ufi_hdr->checksum =
+	    SWAP32(ufi_hdr->checksum);
+	ufi_hdr->antidote =
+	    SWAP32(ufi_hdr->antidote);
+	ufi_hdr->image_cnt =
+	    SWAP32(ufi_hdr->image_cnt);
+#endif /* EMLXS_BIG_ENDIAN */
+
+	if (len != ufi_hdr->file_length) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_bad_msg,
+		    "Invalid image size (%d != %d)",
+		    len, ufi_hdr->file_length);
+
+		return (EMLXS_IMAGE_BAD);
+	}
+
+	flash_image_hdr = NULL;
+	image_hdr = (emlxs_be3_image_header_t *)(buffer +
+	    sizeof (emlxs_be3_ufi_header_t));
+	for (i = 0; i < ufi_hdr->image_cnt; i++, image_hdr++) {
+#ifdef EMLXS_BIG_ENDIAN
+		image_hdr->id = SWAP32(image_hdr->id);
+		image_hdr->offset = SWAP32(image_hdr->offset);
+		image_hdr->length = SWAP32(image_hdr->length);
+		image_hdr->checksum = SWAP32(image_hdr->checksum);
+#endif /* EMLXS_BIG_ENDIAN */
+
+		if (image_hdr->id == UFI_BE3_FLASH_ID) {
+			flash_image_hdr = image_hdr;
+		}
+	}
+
+	if (!flash_image_hdr) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_bad_msg,
+		    "No flash image found.");
+
+		return (EMLXS_IMAGE_BAD);
+	}
+
+	/* Scan for flash dir signature */
+	bptr = (uint8_t *)buffer + flash_image_hdr->offset;
+	flash_dir = NULL;
+	for (i = 0; i < flash_image_hdr->length; i++, bptr++) {
+		if (strncmp((char *)bptr, BE_DIR_SIGNATURE,
+		    sizeof (BE_DIR_SIGNATURE)) == 0) {
+			flash_dir = (emlxs_be3_flash_dir_t *)bptr;
+			break;
+		}
+	}
+
+	if (!flash_dir) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_bad_msg,
+		    "Unable to find flash directory.");
+
+		return (EMLXS_IMAGE_BAD);
+	}
+
+#ifdef EMLXS_BIG_ENDIAN
+	/* Big Endian Swapping */
+	/* Swap flash dir */
+	flash_dir->header.format_rev =
+	    SWAP32(flash_dir->header.format_rev);
+	flash_dir->header.checksum =
+	    SWAP32(flash_dir->header.checksum);
+	flash_dir->header.antidote =
+	    SWAP32(flash_dir->header.antidote);
+	flash_dir->header.entry_count =
+	    SWAP32(flash_dir->header.entry_count);
+	flash_dir->header.resv0 = SWAP32(flash_dir->header.resv0);
+	flash_dir->header.resv1 = SWAP32(flash_dir->header.resv1);
+	flash_dir->header.resv2 = SWAP32(flash_dir->header.resv2);
+	flash_dir->header.resv3 = SWAP32(flash_dir->header.resv3);
+
+	for (i = 0; i < BE_CONTROLLER_SIZE; i++) {
+		flash_dir->header.controller[i].vendor_id =
+		    SWAP32(flash_dir->header.controller[i].vendor_id);
+		flash_dir->header.controller[i].device_id =
+		    SWAP32(flash_dir->header.controller[i].device_id);
+		flash_dir->header.controller[i].sub_vendor_id =
+		    SWAP32(flash_dir->header.controller[i].sub_vendor_id);
+		flash_dir->header.controller[i].sub_device_id =
+		    SWAP32(flash_dir->header.controller[i].sub_device_id);
+	}
+
+	for (i = 0; i < flash_dir->header.entry_count; i++) {
+		entry = &flash_dir->entry[i];
+
+		if ((entry->type == 0) ||
+		    (entry->type == (uint32_t)-1) ||
+		    (entry->image_size == 0)) {
+			continue;
+		}
+
+		flash_dir->entry[i].type =
+		    SWAP32(flash_dir->entry[i].type);
+		flash_dir->entry[i].offset =
+		    SWAP32(flash_dir->entry[i].offset);
+		flash_dir->entry[i].block_size =
+		    SWAP32(flash_dir->entry[i].block_size);
+		flash_dir->entry[i].image_size =
+		    SWAP32(flash_dir->entry[i].image_size);
+		flash_dir->entry[i].checksum =
+		    SWAP32(flash_dir->entry[i].checksum);
+		flash_dir->entry[i].entry_point =
+		    SWAP32(flash_dir->entry[i].entry_point);
+		flash_dir->entry[i].resv0 =
+		    SWAP32(flash_dir->entry[i].resv0);
+		flash_dir->entry[i].resv1 =
+		    SWAP32(flash_dir->entry[i].resv1);
+	}
+#endif /* EMLXS_BIG_ENDIAN */
+
+	/* Verify image checksum */
+	if (flash_dir->header.checksum != flash_image_hdr->checksum) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_bad_msg,
+		    "Invalid flash directory checksum. (%x != %x)\n",
+		    flash_dir->header.checksum, flash_image_hdr->checksum);
+		return (EMLXS_IMAGE_BAD);
+	}
+
+	/* Verify adapter model */
+	found = 0;
+	for (i = 0; i < BE_CONTROLLER_SIZE; i++) {
+		if (flash_dir->header.controller[i].device_id ==
+		    hba->model_info.device_id) {
+			found = 1;
+		}
+	}
+
+	if (!found) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_incompat_msg,
+		    "Invalid adapter device id=0x%x.",
+		    hba->model_info.device_id);
+		return (EMLXS_IMAGE_INCOMPATIBLE);
+	}
+
+	/* Build fw_image table */
+	fw_image->be_version = 3;
+	fw_image->ufi_plus = ufi_plus;
+	for (i = 0; i < flash_dir->header.entry_count; i++) {
+		entry = &flash_dir->entry[i];
+
+		if ((entry->type == 0) ||
+		    (entry->type == (uint32_t)-1) ||
+		    (entry->image_size == 0)) {
+			continue;
+		}
+
+		switch (entry->type) {
+		case BE_FLASHTYPE_REDBOOT:
+			file = &fw_image->file[REDBOOT_FLASHTYPE];
+			(void) strcpy(file->label, "REDBOOT");
+			file->type = MGMT_FLASHROM_OPTYPE_REDBOOT;
+			break;
+		case BE_FLASHTYPE_ISCSI_BIOS:
+			file = &fw_image->file[ISCSI_BIOS_FLASHTYPE];
+			(void) strcpy(file->label, "ISCSI BIOS");
+			file->type = MGMT_FLASHROM_OPTYPE_ISCSI_BIOS;
+			break;
+		case BE_FLASHTYPE_PXE_BIOS:
+			file = &fw_image->file[PXE_BIOS_FLASHTYPE];
+			(void) strcpy(file->label, "PXE BIOS");
+			file->type = MGMT_FLASHROM_OPTYPE_PXE_BIOS;
+			break;
+		case BE_FLASHTYPE_FCOE_BIOS:
+			file = &fw_image->file[FCOE_BIOS_FLASHTYPE];
+			(void) strcpy(file->label, "FCOE BIOS");
+			file->type = MGMT_FLASHROM_OPTYPE_FCOE_BIOS;
+			break;
+		case BE_FLASHTYPE_ISCSI_FIRMWARE:
+			file = &fw_image->file[ISCSI_FIRMWARE_FLASHTYPE];
+			(void) strcpy(file->label, "ISCSI FIRMWARE");
+			file->type = MGMT_FLASHROM_OPTYPE_ISCSI_FIRMWARE;
+			break;
+		case BE_FLASHTYPE_FCOE_FIRMWARE:
+			file = &fw_image->file[FCOE_FIRMWARE_FLASHTYPE];
+			(void) strcpy(file->label, "FCOE FIRMWARE");
+			file->type = MGMT_FLASHROM_OPTYPE_FCOE_FIRMWARE;
+			break;
+		case BE_FLASHTYPE_NCSI_FIRMWARE:
+			file = &fw_image->file[NCSI_FIRMWARE_FLASHTYPE];
+			(void) strcpy(file->label, "NCSI FIRMWARE");
+			file->type = MGMT_FLASHROM_OPTYPE_NCSI_FIRMWARE;
+			break;
+		case BE_FLASHTYPE_FLASH_ISM:
+		case BE_FLASHTYPE_FCOE_BACKUP:
+		case BE_FLASHTYPE_ISCSI_BACKUP:
+			continue;
+
+		default:
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_bad_msg,
+			    "Unknown image type found.  type=%x",
+			    entry->type);
+			continue;
+		}
+
+		file->be_version = fw_image->be_version;
+		file->ufi_plus = fw_image->ufi_plus;
+		file->image_size = entry->image_size;
+
+		if (ufi_plus) {
+			file->image_offset = entry->offset;
+			file->block_size   = entry->block_size;
+			file->block_crc    = entry->checksum;
+			file->load_address = entry->entry_point;
+		} else {
+			file->image_offset = entry->offset +
+			    flash_image_hdr->offset;
+			file->block_size   = entry->block_size;
+
+			wptr = (uint32_t *)(buffer +  file->image_offset +
+			    file->block_size);
+
+			/* Read load address */
+			value = *(wptr - 3);
+			file->load_address = BE_SWAP32(value);
+
+			/* Read block_crc */
+			value = *(wptr - 1);
+			file->block_crc = BE_SWAP32(value);
+		}
+
+		/* Make sure image will fit in block specified */
+		if (file->image_size + 12 > file->block_size) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_bad_msg,
+			    "%s: Image too large for block. image=%x block=%x",
+			    file->label, file->image_size, file->block_size);
+
+			bzero(fw_image, sizeof (emlxs_be_fw_image_t));
+			return (EMLXS_IMAGE_BAD);
+		}
+
+		/* Automatically create a backup file entry for firmware */
+		if (file->type == MGMT_FLASHROM_OPTYPE_FCOE_FIRMWARE) {
+			file2 = &fw_image->file[FCOE_BACKUP_FLASHTYPE];
+
+			bcopy((uint8_t *)file, (uint8_t *)file2,
+			    sizeof (emlxs_be_fw_file_t));
+			file2->type = MGMT_FLASHROM_OPTYPE_FCOE_BACKUP;
+			(void) strcpy(file2->label, "FCOE BACKUP");
+
+			/* Save FCOE version info */
+			bptr = (uint8_t *)buffer + file->image_offset + 0x30;
+			(void) strncpy(fw_image->fcoe_label, (char *)bptr,
+			    BE_VERSION_SIZE);
+			fw_image->fcoe_version = file->block_crc;
+
+		} else if (file->type ==
+		    MGMT_FLASHROM_OPTYPE_ISCSI_FIRMWARE) {
+			file2 = &fw_image->file[ISCSI_BACKUP_FLASHTYPE];
+
+			bcopy((uint8_t *)file, (uint8_t *)file2,
+			    sizeof (emlxs_be_fw_file_t));
+			file2->type = MGMT_FLASHROM_OPTYPE_ISCSI_BACKUP;
+			(void) strcpy(file2->label, "ISCSI BACKUP");
+
+			/* Save ISCSI version info */
+			bptr = (uint8_t *)buffer + file->image_offset + 0x30;
+			(void) strncpy(fw_image->iscsi_label, (char *)bptr,
+			    BE_VERSION_SIZE);
+			fw_image->iscsi_version = file->block_crc;
+		}
+	}
+
+	if (fw_image->fcoe_version == 0) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_bad_msg,
+		    "Unable to find FCOE firmware component.");
+
+		bzero(fw_image, sizeof (emlxs_be_fw_image_t));
+		return (EMLXS_IMAGE_BAD);
+	}
+
+	/* Display contents */
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_msg,
+	    "BE3 UFI Image: %08x, %s", fw_image->fcoe_version,
+	    fw_image->fcoe_label);
+
+	for (i = 0; i < BE_MAX_FLASHTYPES; i++) {
+		file = &fw_image->file[i];
+
+		if (file->image_size == 0) {
+			continue;
+		}
+
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_msg,
+		    "%s: be=%x%s type=%x block=%x image=%x offset=%x crc=%x "
+		    "load=%x",
+		    file->label, file->be_version, (file->ufi_plus)? "+":"",
+		    file->type, file->block_size, file->image_size,
+		    file->image_offset, file->block_crc, file->load_address);
+	}
+
+	return (0);
+
+} /* emlxs_be3_validate_image() */
 
 
 static int32_t
@@ -1195,6 +1472,7 @@ emlxs_sli4_fw_download(emlxs_hba_t *hba, caddr_t buffer, uint32_t len,
 	MATCHMAP *mp = NULL;
 	emlxs_be_fw_image_t fw_image;
 	emlxs_be_fw_file_t *file;
+	uint32_t be_version;
 
 	/* For now we will not take the driver offline during a download */
 	offline = 0;
@@ -1211,9 +1489,30 @@ emlxs_sli4_fw_download(emlxs_hba_t *hba, caddr_t buffer, uint32_t len,
 		return (EMLXS_IMAGE_BAD);
 	}
 
-	/* Validate image */
-	if ((rval = emlxs_sli4_validate_image(hba, buffer, len, &fw_image))) {
-		return (rval);
+	be_version = emlxs_be_version(buffer, len, 0);
+
+	switch (be_version) {
+	case 0:
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_incompat_msg,
+		    "Invalid image provided. Non-UFI format.");
+		return (EMLXS_IMAGE_INCOMPATIBLE);
+	case 2:
+		rval = emlxs_be2_validate_image(hba, buffer, len, &fw_image);
+		if (rval) {
+			return (rval);
+		}
+		break;
+	case 3:
+		rval = emlxs_be3_validate_image(hba, buffer, len, &fw_image);
+		if (rval) {
+			return (rval);
+		}
+		break;
+	default:
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_incompat_msg,
+		    "Invalid image provided. Unknown BE version. (%x)",
+		    be_version);
+		return (EMLXS_IMAGE_INCOMPATIBLE);
 	}
 
 	/* Allocate resources */
@@ -1249,6 +1548,7 @@ emlxs_sli4_fw_download(emlxs_hba_t *hba, caddr_t buffer, uint32_t len,
 		rval = emlxs_sli4_verify_crc(hba, file, mbq, mp);
 
 		if (rval == 0) {
+			/* Do not update */
 			file->image_size = 0;
 			continue;
 		}
@@ -1258,6 +1558,7 @@ emlxs_sli4_fw_download(emlxs_hba_t *hba, caddr_t buffer, uint32_t len,
 
 	if (!update) {
 		offline = 0;
+		rval = 0;
 		goto done;
 	}
 
@@ -1293,11 +1594,11 @@ emlxs_sli4_fw_download(emlxs_hba_t *hba, caddr_t buffer, uint32_t len,
 
 done:
 	if (mbq) {
-		(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mbq);
+		emlxs_mem_put(hba, MEM_MBOX, (void *)mbq);
 	}
 
 	if (mp) {
-		(void) emlxs_mem_buf_free(hba, mp);
+		emlxs_mem_buf_free(hba, mp);
 	}
 
 	if (offline) {
@@ -1311,7 +1612,8 @@ done:
 
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_updated_msg,
 			    "Please reboot system or power cycle adapter "
-			    "to activate new firmware: %s", fw_image.label);
+			    "to activate new firmware: %s",
+			    fw_image.fcoe_label);
 
 		} else {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_detail_msg,
@@ -1660,13 +1962,11 @@ static uint32_t
 emlxs_start_abs_download(emlxs_hba_t *hba,
     PAIF_HDR AifHdr,
     caddr_t Buffer,
-    PWAKE_UP_PARMS WakeUpParms,
-    uint32_t MaxRbusSramSize,
-    uint32_t MaxIbusSramSize, PWAKE_UP_PARMS AbsWakeUpParms, int32_t DwcFile)
+    uint32_t len,
+    PWAKE_UP_PARMS WakeUpParms)
 {
 	emlxs_port_t *port = &PPORT;
 	uint32_t DlByteCount = AifHdr->RoSize + AifHdr->RwSize;
-	IMAGE_HDR ImageHdr;
 	uint32_t *Src;
 	uint32_t *Dst;
 	caddr_t DataBuffer = NULL;
@@ -1677,8 +1977,10 @@ emlxs_start_abs_download(emlxs_hba_t *hba,
 	uint32_t DlToAddr = AifHdr->ImageBase;
 	uint32_t DlCount;
 	uint32_t i;
+	WAKE_UP_PARMS AbsWakeUpParms;
+	int32_t AbsChangeParams;
 
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg,
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_detail_msg,
 	    "Performing absolute download...");
 
 	if ((DataBuffer = (caddr_t)kmem_zalloc(DL_SLIM_SEG_BYTE_COUNT,
@@ -1698,19 +2000,22 @@ emlxs_start_abs_download(emlxs_hba_t *hba,
 
 		return (rval);
 	}
-
 	mb = (MAILBOX *)mbox;
+
+	AbsChangeParams = emlxs_build_parms(Buffer,
+	    &AbsWakeUpParms, len, AifHdr);
 
 	Buffer += sizeof (AIF_HDR);
 
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg, "Erasing flash...");
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_detail_msg, "Erasing flash...");
 
-	if (DwcFile) {
+	if (AifHdr->ImageBase == 0x20000) {
+		/* DWC File */
 		emlxs_format_prog_flash(mbox, 0x20000, 0x50000, ERASE_FLASH, 0,
-		    0, 0, NULL);
+		    0, 0, NULL, 0);
 	} else {
 		emlxs_format_prog_flash(mbox, DlToAddr, DlByteCount,
-		    ERASE_FLASH, 0, 0, 0, NULL);
+		    ERASE_FLASH, 0, 0, 0, NULL, 0);
 	}
 
 	if (EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbox, MBX_WAIT, 0) != MBX_SUCCESS) {
@@ -1723,7 +2028,7 @@ emlxs_start_abs_download(emlxs_hba_t *hba,
 		goto EXIT_ABS_DOWNLOAD;
 	}
 
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg,
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_detail_msg,
 	    "Programming flash...");
 
 	while (DlByteCount) {
@@ -1750,7 +2055,7 @@ emlxs_start_abs_download(emlxs_hba_t *hba,
 		    sizeof (MAILBOX)), (DlCount / sizeof (uint32_t)));
 
 		emlxs_format_prog_flash(mbox, DlToAddr, DlCount,
-		    PROGRAM_FLASH, (DlByteCount) ? 0 : 1, 0, DlCount, NULL);
+		    PROGRAM_FLASH, (DlByteCount) ? 0 : 1, 0, DlCount, NULL, 0);
 
 		if (EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbox, MBX_WAIT, 0) !=
 		    MBX_SUCCESS) {
@@ -1779,31 +2084,12 @@ emlxs_start_abs_download(emlxs_hba_t *hba,
 	}
 #endif  /* FMA_SUPPORT */
 
-	bzero((caddr_t)&ImageHdr, sizeof (IMAGE_HDR));
-	ImageHdr.Id.Type = FUNC_FIRMWARE;
-
-	switch (MaxRbusSramSize) {
-	case REDUCED_RBUS_SRAM_CFG:
-		ImageHdr.Id.Id = REDUCED_SRAM_CFG_PROG_ID;
-		break;
-	case FULL_RBUS_SRAM_CFG:
-		ImageHdr.Id.Id = FULL_SRAM_CFG_PROG_ID;
-		break;
-	default:
-		ImageHdr.Id.Id = OTHER_SRAM_CFG_PROG_ID;
-		break;
-	}
-
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg, "Updating params...");
 
-	if (AbsWakeUpParms) {
+	if (AbsChangeParams) {
 		rval =
-		    emlxs_update_wakeup_parms(hba, AbsWakeUpParms,
+		    emlxs_update_wakeup_parms(hba, &AbsWakeUpParms,
 		    WakeUpParms);
-	} else {
-		rval =
-		    emlxs_update_boot_wakeup_parms(hba, WakeUpParms,
-		    &ImageHdr.Id, 1);
 	}
 
 EXIT_ABS_DOWNLOAD:
@@ -1827,16 +2113,20 @@ emlxs_format_prog_flash(MAILBOXQ *mbq,
     uint32_t DlByteCount,
     uint32_t Function,
     uint32_t Complete,
-    uint32_t BdeAddress, uint32_t BdeSize, PROG_ID *ProgId)
+    uint32_t BdeAddress,
+    uint32_t BdeSize,
+    PROG_ID *ProgId,
+    uint32_t keep)
 {
 	MAILBOX *mb = (MAILBOX *)mbq;
 
 	bzero((void *)mb, MAILBOX_CMD_BSIZE);
 
-	if (ProgId)
+	if (ProgId) {
 		mb->mbxCommand = MBX_DOWN_LOAD;
-	else
+	} else {
 		mb->mbxCommand = MBX_LOAD_SM;
+	}
 
 	mb->un.varLdSM.load_cmplt = Complete;
 	mb->un.varLdSM.method = DL_FROM_SLIM;
@@ -1844,6 +2134,7 @@ emlxs_format_prog_flash(MAILBOXQ *mbq,
 	mb->un.varLdSM.erase_or_prog = Function;
 	mb->un.varLdSM.dl_to_adr = Base;
 	mb->un.varLdSM.dl_len = DlByteCount;
+	mb->un.varLdSM.keep = keep;
 
 	if (BdeSize) {
 		mb->un.varLdSM.un.dl_from_slim_offset = DL_FROM_SLIM_OFFSET;
@@ -1911,6 +2202,7 @@ emlxs_update_boot_wakeup_parms(emlxs_hba_t *hba, PWAKE_UP_PARMS WakeUpParms,
 	MAILBOX *mb;
 	MAILBOXQ *mbox;
 	uint32_t rval = 0;
+	PROG_ID old_prog_id;
 
 	if ((mbox = (MAILBOXQ *)kmem_zalloc(sizeof (MAILBOXQ),
 	    KM_NOSLEEP)) == NULL) {
@@ -1928,6 +2220,7 @@ emlxs_update_boot_wakeup_parms(emlxs_hba_t *hba, PWAKE_UP_PARMS WakeUpParms,
 		(void) emlxs_update_exp_rom(hba, WakeUpParms);
 	}
 
+	old_prog_id = WakeUpParms->u0.boot_bios_id;
 	WakeUpParms->u0.boot_bios_id = *prog_id;
 
 	emlxs_format_update_parms(mbox, WakeUpParms);
@@ -1937,6 +2230,7 @@ emlxs_update_boot_wakeup_parms(emlxs_hba_t *hba, PWAKE_UP_PARMS WakeUpParms,
 		    "Unable to update boot wakeup parms: Mailbox cmd=%x "
 		    "status=%x", mb->mbxCommand, mb->mbxStatus);
 
+		WakeUpParms->u0.boot_bios_id = old_prog_id;
 		rval = 1;
 	}
 
@@ -1958,6 +2252,7 @@ emlxs_update_ff_wakeup_parms(emlxs_hba_t *hba, PWAKE_UP_PARMS WakeUpParms,
 	uint32_t rval = 0;
 	MAILBOXQ *mbox;
 	MAILBOX *mb;
+	PROG_ID old_prog_id;
 
 	if ((mbox = (MAILBOXQ *)kmem_zalloc(sizeof (MAILBOXQ),
 	    KM_NOSLEEP)) == NULL) {
@@ -1967,8 +2262,12 @@ emlxs_update_ff_wakeup_parms(emlxs_hba_t *hba, PWAKE_UP_PARMS WakeUpParms,
 		return (1);
 	}
 
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg,
+	    "FF: Updating parms...");
+
 	mb = (MAILBOX *)mbox;
 
+	old_prog_id = WakeUpParms->prog_id;
 	WakeUpParms->prog_id = *prog_id;
 
 	emlxs_format_update_parms(mbox, WakeUpParms);
@@ -1978,6 +2277,7 @@ emlxs_update_ff_wakeup_parms(emlxs_hba_t *hba, PWAKE_UP_PARMS WakeUpParms,
 		    "Unable to update wakeup parameters: Mailbox cmd=%x "
 		    "status=%x", mb->mbxCommand, mb->mbxStatus);
 
+		WakeUpParms->prog_id = old_prog_id;
 		rval = 1;
 	}
 
@@ -1998,6 +2298,7 @@ emlxs_update_sli1_wakeup_parms(emlxs_hba_t *hba, PWAKE_UP_PARMS WakeUpParms,
 	uint32_t rval = 0;
 	MAILBOXQ *mbox;
 	MAILBOX *mb;
+	PROG_ID old_prog_id;
 
 	if ((mbox = (MAILBOXQ *)kmem_zalloc(sizeof (MAILBOXQ),
 	    KM_NOSLEEP)) == NULL) {
@@ -2007,8 +2308,12 @@ emlxs_update_sli1_wakeup_parms(emlxs_hba_t *hba, PWAKE_UP_PARMS WakeUpParms,
 		return (1);
 	}
 
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg,
+	    "SLI1: Updating parms...");
+
 	mb = (MAILBOX *)mbox;
 
+	old_prog_id = WakeUpParms->sli1_prog_id;
 	WakeUpParms->sli1_prog_id = *prog_id;
 
 	emlxs_format_update_parms(mbox, WakeUpParms);
@@ -2018,6 +2323,7 @@ emlxs_update_sli1_wakeup_parms(emlxs_hba_t *hba, PWAKE_UP_PARMS WakeUpParms,
 		    "Unable to update wakeup parameters. Mailbox cmd=%x "
 		    "status=%x", mb->mbxCommand, mb->mbxStatus);
 
+		WakeUpParms->sli1_prog_id = old_prog_id;
 		rval = 1;
 	}
 
@@ -2038,6 +2344,7 @@ emlxs_update_sli2_wakeup_parms(emlxs_hba_t *hba, PWAKE_UP_PARMS WakeUpParms,
 	uint32_t rval = 0;
 	MAILBOXQ *mbox;
 	MAILBOX *mb;
+	PROG_ID old_prog_id;
 
 	if ((mbox = (MAILBOXQ *)kmem_zalloc(sizeof (MAILBOXQ),
 	    KM_NOSLEEP)) == NULL) {
@@ -2047,8 +2354,12 @@ emlxs_update_sli2_wakeup_parms(emlxs_hba_t *hba, PWAKE_UP_PARMS WakeUpParms,
 		return (1);
 	}
 
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg,
+	    "SLI2: Updating parms...");
+
 	mb = (MAILBOX *)mbox;
 
+	old_prog_id = WakeUpParms->sli2_prog_id;
 	WakeUpParms->sli2_prog_id = *prog_id;
 
 	emlxs_format_update_parms(mbox, WakeUpParms);
@@ -2058,6 +2369,7 @@ emlxs_update_sli2_wakeup_parms(emlxs_hba_t *hba, PWAKE_UP_PARMS WakeUpParms,
 		    "Unable to update wakeup parameters. Mailbox cmd=%x "
 		    "status=%x", mb->mbxCommand, mb->mbxStatus);
 
+		WakeUpParms->sli2_prog_id = old_prog_id;
 		rval = 1;
 	}
 
@@ -2078,6 +2390,7 @@ emlxs_update_sli3_wakeup_parms(emlxs_hba_t *hba, PWAKE_UP_PARMS WakeUpParms,
 	uint32_t rval = 0;
 	MAILBOXQ *mbox;
 	MAILBOX *mb;
+	PROG_ID old_prog_id;
 
 	if ((mbox = (MAILBOXQ *)kmem_zalloc(sizeof (MAILBOXQ),
 	    KM_NOSLEEP)) == NULL) {
@@ -2087,8 +2400,12 @@ emlxs_update_sli3_wakeup_parms(emlxs_hba_t *hba, PWAKE_UP_PARMS WakeUpParms,
 		return (1);
 	}
 
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg,
+	    "SLI3: Updating parms...");
+
 	mb = (MAILBOX *)mbox;
 
+	old_prog_id = WakeUpParms->sli3_prog_id;
 	WakeUpParms->sli3_prog_id = *prog_id;
 
 	emlxs_format_update_parms(mbox, WakeUpParms);
@@ -2098,6 +2415,7 @@ emlxs_update_sli3_wakeup_parms(emlxs_hba_t *hba, PWAKE_UP_PARMS WakeUpParms,
 		    "Unable to update wakeup parameters. Mailbox cmd=%x "
 		    "status=%x", mb->mbxCommand, mb->mbxStatus);
 
+		WakeUpParms->sli3_prog_id = old_prog_id;
 		rval = 1;
 	}
 
@@ -2118,6 +2436,7 @@ emlxs_update_sli4_wakeup_parms(emlxs_hba_t *hba, PWAKE_UP_PARMS WakeUpParms,
 	uint32_t rval = 0;
 	MAILBOXQ *mbox;
 	MAILBOX *mb;
+	PROG_ID old_prog_id;
 
 	if ((mbox = (MAILBOXQ *)kmem_zalloc(sizeof (MAILBOXQ),
 	    KM_NOSLEEP)) == NULL) {
@@ -2127,8 +2446,12 @@ emlxs_update_sli4_wakeup_parms(emlxs_hba_t *hba, PWAKE_UP_PARMS WakeUpParms,
 		return (1);
 	}
 
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg,
+	    "SLI4: Updating parms...");
+
 	mb = (MAILBOX *)mbox;
 
+	old_prog_id = WakeUpParms->sli4_prog_id;
 	WakeUpParms->sli4_prog_id = *prog_id;
 
 	emlxs_format_update_parms(mbox, WakeUpParms);
@@ -2138,6 +2461,7 @@ emlxs_update_sli4_wakeup_parms(emlxs_hba_t *hba, PWAKE_UP_PARMS WakeUpParms,
 		    "Unable to update wakeup parameters. Mailbox cmd=%x "
 		    "status=%x", mb->mbxCommand, mb->mbxStatus);
 
+		WakeUpParms->sli4_prog_id = old_prog_id;
 		rval = 1;
 	}
 
@@ -2150,13 +2474,184 @@ emlxs_update_sli4_wakeup_parms(emlxs_hba_t *hba, PWAKE_UP_PARMS WakeUpParms,
 } /* emlxs_update_sli4_wakeup_parms() */
 
 
+static uint32_t
+emlxs_clean_flash(emlxs_hba_t *hba,
+    PWAKE_UP_PARMS OldWakeUpParms, PWAKE_UP_PARMS NewWakeUpParms)
+{
+	emlxs_port_t *port = &PPORT;
+	PROG_ID load_list[MAX_LOAD_ENTRY];
+	PROG_ID *wakeup_list[MAX_LOAD_ENTRY];
+	uint32_t count;
+	uint32_t i;
+	uint32_t j;
+	uint32_t k = 0;
+	uint32_t *wptr;
+
+	if (!NewWakeUpParms) {
+		return (1);
+	}
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_msg,
+	    "Cleaning flash...");
+
+	/* If old wakeup parameter list is available, */
+	/* then cleanup old entries */
+	if (OldWakeUpParms) {
+		if (bcmp(&OldWakeUpParms->prog_id, &NewWakeUpParms->prog_id,
+		    sizeof (PROG_ID))) {
+
+			wptr = (uint32_t *)&OldWakeUpParms->prog_id;
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_msg,
+			    "OLD:      prog_id: 0x%08x 0x%08x  Removing.",
+			    wptr[0], wptr[1]);
+
+			(void) emlxs_delete_load_entry(hba,
+			    &OldWakeUpParms->prog_id);
+		}
+
+		if (bcmp(&OldWakeUpParms->u0.boot_bios_id,
+		    &NewWakeUpParms->u0.boot_bios_id, sizeof (PROG_ID))) {
+
+			wptr = (uint32_t *)&OldWakeUpParms->u0.boot_bios_id;
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_msg,
+			    "OLD: boot_bios_id: 0x%08x 0x%08x  Removing.",
+			    wptr[0], wptr[1]);
+
+			(void) emlxs_delete_load_entry(hba,
+			    &OldWakeUpParms->u0.boot_bios_id);
+		}
+
+		if (bcmp(&OldWakeUpParms->sli1_prog_id,
+		    &NewWakeUpParms->sli1_prog_id, sizeof (PROG_ID))) {
+
+			wptr = (uint32_t *)&OldWakeUpParms->sli1_prog_id;
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_msg,
+			    "OLD: sli1_prog_id: 0x%08x 0x%08x  Removing.",
+			    wptr[0], wptr[1]);
+
+			(void) emlxs_delete_load_entry(hba,
+			    &OldWakeUpParms->sli1_prog_id);
+		}
+
+		if (bcmp(&OldWakeUpParms->sli2_prog_id,
+		    &NewWakeUpParms->sli2_prog_id, sizeof (PROG_ID))) {
+
+			wptr = (uint32_t *)&OldWakeUpParms->sli2_prog_id;
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_msg,
+			    "OLD: sli2_prog_id: 0x%08x 0x%08x  Removing.",
+			    wptr[0], wptr[1]);
+
+			(void) emlxs_delete_load_entry(hba,
+			    &OldWakeUpParms->sli2_prog_id);
+		}
+
+		if (bcmp(&OldWakeUpParms->sli3_prog_id,
+		    &NewWakeUpParms->sli3_prog_id, sizeof (PROG_ID))) {
+
+			wptr = (uint32_t *)&OldWakeUpParms->sli3_prog_id;
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_msg,
+			    "OLD: sli3_prog_id: 0x%08x 0x%08x  Removing.",
+			    wptr[0], wptr[1]);
+
+			(void) emlxs_delete_load_entry(hba,
+			    &OldWakeUpParms->sli3_prog_id);
+		}
+
+		if (bcmp(&OldWakeUpParms->sli4_prog_id,
+		    &NewWakeUpParms->sli4_prog_id, sizeof (PROG_ID))) {
+
+			wptr = (uint32_t *)&OldWakeUpParms->sli4_prog_id;
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_msg,
+			    "OLD: sli4_prog_id: 0x%08x 0x%08x  Removing.",
+			    wptr[0], wptr[1]);
+
+			(void) emlxs_delete_load_entry(hba,
+			    &OldWakeUpParms->sli4_prog_id);
+		}
+
+		return (0);
+	}
+
+	/* Otherwise use the current load list */
+	count = emlxs_get_load_list(hba, load_list);
+
+	if (!count) {
+		return (1);
+	}
+
+	/* Init the wakeup list */
+	wptr = (uint32_t *)&NewWakeUpParms->prog_id;
+	if (*wptr) {
+		wakeup_list[k++] = &NewWakeUpParms->prog_id;
+	}
+
+	wptr = (uint32_t *)&NewWakeUpParms->u0.boot_bios_id;
+	if (*wptr) {
+		wakeup_list[k++] = &NewWakeUpParms->u0.boot_bios_id;
+	}
+
+	wptr = (uint32_t *)&NewWakeUpParms->sli1_prog_id;
+	if (*wptr) {
+		wakeup_list[k++] = &NewWakeUpParms->sli1_prog_id;
+	}
+
+	wptr = (uint32_t *)&NewWakeUpParms->sli2_prog_id;
+	if (*wptr) {
+		wakeup_list[k++] = &NewWakeUpParms->sli2_prog_id;
+	}
+
+	wptr = (uint32_t *)&NewWakeUpParms->sli3_prog_id;
+	if (*wptr) {
+		wakeup_list[k++] = &NewWakeUpParms->sli3_prog_id;
+	}
+
+	wptr = (uint32_t *)&NewWakeUpParms->sli4_prog_id;
+	if (*wptr) {
+		wakeup_list[k++] = &NewWakeUpParms->sli4_prog_id;
+	}
+
+	if (k == 0) {
+		return (0);
+	}
+
+	/* Match load list to wakeup list */
+	for (i = 0; i < count; i++) {
+
+		wptr = (uint32_t *)&load_list[i];
+
+		for (j = 0; j < k; j++) {
+			if (bcmp((uint8_t *)wakeup_list[j],
+			    (uint8_t *)&load_list[i], sizeof (PROG_ID)) == 0) {
+				break;
+			}
+		}
+
+		/* No match */
+		if (j == k) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_msg,
+			    "Load List[%d]: %08x %08x  Removing.",
+			    i, wptr[0], wptr[1]);
+
+			(void) emlxs_delete_load_entry(hba, &load_list[i]);
+		} else {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_msg,
+			    "Load List[%d]: %08x %08x  Preserving.",
+			    i, wptr[0], wptr[1]);
+		}
+	}
+
+	return (0);
+
+} /* emlxs_clean_flash() */
+
+
 /* ARGSUSED */
 static uint32_t
 emlxs_start_rel_download(emlxs_hba_t *hba,
     PIMAGE_HDR ImageHdr,
     caddr_t Buffer,
     PWAKE_UP_PARMS WakeUpParms,
-    uint32_t MaxRbusSramSize, uint32_t MaxIbusSramSize)
+    uint32_t dwc_flag)
 {
 	emlxs_port_t *port = &PPORT;
 	MAILBOXQ *mbox;
@@ -2164,21 +2659,23 @@ emlxs_start_rel_download(emlxs_hba_t *hba,
 	uint32_t *Src;
 	uint32_t *Dst;
 	caddr_t DataBuffer = NULL;
-	uint32_t rval = 1;
-	uint32_t DlByteCount = ImageHdr->BlockSize;
+	uint32_t rval = 0;
+	uint32_t DlByteCount;
 	uint32_t SegSize = DL_SLIM_SEG_BYTE_COUNT;
 	uint32_t DlCount;
 	uint32_t i;
+	uint32_t *wptr;
 
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg,
-	    "Performing relative download...");
+	wptr = (uint32_t *)&ImageHdr->Id;
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_detail_msg,
+	    "Relative download: %08x %08x", wptr[0], wptr[1]);
 
 	if ((DataBuffer = (caddr_t)kmem_zalloc(DL_SLIM_SEG_BYTE_COUNT,
 	    KM_NOSLEEP)) == NULL) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_failed_msg,
 		    "Unable to allocate data buffer.");
 
-		return (rval);
+		return (1);
 	}
 
 	if ((mbox = (MAILBOXQ *)kmem_zalloc(sizeof (MAILBOXQ),
@@ -2188,60 +2685,31 @@ emlxs_start_rel_download(emlxs_hba_t *hba,
 
 		kmem_free(DataBuffer, DL_SLIM_SEG_BYTE_COUNT);
 
-		return (rval);
-	}
-
-	if (ImageHdr->Id.Type == FUNC_FIRMWARE) {
-		switch (MaxRbusSramSize) {
-		case REDUCED_RBUS_SRAM_CFG:
-			if (ImageHdr->Id.Id != REDUCED_SRAM_CFG_PROG_ID) {
-				EMLXS_MSGF(EMLXS_CONTEXT,
-				    &emlxs_image_bad_msg,
-				    "Invalid header id.");
-
-				return (1);
-			}
-			break;
-		case FULL_RBUS_SRAM_CFG:
-			if (ImageHdr->Id.Id != FULL_SRAM_CFG_PROG_ID) {
-				EMLXS_MSGF(EMLXS_CONTEXT,
-				    &emlxs_image_bad_msg,
-				    "Invalid header id.");
-
-				return (1);
-			}
-			break;
-		default:
-			if (ImageHdr->Id.Id != OTHER_SRAM_CFG_PROG_ID) {
-				EMLXS_MSGF(EMLXS_CONTEXT,
-				    &emlxs_image_bad_msg,
-				    "Invalid header id.");
-
-				return (1);
-			}
-			break;
-		}
+		return (1);
 	}
 
 	mb = (MAILBOX *)mbox;
 
+	DlByteCount = ImageHdr->BlockSize;
+
 	emlxs_format_prog_flash(mbox, 0, DlByteCount, ERASE_FLASH, 0, 0, 0,
-	    &ImageHdr->Id);
+	    &ImageHdr->Id, 0);
 
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg, "Erasing flash...");
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_detail_msg,
+	    "  Erasing flash...");
 
-	if (EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbox, MBX_WAIT, 0) != MBX_SUCCESS) {
+	rval = EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbox, MBX_WAIT, 0);
+
+	if (rval) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_failed_msg,
 		    "Unable to erase flash. Mailbox cmd=%x status=%x",
 		    mb->mbxCommand, mb->mbxStatus);
 
-		rval = 1;
-
 		goto EXIT_REL_DOWNLOAD;
 	}
 
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg,
-	    "Programming flash...");
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_detail_msg,
+	    "  Programming flash...");
 
 	while (DlByteCount) {
 		if (DlByteCount > SegSize) {
@@ -2269,15 +2737,15 @@ emlxs_start_rel_download(emlxs_hba_t *hba,
 		    0,
 		    DlCount,
 		    PROGRAM_FLASH,
-		    (DlByteCount) ? 0 : 1, 0, DlCount, &ImageHdr->Id);
+		    (DlByteCount) ? 0 : 1,
+		    0, DlCount, &ImageHdr->Id, dwc_flag);
 
-		if (EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbox, MBX_WAIT, 0) !=
-		    MBX_SUCCESS) {
+		rval = EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbox, MBX_WAIT, 0);
+
+		if (rval) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_failed_msg,
 			    "Unable to program flash. Mailbox cmd=%x status=%x",
 			    mb->mbxCommand, mb->mbxStatus);
-
-			rval = 1;
 
 			goto EXIT_REL_DOWNLOAD;
 		}
@@ -2297,57 +2765,73 @@ emlxs_start_rel_download(emlxs_hba_t *hba,
 	}
 #endif  /* FMA_SUPPORT */
 
+	/* Update wakeup parameters */
 	switch (ImageHdr->Id.Type) {
 	case TEST_PROGRAM:
-		rval = 0;
 		break;
 
 	case FUNC_FIRMWARE:
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg,
-		    "FF: Updating parms...");
-		rval =
-		    emlxs_update_ff_wakeup_parms(hba, WakeUpParms,
-		    &ImageHdr->Id);
+		if (!dwc_flag) {
+			rval = emlxs_update_ff_wakeup_parms(hba, WakeUpParms,
+			    &ImageHdr->Id);
+		} else {
+			WakeUpParms->prog_id = ImageHdr->Id;
+		}
 		break;
 
 	case BOOT_BIOS:
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg,
-		    "BOOT: Updating parms...");
-		rval =
-		    emlxs_update_boot_wakeup_parms(hba, WakeUpParms,
-		    &ImageHdr->Id, 1);
+		if (!dwc_flag) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg,
+			    "BOOT: Updating parms...");
+
+			rval = emlxs_update_boot_wakeup_parms(hba, WakeUpParms,
+			    &ImageHdr->Id, 1);
+		} else {
+			if (hba->wakeup_parms.u0.boot_bios_wd[0]) {
+				WakeUpParms->u0.boot_bios_id = ImageHdr->Id;
+			}
+
+			if (!(hba->model_info.chip &
+			    (EMLXS_DRAGONFLY_CHIP | EMLXS_CENTAUR_CHIP))) {
+				WakeUpParms->u1.EROM_prog_id = ImageHdr->Id;
+			}
+		}
 		break;
 
 	case SLI1_OVERLAY:
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg,
-		    "SLI1: Updating parms...");
-		rval =
-		    emlxs_update_sli1_wakeup_parms(hba, WakeUpParms,
-		    &ImageHdr->Id);
+		if (!dwc_flag) {
+			rval = emlxs_update_sli1_wakeup_parms(hba, WakeUpParms,
+			    &ImageHdr->Id);
+		} else {
+			WakeUpParms->sli1_prog_id = ImageHdr->Id;
+		}
 		break;
 
 	case SLI2_OVERLAY:
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg,
-		    "SLI2: Updating parms...");
-		rval =
-		    emlxs_update_sli2_wakeup_parms(hba, WakeUpParms,
-		    &ImageHdr->Id);
+		if (!dwc_flag) {
+			rval = emlxs_update_sli2_wakeup_parms(hba, WakeUpParms,
+			    &ImageHdr->Id);
+		} else {
+			WakeUpParms->sli2_prog_id = ImageHdr->Id;
+		}
 		break;
 
 	case SLI3_OVERLAY:
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg,
-		    "SLI3: Updating parms...");
-		rval =
-		    emlxs_update_sli3_wakeup_parms(hba, WakeUpParms,
-		    &ImageHdr->Id);
+		if (!dwc_flag) {
+			rval = emlxs_update_sli3_wakeup_parms(hba, WakeUpParms,
+			    &ImageHdr->Id);
+		} else {
+			WakeUpParms->sli3_prog_id = ImageHdr->Id;
+		}
 		break;
 
 	case SLI4_OVERLAY:
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg,
-		    "SLI4: Updating parms...");
-		rval =
-		    emlxs_update_sli4_wakeup_parms(hba, WakeUpParms,
-		    &ImageHdr->Id);
+		if (!dwc_flag) {
+			rval = emlxs_update_sli4_wakeup_parms(hba, WakeUpParms,
+			    &ImageHdr->Id);
+		} else {
+			WakeUpParms->sli4_prog_id = ImageHdr->Id;
+		}
 		break;
 
 	default:
@@ -2369,6 +2853,77 @@ EXIT_REL_DOWNLOAD:
 	return (rval);
 
 } /* emlxs_start_rel_download() */
+
+
+static uint32_t
+emlxs_proc_rel_2mb(emlxs_hba_t *hba, caddr_t buffer, emlxs_fw_image_t *fw_image)
+{
+	emlxs_port_t *port = &PPORT;
+	uint32_t rval = 0;
+	WAKE_UP_PARMS RelWakeUpParms;
+	WAKE_UP_PARMS WakeUpParms;
+	uint32_t i;
+	IMAGE_HDR ImageHdr;
+	caddr_t bptr;
+	uint32_t flash_cleaned = 0;
+
+	if (emlxs_read_wakeup_parms(hba, &WakeUpParms, 0)) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_failed_msg,
+		    "Unable to get wakeup parameters.");
+
+		return (EMLXS_IMAGE_FAILED);
+	}
+
+download:
+
+	bcopy(&WakeUpParms, &RelWakeUpParms, sizeof (WAKE_UP_PARMS));
+
+	for (i = 0; i < MAX_PROG_TYPES; i++) {
+		if (!fw_image->prog[i].version) {
+			continue;
+		}
+
+		bptr = buffer + fw_image->prog[i].offset;
+
+		bcopy(bptr, &ImageHdr, sizeof (IMAGE_HDR));
+
+		rval = emlxs_start_rel_download(hba, &ImageHdr, bptr,
+		    &RelWakeUpParms, 1);
+
+		if (rval) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_download_failed_msg,
+			    "Failed to program flash.");
+
+			if ((rval == NO_FLASH_MEM_AVAIL) && !flash_cleaned) {
+				/* Cleanup using current load list */
+				(void) emlxs_clean_flash(hba, 0, &WakeUpParms);
+
+				flash_cleaned = 1;
+				goto download;
+			}
+
+			return (EMLXS_IMAGE_FAILED);
+		}
+	}
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_detail_msg,
+	    "Updating wakeup parameters.");
+
+	if (emlxs_update_wakeup_parms(hba, &RelWakeUpParms,
+	    &RelWakeUpParms)) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_failed_msg,
+		    "Unable to update parameters.");
+
+		return (EMLXS_IMAGE_FAILED);
+	}
+
+	/* Cleanup using old wakeup paramters */
+	(void) emlxs_clean_flash(hba, &WakeUpParms, &RelWakeUpParms);
+
+	return (0);
+
+} /* emlxs_proc_rel_2mb() */
 
 
 #define	FLASH_POLLING_BIT	0x80
@@ -2639,6 +3194,46 @@ emlxs_erase_fcode_flash(emlxs_hba_t *hba)
 } /* emlxs_erase_fcode_flash() */
 
 
+static uint32_t
+emlxs_delete_load_entry(emlxs_hba_t *hba, PROG_ID *progId)
+{
+	emlxs_port_t *port = &PPORT;
+	MAILBOXQ *mbox = NULL;
+	MAILBOX *mb;
+	uint32_t rval = 0;
+
+	if ((mbox = (MAILBOXQ *)kmem_zalloc(sizeof (MAILBOXQ),
+	    KM_NOSLEEP)) == NULL) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_msg,
+		    "Unable to allocate mailbox buffer.");
+
+		return (1);
+	}
+
+	mb = (MAILBOX *)mbox;
+	mb->mbxCommand = MBX_DEL_LD_ENTRY;
+	mb->un.varDelLdEntry.list_req = FLASH_LOAD_LIST;
+	mb->un.varDelLdEntry.prog_id = *progId;
+
+	if (EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbox, MBX_WAIT, 0) != MBX_SUCCESS) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_msg,
+		    "Unable to delete load entry: Mailbox cmd=%x status=%x",
+		    mb->mbxCommand, mb->mbxStatus);
+
+		rval = 1;
+	}
+
+done:
+
+	if (mbox) {
+		kmem_free(mbox, sizeof (MAILBOXQ));
+	}
+
+	return (rval);
+
+} /* emlxs_delete_load_entry() */
+
+
 extern uint32_t
 emlxs_get_load_list(emlxs_hba_t *hba, PROG_ID *load_list)
 {
@@ -2646,7 +3241,7 @@ emlxs_get_load_list(emlxs_hba_t *hba, PROG_ID *load_list)
 	LOAD_ENTRY *LoadEntry;
 	LOAD_LIST *LoadList = NULL;
 	uint32_t i;
-	uint32_t rval = 0;
+	uint32_t count = 0;
 
 	bzero(load_list, (sizeof (PROG_ID) * MAX_LOAD_ENTRY));
 
@@ -2655,12 +3250,10 @@ emlxs_get_load_list(emlxs_hba_t *hba, PROG_ID *load_list)
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_msg,
 		    "Unable to allocate LOADLIST buffer.");
 
-		rval = 1;
 		goto done;
 	}
 
 	if (emlxs_read_load_list(hba, LoadList)) {
-		rval = 1;
 		goto done;
 	}
 
@@ -2668,10 +3261,11 @@ emlxs_get_load_list(emlxs_hba_t *hba, PROG_ID *load_list)
 		LoadEntry = &LoadList->load_entry[i];
 		if ((LoadEntry->un.wd[0] != 0) &&
 		    (LoadEntry->un.wd[0] != 0xffffffff)) {
-			load_list[i] = LoadEntry->un.id;
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_debug_msg,
-			    "Load List[%d]: %08x %08x", i,
+			    "Load List[%d]: %08x %08x", count,
 			    LoadEntry->un.wd[0], LoadEntry->un.wd[1]);
+
+			load_list[count++] = LoadEntry->un.id;
 		}
 	}
 
@@ -2681,7 +3275,7 @@ done:
 		kmem_free(LoadList, sizeof (LOAD_LIST));
 	}
 
-	return (rval);
+	return (count);
 
 } /* emlxs_get_load_list() */
 
@@ -2920,74 +3514,12 @@ done:
 } /* emlxs_read_load_list() */
 
 
-static uint32_t
-emlxs_get_abs_image_type(caddr_t Buffer, uint32_t BufferSize)
-{
-	uint32_t Version;
-
-	if (BufferSize < (SLI_VERSION_LOC + 4))
-		return (0xffffffff);
-
-	Buffer += SLI_VERSION_LOC;
-	Version = *((uint32_t *)Buffer);
-
-	return (Version);
-
-} /* emlxs_get_abs_image_type() */
-
-
-static uint32_t
-emlxs_get_dwc_image_type(emlxs_hba_t *hba, caddr_t Buffer,
-    uint32_t BufferSize, PAIF_HDR AifHeader)
-{
-	emlxs_port_t *port = &PPORT;
-	IMAGE_HDR ImageHdr;
-	uint32_t NextImage;
-	uint32_t i;
-	uint8_t *Sptr;
-	uint8_t *Dptr;
-	uint32_t HwId = 0xffffffff;
-
-	NextImage = SLI_IMAGE_START - AifHeader->ImageBase;
-
-	while (BufferSize > NextImage) {
-		Sptr = (uint8_t *)&Buffer[NextImage];
-		Dptr = (uint8_t *)&ImageHdr;
-		for (i = 0; i < sizeof (IMAGE_HDR); i++) {
-			Dptr[i] = Sptr[i];
-		}
-
-		if (ImageHdr.BlockSize == 0xffffffff)
-			break;
-
-		switch (ImageHdr.Id.Type) {
-		case 6:
-		case 7:
-			if (HwId == 0xffffffff) {
-				HwId = ImageHdr.Id.Id;
-			}
-
-			if (HwId != ImageHdr.Id.Id) {
-				EMLXS_MSGF(EMLXS_CONTEXT,
-				    &emlxs_image_bad_msg,
-				    "Invalid hardware id. %x %x", HwId,
-				    ImageHdr.Id.Id);
-			}
-			break;
-		}
-
-		NextImage += ImageHdr.BlockSize;
-	}
-
-	return (HwId);
-
-} /* emlxs_get_dwc_image_type() */
 
 
 static int
 emlxs_build_parms(caddr_t Buffer,
     PWAKE_UP_PARMS AbsWakeUpParms,
-    uint32_t BufferSize, PAIF_HDR AifHeader, int32_t DwcFile)
+    uint32_t BufferSize, PAIF_HDR AifHeader)
 {
 	IMAGE_HDR ImageHdr;
 	uint32_t NextImage;
@@ -2998,7 +3530,8 @@ emlxs_build_parms(caddr_t Buffer,
 
 	bzero((caddr_t)AbsWakeUpParms, sizeof (WAKE_UP_PARMS));
 
-	if (!DwcFile && ((AifHeader->RoSize + AifHeader->RwSize) <= 0x20000)) {
+	if ((AifHeader->ImageBase != 0x20000) &&
+	    ((AifHeader->RoSize + AifHeader->RwSize) <= 0x20000)) {
 		return (FALSE);
 	}
 
@@ -3257,6 +3790,164 @@ emlxs_validate_version(emlxs_hba_t *hba, emlxs_fw_file_t *file, uint32_t id,
 } /* emlxs_validate_version() */
 
 
+static void
+emlxs_verify_image(emlxs_hba_t *hba, emlxs_fw_image_t *fw_image)
+{
+	emlxs_port_t *port = &PPORT;
+	emlxs_vpd_t *vpd = &VPD;
+	uint32_t i;
+	uint32_t count;
+
+	/* Check for AWC file */
+	if (fw_image->awc.version) {
+		if (fw_image->awc.version == vpd->postKernRev) {
+			fw_image->awc.version = 0;
+		}
+
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg,
+		    "AWC file: KERN: old=%s  new=%s  %s.",
+		    vpd->postKernName,
+		    fw_image->awc.label,
+		    (fw_image->awc.version)? "Update":"Skip");
+	}
+
+	/* Check for BWC file */
+	if (fw_image->bwc.version) {
+		if (strcmp(vpd->fcode_version, fw_image->bwc.label) == 0) {
+			fw_image->bwc.version = 0;
+		}
+
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg,
+		    "BWC file: BOOT: old=%s  new=%s  %s.",
+		    vpd->fcode_version,
+		    fw_image->bwc.label,
+		    (fw_image->bwc.version)? "Update":"Skip");
+	}
+
+	/* Check for DWC file */
+	if (fw_image->dwc.version) {
+		/* Check for program files */
+		count = 0;
+		for (i = 0; i < MAX_PROG_TYPES; i++) {
+			if (!fw_image->prog[i].version) {
+				continue;
+			}
+
+			/* Skip components that don't need updating */
+			switch (i) {
+			case TEST_PROGRAM:
+				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg,
+				    "DWC file: TEST:             new=%s  "
+				    "Update.",
+				    fw_image->prog[i].label);
+				break;
+
+			case BOOT_BIOS:
+				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg,
+				    "DWC file: BOOT:             new=%s  "
+				    "Update.",
+				    fw_image->prog[i].label);
+				break;
+
+			case FUNC_FIRMWARE:
+				if (vpd->opFwRev &&
+				    (fw_image->prog[i].version ==
+				    vpd->opFwRev)) {
+					fw_image->prog[i].version = 0;
+				}
+
+				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg,
+				    "DWC file: STUB: old=%s  new=%s  %s.",
+				    vpd->opFwName,
+				    fw_image->prog[i].label,
+				    (fw_image->prog[i].version)?
+				    "Update":"Skip");
+				break;
+
+			case SLI1_OVERLAY:
+				if (vpd->sli1FwRev &&
+				    (fw_image->prog[i].version ==
+				    vpd->sli1FwRev)) {
+					fw_image->prog[i].version = 0;
+				}
+
+				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg,
+				    "DWC file: SLI1: old=%s  new=%s  %s.",
+				    vpd->sli1FwName,
+				    fw_image->prog[i].label,
+				    (fw_image->prog[i].version)?
+				    "Update":"Skip");
+				break;
+
+			case SLI2_OVERLAY:
+				if (vpd->sli2FwRev &&
+				    (fw_image->prog[i].version ==
+				    vpd->sli2FwRev)) {
+					fw_image->prog[i].version = 0;
+				}
+
+				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg,
+				    "DWC file: SLI2: old=%s  new=%s  %s.",
+				    vpd->sli2FwName,
+				    fw_image->prog[i].label,
+				    (fw_image->prog[i].version)?
+				    "Update":"Skip");
+				break;
+
+			case SLI3_OVERLAY:
+				if (vpd->sli3FwRev &&
+				    (fw_image->prog[i].version ==
+				    vpd->sli3FwRev)) {
+					fw_image->prog[i].version = 0;
+				}
+
+				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg,
+				    "DWC file: SLI3: old=%s  new=%s  %s.",
+				    vpd->sli3FwName,
+				    fw_image->prog[i].label,
+				    (fw_image->prog[i].version)?
+				    "Update":"Skip");
+				break;
+
+			case SLI4_OVERLAY:
+				if (vpd->sli4FwRev &&
+				    (fw_image->prog[i].version ==
+				    vpd->sli4FwRev)) {
+					fw_image->prog[i].version = 0;
+				}
+
+				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg,
+				    "DWC file: SLI4: old=%s  new=%s  %s.",
+				    vpd->sli4FwRev,
+				    fw_image->prog[i].label,
+				    (fw_image->prog[i].version)?
+				    "Update":"Skip");
+				break;
+
+			default:
+				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg,
+				    "DWC file: type=%x version=%x label=%s  "
+				    "Update.",
+				    i,
+				    fw_image->prog[i].version,
+				    fw_image->prog[i].label);
+			}
+
+			if (fw_image->prog[i].version) {
+				count++;
+			}
+		}
+
+		if (!count) {
+			fw_image->dwc.version = 0;
+		}
+	}
+
+	return;
+
+} /* emlxs_verify_image() */
+
+
 static uint32_t
 emlxs_validate_image(emlxs_hba_t *hba, caddr_t Buffer, uint32_t Size,
     emlxs_fw_image_t *image)
@@ -3266,6 +3957,7 @@ emlxs_validate_image(emlxs_hba_t *hba, caddr_t Buffer, uint32_t Size,
 	AIF_HDR AifHdr;
 	IMAGE_HDR ImageHdr;
 	uint32_t NextImage;
+	uint32_t count;
 	uint32_t FileType;
 	uint32_t FileLen = 0;
 	uint32_t TotalLen = 0;
@@ -3379,6 +4071,7 @@ emlxs_validate_image(emlxs_hba_t *hba, caddr_t Buffer, uint32_t Size,
 				NextImage = sizeof (AIF_HDR) + 4;
 				BufferSize = AifHdr.RoSize + AifHdr.RwSize;
 
+				count = 0;
 				while (BufferSize > NextImage) {
 					bcopy(&bptr[NextImage], &ImageHdr,
 					    sizeof (IMAGE_HDR));
@@ -3416,9 +4109,18 @@ emlxs_validate_image(emlxs_hba_t *hba, caddr_t Buffer, uint32_t Size,
 						return (rval);
 					}
 
+					count++;
 					NextImage += ImageHdr.BlockSize;
 
 				}	/* while () */
+
+				if (count == 0) {
+					EMLXS_MSGF(EMLXS_CONTEXT,
+					    &emlxs_image_bad_msg,
+					    "DWC file has no PRG images.");
+
+					return (EMLXS_IMAGE_BAD);
+				}
 
 				break;
 			}
@@ -3520,7 +4222,9 @@ emlxs_validate_image(emlxs_hba_t *hba, caddr_t Buffer, uint32_t Size,
 
 			NextImage += ImageHdr.BlockSize;
 		}
-	} else {
+
+	} else { /* PRG File */
+
 		/* Precheck image size */
 		if (Size < sizeof (IMAGE_HDR)) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_image_bad_msg,
@@ -3570,8 +4274,10 @@ emlxs_validate_image(emlxs_hba_t *hba, caddr_t Buffer, uint32_t Size,
 
 		/* Acquire the versions */
 		image->prog[type].version =
-		    (ImageHdr.Id.Type << 24) | (ImageHdr.Id.
-		    Id << 16) | (ImageHdr.Id.Ver << 8) | ImageHdr.Id.Rev;
+		    (ImageHdr.Id.Type << 24) |
+		    (ImageHdr.Id.Id << 16) |
+		    (ImageHdr.Id.Ver << 8) |
+		    ImageHdr.Id.Rev;
 
 		image->prog[type].revcomp = ImageHdr.Id.un.revcomp;
 
@@ -3584,23 +4290,19 @@ emlxs_validate_image(emlxs_hba_t *hba, caddr_t Buffer, uint32_t Size,
 
 	/*
 	 * This checks if a DragonFly (pre-V2 ASIC) SLI2
-	 * image file is greater than version 3.8
+	 * image file is < version 3.8
 	 */
 	if (FC_JEDEC_ID(vpd->biuRev) == DRAGONFLY_JEDEC_ID) {
-		if (image->prog[SLI2_OVERLAY].version != 0) {
-			ver = (image->prog[SLI2_OVERLAY].version &
-			    0x0000ff00) >> 8;
+		ver = (image->prog[SLI2_OVERLAY].version &
+		    0x0000ff00) >> 8;
 
-			if ((((ver & 0xf0) == 0x30) &&
-			    ((ver & 0x0f) >= 0x08)) ||
-			    ((ver & 0xf0) > 0x30)) {
-				EMLXS_MSGF(EMLXS_CONTEXT,
-				    &emlxs_image_incompat_msg,
-				    "ASIC Check: Image requires DragonFly "
-				    "V2 ASIC");
+		if (ver >= 0x38) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_image_incompat_msg,
+			    "ASIC Check: Image requires DragonFly "
+			    "V2 ASIC");
 
-				return (EMLXS_IMAGE_INCOMPATIBLE);
-			}
+			return (EMLXS_IMAGE_INCOMPATIBLE);
 		}
 	}
 
@@ -3752,63 +4454,14 @@ emlxs_start_abs_download_2mb(emlxs_hba_t *hba, caddr_t buffer, uint32_t len,
     uint32_t offline, emlxs_fw_image_t *fw_image)
 {
 	emlxs_port_t *port = &PPORT;
-	caddr_t AwcBuffer = NULL;
-	caddr_t BwcBuffer = NULL;
-	caddr_t DwcBuffer = NULL;
-	AIF_HDR *AwcAifHdr;
-	AIF_HDR *BwcAifHdr;
-	AIF_HDR *DwcAifHdr;
-	uint32_t BWCflag;
-	emlxs_vpd_t *vpd;
-	uint32_t i;
-	uint32_t count;
-	uint32_t extType = 0;
 	uint32_t rval = 0;
 
-	vpd = &VPD;
-
-	/* Check for AWC file */
-	if (fw_image->awc.version) {
-		AwcBuffer = buffer + fw_image->awc.offset;
-		AwcAifHdr = (AIF_HDR *)AwcBuffer;
-	}
-
-	/* Check for BWC file */
-	if (fw_image->bwc.version) {
-		extType = BWCext;
-		BwcBuffer = buffer + fw_image->bwc.offset;
-		BwcAifHdr = (AIF_HDR *)BwcBuffer;
-	}
-
-	/* Check for DWC file */
-	if (fw_image->dwc.version) {
-		extType = DWCext;
-		DwcBuffer = buffer + fw_image->dwc.offset;
-		DwcAifHdr = (AIF_HDR *)DwcBuffer;
-	}
-
-	/* Check for program files */
-	count = 0;
-	for (i = 0; i < MAX_PROG_TYPES; i++) {
-		if (fw_image->prog[i].version) {
-			count++;
-		}
-	}
-
-	if (count > 1) {
-		extType = ALLext;
-
-		if (fw_image->bwc.version) {
-			BWCflag = ALL_WITH_BWC;
-		} else {
-			BWCflag = ALL_WITHOUT_BWC;
-		}
-	} else {
-		BWCflag = NO_ALL;
-	}
-
 	/* If nothing to download then quit now */
-	if (!AwcBuffer && !DwcBuffer && !BwcBuffer) {
+	if (!fw_image->awc.version &&
+	    !fw_image->dwc.version &&
+	    !fw_image->bwc.version) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg,
+		    "Nothing new to update.  Exiting.");
 		return (0);
 	}
 
@@ -3825,65 +4478,33 @@ emlxs_start_abs_download_2mb(emlxs_hba_t *hba, caddr_t buffer, uint32_t len,
 		}
 	}
 
-	if (AwcBuffer) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg,
-		    "AWC file: KERN: old=%s  new=%s ", vpd->postKernName,
-		    fw_image->awc.label);
-
+	if (fw_image->awc.version) {
 		rval = emlxs_proc_abs_2mb(hba,
-		    AwcAifHdr, AwcBuffer, FILE_TYPE_AWC, BWCflag, extType);
+		    (buffer + fw_image->awc.offset),
+		    FILE_TYPE_AWC, 0);
 
 		if (rval) {
 			goto SLI_DOWNLOAD_2MB_EXIT;
 		}
 	}
 
-	if (DwcBuffer) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg,
-		    "DWC file: TEST:             new=%s ",
-		    fw_image->prog[TEST_PROGRAM].label);
-
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg,
-		    "DWC file: STUB: old=%s  new=%s ", vpd->opFwName,
-		    fw_image->prog[FUNC_FIRMWARE].label);
-
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg,
-		    "DWC file: SLI1: old=%s  new=%s ", vpd->sli1FwName,
-		    fw_image->prog[SLI1_OVERLAY].label);
-
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg,
-		    "DWC file: SLI2: old=%s  new=%s ", vpd->sli2FwName,
-		    fw_image->prog[SLI2_OVERLAY].label);
-
-		if (vpd->sli3FwRev || fw_image->prog[SLI3_OVERLAY].version) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg,
-			    "DWC file: SLI3: old=%s  new=%s ",
-			    vpd->sli3FwName,
-			    fw_image->prog[SLI3_OVERLAY].label);
-		}
-
-		if (vpd->sli4FwRev || fw_image->prog[SLI4_OVERLAY].version) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg,
-			    "DWC file: SLI4: old=%s  new=%s ",
-			    vpd->sli4FwName,
-			    fw_image->prog[SLI4_OVERLAY].label);
-		}
-
+	if (fw_image->bwc.version) {
 		rval = emlxs_proc_abs_2mb(hba,
-		    DwcAifHdr, DwcBuffer, FILE_TYPE_DWC, BWCflag, extType);
+		    (buffer + fw_image->bwc.offset),
+		    FILE_TYPE_BWC,
+		    (fw_image->dwc.version)? ALLext:BWCext);
 
 		if (rval) {
 			goto SLI_DOWNLOAD_2MB_EXIT;
 		}
 	}
 
-	if (BwcBuffer) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_msg,
-		    "BWC file: BOOT: old=%s  new=%s ", vpd->fcode_version,
-		    fw_image->bwc.label);
+	if (fw_image->dwc.version) {
+		rval = emlxs_proc_rel_2mb(hba, buffer, fw_image);
 
-		rval = emlxs_proc_abs_2mb(hba,
-		    BwcAifHdr, BwcBuffer, FILE_TYPE_BWC, BWCflag, extType);
+		if (rval) {
+			goto SLI_DOWNLOAD_2MB_EXIT;
+		}
 	}
 
 SLI_DOWNLOAD_2MB_EXIT:
@@ -3912,22 +4533,21 @@ SLI_DOWNLOAD_2MB_EXIT:
  *
  */
 static uint32_t
-emlxs_proc_abs_2mb(emlxs_hba_t *hba,
-    PAIF_HDR AifHdr,
-    caddr_t EntireBuffer,
-    uint32_t FileType, uint32_t BWCflag, uint32_t extType)
+emlxs_proc_abs_2mb(emlxs_hba_t *hba, caddr_t EntireBuffer,
+    uint32_t FileType, uint32_t extType)
 {
 	emlxs_port_t *port = &PPORT;
+	PAIF_HDR AifHdr;
 	caddr_t Buffer = NULL;
 	caddr_t DataBuffer = NULL;
 	uint32_t *Src;
 	uint32_t *Dst;
 	MAILBOXQ *mbox;
 	MAILBOX *mb;
-	uint32_t DlByteCount = AifHdr->RoSize + AifHdr->RwSize;
+	uint32_t DlByteCount;
 	uint32_t rval = 0;
 	uint32_t SegSize = DL_SLIM_SEG_BYTE_COUNT;
-	uint32_t DlToAddr = AifHdr->ImageBase;
+	uint32_t DlToAddr;
 	uint32_t DlCount;
 	WAKE_UP_PARMS AbsWakeUpParms;
 	uint32_t i;
@@ -3935,9 +4555,11 @@ emlxs_proc_abs_2mb(emlxs_hba_t *hba,
 	uint32_t EraseByteCount;
 	uint32_t AreaId;
 	uint32_t RspProgress = 0;
-	uint32_t numBootImage = 0;
-	uint32_t ParamsChg = 0;
-	uint32_t BufferSize;
+	uint32_t ParamsChg;
+
+	AifHdr = (PAIF_HDR)EntireBuffer;
+	DlByteCount = AifHdr->RoSize + AifHdr->RwSize;
+	DlToAddr = AifHdr->ImageBase;
 
 	if ((DataBuffer = (caddr_t)kmem_zalloc(DL_SLIM_SEG_BYTE_COUNT,
 	    KM_NOSLEEP)) == NULL) {
@@ -3946,8 +4568,6 @@ emlxs_proc_abs_2mb(emlxs_hba_t *hba,
 
 		return (EMLXS_IMAGE_FAILED);
 	}
-
-	bzero(DataBuffer, sizeof (DL_SLIM_SEG_BYTE_COUNT));
 
 	if ((mbox = (MAILBOXQ *)kmem_zalloc(sizeof (MAILBOXQ),
 	    KM_NOSLEEP)) == NULL) {
@@ -3961,18 +4581,18 @@ emlxs_proc_abs_2mb(emlxs_hba_t *hba,
 
 	mb = (MAILBOX *)mbox;
 
-	BufferSize = DlByteCount + sizeof (AIF_HDR) + sizeof (uint32_t);
 	Buffer = EntireBuffer + sizeof (AIF_HDR);
 
 	switch (FileType) {
 	case FILE_TYPE_AWC:
+		ParamsChg = 0;
 		break;
 
 	case FILE_TYPE_BWC:
-		ParamsChg = emlxs_build_parms_2mb_bwc(hba,
+		rval = emlxs_build_parms_2mb_bwc(hba,
 		    AifHdr, extType, &AbsWakeUpParms);
 
-		if (ParamsChg == FALSE) {
+		if (rval == FALSE) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_failed_msg,
 			    "BWC build parms failed.");
 
@@ -3980,22 +4600,7 @@ emlxs_proc_abs_2mb(emlxs_hba_t *hba,
 
 			goto EXIT_ABS_DOWNLOAD;
 		}
-		break;
-
-	case FILE_TYPE_DWC:
-		ParamsChg = emlxs_build_parms_2mb_dwc(hba,
-		    Buffer,
-		    BufferSize,
-		    AifHdr, &AbsWakeUpParms, BWCflag, extType, &numBootImage);
-
-		if (ParamsChg == FALSE) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_failed_msg,
-			    "DWC build parms failed.");
-
-			rval = EMLXS_IMAGE_FAILED;
-
-			goto EXIT_ABS_DOWNLOAD;
-		}
+		ParamsChg = 1;
 		break;
 
 	default:
@@ -4005,7 +4610,6 @@ emlxs_proc_abs_2mb(emlxs_hba_t *hba,
 		rval = EMLXS_IMAGE_BAD;
 
 		goto EXIT_ABS_DOWNLOAD;
-
 	}
 
 	EraseByteCount = AifHdr->Area_Size;
@@ -4190,7 +4794,7 @@ emlxs_build_parms_2mb_bwc(emlxs_hba_t *hba,
 
 	/* Read wakeup paramters */
 	if (emlxs_read_wakeup_parms(hba, AbsWakeUpParms, 0) ==
-	    CFG_DATA_NO_REGION) {
+	    (uint32_t)CFG_DATA_NO_REGION) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_failed_msg,
 		    "Unable to get BWC parameters.");
 		return (FALSE);
@@ -4242,148 +4846,6 @@ emlxs_build_parms_2mb_bwc(emlxs_hba_t *hba,
 } /* emlxs_build_parms_2mb_bwc() */
 
 
-/* ARGSUSED */
-static uint32_t
-emlxs_build_parms_2mb_dwc(emlxs_hba_t *hba,
-    caddr_t Buffer,
-    uint32_t BufferSize,
-    PAIF_HDR AifHeader,
-    PWAKE_UP_PARMS AbsWakeUpParms,
-    uint32_t BWCflag, uint32_t extType, uint32_t *numBootImage)
-{
-	emlxs_port_t *port = &PPORT;
-	uint32_t NextImage;
-	uint32_t i;
-	IMAGE_HDR ImageHdr;
-	uint32_t *ptr1;
-	uint32_t *ptr2;
-	PROG_ID BootId[MAX_BOOTID];
-	uint32_t ChangeParams = FALSE;
-	WAKE_UP_PARMS WakeUpParms;
-	caddr_t Sptr;
-	caddr_t Dptr;
-
-	bzero(&BootId, (sizeof (PROG_ID)) * MAX_BOOTID);
-
-	/* Read wakeup paramters */
-	if (emlxs_read_wakeup_parms(hba, AbsWakeUpParms, 0) ==
-	    CFG_DATA_NO_REGION) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_download_failed_msg,
-		    "Unable to get DWC parameters.");
-		return (FALSE);
-	}
-
-	bcopy((caddr_t)AbsWakeUpParms, (caddr_t)&WakeUpParms,
-	    sizeof (WAKE_UP_PARMS));
-
-	if (((BWCflag == ALL_WITHOUT_BWC) || (extType == DWCext)) &&
-	    (WakeUpParms.u0.boot_bios_wd[0])) {
-		*numBootImage = 0;
-	}
-
-	/* incoming buffer is without aif header */
-	NextImage = 0x84 - sizeof (AIF_HDR);
-	BufferSize -= (sizeof (AIF_HDR) + sizeof (uint32_t));
-
-	while (BufferSize > NextImage) {
-		Sptr = &Buffer[NextImage];
-		Dptr = (caddr_t)&ImageHdr;
-		for (i = 0; i < sizeof (IMAGE_HDR); i++) {
-			Dptr[i] = Sptr[i];
-		}
-
-		if (ImageHdr.BlockSize == 0xffffffff) {
-			break;
-		}
-
-		switch (ImageHdr.Id.Type) {
-		case TEST_PROGRAM:
-			break;
-
-		case FUNC_FIRMWARE:
-			AbsWakeUpParms->prog_id = ImageHdr.Id;
-			ChangeParams = TRUE;
-			break;
-
-		case BOOT_BIOS:
-			if (!WakeUpParms.u0.boot_bios_wd[0]) {
-				if (extType == DWCext) {
-					break;
-				} else if (BWCflag == ALL_WITHOUT_BWC) {
-					/* for possible future changes */
-					break;
-				}
-			}
-			ChangeParams = TRUE;
-
-			if (*numBootImage < MAX_BOOTID) {
-				BootId[*numBootImage] = ImageHdr.Id;
-				(*numBootImage)++;
-			}
-			break;
-
-		case SLI1_OVERLAY:
-			AbsWakeUpParms->sli1_prog_id = ImageHdr.Id;
-			ChangeParams = TRUE;
-			break;
-
-		case SLI2_OVERLAY:
-			AbsWakeUpParms->sli2_prog_id = ImageHdr.Id;
-			ChangeParams = TRUE;
-			break;
-
-		case SLI3_OVERLAY:
-			AbsWakeUpParms->sli3_prog_id = ImageHdr.Id;
-			ChangeParams = TRUE;
-			break;
-
-		case SLI4_OVERLAY:
-			AbsWakeUpParms->sli4_prog_id = ImageHdr.Id;
-			ChangeParams = TRUE;
-			break;
-		}
-
-		NextImage += ImageHdr.BlockSize;
-	}
-
-	if ((ChangeParams) && ((BWCflag == ALL_WITHOUT_BWC) ||
-	    (extType == DWCext))) {
-
-		if (*numBootImage > 1) {
-			for (i = 0; i < *numBootImage; i++) {
-				ptr1 =
-				    (uint32_t *)&WakeUpParms.u0.
-				    boot_bios_id;
-				ptr2 = (uint32_t *)&BootId[i];
-
-				if (ptr1[0] == ptr2[0]) {
-					AbsWakeUpParms->u1.EROM_prog_id =
-					    BootId[i];
-					(void) emlxs_update_exp_rom(hba,
-					    AbsWakeUpParms);
-					break;
-				}
-			}
-		} else {
-			if (*numBootImage == 1) {
-				ptr2 = (uint32_t *)&BootId[0];
-
-				if (WakeUpParms.u0.boot_bios_wd[0] == ptr2[0]) {
-					AbsWakeUpParms->u1.EROM_prog_id =
-					    BootId[0];
-					(void) emlxs_update_exp_rom(hba,
-					    AbsWakeUpParms);
-				}
-			}
-		}
-	}
-
-	return (ChangeParams);
-
-
-} /* emlxs_build_parms_2mb_dwc() */
-
-
 extern uint32_t
 emlxs_get_max_sram(emlxs_hba_t *hba, uint32_t *MaxRbusSize,
     uint32_t *MaxIbusSize)
@@ -4393,6 +4855,14 @@ emlxs_get_max_sram(emlxs_hba_t *hba, uint32_t *MaxRbusSize,
 	MAILBOX *mb;
 	uint32_t *Uptr;
 	uint32_t rval = 0;
+
+	if (MaxRbusSize) {
+		*MaxRbusSize = 0;
+	}
+
+	if (MaxIbusSize) {
+		*MaxIbusSize = 0;
+	}
 
 	if ((mbox = (MAILBOXQ *)kmem_zalloc(sizeof (MAILBOXQ),
 	    KM_NOSLEEP)) == NULL) {
@@ -4425,8 +4895,13 @@ emlxs_get_max_sram(emlxs_hba_t *hba, uint32_t *MaxRbusSize,
 		Uptr = (uint32_t *)&mb->un.varDmp.resp_offset;
 	}
 
-	*MaxRbusSize = Uptr[0];
-	*MaxIbusSize = Uptr[1];
+	if (MaxRbusSize) {
+		*MaxRbusSize = Uptr[0];
+	}
+
+	if (MaxIbusSize) {
+		*MaxIbusSize = Uptr[1];
+	}
 
 Exit_Function:
 
@@ -4606,6 +5081,7 @@ emlxs_sbus_fcode_check(emlxs_hba_t *hba, uint32_t version)
 
 } /* emlxs_sbus_fcode_check() */
 
+
 static uint32_t
 emlxs_type_check(uint32_t type)
 {
@@ -4622,7 +5098,6 @@ emlxs_type_check(uint32_t type)
 } /* emlxs_type_check() */
 
 
-
 extern int32_t
 emlxs_boot_code_disable(emlxs_hba_t *hba)
 {
@@ -4632,7 +5107,8 @@ emlxs_boot_code_disable(emlxs_hba_t *hba)
 
 	vpd = &VPD;
 
-	if (hba->model_info.chip == EMLXS_BE_CHIP) {
+	if ((hba->model_info.chip == EMLXS_BE2_CHIP) ||
+	    (hba->model_info.chip == EMLXS_BE3_CHIP)) {
 		return (EMLXS_OP_NOT_SUP);
 	}
 
@@ -4684,10 +5160,12 @@ emlxs_boot_code_enable(emlxs_hba_t *hba)
 	emlxs_vpd_t *vpd;
 	PROG_ID load_list[MAX_LOAD_ENTRY];
 	uint32_t i;
+	uint32_t count;
 
 	vpd = &VPD;
 
-	if (hba->model_info.chip == EMLXS_BE_CHIP) {
+	if ((hba->model_info.chip == EMLXS_BE2_CHIP) ||
+	    (hba->model_info.chip == EMLXS_BE3_CHIP)) {
 		return (FC_SUCCESS);
 	}
 
@@ -4716,12 +5194,14 @@ emlxs_boot_code_enable(emlxs_hba_t *hba)
 		    &hba->wakeup_parms.u1.EROM_prog_id, 0);
 	} else {	/* (EMLXS_DRAGONFLY_CHIP | EMLXS_CENTAUR_CHIP) */
 
-		if (emlxs_get_load_list(hba, load_list)) {
+		count = emlxs_get_load_list(hba, load_list);
+
+		if (!count) {
 			return (FC_FAILURE);
 		}
 
 		/* Scan load list for a boot image */
-		for (i = 0; i < MAX_LOAD_ENTRY; i++) {
+		for (i = 0; i < count; i++) {
 			if (load_list[i].Type == BOOT_BIOS) {
 				/* Update the parms with the boot image id */
 				/* Don't load the EROM this time */
@@ -4732,7 +5212,7 @@ emlxs_boot_code_enable(emlxs_hba_t *hba)
 			}
 		}
 
-		if (i == MAX_LOAD_ENTRY) {
+		if (i == count) {
 			return (EMLXS_NO_BOOT_CODE);
 		}
 	}
@@ -4756,7 +5236,8 @@ emlxs_boot_code_state(emlxs_hba_t *hba)
 {
 	emlxs_port_t *port = &PPORT;
 
-	if (hba->model_info.chip == EMLXS_BE_CHIP) {
+	if ((hba->model_info.chip == EMLXS_BE2_CHIP) ||
+	    (hba->model_info.chip == EMLXS_BE3_CHIP)) {
 		return (FC_SUCCESS);
 	}
 

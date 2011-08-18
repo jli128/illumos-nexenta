@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2010 Emulex.  All rights reserved.
+ * Copyright 2011 Emulex.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +42,7 @@ static void emlxs_timer_check_dhchap(emlxs_port_t *port);
 #endif /* DHCHAP_SUPPORT */
 
 static void	emlxs_timer(void *arg);
+static void	emlxs_timer_check_fw_update(emlxs_hba_t *hba);
 static void	emlxs_timer_check_heartbeat(emlxs_hba_t *hba);
 static uint32_t	emlxs_timer_check_pkts(emlxs_hba_t *hba, uint8_t *flag);
 static void	emlxs_timer_check_nodes(emlxs_port_t *port, uint8_t *flag);
@@ -86,8 +87,6 @@ emlxs_timer(void *arg)
 
 	mutex_enter(&EMLXS_TIMER_LOCK);
 
-	EMLXS_SLI_POLL_ERRATT(hba);
-
 	/* Only one timer thread is allowed */
 	if (hba->timer_flags & EMLXS_TIMER_BUSY) {
 		mutex_exit(&EMLXS_TIMER_LOCK);
@@ -107,6 +106,8 @@ emlxs_timer(void *arg)
 	hba->timer_tics = DRV_TIME;
 
 	mutex_exit(&EMLXS_TIMER_LOCK);
+
+	EMLXS_SLI_POLL_ERRATT(hba);
 
 	/* Perform standard checks */
 	emlxs_timer_checks(hba);
@@ -156,6 +157,9 @@ emlxs_timer_checks(emlxs_hba_t *hba)
 
 	/* Check heartbeat timer */
 	emlxs_timer_check_heartbeat(hba);
+
+	/* Check fw update timer */
+	emlxs_timer_check_fw_update(hba);
 
 #ifdef IDLE_TIMER
 	emlxs_pm_idle_timer(hba);
@@ -433,8 +437,7 @@ emlxs_timer_check_pkts(emlxs_hba_t *hba, uint8_t *flag)
 		sbp = iocbq->sbp;
 		if (sbp && (sbp != STALE_PACKET)) {
 			if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
-				hba->fc_table[sbp->iotag] = NULL;
-				emlxs_sli4_free_xri(hba, sbp, sbp->xp);
+				emlxs_sli4_free_xri(hba, sbp, sbp->xrip, 1);
 			} else {
 				(void) emlxs_unregister_pkt(
 				    (CHANNEL *)iocbq->channel,
@@ -497,8 +500,25 @@ emlxs_timer_check_pkts(emlxs_hba_t *hba, uint8_t *flag)
 	mutex_enter(&EMLXS_FCTAB_LOCK);
 	for (iotag = 1; iotag < hba->max_iotag; iotag++) {
 		sbp = hba->fc_table[iotag];
-		if (sbp && (sbp != STALE_PACKET) &&
-		    (sbp->pkt_flags & PACKET_IN_CHIPQ) &&
+
+		if (!sbp || (sbp == STALE_PACKET)) {
+			continue;
+		}
+
+		/* Check if IO is valid */
+		if (!(sbp->pkt_flags & PACKET_VALID) ||
+		    (sbp->pkt_flags & (PACKET_ULP_OWNED|
+		    PACKET_COMPLETED|PACKET_IN_COMPLETION))) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_debug_msg,
+			    "timer_check_pkts: Invalid IO found. iotag=%x",
+			    iotag);
+
+			hba->fc_table[iotag] = STALE_PACKET;
+			hba->io_count--;
+			continue;
+		}
+
+		if ((sbp->pkt_flags & PACKET_IN_CHIPQ) &&
 		    (hba->timer_tics >= sbp->ticks)) {
 			rc = emlxs_pkt_chip_timeout(sbp->iocbq.port,
 			    sbp, &abort, flag);
@@ -802,12 +822,44 @@ emlxs_timer_check_heartbeat(emlxs_hba_t *hba)
 
 	rc =  EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbq, MBX_NOWAIT, 0);
 	if ((rc != MBX_BUSY) && (rc != MBX_SUCCESS)) {
-		(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mbq);
+		emlxs_mem_put(hba, MEM_MBOX, (void *)mbq);
 	}
 
 	return;
 
 } /* emlxs_timer_check_heartbeat() */
+
+
+static void
+emlxs_timer_check_fw_update(emlxs_hba_t *hba)
+{
+	emlxs_port_t *port = &PPORT;
+
+	if (!(hba->fw_flag & FW_UPDATE_NEEDED)) {
+		hba->fw_timer = 0;
+		return;
+	}
+
+	if (hba->timer_tics < hba->fw_timer) {
+		return;
+	}
+
+	if (hba->tgt_mode) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_update_msg,
+		    "A manual HBA reset or link reset (using emlxadm) "
+		    "is required.");
+	} else {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_update_msg,
+		    "A manual HBA reset or link reset (using luxadm or fcadm) "
+		    "is required.");
+	}
+
+	/* Set timer for 24 hours */
+	hba->fw_timer = hba->timer_tics + (60 * 60 * 24);
+
+	return;
+
+} /* emlxs_timer_check_fw_update() */
 
 
 static void
@@ -866,7 +918,7 @@ emlxs_timer_check_discovery(emlxs_port_t *port)
 
 		mutex_exit(&EMLXS_PORT_LOCK);
 
-		(void) emlxs_mb_unreg_did(port, nlp->nlp_DID, NULL, NULL, NULL);
+		(void) emlxs_mb_unreg_node(port, nlp, NULL, NULL, NULL);
 
 		mutex_enter(&EMLXS_PORT_LOCK);
 
@@ -884,7 +936,7 @@ emlxs_timer_check_discovery(emlxs_port_t *port)
 		 */
 		if (hba->state != FC_LINK_UP) {
 			mutex_exit(&EMLXS_PORT_LOCK);
-			(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mbox);
+			emlxs_mem_put(hba, MEM_MBOX, (void *)mbox);
 		} else {
 			/* Change state and clear discovery timer */
 			EMLXS_STATE_CHANGE_LOCKED(hba, FC_CLEAR_LA);
@@ -898,8 +950,7 @@ emlxs_timer_check_discovery(emlxs_port_t *port)
 
 			rc = EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbox, MBX_NOWAIT, 0);
 			if ((rc != MBX_BUSY) && (rc != MBX_SUCCESS)) {
-				(void) emlxs_mem_put(hba, MEM_MBOX,
-				    (uint8_t *)mbox);
+				emlxs_mem_put(hba, MEM_MBOX, (void *)mbox);
 			}
 		}
 	}
@@ -1003,7 +1054,8 @@ emlxs_pkt_chip_timeout(emlxs_port_t *port, emlxs_buf_t *sbp, Q *abortq,
 		/* Create the abort IOCB */
 		if (hba->state >= FC_LINK_UP) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_timeout_msg,
-			    "chipQ:1:Aborting. sbp=%p iotag=%x tmo=%d flags=%x",
+			    "chipQ: 1:Aborting. sbp=%p iotag=%x tmo=%d "
+			    "flags=%x",
 			    sbp, sbp->iotag,
 			    (pkt) ? pkt->pkt_timeout : 0, sbp->pkt_flags);
 
@@ -1017,7 +1069,8 @@ emlxs_pkt_chip_timeout(emlxs_port_t *port, emlxs_buf_t *sbp, Q *abortq,
 			    hba->timer_tics + (4 * hba->fc_ratov) + 10;
 		} else {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_timeout_msg,
-			    "chipQ:1:Closing. sbp=%p iotag=%x tmo=%d flags=%x",
+			    "chipQ: 1:Closing. sbp=%p iotag=%x tmo=%d "
+			    "flags=%x",
 			    sbp, sbp->iotag,
 			    (pkt) ? pkt->pkt_timeout : 0, sbp->pkt_flags);
 

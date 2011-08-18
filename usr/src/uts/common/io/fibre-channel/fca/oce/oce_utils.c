@@ -19,10 +19,7 @@
  * CDDL HEADER END
  */
 
-/*
- * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to license terms.
- */
+/* Copyright © 2003-2011 Emulex. All rights reserved.  */
 
 /*
  * Source file containing the implementation of the driver
@@ -61,6 +58,13 @@ oce_page_list(oce_dma_buf_t *dbuf,
 		paddr += PAGE_4K;
 	}
 } /* oce_page_list */
+
+void
+oce_list_link_init(OCE_LIST_NODE_T  *list_node)
+{
+	list_node->next = NULL;
+	list_node->prev = NULL;
+}
 
 static inline void
 oce_list_insert_node(OCE_LIST_NODE_T  *list_node, OCE_LIST_NODE_T *prev_node,
@@ -205,4 +209,36 @@ oce_list_remove_node(OCE_LIST_T  *list_hdr, OCE_LIST_NODE_T *list_node)
 	mutex_enter(&list_hdr->list_lock);
 	oce_list_remove(list_node);
 	mutex_exit(&list_hdr->list_lock);
+}
+
+void
+oce_gen_hkey(char *hkey, int key_size)
+{
+	int i;
+	int nkeys = key_size/sizeof (uint32_t);
+	for (i = 0; i < nkeys; i++) {
+		(void) random_get_pseudo_bytes(
+		    (uint8_t *)&hkey[i * sizeof (uint32_t)],
+		    sizeof (uint32_t));
+	}
+}
+
+int
+oce_atomic_reserve(uint32_t *count_p, uint32_t n)
+{
+	uint32_t oldval;
+	uint32_t newval;
+
+	/*
+	 * ATOMICALLY
+	 */
+	do {
+		oldval = *count_p;
+		if (oldval < n)
+			return (-1);
+		newval = oldval - n;
+
+	} while (atomic_cas_32(count_p, oldval, newval) != oldval);
+
+	return (newval);
 }
