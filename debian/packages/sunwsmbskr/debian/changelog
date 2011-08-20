@@ -1,3 +1,9 @@
+sunwsmbskr (5.11.134-31-2-0) nexenta; urgency=low
+
+  * Issue 5827: authentication type is not supported (when joining a domain)
+
+ -- Gate Keeper <support@nexenta.com>  Thu, 11 Aug 2011 14:54:43 -0400
+
 sunwsmbskr (5.11.134-31-0-100) nexenta; urgency=low
 
   * Renumber packages in preparation for 3.1 release

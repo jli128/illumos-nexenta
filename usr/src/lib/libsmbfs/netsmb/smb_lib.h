@@ -33,8 +33,8 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #ifndef _NETSMB_SMB_LIB_H_
@@ -109,6 +109,7 @@ struct smb_ctx {
 	int		ct_shtype_req;	/* share type wanted */
 	char		*ct_origshare;
 	char		*ct_home;
+	char		*ct_rpath;	/* remote file name */
 
 	/* Connection setup SMB stuff. */
 	/* Strings from the SMB negotiate response. */
@@ -187,6 +188,11 @@ int  smb_ctx_newvc(struct smb_ctx *);
 /*
  * I/O daemon stuff
  */
+
+#define	SMBIOD_RUNDIR	"/var/run/smbiod"
+#define	SMBIOD_SVC_DOOR	SMBIOD_RUNDIR "/.svc"
+#define	SMBIOD_USR_DOOR	SMBIOD_RUNDIR "/%d"
+#define	SMBIOD_START	1
 
 int  smb_iod_cl_newvc(smb_ctx_t *ctx);
 char *smb_iod_door_path(void);
