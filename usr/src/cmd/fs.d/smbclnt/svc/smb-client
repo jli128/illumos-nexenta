@@ -19,11 +19,10 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 # Start/stop client SMB service
@@ -31,19 +30,29 @@
 
 . /lib/svc/share/smf_include.sh
 
+result=${SMF_EXIT_OK}
+
 case "$1" in
 'start')
-
-	/sbin/mountall -F smbfs
+	# Start the main smbiod service
+	/usr/lib/smbfs/smbiod-svc
+	result=$?
+	# Do smbfs mounts (background)
+	/usr/bin/ctrun -l none \
+	  /sbin/mountall -F smbfs
 	;;
 
 'stop')
+	# First destroy the mounts,
 	/sbin/umountall -F smbfs
+	# then kill the smbiod service.
+	smf_kill_contract $2 TERM 1
+	result=$?
 	;;
 
 *)
 	echo "Usage: $0 { start | stop }"
-	exit 1
+	result=1
 	;;
 esac
-exit $SMF_EXIT_OK
+exit $result

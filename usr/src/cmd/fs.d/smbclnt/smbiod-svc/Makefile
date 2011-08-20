@@ -18,15 +18,40 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-include ../Makefile.com
+#
+# cmd/fs.d/smbclnt/smbiod-svc/Makefile
+#
 
-DYNFLAGS +=	-R/usr/lib/smbsrv
+FSTYPE=		smbfs
+TYPEPROG=	smbiod-svc
 
-install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
+include		../../Makefile.fstype
+
+OBJS=	$(TYPEPROG).o
+SRCS=	$(TYPEPROG).c
+POFILE=	$(TYPEPROG).po
+
+CFLAGS += $(CCVERBOSE)
+C99MODE= $(C99_ENABLE)
+
+CPPFLAGS += -I$(SRC)/lib/libsmbfs \
+	-I$(SRC)/uts/common/smbclnt -I$(SRC)/uts/common
+
+# Debugging
+${NOT_RELEASE_BUILD} CPPFLAGS += -DDEBUG
+
+all:	$(TYPEPROG)
+
+catalog:	$(POFILE)
+
+lint:	lint_SRCS
+
+clean:
+	$(RM) $(OBJS) $(POFILE)
+
+.KEEP_STATE:

@@ -6,7 +6,7 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwsmbfskr
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-31-0-100), sunwkvm (>=5.11.134-31-0-100), sunwcsr (>=5.11.134-31-0-100), sunwckr (>=5.11.134-31-0-100), sunwcnetr (>=5.11.134-31-0-100), sunwcsu (>=5.11.134-31-0-100), sunwcsd (>=5.11.134-31-0-100), sunwcsl (>=5.11.134-31-0-100), sunwcar (>=5.11.134-31-0-100), sunwsmbfsu (>=5.11.134-31-0-100)
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-31-0-100), sunwkvm (>=5.11.134-31-0-100), sunwcsr (>=5.11.134-31-0-100), sunwckr (>=5.11.134-31-0-100), sunwcnetr (>=5.11.134-31-0-100), sunwcsu (>=5.11.134-31-0-100), sunwcsd (>=5.11.134-31-0-100), sunwcsl (>=5.11.134-31-0-100), sunwcar (>=5.11.134-31-0-100), sunwsmbfsu (>=5.11.134-31-2-0)
 Description: SMB/CIFS File System client support (Kernel)
  SMB/CIFS File System client support (Kernel)
  .

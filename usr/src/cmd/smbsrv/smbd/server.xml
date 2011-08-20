@@ -70,6 +70,14 @@ file.
 		<service_fmri value='svc:/system/idmap:default'/>
 	</dependency>
 
+	<!-- Must have SMB client service started -->
+	<dependency name='smb-client'
+	    grouping='require_all'
+	    restart_on='none'
+	    type='service'>
+		<service_fmri value='svc:/network/smb/client:default'/>
+	</dependency>
+
 	<!--
 	    Want to make sure that the network/shares/group service
 	    starts after the smb/server service.  It needs to be

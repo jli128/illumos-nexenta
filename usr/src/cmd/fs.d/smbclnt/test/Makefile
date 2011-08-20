@@ -19,12 +19,40 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-HDRS=	libsmbrdr.h
+FSTYPE=		smbfs
+LIBPROG=	testnp
+ROOTFS_PROG=	$(LIBPROG)
 
-include ../Makefile.smbsrv
+include		../../Makefile.fstype
+
+OBJS=	$(LIBPROG).o
+SRCS=	$(LIBPROG).c $(FSLIBSRC)
+
+LDLIBS += -lsmbfs
+
+CFLAGS += $(CCVERBOSE)
+C99MODE= $(C99_ENABLE)
+
+CLOBBERFILES	+= $(LIBPROG)
+
+# uncomment these for dbx debugging
+#COPTFLAG = -g
+#CTF_FLAGS =
+#CTFCONVERT_O=
+#CTFMERGE_LIB=
+
+all:	$(ROOTFS_PROG)
+
+install:	$(ROOTLIBFSTYPEPROG)
+
+lint:	lint_SRCS
+
+clean:     
+	$(RM) $(OBJS)
+
+.KEEP_STATE:

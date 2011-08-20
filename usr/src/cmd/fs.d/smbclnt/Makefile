@@ -20,8 +20,8 @@
 #
 
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 #
@@ -31,8 +31,9 @@
 
 include $(SRC)/Makefile.master
 
-SUBDIRS_CATALOG=	smbutil smbiod mount umount
-SUBDIRS=		$(SUBDIRS_CATALOG) chacl lsacl svc
+SUBDIRS_CATALOG=	smbutil mount umount
+SUBDIRS=		$(SUBDIRS_CATALOG) chacl lsacl \
+			smbiod smbiod-svc svc test
 
 # for messaging catalog files
 #
