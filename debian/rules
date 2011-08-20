@@ -72,7 +72,7 @@ setup-closed-stamp:
 build-on: patch setup-closed build-on-stamp
 build-on-stamp:
 	dh_testdir
-	env - bash -c 'cd $(GATEROOT); /opt/onbld/bin/nightly ./opensolaris.sh'
+	env - bash -c 'cd $(GATEROOT); /opt/onbld/bin/nightly -i ./opensolaris.sh'
 	touch $@
 
 build-packages: build-on build-packages-stamp
@@ -111,17 +111,17 @@ clobber_on:
 	if test -f patch-stamp -a -d $(GATEROOT) ;then \
 		cd $(GATEROOT) ; \
 		/opt/onbld/bin/bldenv ./opensolaris.sh \
-		  'cd usr/src ; dmake clobber' ;\
+		  'cd usr/src ; dmake clobber' </dev/null ;\
 	fi
 
 rm_log_proto:
 	if test -d "onnv-gate/log" ; then \
-			rm -r onnv-gate/log; \
+			rm -rf onnv-gate/log; \
 	else \
 			echo "no logs present"; \
 	fi
 	if test -d "onnv-gate/proto" ; then \
-			rm -r onnv-gate/proto; \
+			rm -rf onnv-gate/proto; \
 	else \
 			echo "no proto-dir present"; \
 	fi

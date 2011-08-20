@@ -81,7 +81,7 @@ $(NAMES) : src/libc/xcurses/mknames.awk src/libc/xcurses/caps
 
 h/term.h : src/libc/xcurses/mkterm.awk src/libc/xcurses/caps
 	$(RM) $@
-	cd src/libc/xcurses; awk -f mkterm.awk caps > term.h
+	cd src/libc/xcurses; nawk -f mkterm.awk caps > term.h
 	$(MV) src/libc/xcurses/term.h h/term.h
 
 src/libc/xcurses/keyindex.c : src/libc/xcurses/mkkey.awk src/libc/xcurses/caps
