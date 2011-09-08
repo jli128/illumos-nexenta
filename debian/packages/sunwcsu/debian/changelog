@@ -1,3 +1,9 @@
+sunwcsu (5.11.134-31-6424-0) nexenta; urgency=low
+
+  * Issue 5912: update terminfo database to include modern terminals
+
+ -- Nexenta Systems <support@nexenta.com>  Thu, 01 Sep 2011 20:55:59 -0700
+
 sunwcsu (5.11.134-31-0-101) nexenta; urgency=high
 
   * Issue 5213: After you run "setup network service nfs-server restart"
