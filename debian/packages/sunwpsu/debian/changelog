@@ -1,3 +1,9 @@
+sunwpsu (5.11.134-31-6424-0) nexenta; urgency=low
+
+  * Issue 5912: update terminfo database to include modern terminals
+
+ -- Nexenta Systems <support@nexenta.com>  Thu, 01 Sep 2011 20:59:56 -0700
+
 sunwpsu (5.11.134-31-0-100) nexenta; urgency=low
 
   * Renumber packages in preparation for 3.1 release

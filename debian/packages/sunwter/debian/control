@@ -1,12 +1,12 @@
 Source: sunwter
 Section: base
-Priority: optional
+Priority: required
 Maintainer: Nexenta Systems <support@nexenta.com>
 Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwter
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-31-0-100), sunwkvm (>=5.11.134-31-0-100), sunwcsr (>=5.11.134-31-0-100), sunwckr (>=5.11.134-31-0-100), sunwcnetr (>=5.11.134-31-0-100), sunwcsu (>=5.11.134-31-0-100), sunwcsd (>=5.11.134-31-0-100), sunwcsl (>=5.11.134-31-0-100)
+Depends: ${shlibs:Depends}
 Description: Terminal Information
  extensive terminfo database entries describing capabilities of terminals and pseudoterminals
  .
