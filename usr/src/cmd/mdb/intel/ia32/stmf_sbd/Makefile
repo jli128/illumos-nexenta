@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 #
 
 MODULE = stmf_sbd.so
@@ -27,6 +28,7 @@ MDBTGT = kvm
 
 MODSRCS = stmf_sbd.c
 
+CLSTMFSBDBASE = ../../../../../../nza-closed/uts/common/io/comstar/lu/stmf_sbd
 UTSBASE = ../../../../../uts
 COMSTARBASE = $(UTSBASE)/common/io/comstar
 STMFSBDBASE = $(COMSTARBASE)/lu/stmf_sbd
@@ -36,6 +38,7 @@ include ../../Makefile.ia32
 include ../../../Makefile.module
 
 CPPFLAGS += -I$(UTSBASE)/common -I$(UTSBASE)/common/sys -I$(STMFSBDBASE)
+CPPFLAGS += -I$(CLSTMFSBDBASE)
 
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all

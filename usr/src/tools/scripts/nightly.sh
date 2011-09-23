@@ -319,6 +319,9 @@ function copy_source {
 #
 # usage: copy_source_mercurial destdir srcroot
 #
+# XXXNZA -> This function is only called for building the source product,
+# so do not do any NZA actions for now.
+#
 function copy_source_mercurial {
 	typeset dest=$1
 	typeset srcroot=$2
@@ -963,6 +966,7 @@ function staffer {
 # Sets CLOSED_IS_PRESENT for future use.
 #
 function check_closed_tree {
+	# XXXNZA -> No need to check for nza-closed.
 	if [ -z "$CLOSED_IS_PRESENT" ]; then
 		if [ -d $CODEMGR_WS/usr/closed ]; then
 			CLOSED_IS_PRESENT="yes"
@@ -1324,6 +1328,13 @@ fi
 #
 if [ "$CLOSED_BRINGOVER_WS" = "" ]; then
 	CLOSED_BRINGOVER_WS=$CLOSED_CLONE_WS
+fi
+
+#
+# XXXNZA -> Derive nza-closed source path, if not specified.
+#
+if [ "$NZA_CLOSED_SRC" = "" ]; then
+	NZA_CLOSED_SRC=$BRINGOVER_WS/usr/nza-closed
 fi
 
 #
@@ -2330,6 +2341,48 @@ type bringover_mercurial > /dev/null 2>&1 || function bringover_mercurial {
 		printf "$mergepassmsg"
 	fi
 	printf "\n"
+
+	#
+	# XXXNZA -> update usr/nza-closed if it exists in the parent
+	# (as expressed by NZA_CLOSED_SRC).  This is not quite as
+	# thorough as the other workspaces (no check for merge failures).
+	#
+	if [[ -d $NZA_CLOSED_SRC && -d $NZA_CLOSED_SRC/.hg ]]; then
+		if [[ ! -d $CODEMGR_WS/usr/nza-closed ]]; then
+			staffer mkdir -p $CODEMGR_WS/usr/nza-closed
+			staffer hg init $CODEMGR_WS/usr/nza-closed
+			staffer echo "[paths]" \
+			    > $CODEMGR_WS/usr/nza-closed/.hg/hgrc
+			staffer echo "default=$NZA_CLOSED_SRC" \
+			    >> $CODEMGR_WS/usr/nza-closed/.hg/hgrc
+		fi
+		staffer hg --cwd $CODEMGR_WS/usr/nza-closed pull -u \
+		    $NZA_CLOSED_SRC > $TMPDIR/pull_nza_closed.out 2>&1
+		if (( $? != 0 )); then
+			printf "nza-closed pull failed as follows:\n\n"
+			cat $TMPDIR/pull_nza_closed.out
+			if grep "^merging.*failed" $TMPDIR/pull_nza_closed.out > /dev/null 2>&1; then
+				printf "$mergefailmsg"
+			fi
+			touch $TMPDIR/bringover_failed
+			return
+		fi
+		if grep "not updating" $TMPDIR/pull_nza_closed.out > /dev/null 2>&1; then
+			staffer hg --cwd $CODEMGR_WS/usr/nza-closed merge \
+			    >> $TMPDIR/pull_nza_closed.out 2>&1
+			if (( $? != 0 )); then
+				printf "nza-closed merge failed as follows:\n\n"
+				cat $TMPDIR/pull_nza_closed.out
+				if grep "^merging.*failed" \
+				    $TMPDIR/pull_nza_closed.out \
+				    > /dev/null 2>&1; then
+					printf "$mergefailmsg"
+				fi
+				touch $TMPDIR/bringover_failed
+				return
+			fi
+		fi
+	fi
 
 	#
 	# We only want to update usr/closed if it exists, and we haven't been

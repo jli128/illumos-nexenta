@@ -1439,6 +1439,7 @@ sbd_populate_and_register_lu(sbd_lu_t *sl, uint32_t *err_ret)
 	lu->lu_send_status_done = sbd_send_status_done;
 	lu->lu_task_free = sbd_task_free;
 	lu->lu_abort = sbd_abort;
+	lu->lu_task_poll = sbd_task_poll;
 	lu->lu_dbuf_free = sbd_dbuf_free;
 	lu->lu_ctl = sbd_ctl;
 	lu->lu_info = sbd_info;
@@ -3727,4 +3728,25 @@ sbd_unmap(sbd_lu_t *sl, uint64_t offset, uint64_t length)
 
 	return (VOP_IOCTL(vp, DKIOCFREE, (intptr_t)(&df), FKIOCTL, kcred,
 	    &unused, NULL));
+}
+
+/*
+ * Check if this lu belongs to sbd or some other lu
+ * provider. A simple check for one of the module
+ * entry points is sufficient.
+ */
+int
+sbd_is_valid_lu(stmf_lu_t *lu)
+{
+	if (lu->lu_new_task == sbd_new_task)
+		return (1);
+	return (0);
+}
+
+uint8_t
+sbd_get_lbasize_shift(stmf_lu_t *lu)
+{
+	sbd_lu_t *sl = (sbd_lu_t *)lu->lu_provider_private;
+
+	return (sl->sl_data_blocksize_shift);
 }

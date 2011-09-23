@@ -704,6 +704,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/comstar/lu/stmf_sbd/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(NZA_UTS)/common/io/comstar/lu/stmf_sbd/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/dld/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)

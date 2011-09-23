@@ -20,6 +20,8 @@
  */
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ *
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/atomic.h>
@@ -39,7 +41,7 @@
 
 #define	MAX_PGR_PARAM_LIST_LENGTH	(256 * 1024)
 
-int  sbd_pgr_reservation_conflict(scsi_task_t *);
+int  sbd_pgr_reservation_conflict(scsi_task_t *, struct sbd_lu *sl);
 void sbd_pgr_reset(sbd_lu_t *);
 void sbd_pgr_initialize_it(scsi_task_t *, sbd_it_data_t *);
 void sbd_handle_pgr_in_cmd(scsi_task_t *, stmf_data_buf_t *);
@@ -812,9 +814,8 @@ sbd_pgr_initialize_it(scsi_task_t *task, sbd_it_data_t *it)
  * Check for any PGR Reservation conflict. return 0 if access allowed
  */
 int
-sbd_pgr_reservation_conflict(scsi_task_t *task)
+sbd_pgr_reservation_conflict(scsi_task_t *task, sbd_lu_t *slu)
 {
-	sbd_lu_t	*slu = (sbd_lu_t *)task->task_lu->lu_provider_private;
 	sbd_pgr_t	*pgr = slu->sl_pgr;
 	sbd_it_data_t	*it  = (sbd_it_data_t *)task->task_lu_itl_handle;
 
