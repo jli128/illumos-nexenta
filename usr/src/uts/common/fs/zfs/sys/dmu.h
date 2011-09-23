@@ -704,7 +704,7 @@ void dmu_traverse_objset(objset_t *os, uint64_t txg_start,
     dmu_traverse_cb_t cb, void *arg);
 
 int dmu_sendbackup(objset_t *tosnap, objset_t *fromsnap, boolean_t fromorigin,
-    struct vnode *vp, offset_t *off);
+    struct vnode *vp, offset_t *off, boolean_t dryrun);
 
 typedef struct dmu_recv_cookie {
 	/*
