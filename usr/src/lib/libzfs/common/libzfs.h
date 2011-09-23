@@ -525,6 +525,9 @@ typedef struct sendflags {
 
 	/* send properties (ie, -p) */
 	int props : 1;
+
+	/* dry run (ie, -n) */
+	int dry : 1;
 } sendflags_t;
 
 typedef boolean_t (snapfilter_cb_t)(zfs_handle_t *, void *);

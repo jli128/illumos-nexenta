@@ -236,7 +236,7 @@ get_usage(zfs_help_t idx)
 	case HELP_ROLLBACK:
 		return (gettext("\trollback [-rRf] <snapshot>\n"));
 	case HELP_SEND:
-		return (gettext("\tsend [-RDp] [-[iI] snapshot] <snapshot>\n"));
+		return (gettext("\tsend [-RDpn] [-[iI] snapshot] <snapshot>\n"));
 	case HELP_SET:
 		return (gettext("\tset <property=value> "
 		    "<filesystem|volume|snapshot> ...\n"));
@@ -2563,8 +2563,8 @@ usage:
 }
 
 /*
- * zfs send [-vDp] -R [-i|-I <@snap>] <fs@snap>
- * zfs send [-vDp] [-i|-I <@snap>] <fs@snap>
+ * zfs send [-vDpn] -R [-i|-I <@snap>] <fs@snap>
+ * zfs send [-vDpn] [-i|-I <@snap>] <fs@snap>
  *
  * Send a backup stream to stdout.
  */
@@ -2581,7 +2581,7 @@ zfs_do_send(int argc, char **argv)
 	boolean_t extraverbose = B_FALSE;
 
 	/* check options */
-	while ((c = getopt(argc, argv, ":i:I:RDpv")) != -1) {
+	while ((c = getopt(argc, argv, ":i:I:RDpvn")) != -1) {
 		switch (c) {
 		case 'i':
 			if (fromname)
@@ -2608,6 +2608,9 @@ zfs_do_send(int argc, char **argv)
 		case 'D':
 			flags.dedup = B_TRUE;
 			break;
+		case 'n':
+			flags.dry = B_TRUE;
+			break;
 		case ':':
 			(void) fprintf(stderr, gettext("missing argument for "
 			    "'%c' option\n"), optopt);
@@ -2633,7 +2636,10 @@ zfs_do_send(int argc, char **argv)
 		usage(B_FALSE);
 	}
 
-	if (isatty(STDOUT_FILENO)) {
+	if (flags.dry) {
+		close(STDOUT_FILENO);
+		(void) open("/dev/null", O_WRONLY|O_LARGEFILE);
+	} else if (isatty(STDOUT_FILENO)) {
 		(void) fprintf(stderr,
 		    gettext("Error: Stream can not be written to a terminal.\n"
 		    "You must redirect standard output.\n"));

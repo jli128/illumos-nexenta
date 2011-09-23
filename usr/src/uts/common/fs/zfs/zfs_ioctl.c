@@ -3837,6 +3837,7 @@ zfs_ioc_send(zfs_cmd_t *zc)
 	dsl_dataset_t *dsfrom = NULL;
 	spa_t *spa;
 	dsl_pool_t *dp;
+	offset_t off_starting;
 
 	error = spa_open(zc->zc_name, &spa, FTAG);
 	if (error)
@@ -3886,8 +3887,10 @@ zfs_ioc_send(zfs_cmd_t *zc)
 	}
 
 	off = fp->f_offset;
-	error = dmu_sendbackup(tosnap, fromsnap, zc->zc_obj, fp->f_vnode, &off);
+	off_starting = off;
+	error = dmu_sendbackup(tosnap, fromsnap, zc->zc_obj, fp->f_vnode, &off, zc->zc_dry);
 
+	zc->zc_sendcounter = off - off_starting;
 	if (VOP_SEEK(fp->f_vnode, fp->f_offset, &off, NULL) == 0)
 		fp->f_offset = off;
 	releasef(zc->zc_cookie);

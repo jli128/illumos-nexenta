@@ -1,3 +1,9 @@
+sunwzfsr (5.11.134-31-6590-0) nexenta; urgency=low
+
+  * Issue 6446: include dryrun for 'zfs send'
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 19 Sep 2011 20:24:47 -0700
+
 sunwzfsr (5.11.134-31-0-100a) nexenta; urgency=low
 
   * Issue 5332: can't import pools with more than 13 disks

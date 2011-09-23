@@ -288,6 +288,8 @@ typedef struct zfs_cmd {
 	uint64_t	zc_fromobj;
 	uint64_t	zc_createtxg;
 	zfs_stat_t	zc_stat;
+	uint64_t	zc_sendcounter;
+	boolean_t	zc_dry;
 } zfs_cmd_t;
 
 typedef struct zfs_useracct {

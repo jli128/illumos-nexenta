@@ -70,6 +70,7 @@ struct backuparg {
 	uint64_t toguid;
 	int err;
 	pendop_t pending_op;
+	boolean_t dryrun;
 };
 
 static int
@@ -78,10 +79,13 @@ dump_bytes(struct backuparg *ba, void *buf, int len)
 	ssize_t resid; /* have to get resid to get detailed errno */
 	ASSERT3U(len % 8, ==, 0);
 
-	fletcher_4_incremental_native(buf, len, &ba->zc);
-	ba->err = vn_rdwr(UIO_WRITE, ba->vp,
-	    (caddr_t)buf, len,
-	    0, UIO_SYSSPACE, FAPPEND, RLIM64_INFINITY, CRED(), &resid);
+	ba->err = 0;
+	if (!ba->dryrun) {
+		fletcher_4_incremental_native(buf, len, &ba->zc);
+		ba->err = vn_rdwr(UIO_WRITE, ba->vp,
+		    (caddr_t)buf, len,
+		    0, UIO_SYSSPACE, FAPPEND, RLIM64_INFINITY, CRED(), &resid);
+	}
 	*ba->off += len;
 	return (ba->err);
 }
@@ -364,16 +368,23 @@ backup_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp, arc_buf_t *pbuf,
 	} else { /* it's a level-0 block of a regular object */
 		uint32_t aflags = ARC_WAIT;
 		arc_buf_t *abuf;
+		void *buf;
 		int blksz = BP_GET_LSIZE(bp);
 
-		if (dsl_read(NULL, spa, bp, pbuf,
-		    arc_getbuf_func, &abuf, ZIO_PRIORITY_ASYNC_READ,
-		    ZIO_FLAG_CANFAIL, &aflags, zb) != 0)
-			return (EIO);
+		if (!ba->dryrun) {
+			if (dsl_read(NULL, spa, bp, pbuf,
+			    arc_getbuf_func, &abuf, ZIO_PRIORITY_ASYNC_READ,
+			    ZIO_FLAG_CANFAIL, &aflags, zb) != 0)
+				return (EIO);
+			buf = abuf->b_data;
+		}
 
 		err = dump_data(ba, type, zb->zb_object, zb->zb_blkid * blksz,
-		    blksz, bp, abuf->b_data);
-		(void) arc_buf_remove_ref(abuf, &abuf);
+			blksz, bp, buf);
+
+		if (!ba->dryrun) {
+			(void) arc_buf_remove_ref(abuf, &abuf);
+		}
 	}
 
 	ASSERT(err == 0 || err == EINTR);
@@ -382,7 +393,7 @@ backup_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp, arc_buf_t *pbuf,
 
 int
 dmu_sendbackup(objset_t *tosnap, objset_t *fromsnap, boolean_t fromorigin,
-    vnode_t *vp, offset_t *off)
+    vnode_t *vp, offset_t *off, boolean_t dryrun)
 {
 	dsl_dataset_t *ds = tosnap->os_dsl_dataset;
 	dsl_dataset_t *fromds = fromsnap ? fromsnap->os_dsl_dataset : NULL;
@@ -390,6 +401,7 @@ dmu_sendbackup(objset_t *tosnap, objset_t *fromsnap, boolean_t fromorigin,
 	struct backuparg ba;
 	int err;
 	uint64_t fromtxg = 0;
+	uint64_t starting_off = *off;
 
 	/* tosnap must be a snapshot */
 	if (ds->ds_phys->ds_next_snap_obj == 0)
@@ -463,14 +475,21 @@ dmu_sendbackup(objset_t *tosnap, objset_t *fromsnap, boolean_t fromorigin,
 	ba.toguid = ds->ds_phys->ds_guid;
 	ZIO_SET_CHECKSUM(&ba.zc, 0, 0, 0, 0);
 	ba.pending_op = PENDING_NONE;
+	ba.dryrun = dryrun;
+
 
 	if (dump_bytes(&ba, drr, sizeof (dmu_replay_record_t)) != 0) {
 		kmem_free(drr, sizeof (dmu_replay_record_t));
 		return (ba.err);
 	}
 
-	err = traverse_dataset(ds, fromtxg, TRAVERSE_PRE | TRAVERSE_PREFETCH,
-	    backup_cb, &ba);
+	if (ba.dryrun) {
+		err = traverse_dataset(ds, fromtxg, TRAVERSE_PRE | TRAVERSE_PREFETCH_METADATA,
+		    backup_cb, &ba);
+	} else {
+		err = traverse_dataset(ds, fromtxg, TRAVERSE_PRE | TRAVERSE_PREFETCH,
+		    backup_cb, &ba);
+	}
 
 	if (ba.pending_op != PENDING_NONE)
 		if (dump_bytes(&ba, drr, sizeof (dmu_replay_record_t)) != 0)

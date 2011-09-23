@@ -58,6 +58,8 @@ static const zio_cksum_t zero_cksum = { 0 };
 typedef struct dedup_arg {
 	int	inputfd;
 	int	outputfd;
+	uint64_t	dedup_data_sz;
+	boolean_t	dry;
 	libzfs_handle_t  *dedup_hdl;
 } dedup_arg_t;
 
@@ -174,6 +176,20 @@ cksum_and_write(const void *buf, uint64_t len, zio_cksum_t *zc, int outfd)
 	return (write(outfd, buf, len));
 }
 
+static int
+dedup_cksum_and_write(dedup_arg_t *dda, const void *buf, uint64_t len,
+		      zio_cksum_t *zc, int outfd)
+{
+	int ret = len;
+
+	dda->dedup_data_sz += len;
+	fletcher_4_incremental_native(buf, len, zc);
+	if (!dda->dry)
+		ret =  (write(outfd, buf, len));
+
+	return (ret);
+}
+
 /*
  * This function is started in a separate thread when the dedup option
  * has been requested.  The main send thread determines the list of
@@ -252,7 +268,7 @@ cksummer(void *arg)
 			    DMU_BACKUP_FEATURE_DEDUPPROPS);
 			DMU_SET_FEATUREFLAGS(drrb->drr_versioninfo, fflags);
 
-			if (cksum_and_write(drr, sizeof (dmu_replay_record_t),
+			if (dedup_cksum_and_write(dda, drr, sizeof (dmu_replay_record_t),
 			    &stream_cksum, outfd) == -1)
 				goto out;
 			if (DMU_GET_STREAM_HDRTYPE(drrb->drr_versioninfo) ==
@@ -266,7 +282,7 @@ cksummer(void *arg)
 				(void) ssread(buf, sz, ofp);
 				if (ferror(stdin))
 					perror("fread");
-				if (cksum_and_write(buf, sz, &stream_cksum,
+				if (dedup_cksum_and_write(dda, buf, sz, &stream_cksum,
 				    outfd) == -1)
 					goto out;
 			}
@@ -282,19 +298,20 @@ cksummer(void *arg)
 			if ((write(outfd, drr,
 			    sizeof (dmu_replay_record_t))) == -1)
 				goto out;
+			dda->dedup_data_sz += sizeof (dmu_replay_record_t);
 			break;
 		}
 
 		case DRR_OBJECT:
 		{
-			if (cksum_and_write(drr, sizeof (dmu_replay_record_t),
+			if (dedup_cksum_and_write(dda, drr, sizeof (dmu_replay_record_t),
 			    &stream_cksum, outfd) == -1)
 				goto out;
 			if (drro->drr_bonuslen > 0) {
 				(void) ssread(buf,
 				    P2ROUNDUP((uint64_t)drro->drr_bonuslen, 8),
 				    ofp);
-				if (cksum_and_write(buf,
+				if (dedup_cksum_and_write(dda, buf,
 				    P2ROUNDUP((uint64_t)drro->drr_bonuslen, 8),
 				    &stream_cksum, outfd) == -1)
 					goto out;
@@ -304,11 +321,11 @@ cksummer(void *arg)
 
 		case DRR_SPILL:
 		{
-			if (cksum_and_write(drr, sizeof (dmu_replay_record_t),
+			if (dedup_cksum_and_write(dda, drr, sizeof (dmu_replay_record_t),
 			    &stream_cksum, outfd) == -1)
 				goto out;
 			(void) ssread(buf, drrs->drr_length, ofp);
-			if (cksum_and_write(buf, drrs->drr_length,
+			if (dedup_cksum_and_write(dda, buf, drrs->drr_length,
 			    &stream_cksum, outfd) == -1)
 				goto out;
 			break;
@@ -316,7 +333,7 @@ cksummer(void *arg)
 
 		case DRR_FREEOBJECTS:
 		{
-			if (cksum_and_write(drr, sizeof (dmu_replay_record_t),
+			if (dedup_cksum_and_write(dda, drr, sizeof (dmu_replay_record_t),
 			    &stream_cksum, outfd) == -1)
 				goto out;
 			break;
@@ -381,17 +398,17 @@ cksummer(void *arg)
 				wbr_drrr->drr_key.ddk_prop =
 				    drrw->drr_key.ddk_prop;
 
-				if (cksum_and_write(&wbr_drr,
+				if (dedup_cksum_and_write(dda, &wbr_drr,
 				    sizeof (dmu_replay_record_t), &stream_cksum,
 				    outfd) == -1)
 					goto out;
 			} else {
 				/* block not previously seen */
-				if (cksum_and_write(drr,
+				if (dedup_cksum_and_write(dda, drr,
 				    sizeof (dmu_replay_record_t), &stream_cksum,
 				    outfd) == -1)
 					goto out;
-				if (cksum_and_write(buf,
+				if (dedup_cksum_and_write(dda, buf,
 				    drrw->drr_length,
 				    &stream_cksum, outfd) == -1)
 					goto out;
@@ -401,7 +418,7 @@ cksummer(void *arg)
 
 		case DRR_FREE:
 		{
-			if (cksum_and_write(drr, sizeof (dmu_replay_record_t),
+			if (dedup_cksum_and_write(dda, drr, sizeof (dmu_replay_record_t),
 			    &stream_cksum, outfd) == -1)
 				goto out;
 			break;
@@ -863,6 +880,9 @@ typedef struct send_dump_data {
 	uint64_t prevsnap_obj;
 	boolean_t seenfrom, seento, replicate, doall, fromorigin;
 	boolean_t verbose;
+	boolean_t dry;
+	uint32_t hdr_send_sz;
+	uint64_t send_sz;
 	int outfd;
 	boolean_t err;
 	nvlist_t *fss;
@@ -880,7 +900,7 @@ typedef struct send_dump_data {
  */
 static int
 dump_ioctl(zfs_handle_t *zhp, const char *fromsnap, uint64_t fromsnap_obj,
-    boolean_t fromorigin, int outfd, nvlist_t *debugnv)
+    boolean_t fromorigin, int outfd, nvlist_t *debugnv, boolean_t dryrun, uint64_t *sendcounter)
 {
 	zfs_cmd_t zc = { 0 };
 	libzfs_handle_t *hdl = zhp->zfs_hdl;
@@ -894,6 +914,8 @@ dump_ioctl(zfs_handle_t *zhp, const char *fromsnap, uint64_t fromsnap_obj,
 	zc.zc_obj = fromorigin;
 	zc.zc_sendobj = zfs_prop_get_int(zhp, ZFS_PROP_OBJSETID);
 	zc.zc_fromobj = fromsnap_obj;
+	zc.zc_dry = dryrun;
+	zc.zc_sendcounter = 0;
 
 	VERIFY(0 == nvlist_alloc(&thisdbg, NV_UNIQUE_NAME, 0));
 	if (fromsnap && fromsnap[0] != '\0') {
@@ -948,6 +970,7 @@ dump_ioctl(zfs_handle_t *zhp, const char *fromsnap, uint64_t fromsnap_obj,
 		}
 	}
 
+	*sendcounter = (uint64_t)zc.zc_sendcounter;
 	if (debugnv)
 		VERIFY(0 == nvlist_add_nvlist(debugnv, zhp->zfs_name, thisdbg));
 	nvlist_free(thisdbg);
@@ -997,6 +1020,7 @@ dump_snapshot(zfs_handle_t *zhp, void *arg)
 	send_dump_data_t *sdd = arg;
 	char *thissnap;
 	int err;
+	uint64_t sendcounter = 0;
 	boolean_t isfromsnap, istosnap;
 	boolean_t exclude = B_FALSE;
 
@@ -1082,7 +1106,12 @@ dump_snapshot(zfs_handle_t *zhp, void *arg)
 
 	err = dump_ioctl(zhp, sdd->prevsnap, sdd->prevsnap_obj,
 	    sdd->prevsnap[0] == '\0' && (sdd->fromorigin || sdd->replicate),
-	    sdd->outfd, sdd->debugnv);
+	    sdd->outfd, sdd->debugnv, sdd->dry, &sendcounter);
+
+	sdd->send_sz += sendcounter;
+	if (sdd->verbose) {
+		(void) fprintf(stderr, "stream size: %llu  bytes\n", (u_longlong_t)sendcounter);
+	}
 
 	(void) strcpy(sdd->prevsnap, thissnap);
 	sdd->prevsnap_obj = zfs_prop_get_int(zhp, ZFS_PROP_OBJSETID);
@@ -1294,6 +1323,8 @@ zfs_send(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
 	    (flags.doall || flags.replicate))
 		holdsnaps = B_TRUE;
 
+	sdd.dry = flags.dry;
+
 	if (flags.dedup) {
 		featureflags |= (DMU_BACKUP_FEATURE_DEDUP |
 		    DMU_BACKUP_FEATURE_DEDUPPROPS);
@@ -1305,6 +1336,17 @@ zfs_send(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
 		dda.outputfd = outfd;
 		dda.inputfd = pipefd[1];
 		dda.dedup_hdl = zhp->zfs_hdl;
+		dda.dry = flags.dry;
+
+		/*
+		 * We need to unset the flag being sent to kernel. With dedup,
+		 * file descriptor sent to kernel is one end of the pipe and we
+		 * would want the data back in the pipe for cksummer() to calculate
+		 * the dedupted bytes in stream. So reset the dryrun flag so that
+		 * kernel writes to the pipe.
+		 */
+		sdd.dry = B_FALSE;
+
 		if (err = pthread_create(&tid, NULL, cksummer, &dda)) {
 			(void) close(pipefd[0]);
 			(void) close(pipefd[1]);
@@ -1364,10 +1406,12 @@ zfs_send(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
 		    "%s@%s", zhp->zfs_name, tosnap);
 		drr.drr_payloadlen = buflen;
 		err = cksum_and_write(&drr, sizeof (drr), &zc, outfd);
+		sdd.hdr_send_sz += sizeof (drr);
 
 		/* write header nvlist */
 		if (err != -1 && packbuf != NULL) {
 			err = cksum_and_write(packbuf, buflen, &zc, outfd);
+			sdd.hdr_send_sz += buflen;
 		}
 		free(packbuf);
 		if (err == -1) {
@@ -1383,6 +1427,7 @@ zfs_send(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
 			drr.drr_type = DRR_END;
 			drr.drr_u.drr_end.drr_checksum = zc;
 			err = write(outfd, &drr, sizeof (drr));
+			sdd.hdr_send_sz += sizeof (drr);
 			if (err == -1) {
 				fsavl_destroy(fsavl);
 				nvlist_free(fss);
@@ -1428,6 +1473,7 @@ zfs_send(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
 	if (flags.dedup) {
 		(void) close(pipefd[0]);
 		(void) pthread_join(tid, NULL);
+		sdd.send_sz = dda.dedup_data_sz;
 	}
 
 	if (sdd.cleanup_fd != -1) {
@@ -1447,6 +1493,17 @@ zfs_send(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
 			return (zfs_standard_error(zhp->zfs_hdl,
 			    errno, errbuf));
 		}
+		sdd.hdr_send_sz += sizeof (drr);
+	}
+	if (sdd.verbose) {
+		fprintf(stderr, "Total header size : %u\n", sdd.hdr_send_sz);
+		fprintf(stderr, "Total data size : %llu\n", sdd.send_sz);
+		fprintf(stderr, "Total Send Stream Size : %llu\n",
+			sdd.send_sz + (uint64_t)sdd.hdr_send_sz);
+	}
+
+	if (flags.dry) {
+		fprintf(stderr, "%llu\n", sdd.send_sz + (uint64_t)sdd.hdr_send_sz);
 	}
 
 	return (err || sdd.err);
