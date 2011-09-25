@@ -3107,7 +3107,7 @@ fme_undiagnosable(struct fme *f)
 
 	for (ep = f->observations; ep; ep = ep->observations) {
 
-		if (ep->ffep != f->e0r)
+		if (ep->ffep != NULL && ep->ffep != f->e0r)
 			fmd_case_add_ereport(f->hdl, f->fmcase, ep->ffep);
 
 		pathstr = ipath2str(NULL, ipath(platform_getpath(ep->nvp)));
