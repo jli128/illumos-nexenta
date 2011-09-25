@@ -1,3 +1,9 @@
+sunwfmd (5.11.134-31-6490-0) nexenta; urgency=low
+
+  * Issue 5639: FMD Service Segmentation Fault (core dumped)
+
+ -- Nexenta Systems <support@nexenta.com>  Mon, 18 Jul 2011 04:43:30 -0400
+
 sunwfmd (5.11.134-31-0-100) nexenta; urgency=low
 
   * Renumber packages in preparation for 3.1 release
