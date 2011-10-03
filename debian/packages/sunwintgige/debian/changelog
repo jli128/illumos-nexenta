@@ -1,3 +1,9 @@
+sunwintgige (5.11.134-31-6710-0) nexenta; urgency=low
+
+  * Issue 6679: Need 82579 PHY support in e1000g
+
+ -- Nexenta Systems <support@nexenta.com>  Mon, 03 Oct 2011 07:06:11 -0700
+
 sunwintgige (5.11.134-31-0-100) nexenta; urgency=low
 
   * Renumber packages in preparation for 3.1 release

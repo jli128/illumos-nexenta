@@ -218,6 +218,8 @@ check_add_drv()
 	"pci8086,10f0"
 	"pci8086,10f5"
 	"pci8086,10f6"
+	"pci8086,1502"
+	"pci8086,1503"
 	"pci8086,150c"
 	"pci8086,294c"
 	"pci8086,f0fe"
@@ -267,6 +269,8 @@ check_add_drv()
 	"pciex8086,10f0"
 	"pciex8086,10f5"
 	"pciex8086,10f6"
+	"pciex8086,1502"
+	"pciex8086,1503"
 	"pciex8086,150c"
 	"pciex8086,294c"
 	"pciex8086,f0fe"' \

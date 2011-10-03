@@ -19,8 +19,11 @@
  */
 
 /*
- * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+
+/*
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -45,8 +48,8 @@
 #include "e1000g_debug.h"
 
 static char ident[] = "Intel PRO/1000 Ethernet";
-static char e1000g_string[] = "Intel(R) PRO/1000 Network Connection";
-static char e1000g_version[] = "Driver Ver. 5.3.22";
+/* LINTED E_STATIC_UNUSED */
+static char e1000g_version[] = "Driver Ver. 5.3.24";
 
 /*
  * Proto types for DDI entry points
@@ -177,7 +180,6 @@ mac_priv_prop_t e1000g_priv_props[] = {
 #define	E1000G_MAX_PRIV_PROPS	\
 	(sizeof (e1000g_priv_props)/sizeof (mac_priv_prop_t))
 
-
 static struct cb_ops cb_ws_ops = {
 	nulldev,		/* cb_open */
 	nulldev,		/* cb_close */
@@ -255,6 +257,7 @@ static mac_callbacks_t e1000g_m_callbacks = {
 /*
  * Global variables
  */
+uint32_t e1000g_jumbo_mtu = MAXIMUM_MTU_9K;
 uint32_t e1000g_mblks_pending = 0;
 /*
  * Workaround for Dynamic Reconfiguration support, for x86 platform only.
@@ -581,9 +584,7 @@ e1000g_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		mutex_exit(&e1000g_rx_detach_lock);
 	}
 
-	cmn_err(CE_CONT, "!%s, %s\n", e1000g_string, e1000g_version);
 	Adapter->e1000g_state = E1000G_INITIALIZED;
-
 	return (DDI_SUCCESS);
 
 attach_fail:
@@ -680,6 +681,7 @@ e1000g_regs_map(struct e1000g *Adapter)
 	case e1000_ich9lan:
 	case e1000_ich10lan:
 	case e1000_pchlan:
+	case e1000_pch2lan:
 		rnumber = ICH_FLASH_REG_SET;
 
 		/* get flash size */
@@ -884,19 +886,27 @@ e1000g_setup_max_mtu(struct e1000g *Adapter)
 	case e1000_pchlan:
 		Adapter->max_mtu = MAXIMUM_MTU_4K;
 		break;
+	/* pch2 can do jumbo frames up to 9K */
+	case e1000_pch2lan:
+		Adapter->max_mtu = MAXIMUM_MTU_9K;
+		break;
 	/* types with a special limit */
 	case e1000_82571:
 	case e1000_82572:
 	case e1000_82574:
 	case e1000_80003es2lan:
 	case e1000_ich10lan:
-		Adapter->max_mtu = MAXIMUM_MTU_9K;
+		if (e1000g_jumbo_mtu >= ETHERMTU &&
+		    e1000g_jumbo_mtu <= MAXIMUM_MTU_9K) {
+			Adapter->max_mtu = e1000g_jumbo_mtu;
+		} else {
+			Adapter->max_mtu = MAXIMUM_MTU_9K;
+		}
 		break;
 	/* default limit is 16K */
 	default:
 		Adapter->max_mtu = FRAME_SIZE_UPTO_16K -
-		    sizeof (struct ether_vlan_header) - ETHERFCSL -
-		    E1000G_IPALIGNPRESERVEROOM;
+		    sizeof (struct ether_vlan_header) - ETHERFCSL;
 		break;
 	}
 }
@@ -942,10 +952,9 @@ e1000g_set_bufsize(struct e1000g *Adapter)
 	    ((mac->type == e1000_82545) ||
 	    (mac->type == e1000_82546) ||
 	    (mac->type == e1000_82546_rev_3))) {
-		Adapter->rx_buffer_size = E1000_RX_BUFFER_SIZE_2K +
-		    E1000G_IPALIGNROOM;
+		Adapter->rx_buffer_size = E1000_RX_BUFFER_SIZE_2K;
 	} else {
-		rx_size = Adapter->max_frame_size + E1000G_IPALIGNPRESERVEROOM;
+		rx_size = Adapter->max_frame_size;
 		if ((rx_size > FRAME_SIZE_UPTO_2K) &&
 		    (rx_size <= FRAME_SIZE_UPTO_4K))
 			Adapter->rx_buffer_size = E1000_RX_BUFFER_SIZE_4K;
@@ -958,6 +967,7 @@ e1000g_set_bufsize(struct e1000g *Adapter)
 		else
 			Adapter->rx_buffer_size = E1000_RX_BUFFER_SIZE_2K;
 	}
+	Adapter->rx_buffer_size += E1000G_IPALIGNROOM;
 
 	tx_size = Adapter->max_frame_size;
 	if ((tx_size > FRAME_SIZE_UPTO_2K) && (tx_size <= FRAME_SIZE_UPTO_4K))
@@ -1438,6 +1448,8 @@ e1000g_init(struct e1000g *Adapter)
 		pba = E1000_PBA_10K;
 	} else if (hw->mac.type == e1000_pchlan) {
 		pba = E1000_PBA_26K;
+	} else if (hw->mac.type == e1000_pch2lan) {
+		pba = E1000_PBA_26K;
 	} else {
 		/*
 		 * Total FIFO is 40K
@@ -1664,7 +1676,12 @@ e1000g_link_up(struct e1000g *Adapter)
 	case e1000_media_type_copper:
 		if (hw->mac.get_link_status) {
 			(void) e1000_check_for_link(hw);
-			link_up = !hw->mac.get_link_status;
+			if ((E1000_READ_REG(hw, E1000_STATUS) &
+			    E1000_STATUS_LU)) {
+				link_up = B_TRUE;
+			} else {
+				link_up = !hw->mac.get_link_status;
+			}
 		} else {
 			link_up = B_TRUE;
 		}
@@ -1964,6 +1981,10 @@ e1000g_stop(struct e1000g *Adapter, boolean_t global)
 		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_LOST);
 	}
 
+	mutex_enter(&Adapter->link_lock);
+	Adapter->link_complete = B_FALSE;
+	mutex_exit(&Adapter->link_lock);
+
 	/* Release resources still held by the TX descriptors */
 	e1000g_tx_clean(Adapter);
 
@@ -1993,7 +2014,7 @@ e1000g_stop(struct e1000g *Adapter, boolean_t global)
 		mutex_exit(&e1000g_rx_detach_lock);
 	}
 
-	if (Adapter->link_state == LINK_STATE_UP) {
+	if (Adapter->link_state != LINK_STATE_UNKNOWN) {
 		Adapter->link_state = LINK_STATE_UNKNOWN;
 		if (!Adapter->reset_flag)
 			mac_link_update(Adapter->mh, Adapter->link_state);
@@ -3189,18 +3210,18 @@ reset:
 			err = ENOTSUP; /* read-only prop. Can't set this. */
 			break;
 		case MAC_PROP_MTU:
+			/* adapter must be stopped for an MTU change */
+			if (Adapter->e1000g_state & E1000G_STARTED) {
+				err = EBUSY;
+				break;
+			}
+
 			cur_mtu = Adapter->default_mtu;
 
 			/* get new requested MTU */
 			bcopy(pr_val, &new_mtu, sizeof (new_mtu));
 			if (new_mtu == cur_mtu) {
 				err = 0;
-				break;
-			}
-
-			/* adapter must be stopped for an MTU change */
-			if (Adapter->e1000g_state & E1000G_STARTED) {
-				err = EBUSY;
 				break;
 			}
 
@@ -3231,9 +3252,7 @@ reset:
 				 * resource consumption
 				 */
 				if (Adapter->max_frame_size >=
-				    (FRAME_SIZE_UPTO_4K -
-				    E1000G_IPALIGNPRESERVEROOM)) {
-
+				    (FRAME_SIZE_UPTO_4K)) {
 					if (Adapter->tx_desc_num_flag == 0)
 						Adapter->tx_desc_num =
 						    DEFAULT_JUMBO_NUM_TX_DESC;
@@ -3247,7 +3266,7 @@ reset:
 						    DEFAULT_JUMBO_NUM_TX_BUF;
 
 					if (Adapter->rx_buf_num_flag == 0)
-						Adapter->rx_freelist_num =
+						Adapter->rx_freelist_limit =
 						    DEFAULT_JUMBO_NUM_RX_BUF;
 				} else {
 					if (Adapter->tx_desc_num_flag == 0)
@@ -3263,7 +3282,7 @@ reset:
 						    DEFAULT_NUM_TX_FREELIST;
 
 					if (Adapter->rx_buf_num_flag == 0)
-						Adapter->rx_freelist_num =
+						Adapter->rx_freelist_limit =
 						    DEFAULT_NUM_RX_FREELIST;
 				}
 			}
@@ -3432,6 +3451,7 @@ e1000g_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 			err = ENOTSUP;
 			break;
 	}
+
 	return (err);
 }
 
@@ -3753,9 +3773,7 @@ e1000g_get_conf(struct e1000g *Adapter)
 	 * decrease the number of descriptors and free packets
 	 * for jumbo frames to reduce tx/rx resource consumption
 	 */
-	if (Adapter->max_frame_size >=
-	    (FRAME_SIZE_UPTO_4K -
-	    E1000G_IPALIGNPRESERVEROOM)) {
+	if (Adapter->max_frame_size >= FRAME_SIZE_UPTO_4K) {
 		is_jumbo = B_TRUE;
 	}
 
@@ -3792,6 +3810,7 @@ e1000g_get_conf(struct e1000g *Adapter)
 	    is_jumbo ? DEFAULT_JUMBO_NUM_RX_BUF
 	    : DEFAULT_NUM_RX_FREELIST, &propval);
 	Adapter->rx_freelist_num = propval;
+	Adapter->rx_freelist_limit = propval;
 
 	/*
 	 * NumTxPacketList
@@ -4428,24 +4447,17 @@ e1000g_get_max_frame_size(struct e1000g *Adapter)
 	case 0:
 		Adapter->default_mtu = ETHERMTU;
 		break;
-	/*
-	 * To avoid excessive memory allocation for rx buffers,
-	 * the bytes of E1000G_IPALIGNPRESERVEROOM are reserved.
-	 */
 	case 1:
 		Adapter->default_mtu = FRAME_SIZE_UPTO_4K -
-		    sizeof (struct ether_vlan_header) - ETHERFCSL -
-		    E1000G_IPALIGNPRESERVEROOM;
+		    sizeof (struct ether_vlan_header) - ETHERFCSL;
 		break;
 	case 2:
 		Adapter->default_mtu = FRAME_SIZE_UPTO_8K -
-		    sizeof (struct ether_vlan_header) - ETHERFCSL -
-		    E1000G_IPALIGNPRESERVEROOM;
+		    sizeof (struct ether_vlan_header) - ETHERFCSL;
 		break;
 	case 3:
 		Adapter->default_mtu = FRAME_SIZE_UPTO_16K -
-		    sizeof (struct ether_vlan_header) - ETHERFCSL -
-		    E1000G_IPALIGNPRESERVEROOM;
+		    sizeof (struct ether_vlan_header) - ETHERFCSL;
 		break;
 	default:
 		Adapter->default_mtu = ETHERMTU;
@@ -4474,7 +4486,7 @@ e1000g_pch_limits(struct e1000g *Adapter)
 	struct e1000_hw *hw = &Adapter->shared;
 
 	/* only applies to PCH silicon type */
-	if (hw->mac.type != e1000_pchlan)
+	if (hw->mac.type != e1000_pchlan && hw->mac.type != e1000_pch2lan)
 		return;
 
 	/* only applies to frames larger than ethernet default */
@@ -6409,6 +6421,7 @@ e1000g_get_driver_control(struct e1000_hw *hw)
 	case e1000_ich9lan:
 	case e1000_ich10lan:
 	case e1000_pchlan:
+	case e1000_pch2lan:
 		ctrl_ext = E1000_READ_REG(hw, E1000_CTRL_EXT);
 		E1000_WRITE_REG(hw, E1000_CTRL_EXT,
 		    ctrl_ext | E1000_CTRL_EXT_DRV_LOAD);
@@ -6443,6 +6456,7 @@ e1000g_release_driver_control(struct e1000_hw *hw)
 	case e1000_ich9lan:
 	case e1000_ich10lan:
 	case e1000_pchlan:
+	case e1000_pch2lan:
 		ctrl_ext = E1000_READ_REG(hw, E1000_CTRL_EXT);
 		E1000_WRITE_REG(hw, E1000_CTRL_EXT,
 		    ctrl_ext & ~E1000_CTRL_EXT_DRV_LOAD);
