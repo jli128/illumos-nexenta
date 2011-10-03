@@ -19,9 +19,44 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
+
+/*
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ */
+
+/*
+ * Copyright (c) 2001-2010, Intel Corporation
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ *  1. Redistributions of source code must retain the above copyright notice,
+ *     this list of conditions and the following disclaimer.
+ *
+ *  2. Redistributions in binary form must reproduce the above copyright
+ *     notice, this list of conditions and the following disclaimer in the
+ *     documentation and/or other materials provided with the distribution.
+ *
+ *  3. Neither the name of the Intel Corporation nor the names of its
+ *     contributors may be used to endorse or promote products derived from
+ *     this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ */
+
 
 /*
  * **********************************************************************
@@ -266,10 +301,12 @@ e1000g_rx_setup(struct e1000g *Adapter)
 	 */
 	rctl = E1000_RCTL_EN |		/* Enable Receive Unit */
 	    E1000_RCTL_BAM |		/* Accept Broadcast Packets */
-	    E1000_RCTL_LPE |		/* Large Packet Enable bit */
 	    (hw->mac.mc_filter_type << E1000_RCTL_MO_SHIFT) |
 	    E1000_RCTL_RDMTS_HALF |
 	    E1000_RCTL_LBM_NO;		/* Loopback Mode = none */
+
+	if (Adapter->default_mtu > ETHERMTU)
+		rctl |= E1000_RCTL_LPE;  /* Large Packet Enable bit */
 
 	if (Adapter->strip_crc)
 		rctl |= E1000_RCTL_SECRC;	/* Strip Ethernet CRC */
@@ -340,6 +377,16 @@ e1000g_rx_setup(struct e1000g *Adapter)
 		}
 	}
 
+	/* Workaround errata on 82579 adapters with large frames */
+	if (hw->mac.type == e1000_pch2lan) {
+		boolean_t enable_jumbo = (Adapter->default_mtu > ETHERMTU ?
+		    B_TRUE : B_FALSE);
+
+		if (e1000_lv_jumbo_workaround_ich8lan(hw, enable_jumbo) != 0)
+			E1000G_DEBUGLOG_0(Adapter, E1000G_INFO_LEVEL,
+			    "failed to enable jumbo frame workaround mode\n");
+	}
+
 	reg_val =
 	    E1000_RXCSUM_TUOFL |	/* TCP/UDP checksum offload Enable */
 	    E1000_RXCSUM_IPOFL;		/* IP checksum offload Enable */
@@ -368,29 +415,44 @@ static p_rx_sw_packet_t
 e1000g_get_buf(e1000g_rx_data_t *rx_data)
 {
 	p_rx_sw_packet_t packet;
+	struct e1000g *Adapter;
+
+	Adapter = rx_data->rx_ring->adapter;
 
 	mutex_enter(&rx_data->freelist_lock);
 	packet = (p_rx_sw_packet_t)
 	    QUEUE_POP_HEAD(&rx_data->free_list);
 	if (packet != NULL) {
 		rx_data->avail_freepkt--;
-	} else {
-		/*
-		 * If the freelist has no packets, check the recycle list
-		 * to see if there are any available descriptor there.
-		 */
-		mutex_enter(&rx_data->recycle_lock);
-		QUEUE_SWITCH(&rx_data->free_list, &rx_data->recycle_list);
-		rx_data->avail_freepkt = rx_data->recycle_freepkt;
-		rx_data->recycle_freepkt = 0;
-		mutex_exit(&rx_data->recycle_lock);
+		goto end;
+	}
+
+	/*
+	 * If the freelist has no packets, check the recycle list
+	 * to see if there are any available descriptor there.
+	 */
+	mutex_enter(&rx_data->recycle_lock);
+	QUEUE_SWITCH(&rx_data->free_list, &rx_data->recycle_list);
+	rx_data->avail_freepkt = rx_data->recycle_freepkt;
+	rx_data->recycle_freepkt = 0;
+	mutex_exit(&rx_data->recycle_lock);
+	packet = (p_rx_sw_packet_t)QUEUE_POP_HEAD(&rx_data->free_list);
+	if (packet != NULL) {
+		rx_data->avail_freepkt--;
+		goto end;
+	}
+
+	if (Adapter->rx_freelist_num < Adapter->rx_freelist_limit) {
+		(void) e1000g_increase_rx_packets(rx_data);
 		packet = (p_rx_sw_packet_t)
 		    QUEUE_POP_HEAD(&rx_data->free_list);
-		if (packet != NULL)
+		if (packet != NULL) {
 			rx_data->avail_freepkt--;
+		}
 	}
-	mutex_exit(&rx_data->freelist_lock);
 
+end:
+	mutex_exit(&rx_data->freelist_lock);
 	return (packet);
 }
 
@@ -580,12 +642,15 @@ e1000g_receive(e1000g_rx_ring_t *rx_ring, mblk_t **tail, uint_t sz)
 				 * drop this fragment, do the processing of
 				 * the end of the packet.
 				 */
-				ASSERT(rx_data->rx_mblk_tail != NULL);
+				if (rx_data->rx_mblk_tail == NULL) {
+					E1000G_STAT(rx_ring->stat_crc_only_pkt);
+					goto rx_next_desc;
+				}
+
 				rx_data->rx_mblk_tail->b_wptr -=
 				    ETHERFCSL - length;
 				rx_data->rx_mblk_len -=
 				    ETHERFCSL - length;
-
 				goto rx_end_of_packet;
 			}
 		}
@@ -697,8 +762,7 @@ rx_copy:
 				    E1000_RXD_STAT_TCPCS) &&
 				    !(current_desc->errors &
 				    E1000_RXD_ERR_TCPE))
-					cksumflags |= HCK_FULLCKSUM |
-					    HCK_FULLCKSUM_OK;
+					cksumflags |= HCK_FULLCKSUM_OK;
 				/*
 				 * Check IP Checksum
 				 */
