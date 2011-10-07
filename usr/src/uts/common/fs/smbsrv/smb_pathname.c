@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -128,9 +129,9 @@ smb_is_executable(char *path)
  * smb_fsop_lookup(), smb_vop_lookup() and other smb_vop_*() routines in the
  * following areas:
  *
- *	- non-traversal of child mounts		(handled by smb_pathname_reduce)
- *	- unmangling 				(handled in smb_pathname)
- *	- "chroot" behavior of share root 	(handled by lookuppnvp)
+ *	- traversal of child mounts (handled by smb_pathname_reduce)
+ *	- unmangling                (handled in smb_pathname)
+ *	- "chroot" behavior of share root (handled by lookuppnvp)
  *
  * In addition, it needs to replace backslashes with forward slashes.  It also
  * ensures that link processing is done correctly, and that directory
@@ -270,18 +271,30 @@ smb_pathname_reduce(
 	kmem_free(usepath, MAXPATHLEN);
 
 	/*
-	 * Prevent access to anything outside of the share root, except
-	 * when mapping a share because that may require traversal from
-	 * / to a mounted file system.  share_root_node is NULL when
-	 * mapping a share.
+	 * Prevent traversal to another file system if the target file
+	 * system is incompatible with the share root filesystem and if
+	 * mount point traversal is disabled.
 	 *
 	 * Note that we disregard whether the traversal of the path went
 	 * outside of the file system and then came back (say via a link).
+	 * This means that only symlinks that are expressed relatively to
+	 * the share root work.
+	 *
+	 * share_root_node is NULL when mapping a share, so we disregard
+	 * that case.
 	 */
 
 	if ((err == 0) && share_root_node) {
-		if (share_root_node->vp->v_vfsp != (*dir_node)->vp->v_vfsp)
+		if (share_root_node->vp->v_vfsp != (*dir_node)->vp->v_vfsp) {
 			err = EACCES;
+			if ((sr) && (sr)->tid_tree &&
+			    smb_tree_has_feature((sr)->tid_tree,
+			    SMB_TREE_TRAVERSE_MOUNTS) &&
+			    smb_vfs_is_compat(
+			    share_root_node->vp->v_vfsp,
+			    (*dir_node)->vp->v_vfsp))
+				err = 0;
+		}
 	}
 
 	if (err) {

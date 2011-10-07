@@ -20,7 +20,9 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
+
 #include <sys/atomic.h>
 #include <sys/strsubr.h>
 #include <sys/synch.h>
@@ -1187,16 +1189,6 @@ dump_smb_inaddr(smb_inaddr_t *ipaddr)
 		cmn_err(CE_WARN, "error ipstr=%s", ipstr);
 	else
 		cmn_err(CE_WARN, "error converting ip address");
-}
-
-boolean_t
-smb_session_oplocks_enable(smb_session_t *session)
-{
-	SMB_SESSION_VALID(session);
-	if (session->s_cfg.skc_oplock_enable == 0)
-		return (B_FALSE);
-	else
-		return (B_TRUE);
 }
 
 boolean_t
