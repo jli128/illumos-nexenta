@@ -20,7 +20,7 @@
  */
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2011, Joyent, Inc. All rights reserved.
  */
 /*
  * Copyright (c) 2009, Intel Corporation.
@@ -614,13 +614,12 @@ acpica_ddi_setwake(dev_info_t *dip, int level)
 
 	rv = -1;
 	if (level == 0) {
-		if (ACPI_FAILURE(AcpiDisableGpe(gpeobj, gpebit, ACPI_NOT_ISR)))
+		if (ACPI_FAILURE(AcpiDisableGpe(gpeobj, gpebit)))
 			goto done;
 	} else if (prw_level <= level) {
 		if (ACPI_SUCCESS(
-		    AcpiSetGpeType(gpeobj, gpebit, ACPI_GPE_TYPE_WAKE)))
-			if (ACPI_FAILURE(
-			    AcpiEnableGpe(gpeobj, gpebit, ACPI_NOT_ISR)))
+		    AcpiSetGpeWakeMask(gpeobj, gpebit, ACPI_GPE_ENABLE)))
+			if (ACPI_FAILURE(AcpiEnableGpe(gpeobj, gpebit)))
 				goto done;
 	}
 	rv = 0;
