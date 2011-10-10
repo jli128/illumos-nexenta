@@ -119,6 +119,26 @@ static int zfs_fill_zplprops_root(uint64_t, nvlist_t *, nvlist_t *,
     boolean_t *);
 int zfs_set_prop_nvlist(const char *, zprop_source_t, nvlist_t *, nvlist_t **);
 
+static int
+zfs_is_wormed(const char *name)
+{
+	char worminfo[13] = {0};
+	char cname[MAXNAMELEN];
+	char *end;
+
+	strcpy(cname, name);
+	end = strchr(cname, '@');
+	if (end)
+		*end = 0;
+
+	if (dsl_prop_get(cname, "nms:worm", 1, 12, &worminfo, NULL) == 0 &&
+	    worminfo[0] && strcmp(worminfo, "0") != 0 &&
+	    strcmp(worminfo, "off") != 0 && strcmp(worminfo, "-") != 0) {
+		return 1;
+	}
+	return 0;
+}
+
 /* _NOTE(PRINTFLIKE(4)) - this is printf-like, but lint is too whiney */
 void
 __dprintf(const char *file, const char *func, int line, const char *fmt, ...)
@@ -2201,6 +2221,8 @@ zfs_set_prop_nvlist(const char *dsname, zprop_source_t source, nvlist_t *nvl,
 	nvlist_t *genericnvl;
 	nvlist_t *errors;
 	nvlist_t *retrynvl;
+	zfsvfs_t *zfsvfs;
+	boolean_t set_worm = B_FALSE;
 
 	VERIFY(nvlist_alloc(&genericnvl, NV_UNIQUE_NAME, KM_SLEEP) == 0);
 	VERIFY(nvlist_alloc(&errors, NV_UNIQUE_NAME, KM_SLEEP) == 0);
@@ -2213,6 +2235,11 @@ retry:
 		zfs_prop_t prop = zfs_name_to_prop(propname);
 		int err = 0;
 
+		if (!set_worm && !strcmp(propname, "nms:worm")) {
+			set_worm = TRUE;
+		}
+
+		cmn_err(CE_NOTE, "The property is %s\n", propname);
 		/* decode the property value */
 		propval = pair;
 		if (nvpair_type(pair) == DATA_TYPE_NVLIST) {
@@ -2345,6 +2372,15 @@ retry:
 		nvlist_free(errors);
 	else
 		*errlist = errors;
+
+	if (set_worm && getzfsvfs(dsname, &zfsvfs) == 0) {
+		if (zfs_is_wormed(dsname)) {
+			zfsvfs->z_isworm = B_TRUE;
+		} else {
+			zfsvfs->z_isworm = B_FALSE;
+		}
+		VFS_RELE(zfsvfs->z_vfs);
+	}
 
 	return (rv);
 }
@@ -2801,6 +2837,14 @@ zfs_fill_zplprops_impl(objset_t *os, uint64_t zplver,
 	VERIFY(nvlist_add_uint64(zplprops,
 	    zfs_prop_to_name(ZFS_PROP_NORMALIZE), norm) == 0);
 
+	if (os) {
+		char osname[MAXNAMELEN];
+
+		dmu_objset_name(os, osname);
+		if (zfs_is_wormed(osname))
+			return EPERM;
+	}
+
 	/*
 	 * If we're normalizing, names must always be valid UTF-8 strings.
 	 */
@@ -2948,11 +2992,17 @@ zfs_ioc_create(zfs_cmd_t *zc)
 			return (error);
 		}
 	} else {
+		char parent[MAXNAMELEN];
 		boolean_t is_insensitive = B_FALSE;
 
 		if (cbfunc == NULL) {
 			nvlist_free(nvprops);
 			return (EINVAL);
+		}
+
+		if (zfs_get_parent(zc->zc_name, parent, sizeof(parent)) == 0) {
+			if (zfs_is_wormed(parent))
+				return EPERM;
 		}
 
 		if (type == DMU_OST_ZVOL) {
@@ -3109,6 +3159,9 @@ zfs_ioc_destroy_snaps(zfs_cmd_t *zc)
 {
 	int err;
 
+	if (zfs_is_wormed(zc->zc_name))
+		return EPERM;
+
 	if (snapshot_namecheck(zc->zc_value, NULL, NULL) != 0)
 		return (EINVAL);
 	err = dmu_objset_find(zc->zc_name,
@@ -3131,6 +3184,10 @@ static int
 zfs_ioc_destroy(zfs_cmd_t *zc)
 {
 	int err;
+
+	if (zfs_is_wormed(zc->zc_name))
+		return EPERM;
+
 	if (strchr(zc->zc_name, '@') && zc->zc_objset_type == DMU_OST_ZFS) {
 		err = zfs_unmount_snap(zc->zc_name, NULL);
 		if (err)
@@ -3156,6 +3213,9 @@ zfs_ioc_rollback(zfs_cmd_t *zc)
 	int error;
 	zfsvfs_t *zfsvfs;
 	char *clone_name;
+
+	if (zfs_is_wormed(zc->zc_name))
+		return EPERM;
 
 	error = dsl_dataset_hold(zc->zc_name, FTAG, &ds);
 	if (error)
@@ -3239,6 +3299,9 @@ static int
 zfs_ioc_rename(zfs_cmd_t *zc)
 {
 	boolean_t recursive = zc->zc_cookie & 1;
+
+	if (zfs_is_wormed(zc->zc_name))
+		return EPERM;
 
 	zc->zc_value[sizeof (zc->zc_value) - 1] = '\0';
 	if (dataset_namecheck(zc->zc_value, NULL, NULL) != 0 ||
