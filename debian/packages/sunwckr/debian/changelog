@@ -1,4 +1,4 @@
-sunwckr (5.11.134-31-0-6831) nexenta; urgency=low
+sunwckr (5.11.134-31-6831-0) nexenta; urgency=low
 
   * Issue 6667: acpica update from Intel via Joyent
 
