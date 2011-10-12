@@ -6,7 +6,8 @@ Build-Depends: debhelper(>=4.9.5gnusol5)
 
 Package: sunwter
 Architecture: solaris-i386
-Depends: ${shlibs:Depends}
+Depends: ${shlibs:Depends}, ncurses-base (>= 5.6+20071124-1nexenta6)
+Replaces: sunwcsu (<< 5.11.134-31-6424-1)
 Description: Terminal Information
  extensive terminfo database entries describing capabilities of terminals and pseudoterminals
  .
