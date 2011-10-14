@@ -1,3 +1,10 @@
+sunwcsu (5.11.134-31-6904-0) nexenta; urgency=low
+
+  * Issue 6885: backport illumos 948 chmod(1M) is not -R friendly when
+    doing ACLs
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 12 Oct 2011 18:59:42 -0400
+
 sunwcsu (5.11.134-31-6424-1) nexenta; urgency=low
 
   * Issue 6424: Removed Depends on sunwter, Recommends instead.
