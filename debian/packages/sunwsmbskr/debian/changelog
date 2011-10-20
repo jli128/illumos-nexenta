@@ -2,7 +2,7 @@ sunwsmbskr (5.11.134-31-3-0) nexenta; urgency=low
 
   * Issue 6809: OS X Lion (10.7) Finder access denied
 
- -- Gate Keeper <support@nexenta.com>  Tue Oct 11 16:41:44 2011 -0400
+ -- Gate Keeper <support@nexenta.com>  Tue, 11 Oct 2011 16:41:44 -0400
 
 sunwsmbskr (5.11.134-31-2-0) nexenta; urgency=low
 
