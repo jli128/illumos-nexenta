@@ -1,3 +1,9 @@
+sunwmptsas (5.11.134-31-6940-0) nexenta; urgency=low
+
+  *  Issue 6530: mpt_sas crash when more than 1 Initiator involved - ie HA
+
+ -- Nexenta Systems <support@nexenta.com>  Sat, 22 Oct 2011 16:55:45 -0700
+
 sunwmptsas (5.11.134-31-0-100) nexenta; urgency=low
 
   * Renumber packages in preparation for 3.1 release
