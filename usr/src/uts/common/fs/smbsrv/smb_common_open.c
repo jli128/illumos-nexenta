@@ -63,7 +63,7 @@ static boolean_t smb_open_overwrite(smb_arg_open_t *);
 uint32_t
 smb_access_generic_to_file(uint32_t desired_access)
 {
-	uint32_t access = 0;
+	uint32_t access = READ_CONTROL;
 
 	if (desired_access & GENERIC_ALL)
 		return (FILE_ALL_ACCESS & ~SYNCHRONIZE);
