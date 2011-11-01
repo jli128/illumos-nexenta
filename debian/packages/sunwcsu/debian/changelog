@@ -1,3 +1,9 @@
+sunwcsu (5.11.134-31-7090-1) nexenta; urgency=low
+
+  * Corrected version to include patch-id instead of bug-id.
+
+ -- Kartik Mistry <kartik.mistry@nexenta.com>  Tue, 01 Nov 2011 22:34:16 +0530
+
 sunwcsu (5.11.134-31-7001-1) nexenta; urgency=low
 
   * Issue 7001: Reverted sunwter from Recommends to Depends.
