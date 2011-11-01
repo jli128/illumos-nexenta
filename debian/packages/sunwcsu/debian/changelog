@@ -1,3 +1,9 @@
+sunwcsu (5.11.134-31-7001-1) nexenta; urgency=low
+
+  * Issue 7001: Reverted sunwter from Recommends to Depends.
+
+ -- Kartik Mistry <kartik.mistry@nexenta.com>  Tue, 01 Nov 2011 07:40:22 +0530
+
 sunwcsu (5.11.134-31-6904-0) nexenta; urgency=low
 
   * Issue 6885: backport illumos 948 chmod(1M) is not -R friendly when
