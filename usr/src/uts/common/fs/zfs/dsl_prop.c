@@ -54,10 +54,13 @@ dodefault(const char *propname, int intsz, int numints, void *buf)
 		return (ENOENT);
 
 	if (zfs_prop_get_type(prop) == PROP_TYPE_STRING) {
+		const char *defaultstr;
+
 		if (intsz != 1)
 			return (EOVERFLOW);
-		(void) strncpy(buf, zfs_prop_default_string(prop),
-		    numints);
+		if ((defaultstr = zfs_prop_default_string(prop)) == NULL)
+			defaultstr = "";
+		(void) strncpy(buf, defaultstr, numints);
 	} else {
 		if (intsz != 8 || numints < 1)
 			return (EOVERFLOW);
