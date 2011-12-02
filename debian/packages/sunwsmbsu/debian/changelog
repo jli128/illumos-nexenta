@@ -1,3 +1,10 @@
+sunwsmbsu (5.11.134-31-7623-0) nexenta; urgency=high
+
+  * Issue 7427: Nexenta panics when CIFS access attempted from Windows XP with Simplified Chinese characterset
+  * Issue 6628: Enabling CIFS causes appliance reboot
+
+ -- Gate Keeper <support@nexenta.com>  Mon, 02 Dec 2011 16:13:33 -0500
+
 sunwsmbsu (5.11.134-31-2-0) nexenta; urgency=low
 
   * Issue 5827: authentication type is not supported (when joining a domain)
