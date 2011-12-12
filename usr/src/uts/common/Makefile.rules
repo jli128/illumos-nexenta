@@ -2025,6 +2025,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/cardbus/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/comstar/lu/stmf_sbd/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
+$(LINTS_DIR)/%.ln:		$(NZA_UTS)/common/io/comstar/lu/stmf_sbd/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/comstar/port/fct/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
