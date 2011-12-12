@@ -28,6 +28,9 @@
  *	All Rights Reserved
  */
 
+/*
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ */
 
 #include <sys/param.h>
 #include <sys/types.h>
