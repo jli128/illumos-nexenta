@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011, Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -12030,8 +12031,8 @@ mptsas_add_intrs(mptsas_t *mpt, int intr_type)
 		return (DDI_FAILURE);
 	}
 
-	if (0 && avail < count) {
-		mptsas_log(mpt, CE_NOTE, "ddi_intr_get_nvail returned %d, "
+	if (avail < count) {
+		mptsas_log(mpt, CE_CONT, "!ddi_intr_get_nvail returned %d, "
 		    "navail() returned %d", count, avail);
 	}
 

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2010 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <stdio.h>
@@ -126,7 +126,6 @@ zm_process_tree(zm_t *zm, zpool_handle_t *zph, nvlist_t *vd)
 
 	fd = open(rpath, O_RDONLY | O_NDELAY);
 	if (fd >= 0) {
-		struct dk_minfo minfo;
 		char	block[DEV_BSIZE];
 
 		if (read(fd, block, DEV_BSIZE) == DEV_BSIZE) {

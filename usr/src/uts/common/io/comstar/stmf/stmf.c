@@ -8439,7 +8439,6 @@ stmf_remote_port_free(stmf_remote_port_t *rpt)
 stmf_lu_t *
 stmf_check_and_hold_lu(scsi_task_t *task, uint8_t *guid)
 {
-	stmf_scsi_session_t *ss;
 	stmf_i_scsi_session_t *iss;
 	stmf_lu_t *lu;
 	stmf_i_lu_t *ilu = NULL;

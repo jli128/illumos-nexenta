@@ -129,7 +129,7 @@ zfs_is_wormed(const char *name)
 	char cname[MAXNAMELEN];
 	char *end;
 
-	strcpy(cname, name);
+	(void) strlcpy(cname, name, MAXNAMELEN);
 	end = strchr(cname, '@');
 	if (end)
 		*end = 0;
@@ -137,9 +137,9 @@ zfs_is_wormed(const char *name)
 	if (dsl_prop_get(cname, "nms:worm", 1, 12, &worminfo, NULL) == 0 &&
 	    worminfo[0] && strcmp(worminfo, "0") != 0 &&
 	    strcmp(worminfo, "off") != 0 && strcmp(worminfo, "-") != 0) {
-		return 1;
+		return (1);
 	}
-	return 0;
+	return (0);
 }
 
 /* _NOTE(PRINTFLIKE(4)) - this is printf-like, but lint is too whiney */
@@ -2269,8 +2269,8 @@ retry:
 		zfs_prop_t prop = zfs_name_to_prop(propname);
 		int err = 0;
 
-		if (!set_worm && !strcmp(propname, "nms:worm")) {
-			set_worm = TRUE;
+		if (!set_worm && (strcmp(propname, "nms:worm") == 0)) {
+			set_worm = B_TRUE;
 		}
 
 		cmn_err(CE_NOTE, "The property is %s\n", propname);
@@ -2878,7 +2878,7 @@ zfs_fill_zplprops_impl(objset_t *os, uint64_t zplver,
 
 		dmu_objset_name(os, osname);
 		if (zfs_is_wormed(osname))
-			return EPERM;
+			return (EPERM);
 	}
 
 	/*
@@ -3036,9 +3036,9 @@ zfs_ioc_create(zfs_cmd_t *zc)
 			return (EINVAL);
 		}
 
-		if (zfs_get_parent(zc->zc_name, parent, sizeof(parent)) == 0) {
+		if (zfs_get_parent(zc->zc_name, parent, MAXNAMELEN) == 0) {
 			if (zfs_is_wormed(parent))
-				return EPERM;
+				return (EPERM);
 		}
 
 		if (type == DMU_OST_ZVOL) {
@@ -3199,7 +3199,7 @@ zfs_ioc_destroy_snaps_nvl(zfs_cmd_t *zc)
 	nvpair_t *pair;
 
 	if (zfs_is_wormed(zc->zc_name))
-		return EPERM;
+		return (EPERM);
 
 	if ((err = get_nvlist(zc->zc_nvlist_src, zc->zc_nvlist_src_size,
 	    zc->zc_iflags, &nvl)) != 0)
@@ -3242,7 +3242,7 @@ zfs_ioc_destroy(zfs_cmd_t *zc)
 	int err;
 
 	if (zfs_is_wormed(zc->zc_name))
-		return EPERM;
+		return (EPERM);
 
 	if (strchr(zc->zc_name, '@') && zc->zc_objset_type == DMU_OST_ZFS) {
 		err = zfs_unmount_snap(zc->zc_name, NULL);
@@ -3271,7 +3271,7 @@ zfs_ioc_rollback(zfs_cmd_t *zc)
 	char *clone_name;
 
 	if (zfs_is_wormed(zc->zc_name))
-		return EPERM;
+		return (EPERM);
 
 	error = dsl_dataset_hold(zc->zc_name, FTAG, &ds);
 	if (error)
@@ -3357,7 +3357,7 @@ zfs_ioc_rename(zfs_cmd_t *zc)
 	boolean_t recursive = zc->zc_cookie & 1;
 
 	if (zfs_is_wormed(zc->zc_name))
-		return EPERM;
+		return (EPERM);
 
 	zc->zc_value[sizeof (zc->zc_value) - 1] = '\0';
 	if (dataset_namecheck(zc->zc_value, NULL, NULL) != 0 ||

@@ -153,8 +153,8 @@ smb_vfs_is_compat(vfs_t *root_vfsp, vfs_t *target_vfsp)
 
 	compat = 1;	/* innocent until proven otherwise */
 	for (i = 0; i < sizeof (features)/sizeof (features[0]); i++) {
-		if (vfs_has_feature(root_vfsp, i) !=
-		    vfs_has_feature(target_vfsp, i)) {
+		if (vfs_has_feature(root_vfsp, features[i]) !=
+		    vfs_has_feature(target_vfsp, features[i])) {
 			compat = 0;
 		}
 	}
