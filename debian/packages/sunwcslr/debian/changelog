@@ -1,3 +1,9 @@
+sunwcslr (5.11.134-31-7697-0) nexenta; urgency=low
+
+  * Fixed core dumped mountd (bug #7563)
+
+ -- Vitaliy Gusev <vitaliy.gusev@nexenta.com>  Wed, 21 Dec 2011 00:00:00 +0400
+
 sunwcslr (5.11.134-31-0-100) nexenta; urgency=low
 
   * Renumber packages in preparation for 3.1 release
