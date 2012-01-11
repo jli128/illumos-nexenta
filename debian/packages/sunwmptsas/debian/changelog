@@ -1,3 +1,10 @@
+sunwmptsas (5.11.134-31-7724-0) nexenta; urgency=high
+
+  * Issue 7364: "hddisco" hangs after unplugging both cables from JBOD (and
+    NMS too)
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 28 Dec 2011 18:10:25 -0400
+
 sunwmptsas (5.11.134-31-6940-0) nexenta; urgency=low
 
   *  Issue 6530: mpt_sas crash when more than 1 Initiator involved - ie HA

@@ -6053,10 +6053,6 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 		}
 
 		mutex_enter(&mpt->m_mutex);
-		if (mptsas_set_led_status(mpt, ptgt, 0) != DDI_SUCCESS) {
-			NDBG14(("mptsas: clear LED for tgt %x failed",
-			    ptgt->m_slot_num));
-		}
 		if (rval == DDI_SUCCESS) {
 			mptsas_tgt_free(&mpt->m_active->m_tgttbl,
 			    ptgt->m_sas_wwn, ptgt->m_phymask);
