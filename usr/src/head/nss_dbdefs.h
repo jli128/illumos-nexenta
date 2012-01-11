@@ -666,7 +666,6 @@ typedef struct {
 	(str)->key2str  = NULL,				\
 	(str)->returnval = 0,				\
 	(str)->returnlen = 0,				\
-	(str)->h_errno    = 0,				\
 	(str)->erange    = 0)
 
 #define	NSS_XbyY_INIT_EXT(str, res, bufp, len, func, kfunc)	(\
@@ -678,7 +677,6 @@ typedef struct {
 	(str)->key2str  = (kfunc),			\
 	(str)->returnval = 0,				\
 	(str)->returnlen = 0,				\
-	(str)->h_errno    = 0,				\
 	(str)->erange    = 0)
 
 #define	NSS_XbyY_FINI(str)				(\
