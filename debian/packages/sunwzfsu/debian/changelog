@@ -1,3 +1,9 @@
+sunwzfsu (5.11.134-31-12272-13803) nexenta; urgency=high
+
+  * Issue 13803: backport illumos 1909
+
+ -- Boris Protopopov <boris.protopopov@nexenta.com>  Tue, 28 May 2013 13:53:38 -0700
+
 sunwzfsu (5.11.134-31-12271-13409) nexenta; urgency=low
 
   * Issue 13409: Fixed section definition in libzfs mapfile-vers file

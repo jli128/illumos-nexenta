@@ -1,3 +1,8 @@
+sunwzfskr (5.11.134-31-12278-13803) nexenta; urgency=high
+
+  * Issue 13803: backport illumos 1909
+
+ -- Boris Protopopov <boris.protopopov@nexenta.com>  Tue, 28 May 2013 13:53:38 -0700
 sunwzfskr (5.11.134-31-12277-13729) nexenta; urgency=high
 
   * Issue 13729: assign each ARC hash bucket its own mutex
