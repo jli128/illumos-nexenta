@@ -15,7 +15,7 @@ export GATEROOT=$(CURDIR)/$(GATESUBDIR)
 CLOSEDBIN_NAME=on-closed-bins-nd.i386.tar.bz2 
 CLOSEDBIN_URL=http://dlc.sun.com/osol/on/downloads/b134/$(CLOSEDBIN_NAME)
 GATEREV=onnv_134
-GATEPARENT_URL=http://hg.genunix.org/onnv-gate.hg
+GATEPARENT_URL=ssh://anonhg@hg.illumos.org/illumos-gate
 CRYPTO_DIR=on-crypto-nd.i386.tar.bz2
 CRYPTO_URL=http://dlc.sun.com/osol/on/downloads/b134/$(CRYPTO_DIR)
 
