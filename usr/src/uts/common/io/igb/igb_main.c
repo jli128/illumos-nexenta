@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright(c) 2007-2010 Intel Corporation. All rights reserved.
+ * Copyright(c) 2007-2012 Intel Corporation. All rights reserved.
  */
 
 /*
@@ -31,7 +31,7 @@
 #include "igb_sw.h"
 
 static char ident[] = "Intel 1Gb Ethernet";
-static char igb_version[] = "igb 1.1.17";
+static char igb_version[] = "igb 1.1.18";
 
 /*
  * Local function protoypes
@@ -286,6 +286,30 @@ static adapter_info_t igb_82580_cap = {
 	0xffe00000		/* mask for RXDCTL register */
 };
 
+static adapter_info_t igb_i350_cap = {
+	/* limits */
+	8,		/* maximum number of rx queues */
+	1,		/* minimum number of rx queues */
+	4,		/* default number of rx queues */
+	8,		/* maximum number of tx queues */
+	1,		/* minimum number of tx queues */
+	4,		/* default number of tx queues */
+	65535,		/* maximum interrupt throttle rate */
+	0,		/* minimum interrupt throttle rate */
+	200,		/* default interrupt throttle rate */
+
+	/* function pointers */
+	igb_enable_adapter_interrupts_82580,
+	igb_setup_msix_82580,
+
+	/* capabilities */
+	(IGB_FLAG_HAS_DCA |	/* capability flags */
+	IGB_FLAG_VMDQ_POOL |
+	IGB_FLAG_NEED_CTX_IDX),
+
+	0xffe00000		/* mask for RXDCTL register */
+};
+
 /*
  * Module Initialization Functions
  */
@@ -517,6 +541,13 @@ igb_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 
 	igb_log(igb, "%s", igb_version);
 	atomic_or_32(&igb->igb_state, IGB_INITIALIZED);
+
+	/*
+	 * Newer models have Energy Efficient Ethernet, let's disable this by
+	 * default.
+	 */
+	if (igb->hw.mac.type == e1000_i350)
+		e1000_set_eee_i350(&igb->hw);
 
 	return (DDI_SUCCESS);
 
@@ -837,6 +868,9 @@ igb_identify_hardware(igb_t *igb)
 		break;
 	case e1000_82580:
 		igb->capab = &igb_82580_cap;
+		break;
+	case e1000_i350:
+		igb->capab = &igb_i350_cap;
 		break;
 	default:
 		return (IGB_FAILURE);
@@ -1700,6 +1734,9 @@ igb_start(igb_t *igb, boolean_t alloc_buffer)
 
 	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK)
 		goto start_failure;
+
+	if (igb->hw.mac.type == e1000_i350)
+		e1000_set_eee_i350(&igb->hw);
 
 	for (i = igb->num_tx_rings - 1; i >= 0; i--)
 		mutex_exit(&igb->tx_rings[i].tx_lock);
