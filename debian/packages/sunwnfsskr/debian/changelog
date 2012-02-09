@@ -1,3 +1,9 @@
+sunwnfsskr (5.11.134-31-{GNGID}-0) nexenta; urgency=low
+
+  * Issue 7474: Fix openowner entries growing
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 25 Jan 2012 18:07:32 +0400
+
 sunwnfsskr (5.11.134-31-0-100) nexenta; urgency=low
 
   * Renumber packages in preparation for 3.1 release
