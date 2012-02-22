@@ -1,3 +1,10 @@
+sunwzfskr (5.11.134-31-8286-0) nexenta; urgency=low
+
+  * Issue 5842: Kernel panic in 'zfs recv' due to uninitialized variable passed
+    to ddt_object_prefetch()
+
+ -- Nexenta Systems <support@nexenta.com>  Fri, 10 Feb 2012 12:00:00 -0400
+
 sunwzfskr (5.11.134-31-7622-0) nexenta; urgency=low
 
   * Issue 6390: Crashes with Auto-sync and Direction reversal, or -R
