@@ -1,3 +1,9 @@
+sunwstmf (5.11.134-31-8475-0) nexenta; urgency=low
+
+  * Issue 6919: ATS not dropping locks upon completion
+
+ -- Gate Keeper <support@nexenta.com>  Mon, 20 Feb 2012 12:08:55 -0700
+
 sunwstmf (5.11.134-31-8063-0) nexenta; urgency=low
 
   * Issue 7916: COMSTAR issues CT requests at revision 2 - Should be revision 1
