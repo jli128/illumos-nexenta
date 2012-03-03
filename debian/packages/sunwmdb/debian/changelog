@@ -1,3 +1,9 @@
+sunwmdb (5.11.134-31-8544-0) nexenta; urgency=low
+
+  * Issue 6231: should allow domain groups as member of local groups
+
+ -- Gate Keeper <support@nexenta.com>  Fri, 16 Sep 2011 16:57:00 -0400
+
 sunwmdb (5.11.134-31-0-100) nexenta; urgency=low
 
   * Renumber packages in preparation for 3.1 release
