@@ -1,3 +1,10 @@
+sunwzfsu (5.11.134-31-8543-0) nexenta; urgency=low
+
+  * Issue 8531: Backport Illumos fix for 1936
+    add support for "-t <datatype>" argument to zfs get
+
+ -- Nexenta Systems <support@nexenta.com>  Fri, 02 Mar 2012 03:28:16 -0800
+
 sunwzfsu (5.11.134-31-6590-0) nexenta; urgency=low
 
   * Issue 6446: include dryrun for 'zfs send'
