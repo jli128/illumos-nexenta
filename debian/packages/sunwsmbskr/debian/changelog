@@ -1,4 +1,4 @@
-sunwsmbfskr (5.11.134-31-8546-0) nexenta; urgency=high
+sunwsmbskr (5.11.134-31-8546-0) nexenta; urgency=high
 
   * Issue 7225: Codenomicon findings in smbsrv
   * Issue 7258: Connections to CIFS service via DNS alias kills other sessions
