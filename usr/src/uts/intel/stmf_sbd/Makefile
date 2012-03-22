@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 #	This makefile drives the production of the stmf_sbd driver for 
 #	COMSTAR.
@@ -60,7 +61,8 @@ LDFLAGS		+= -dy -Ndrv/stmf -Nfs/zfs
 
 INC_PATH	+= -I$(UTSBASE)/common/fs/zfs
 INC_PATH	+= -I$(UTSBASE)/common/io/comstar/lu/stmf_sbd
-INC_PATH	+= -I$(NZA_UTS)/common/io/comstar/lu/stmf_sbd
+# Will be a NOP for non-closed-source builds
+INC_PATH	+= $(NZA_STMFSBDBASE_FLAGS)
 
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
@@ -95,4 +97,5 @@ install:	$(INSTALL_DEPS)
 #
 #	Include common targets.
 #
+include $(NZA_MAKEDEFS)
 include ../Makefile.targ

@@ -21,7 +21,6 @@
 
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 #
 #
 # Makefile.master, global definitions for system source
@@ -117,12 +116,6 @@ __SSNEXT=	$(POUND_SIGN)
 # CLOSED is the root of the tree that contains source which isn't released
 # as open source
 CLOSED=		$(SRC)/../closed
-
-# NZA_CLOSED is the root of the tree that contains Nexenta-specific source
-# files.  For now, it's merely a place for existing modules to pull in
-# closed-source files.  This may change, or will be folded into a revived
-# $CLOSED directory.
-NZA_CLOSED=	$(SRC)/../nza-closed
 
 # BUILD_TOOLS is the root of all tools including compilers.
 # ONBLD_TOOLS is the root of all the tools that are part of SUNWonbld.

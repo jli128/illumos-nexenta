@@ -1332,13 +1332,6 @@ if [ "$CLOSED_BRINGOVER_WS" = "" ]; then
 fi
 
 #
-# XXXNZA -> Derive nza-closed source path, if not specified.
-#
-if [ "$NZA_CLOSED_SRC" = "" ]; then
-	NZA_CLOSED_SRC=$BRINGOVER_WS/usr/nza-closed
-fi
-
-#
 # If BRINGOVER_FILES was not specified, default to usr
 #
 if [ "$BRINGOVER_FILES" = "" ]; then
@@ -2152,6 +2145,15 @@ SCM_TYPE=$(child_wstype)
 if [ "$i_FLAG" = "n" -a -d "$SRC" ]; then
 	echo "\n==== Make clobber at `date` ====\n" >> $LOGFILE
 
+	#
+	# One NZA evironment variable needs to be set.
+	#
+	if [ -f $SRC/../nza-closed/Makefile.nza ]; then
+		export NZA_MAKEDEFS=$SRC/../nza-closed/Makefile.nza
+	else
+		export NZA_MAKEDEFS=$SRC/Makefile.nza
+	fi
+
 	cd $SRC
 	# remove old clobber file
 	rm -f $SRC/clobber.out
@@ -2357,7 +2359,7 @@ type bringover_mercurial > /dev/null 2>&1 || function bringover_mercurial {
 	# (as expressed by NZA_CLOSED_SRC).  This is not quite as
 	# thorough as the other workspaces (no check for merge failures).
 	#
-	if [[ -d $NZA_CLOSED_SRC && -d $NZA_CLOSED_SRC/.hg ]]; then
+	if [[ -d ${NZA_CLOSED_SRC:=/dev/null} && -d $NZA_CLOSED_SRC/.hg ]]; then
 		if [[ ! -d $CODEMGR_WS/usr/nza-closed ]]; then
 			staffer mkdir -p $CODEMGR_WS/usr/nza-closed
 			staffer hg init $CODEMGR_WS/usr/nza-closed
@@ -2392,6 +2394,8 @@ type bringover_mercurial > /dev/null 2>&1 || function bringover_mercurial {
 				return
 			fi
 		fi
+	else
+		staffer echo "Building without NZA closed sources"
 	fi
 
 	#
@@ -2660,6 +2664,15 @@ fi
 #
 if [ "$X_FLAG" = "y" ]; then
 	copy_ihv_proto
+fi
+
+#
+# One NZA evironment variable needs to be set.
+#
+if [ -f $SRC/../nza-closed/Makefile.nza ]; then
+	export NZA_MAKEDEFS=$SRC/../nza-closed/Makefile.nza
+else
+	export NZA_MAKEDEFS=$SRC/Makefile.nza
 fi
 
 if [ "$i_FLAG" = "y" -a "$SH_FLAG" = "y" ]; then

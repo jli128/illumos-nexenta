@@ -28,7 +28,6 @@ MDBTGT = kvm
 
 MODSRCS = stmf_sbd.c
 
-CLSTMFSBDBASE = ../../../../../../nza-closed/uts/common/io/comstar/lu/stmf_sbd
 UTSBASE = ../../../../../uts
 COMSTARBASE = $(UTSBASE)/common/io/comstar
 STMFSBDBASE = $(COMSTARBASE)/lu/stmf_sbd
@@ -38,8 +37,10 @@ include ../../../../Makefile.cmd.64
 include ../../Makefile.sparcv9
 include ../../../Makefile.module
 
+include $(NZA_MAKEDEFS)
+
 CPPFLAGS += -I$(UTSBASE)/common -I$(UTSBASE)/common/sys -I$(STMFSBDBASE)
-CPPFLAGS += -I$(CLSTMFSBDBASE)
+CPPFLAGS += $(NZA_STMFSBDBASE_FLAGS)
 
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all

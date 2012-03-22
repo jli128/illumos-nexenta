@@ -107,9 +107,8 @@ ONBLD_BIN='/opt/onbld/bin'
 export PARENT_WS=''
 
 # CLONE_WS is the workspace nightly should do a bringover from.
-# XXXNZA -> You're best off keeping a local clone so as not to embed passwords
-# in this URL.
-export CLONE_WS='https://user:password@repos.nexenta.com/nza-kernel'
+# NZA:  This will be Nexenta's Illumos child, or a child of that.
+export CLONE_WS=''
 
 # The bringover, if any, is done as STAFFER.
 # Set STAFFER to your own login as gatekeeper or developer
@@ -140,12 +139,13 @@ export ON_CLOSED_BINS="$CODEMGR_WS/closed"
 export ON_CRYPTO_BINS="$CODEMGR_WS/on-crypto.$MACH.tar.bz2"
 
 #
-# XXXNZA --> Sources of Nexenta-specific closed sources.  The usr/src
-# directory will point here (and will not build without these sources).
-# The aforementioned local clone should probably have nza-closed in
-# usr/nza-closed as expected for a build.
-#export NZA_CLOSED_SRC='https://user:password@repos.nexenta.com/nza-closed'
-#export NZA_CLOSED_SRC="$CLONE_WS/usr/nza-closed"
+# NZA --> Sources of Nexenta-specific closed sources.  The usr/nza-closed
+# directory will be cloned from here.  If usr/nza-closed is not present,
+# the nightly will build, but not have any Nexenta closed-source enhancements.
+# This variable can be not set, and the build will still occur.
+# Also, this variable does not have to be relative to $CLONE_WS, but in this
+# example, it is.
+export NZA_CLOSED_SRC="$CLONE_WS/usr/nza-closed"
 
 #
 # REF_PROTO_LIST - for comparing the list of stuff in your proto area

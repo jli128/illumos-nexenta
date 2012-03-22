@@ -27,7 +27,9 @@
 #ifndef	_STMF_SBD_H
 #define	_STMF_SBD_H
 
+#ifdef NZA_CLOSED
 #include "ats_copy_mgr.h"
+#endif
 
 #ifdef	__cplusplus
 extern "C" {
@@ -56,7 +58,9 @@ extern krwlock_t sbd_global_prop_lock;
 #define	SBD_FILEIO_FAILURE	(SBD_FAILURE | STMF_FSC(7))
 #define	SBD_IO_PAST_EOF		(SBD_FAILURE | STMF_FSC(8))
 #define	SBD_BUSY		(SBD_FAILURE | STMF_FSC(9))
+#ifdef NZA_CLOSED
 #define	SBD_COMPARE_FAILED	(SBD_FAILURE | STMF_FSC(10))
+#endif
 
 #define	SHARED_META_DATA_SIZE	65536
 #define	SBD_META_OFFSET		4096
@@ -248,7 +252,9 @@ typedef struct sbd_lu {
 	struct sbd_pgr		*sl_pgr;
 	uint64_t	sl_rs_owner_session_id;
 
+#ifdef NZA_CLOSED
 	ats_state_t	sl_ats_state;		/* ats handling */
+#endif
 } sbd_lu_t;
 
 /*

@@ -206,8 +206,10 @@ typedef struct sbd_cmd {
 	uint32_t	len;		/* len left */
 	uint32_t	current_ro;	/* running relative offset */
 	uint8_t		*trans_data;	/* Any transient data */
+#ifdef NZA_CLOSED
 	uint32_t	non_conflicting_ats;	/* if any */
 	uint32_t	rsvd;
+#endif
 } sbd_cmd_t;
 
 /*
@@ -218,7 +220,9 @@ typedef struct sbd_cmd {
 #define	SBD_SCSI_CMD_XFER_FAIL		0x04
 #define	SBD_SCSI_CMD_SYNC_WRITE		0x08
 #define	SBD_SCSI_CMD_TRANS_DATA		0x10
+#ifdef NZA_CLOSED
 #define	SBD_SCSI_CMD_ATS_RELATED	0x20
+#endif
 
 /*
  * cmd types
