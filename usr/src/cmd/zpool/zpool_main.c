@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <assert.h>
@@ -1981,15 +1982,15 @@ print_iostat_separator(iostat_cbdata_t *cb)
 
 	for (i = 0; i < cb->cb_namewidth; i++)
 		(void) printf("-");
-	(void) printf("  -----  -----  -----  -----  -----  -----\n");
+	(void) printf("  -----  -----  -----  -----  -----  -----  -----  -----\n");
 }
 
 static void
 print_iostat_header(iostat_cbdata_t *cb)
 {
-	(void) printf("%*s     capacity     operations    bandwidth\n",
+	(void) printf("%*s     capacity     operations    bandwidth      latency\n",
 	    cb->cb_namewidth, "");
-	(void) printf("%-*s  alloc   free   read  write   read  write\n",
+	(void) printf("%-*s  alloc   free   read  write   read  write   read  write\n",
 	    cb->cb_namewidth, "pool");
 	print_iostat_separator(cb);
 }
@@ -2003,6 +2004,25 @@ print_one_stat(uint64_t value)
 	char buf[64];
 
 	zfs_nicenum(value, buf, sizeof (buf));
+	(void) printf("  %5s", buf);
+}
+
+/*
+ * Display latency statistic (extra care needed)
+ */
+static void
+print_one_latency_stat(uint64_t iotime, uint64_t ops)
+{
+	char buf[64];
+	double value = 0.0; /* latency in milliseconds */
+
+	if (ops != 0) {
+		value = (double)iotime;
+		value /= (double)ops;
+		value /= (double)(MICROSEC / MILLISEC);
+	}
+
+	sprintf(buf, "%.2f", value);
 	(void) printf("  %5s", buf);
 }
 
@@ -2065,6 +2085,18 @@ print_vdev_stats(zpool_handle_t *zhp, const char *name, nvlist_t *oldnv,
 
 	print_one_stat((uint64_t)(scale * (newvs->vs_bytes[ZIO_TYPE_WRITE] -
 	    oldvs->vs_bytes[ZIO_TYPE_WRITE])));
+
+	/* No scale needed here since we are dividing in print_one_latency_stat() */
+
+        print_one_latency_stat(newvs->vs_iotime[ZIO_TYPE_READ] -
+            oldvs->vs_iotime[ZIO_TYPE_READ],
+			       newvs->vs_ops[ZIO_TYPE_READ] -
+	    oldvs->vs_ops[ZIO_TYPE_READ]);
+
+        print_one_latency_stat(newvs->vs_iotime[ZIO_TYPE_WRITE] -
+            oldvs->vs_iotime[ZIO_TYPE_WRITE],
+			       newvs->vs_ops[ZIO_TYPE_WRITE] -
+	    oldvs->vs_ops[ZIO_TYPE_WRITE]);
 
 	(void) printf("\n");
 

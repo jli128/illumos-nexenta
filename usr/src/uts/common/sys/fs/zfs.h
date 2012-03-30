@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /* Portions Copyright 2010 Robert Milkowski */
@@ -669,6 +670,8 @@ typedef struct vdev_stat {
 	uint64_t	vs_self_healed;		/* self-healed bytes	*/
 	uint64_t	vs_scan_removing;	/* removing?	*/
 	uint64_t	vs_scan_processed;	/* scan processed bytes	*/
+	hrtime_t	vs_latency[ZIO_TYPES];	/* moving average of i/o latency */
+	hrtime_t	vs_iotime[ZIO_TYPES];	/* time spent doing i/o */
 } vdev_stat_t;
 
 /*

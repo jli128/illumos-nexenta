@@ -1,3 +1,9 @@
+sunwhea (5.11.134-31-8936-0) nexenta; urgency=low
+
+  * Issue 8923: ZFS should track latency, use latency-aware hybrid allocator
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 21 Mar 2012 14:50:23 -0400
+
 sunwhea (5.11.134-31-0-100) nexenta; urgency=low
 
   * Renumber packages in preparation for 3.1 release

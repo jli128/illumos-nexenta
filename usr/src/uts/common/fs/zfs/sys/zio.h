@@ -23,7 +23,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _ZIO_H
@@ -428,6 +428,9 @@ struct zio {
 #ifdef	_KERNEL
 	taskq_ent_t	io_tqent;
 #endif
+
+	/* Timestamp for tracking vdev I/O latency */
+	hrtime_t io_vd_timestamp;
 };
 
 extern zio_t *zio_null(zio_t *pio, spa_t *spa, vdev_t *vd,
