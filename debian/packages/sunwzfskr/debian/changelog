@@ -1,3 +1,9 @@
+sunwzfskr (5.11.134-31-8936-0) nexenta; urgency=low
+
+  * Issue 8923: ZFS should track latency, use latency-aware hybrid allocator
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 21 Mar 2012 14:42:34 -0400
+
 sunwzfskr (5.11.134-31-8286-0) nexenta; urgency=low
 
   * Issue 5842: Kernel panic in 'zfs recv' due to uninitialized variable passed

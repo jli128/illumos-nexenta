@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -60,6 +61,9 @@ static vdev_ops_t *vdev_ops_table[] = {
 
 /* maximum scrub/resilver I/O queue per leaf vdev */
 int zfs_scrub_limit = 10;
+
+/* alpha for exponential moving average of I/O latency (in 1/10th of a percent) */
+int zfs_vs_latency_alpha = 10;
 
 /*
  * Given a vdev type, return the appropriate ops vector.
@@ -2471,6 +2475,8 @@ vdev_get_stats(vdev_t *vd, vdev_stat_t *vs)
 			for (int t = 0; t < ZIO_TYPES; t++) {
 				vs->vs_ops[t] += cvs->vs_ops[t];
 				vs->vs_bytes[t] += cvs->vs_bytes[t];
+				vs->vs_iotime[t] += cvs->vs_iotime[t];
+				vs->vs_latency[t] += cvs->vs_latency[t];
 			}
 			cvs->vs_scan_removing = cvd->vdev_removing;
 			mutex_exit(&vd->vdev_stat_lock);
@@ -2562,6 +2568,19 @@ vdev_stat_update(zio_t *zio, uint64_t psize)
 
 		vs->vs_ops[type]++;
 		vs->vs_bytes[type] += psize;
+
+		/*
+		 * While measuring each delta in nanoseconds, we should keep cumulative
+		 * iotime in microseconds so it doesn't overflow on a busy system.
+		 */
+		vs->vs_iotime[type] += (zio->io_vd_timestamp) / 1000;
+
+		/* Latency is an exponential moving average of iotime deltas with tuneable alpha measured in 1/10th of percent. */
+/*
+		zfs_dbgmsg("Latency old: %llu calc_delta: %lld type: %d t_delta: %llu",
+			vs->vs_latency[type], ((int64_t)zio->io_vd_timestamp - vs->vs_latency[type]) * zfs_vs_latency_alpha / 1000, type, zio->io_vd_timestamp);
+*/
+		vs->vs_latency[type] += ((int64_t)zio->io_vd_timestamp - vs->vs_latency[type]) * zfs_vs_latency_alpha / 1000;
 
 		mutex_exit(&vd->vdev_stat_lock);
 		return;

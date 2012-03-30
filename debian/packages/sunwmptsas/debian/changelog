@@ -1,3 +1,10 @@
+sunwmptsas (5.11.134-31-8936-0) nexenta; urgency=high
+
+  * Issue 8621: mpt_sas command errors not exposed to scsi layer
+  * Issue 8922: mpt_sas should offline targets with repeated timeouts
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 21 Mar 2012 15:11:46 -0400
+
 sunwmptsas (5.11.134-31-7724-0) nexenta; urgency=high
 
   * Issue 7364: "hddisco" hangs after unplugging both cables from JBOD (and
