@@ -1,3 +1,9 @@
+sunwzfsu (5.11.134-31-9403-0) nexenta; urgency=low
+
+  * Issue 9110: Fix division by zero. Reformat output.
+
+ -- Nexenta Systems <support@nexenta.com>  Tue, 17 Apr 2012 20:57:20 +0400
+
 sunwzfsu (5.11.134-31-8936-0) nexenta; urgency=low
 
   * Issue 8923: ZFS should track latency, use latency-aware hybrid allocator
