@@ -1,3 +1,9 @@
+sunwzfsu (5.11.134-31-9465-0) nexenta; urgency=low
+
+  * Issue 8853: sharenfs property must accept more than 1024 bytes
+
+ -- Nexenta Systems <support@nexenta.com>  Thu, 29 Mar 2012 14:40:47 +0400
+
 sunwzfsu (5.11.134-31-9403-0) nexenta; urgency=low
 
   * Issue 9110: Fix division by zero. Reformat output.
