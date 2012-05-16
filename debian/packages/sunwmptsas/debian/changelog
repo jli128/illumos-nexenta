@@ -1,3 +1,9 @@
+sunwmptsas (5.11.134-31-9636-0) nexenta; urgency=high
+
+  * Issue 9636: mpt_sas should attempt an MUR reset at attach time.
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 16 May 2012 15:11:46 -0400
+
 sunwmptsas (5.11.134-31-8936-0) nexenta; urgency=high
 
   * Issue 8621: mpt_sas command errors not exposed to scsi layer
