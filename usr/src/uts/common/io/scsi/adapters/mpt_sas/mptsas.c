@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -1752,7 +1753,7 @@ mptsas_do_detach(dev_info_t *dip)
 	MPTSAS_DISABLE_INTR(mpt);
 	mptsas_raid_action_system_shutdown(mpt);
 	mpt->m_softstate |= MPTSAS_SS_MSG_UNIT_RESET;
-	(void) mptsas_ioc_reset(mpt);
+	(void) mptsas_ioc_reset(mpt, B_FALSE);
 	mutex_exit(&mpt->m_mutex);
 	mptsas_rem_intrs(mpt);
 	ddi_taskq_destroy(mpt->m_event_taskq);
@@ -11496,7 +11497,8 @@ mptsas_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *credp,
 			mutex_enter(&mpt->m_mutex);
 			if (mpt->m_diag_action_in_progress) {
 				mutex_exit(&mpt->m_mutex);
-				return (EBUSY);
+				status = EBUSY;
+				goto out;
 			}
 			mpt->m_diag_action_in_progress = 1;
 			status = mptsas_diag_action(mpt,
@@ -11652,7 +11654,7 @@ mptsas_init_chip(mptsas_t *mpt, int first_time)
 	/*
 	 * Reset the chip
 	 */
-	rval = mptsas_ioc_reset(mpt);
+	rval = mptsas_ioc_reset(mpt, first_time);
 	if (rval == MPTSAS_RESET_FAIL) {
 		mptsas_log(mpt, CE_WARN, "hard reset failed!");
 		goto fail;
