@@ -250,7 +250,7 @@ log_init(void)
 	    utsname.release, utsname.version, NBBY * (uint_t)sizeof (void *));
 	printf("Copyright (c) 1983, 2010, Oracle and/or its affiliates. "
 	    "All rights reserved.\n");
-	printf("Copyright (c) 2011 Nexenta Systems.  All rights reserved.\n");
+	printf("Copyright (c) 2012 Nexenta Systems.  All rights reserved.\n");
 #ifdef DEBUG
 	printf("DEBUG enabled\n");
 #endif
