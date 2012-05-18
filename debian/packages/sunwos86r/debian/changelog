@@ -1,3 +1,9 @@
+sunwos86r (5.11.134-31-9673-0) nexenta; urgency=low
+
+  * Issue 8825: unsupported disks in MD1200 JBOD
+
+ -- Nexenta Systems <support@nexenta.com>  Fri, 18 May 2012 9:25:23 -0500
+
 sunwos86r (5.11.134-31-0-100) nexenta; urgency=low
 
   * Renumber packages in preparation for 3.1 release
