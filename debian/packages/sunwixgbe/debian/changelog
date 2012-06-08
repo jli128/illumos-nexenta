@@ -1,3 +1,9 @@
+sunwixgbe (5.11.134-31-9739-0) nexenta; urgency=low
+
+  * Issue 9739: add ixgbe support for new x520 models
+
+ -- Gate Keeper <support@nexenta.com>  Thu, 24 May 2012 12:08:55 -0700
+
 sunwixgbe (5.11.134-31-6519-0) nexenta; urgency=low
 
   * Issue 6242: update ixgbe from Joyent's Auguest 2011 drop
