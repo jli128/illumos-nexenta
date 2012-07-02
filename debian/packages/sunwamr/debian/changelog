@@ -1,3 +1,9 @@
+sunwamr (5.11.134-31-9978-0) nexenta; urgency=low
+
+  * Issue #9978 - PCI ID conflict between amr(7d) and Dell C6220
+
+ -- Gate Keeper <support@nexenta.com>  Fri, 22 Jun 2012 12:08:55 -0700
+
 sunwamr (5.11.134-31-0-100) nexenta; urgency=low
 
   * Renumber packages in preparation for 3.1 release
