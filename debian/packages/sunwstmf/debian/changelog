@@ -1,3 +1,9 @@
+sunwstmf (5.11.134-31-8499-0) nexenta; urgency=low
+
+  * Issue 8499: Unreleased ATS lock possibly caused by concurrent svmotions
+
+ -- Gate Keeper <support@nexenta.com>  Mon, 09 Jul 2012 12:08:55 -0700
+
 sunwstmf (5.11.134-31-0-105) nexenta; urgency=low
 
   * Issue 6919: ATS not dropping locks upon completion
