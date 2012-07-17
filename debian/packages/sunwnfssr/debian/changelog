@@ -1,9 +1,3 @@
-sunwnfssr (5.11.134-31-10333-0) nexenta; urgency=low
-
-  * Issue 7445: Add SMF manifest for nfslogd
-
- -- Gate Keeper <support@nexenta.com>  Thu, 12 Apr 2012 02:39:15 +0400
-
 sunwnfssr (5.11.134-31-0-100) nexenta; urgency=low
 
   * Renumber packages in preparation for 3.1 release
