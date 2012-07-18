@@ -3815,14 +3815,14 @@ sbd_abort(struct stmf_lu *lu, int abort_cmd, void *arg, uint32_t flags)
 
 	ASSERT(abort_cmd == STMF_LU_ABORT_TASK);
 	task = (scsi_task_t *)arg;
+#ifdef NZA_CLOSED
+	if (task->task_cdb[0] == SCMD_COMPARE_AND_WRITE)
+		sbd_free_ats_handle(task);
+#endif
 	if (task->task_lu_private) {
 		sbd_cmd_t *scmd = (sbd_cmd_t *)task->task_lu_private;
 
 		if (scmd->flags & SBD_SCSI_CMD_ACTIVE) {
-#ifdef NZA_CLOSED
-			if (task->task_cdb[0] == SCMD_COMPARE_AND_WRITE)
-				sbd_free_ats_handle(task);
-#endif
 			if (scmd->flags & SBD_SCSI_CMD_TRANS_DATA) {
 				kmem_free(scmd->trans_data,
 				    scmd->trans_data_len);
