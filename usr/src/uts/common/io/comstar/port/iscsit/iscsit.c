@@ -3183,9 +3183,21 @@ iscsit_add_pdu_to_queue(iscsit_sess_t *ist, idm_pdu_t *rx_pdu)
 	mutex_exit(&ict->ict_mutex);
 
 	index = ntohl(cmdsn) % ISCSIT_RXPDU_QUEUE_LEN;
-	ASSERT(cbuf->cb_buffer[index] == NULL);
-	cbuf->cb_buffer[index] = rx_pdu;
-	cbuf->cb_num_elems++;
+	/*
+	 * In the normal case, assuming that the Initiator is not
+	 * buggy and that we don't have packet duplication occuring,
+	 * the entry in the array will be NULL.  However, we may have
+	 * received a duplicate PDU with cmdsn > expsn , and in that
+	 * case we just ignore this PDU -- the previously received one
+	 * remains queued for processing.  We need to be careful not
+	 * to leak this one however.
+	 */
+	if (cbuf->cb_buffer[index] != NULL) {
+		idm_pdu_complete(rx_pdu, IDM_STATUS_FAIL);
+	} else {
+		cbuf->cb_buffer[index] = rx_pdu;
+		cbuf->cb_num_elems++;
+	}
 }
 
 static idm_pdu_t *
