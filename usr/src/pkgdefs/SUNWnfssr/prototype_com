@@ -66,5 +66,6 @@ d none var/svc 0755 root sys
 d none var/svc/manifest 0755 root sys
 d none var/svc/manifest/network 0755 root sys
 d none var/svc/manifest/network/nfs 0755 root sys
+f manifest var/svc/manifest/network/nfs/nfslogd.xml 0444 root sys
 f manifest var/svc/manifest/network/nfs/server.xml 0444 root sys
 f manifest var/svc/manifest/network/nfs/rquota.xml 0444 root sys
