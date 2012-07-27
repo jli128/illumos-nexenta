@@ -1,3 +1,9 @@
+sunwixgbe (5.11.134-31-10438-0) nexenta; urgency=low
+
+  * Issue 10438: Intel X540 support
+
+ -- Gate Keeper <support@nexenta.com>  Fri, 20 Jul 2012 13:53:55 -0700
+
 sunwixgbe (5.11.134-31-9739-0) nexenta; urgency=low
 
   * Issue 9739: add ixgbe support for new x520 models
