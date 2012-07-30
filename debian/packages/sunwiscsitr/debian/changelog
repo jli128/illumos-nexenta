@@ -2,7 +2,7 @@ sunwiscsitr (5.11.134-31-10219-0) nexenta; urgency=low
 
   * re #9822: libiscsi test panics COMSTAR
 
--- Nexenta Systems <steve.ma@nexenta.com>  Tue, 17 Jul 2012 12:15:23 -0500
+ -- Nexenta Systems <steve.ma@nexenta.com>  Tue, 17 Jul 2012 12:15:23 -0500
 
 sunwiscsitr (5.11.134-31-0-101) nexenta; urgency=high
 
