@@ -65,8 +65,9 @@ typedef struct pid2sid {
 
 
 typedef struct idmap_sid2pid_cache {
+	krwlock_t		rwlock;
 	avl_tree_t		tree;
-	kmutex_t		mutex;
+	kmutex_t		list_mutex; /* protects against readers */
 	struct sid2pid		head;
 	time_t			purge_time;
 	int			uid_num;
@@ -76,8 +77,9 @@ typedef struct idmap_sid2pid_cache {
 
 
 typedef struct idmap_pid2sid_cache {
+	krwlock_t		rwlock;
 	avl_tree_t		tree;
-	kmutex_t		mutex;
+	kmutex_t		list_mutex; /* protects against readers */
 	struct pid2sid		head;
 	time_t			purge_time;
 } idmap_pid2sid_cache_t;

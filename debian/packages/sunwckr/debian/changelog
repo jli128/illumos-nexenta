@@ -1,3 +1,9 @@
+sunwckr (5.11.134-31-10491-0) nexenta; urgency=low
+
+  * Issue 10453: kidmap_cache_lookup_xxx: replace mutex with rwlock
+
+ -- Nexenta Systems <support@nexenta.com>  Mon, 30 Jul 2012 16:43:02 +0400
+
 sunwckr (5.11.134-31-8430-0) nexenta; urgency=low
 
   * Issue 7856: all SSD's have illegal request counter after reboot
