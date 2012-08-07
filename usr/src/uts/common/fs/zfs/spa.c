@@ -2149,7 +2149,7 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 
 	if (spa_version(spa) >= SPA_VERSION_FEATURES) {
 		boolean_t missing_feat_read = B_FALSE;
-		nvlist_t *unsup_feat;
+		nvlist_t *unsup_feat, *enabled_feat;
 
 		if (spa_dir_prop(spa, DMU_POOL_FEATURES_FOR_READ,
 		    &spa->spa_feat_for_read_obj) != 0) {
@@ -2166,27 +2166,32 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 			return (spa_vdev_err(rvd, VDEV_AUX_CORRUPT_DATA, EIO));
 		}
 
-		VERIFY(nvlist_alloc(&unsup_feat, NV_UNIQUE_NAME, KM_SLEEP) ==
-		    0);
+		enabled_feat = fnvlist_alloc();
+		unsup_feat = fnvlist_alloc();
 
 		if (!feature_is_supported(spa->spa_meta_objset,
 		    spa->spa_feat_for_read_obj, spa->spa_feat_desc_obj,
-		    unsup_feat))
+		    unsup_feat, enabled_feat))
 			missing_feat_read = B_TRUE;
 
 		if (spa_writeable(spa) || state == SPA_LOAD_TRYIMPORT) {
 			if (!feature_is_supported(spa->spa_meta_objset,
 			    spa->spa_feat_for_write_obj, spa->spa_feat_desc_obj,
-			    unsup_feat))
+			    unsup_feat, enabled_feat)) {
 				missing_feat_write = B_TRUE;
+			}
 		}
+
+		fnvlist_add_nvlist(spa->spa_load_info,
+		    ZPOOL_CONFIG_ENABLED_FEAT, enabled_feat);
 
 		if (!nvlist_empty(unsup_feat)) {
-			VERIFY(nvlist_add_nvlist(spa->spa_load_info,
-			    ZPOOL_CONFIG_UNSUP_FEAT, unsup_feat) == 0);
+			fnvlist_add_nvlist(spa->spa_load_info,
+			    ZPOOL_CONFIG_UNSUP_FEAT, unsup_feat);
 		}
 
-		nvlist_free(unsup_feat);
+		fnvlist_free(enabled_feat);
+		fnvlist_free(unsup_feat);
 
 		if (!missing_feat_read) {
 			fnvlist_add_boolean(spa->spa_load_info,
@@ -2543,6 +2548,12 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 		if (!dsl_scan_resilvering(spa->spa_dsl_pool) &&
 		    vdev_resilver_needed(rvd, NULL, NULL))
 			spa_async_request(spa, SPA_ASYNC_RESILVER);
+
+		/*
+		 * Log the fact that we booted up (so that we can detect if
+		 * we rebooted in the middle of an operation).
+		 */
+		spa_history_log_version(spa, "open");
 
 		/*
 		 * Delete any inconsistent datasets.
@@ -3220,7 +3231,7 @@ spa_l2cache_drop(spa_t *spa)
  */
 int
 spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
-    const char *history_str, nvlist_t *zplprops)
+    nvlist_t *zplprops)
 {
 	spa_t *spa;
 	char *altroot = NULL;
@@ -3439,9 +3450,7 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 
 	spa_config_sync(spa, B_FALSE, B_TRUE);
 
-	if (version >= SPA_VERSION_ZPOOL_HISTORY && history_str != NULL)
-		(void) spa_history_log(spa, history_str, LOG_CMD_POOL_CREATE);
-	spa_history_log_version(spa, LOG_POOL_CREATE);
+	spa_history_log_version(spa, "create");
 
 	spa->spa_minref = refcount_count(&spa->spa_refcount);
 
@@ -3641,7 +3650,6 @@ spa_import_rootpool(char *devpath, char *devid)
 	}
 
 	error = 0;
-	spa_history_log_version(spa, LOG_POOL_IMPORT);
 out:
 	spa_config_enter(spa, SCL_ALL, FTAG, RW_WRITER);
 	vdev_free(rvd);
@@ -3703,7 +3711,7 @@ spa_import(const char *pool, nvlist_t *config, nvlist_t *props, uint64_t flags)
 		spa_config_sync(spa, B_FALSE, B_TRUE);
 
 		mutex_exit(&spa_namespace_lock);
-		spa_history_log_version(spa, LOG_POOL_IMPORT);
+		spa_history_log_version(spa, "import");
 
 		return (0);
 	}
@@ -3834,7 +3842,7 @@ spa_import(const char *pool, nvlist_t *config, nvlist_t *props, uint64_t flags)
 	spa_async_request(spa, SPA_ASYNC_AUTOEXPAND);
 
 	mutex_exit(&spa_namespace_lock);
-	spa_history_log_version(spa, LOG_POOL_IMPORT);
+	spa_history_log_version(spa, "import");
 
 	return (0);
 }
@@ -4372,7 +4380,7 @@ spa_vdev_attach(spa_t *spa, uint64_t guid, nvlist_t *nvroot, int replacing)
 	 */
 	(void) spa_vdev_exit(spa, newrootvd, dtl_max_txg, 0);
 
-	spa_history_log_internal(LOG_POOL_VDEV_ATTACH, spa, NULL,
+	spa_history_log_internal(spa, "vdev attach", NULL,
 	    "%s vdev=%s %s vdev=%s",
 	    replacing && newvd_isspare ? "spare in" :
 	    replacing ? "replace" : "attach", newvdpath,
@@ -4589,7 +4597,7 @@ spa_vdev_detach(spa_t *spa, uint64_t guid, uint64_t pguid, int replace_done)
 
 	error = spa_vdev_exit(spa, vd, txg, 0);
 
-	spa_history_log_internal(LOG_POOL_VDEV_DETACH, spa, NULL,
+	spa_history_log_internal(spa, "detach", NULL,
 	    "vdev=%s", vdpath);
 	spa_strfree(vdpath);
 
@@ -4858,9 +4866,8 @@ spa_vdev_split_mirror(spa_t *spa, char *newname, nvlist_t *config,
 		if (vml[c] != NULL) {
 			vdev_split(vml[c]);
 			if (error == 0)
-				spa_history_log_internal(LOG_POOL_VDEV_DETACH,
-				    spa, tx, "vdev=%s",
-				    vml[c]->vdev_path);
+				spa_history_log_internal(spa, "detach", tx,
+				    "vdev=%s", vml[c]->vdev_path);
 			vdev_free(vml[c]);
 		}
 	}
@@ -4875,8 +4882,8 @@ spa_vdev_split_mirror(spa_t *spa, char *newname, nvlist_t *config,
 		zio_handle_panic_injection(spa, FTAG, 3);
 
 	/* split is complete; log a history record */
-	spa_history_log_internal(LOG_POOL_SPLIT, newspa, NULL,
-	    "split new pool %s from pool %s", newname, spa_name(spa));
+	spa_history_log_internal(newspa, "split", NULL,
+	    "from pool %s", spa_name(spa));
 
 	kmem_free(vml, children * sizeof (vdev_t *));
 
@@ -5462,8 +5469,7 @@ spa_async_thread(spa_t *spa)
 		 * then log an internal history event.
 		 */
 		if (new_space != old_space) {
-			spa_history_log_internal(LOG_POOL_VDEV_ONLINE,
-			    spa, NULL,
+			spa_history_log_internal(spa, "vdev online", NULL,
 			    "pool '%s' size: %llu(+%llu)",
 			    spa_name(spa), new_space, new_space - old_space);
 		}
@@ -5699,6 +5705,7 @@ spa_sync_version(void *arg1, void *arg2, dmu_tx_t *tx)
 
 	spa->spa_uberblock.ub_version = version;
 	vdev_config_dirty(spa->spa_root_vdev);
+	spa_history_log_internal(spa, "set", tx, "version=%lld", version);
 }
 
 /*
@@ -5733,6 +5740,8 @@ spa_sync_props(void *arg1, void *arg2, dmu_tx_t *tx)
 			VERIFY3U(0, ==, zfeature_lookup_name(fname, &feature));
 
 			spa_feature_enable(spa, feature, tx);
+			spa_history_log_internal(spa, "set", tx,
+			    "%s=enabled", nvpair_name(elem));
 			break;
 
 		case ZPOOL_PROP_VERSION:
@@ -5772,6 +5781,8 @@ spa_sync_props(void *arg1, void *arg2, dmu_tx_t *tx)
 			 */
 			if (tx->tx_txg != TXG_INITIAL)
 				vdev_config_dirty(spa->spa_root_vdev);
+			spa_history_log_internal(spa, "set", tx,
+			    "%s=%s", nvpair_name(elem), strval);
 			break;
 		default:
 			/*
@@ -5794,7 +5805,8 @@ spa_sync_props(void *arg1, void *arg2, dmu_tx_t *tx)
 				VERIFY(zap_update(mos,
 				    spa->spa_pool_props_object, propname,
 				    1, strlen(strval) + 1, strval, tx) == 0);
-
+				spa_history_log_internal(spa, "set", tx,
+				    "%s=%s", nvpair_name(elem), strval);
 			} else if (nvpair_type(elem) == DATA_TYPE_UINT64) {
 				VERIFY(nvpair_value_uint64(elem, &intval) == 0);
 
@@ -5806,6 +5818,8 @@ spa_sync_props(void *arg1, void *arg2, dmu_tx_t *tx)
 				VERIFY(zap_update(mos,
 				    spa->spa_pool_props_object, propname,
 				    8, 1, &intval, tx) == 0);
+				spa_history_log_internal(spa, "set", tx,
+				    "%s=%lld", nvpair_name(elem), intval);
 			} else {
 				ASSERT(0); /* not allowed */
 			}
@@ -5834,13 +5848,6 @@ spa_sync_props(void *arg1, void *arg2, dmu_tx_t *tx)
 			}
 		}
 
-		/* log internal history if this is not a zpool create */
-		if (spa_version(spa) >= SPA_VERSION_ZPOOL_HISTORY &&
-		    tx->tx_txg != TXG_INITIAL) {
-			spa_history_log_internal(LOG_POOL_PROPSET,
-			    spa, tx, "%s %lld %s",
-			    nvpair_name(elem), intval, spa_name(spa));
-		}
 	}
 
 	mutex_exit(&spa->spa_props_lock);

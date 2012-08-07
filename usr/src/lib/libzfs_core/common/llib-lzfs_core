@@ -18,40 +18,11 @@
  *
  * CDDL HEADER END
  */
-
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
+/*LINTLIBRARY*/
+/*PROTOLIB1*/
 
-/*
- * ASSERTION:
- * 	Complex expressions.
- *	Call complex expressions and make sure test succeeds.
- *	Match expected output in tst.complex.d.out
- *
- * SECTION: Types, Operators, and Expressions/Arithmetic Operators
- *
- */
-
-#pragma D option quiet
-
-BEGIN
-{
-	i = 0;
-	i = i++ + ++i;
-	printf("The value of i is %d\n", i);
-	i = i-- - --i;
-	printf("The value of i is %d\n", i);
-	i = i-- + ++i;
-	printf("The value of i is %d\n", i);
-	i += i++ + -- i + ++i - ++i * i ;
-	printf("The value of i is %d\n", i);
-	i -= i++ * 3;
-	printf("The value of i is %d\n", i);
-	i = i++/i--+i++-++i-++i;
-	printf("The value of i is %d\n", i);
-	exit (0);
-}
+#include <libzfs_core.h>

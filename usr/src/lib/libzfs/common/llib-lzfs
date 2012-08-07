@@ -32,6 +32,7 @@
 /*PROTOLIB1*/
 
 #include <libzfs.h>
+#include <libzfs_core.h>
 #include "../../../common/zfs/zfs_comutil.h"
 #include "../../../common/zfs/zfs_fletcher.h"
 #include "../../../common/zfs/zfs_prop.h"
