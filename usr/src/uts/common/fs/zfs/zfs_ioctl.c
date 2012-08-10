@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Portions Copyright 2011 Martin Matuska
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
  */
@@ -4188,6 +4188,7 @@ zfs_ioc_send(zfs_cmd_t *zc)
 		error = dmu_send_estimate(tosnap, fromsnap,
 		    &zc->zc_objset_type);
 	} else {
+		offset_t off_starting;
 		file_t *fp = getf(zc->zc_cookie);
 		if (fp == NULL) {
 			dsl_dataset_rele(ds, FTAG);
@@ -4197,9 +4198,12 @@ zfs_ioc_send(zfs_cmd_t *zc)
 		}
 
 		off = fp->f_offset;
+		off_starting = off;
 		error = dmu_send(tosnap, fromsnap,
-		    zc->zc_cookie, fp->f_vnode, &off);
+		    zc->zc_cookie, fp->f_vnode, &off,
+		    zc->zc_sendsize);
 
+		zc->zc_sendcounter = off - off_starting;
 		if (VOP_SEEK(fp->f_vnode, fp->f_offset, &off, NULL) == 0)
 			fp->f_offset = off;
 		releasef(zc->zc_cookie);
@@ -5172,7 +5176,7 @@ zfs_ioc_send_new(const char *snapname, nvlist_t *innvl, nvlist_t *outnvl)
 	}
 
 	off = fp->f_offset;
-	error = dmu_send(tosnap, fromsnap, fd, fp->f_vnode, &off);
+	error = dmu_send(tosnap, fromsnap, fd, fp->f_vnode, &off, 0);
 
 	if (VOP_SEEK(fp->f_vnode, fp->f_offset, &off, NULL) == 0)
 		fp->f_offset = off;

@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifndef	_SYS_ZFS_IOCTL_H
@@ -305,6 +306,8 @@ typedef struct zfs_cmd {
 	uint64_t	zc_fromobj;
 	uint64_t	zc_createtxg;
 	zfs_stat_t	zc_stat;
+	uint64_t	zc_sendcounter;
+	boolean_t	zc_sendsize;
 } zfs_cmd_t;
 
 typedef struct zfs_useracct {

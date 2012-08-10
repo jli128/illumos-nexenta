@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
@@ -783,7 +783,7 @@ void dmu_traverse_objset(objset_t *os, uint64_t txg_start,
     dmu_traverse_cb_t cb, void *arg);
 
 int dmu_send(objset_t *tosnap, objset_t *fromsnap,
-    int outfd, struct vnode *vp, offset_t *off);
+    int outfd, struct vnode *vp, offset_t *off, boolean_t sendsize);
 int dmu_send_estimate(objset_t *tosnap, objset_t *fromsnap, uint64_t *sizep);
 
 typedef struct dmu_recv_cookie {

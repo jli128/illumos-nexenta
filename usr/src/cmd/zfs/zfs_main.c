@@ -252,7 +252,7 @@ get_usage(zfs_help_t idx)
 	case HELP_ROLLBACK:
 		return (gettext("\trollback [-rRf] <snapshot>\n"));
 	case HELP_SEND:
-		return (gettext("\tsend [-DnPpRrv] [-[iI] snapshot] "
+		return (gettext("\tsend [-DnPpRrvs] [-[iI] snapshot] "
 		    "<snapshot>\n"));
 	case HELP_SET:
 		return (gettext("\tset <property=value> "
@@ -3552,7 +3552,7 @@ zfs_do_send(int argc, char **argv)
 	boolean_t extraverbose = B_FALSE;
 
 	/* check options */
-	while ((c = getopt(argc, argv, ":i:I:RDpvnP")) != -1) {
+	while ((c = getopt(argc, argv, ":i:I:RDpvnPs")) != -1) {
 		switch (c) {
 		case 'i':
 			if (fromname)
@@ -3587,6 +3587,9 @@ zfs_do_send(int argc, char **argv)
 		case 'n':
 			flags.dryrun = B_TRUE;
 			break;
+		case 's':
+			flags.sendsize = B_TRUE;
+			break;
 		case ':':
 			(void) fprintf(stderr, gettext("missing argument for "
 			    "'%c' option\n"), optopt);
@@ -3612,7 +3615,17 @@ zfs_do_send(int argc, char **argv)
 		usage(B_FALSE);
 	}
 
-	if (!flags.dryrun && isatty(STDOUT_FILENO)) {
+	if (flags.sendsize) {
+		int fd = open("/dev/null", O_WRONLY|O_LARGEFILE);
+		if (fd < 0) {
+			perror("failed to open /dev/null");
+			return 1;
+		} 
+		if ((dup2(fd, STDOUT_FILENO)) < 0) {
+			perror("failed to dup2(/dev/null,STDOUT_FILENO)"); 
+			return 1;
+		} 
+	} else if (!flags.dryrun && isatty(STDOUT_FILENO)) {
 		(void) fprintf(stderr,
 		    gettext("Error: Stream can not be written to a terminal.\n"
 		    "You must redirect standard output.\n"));
