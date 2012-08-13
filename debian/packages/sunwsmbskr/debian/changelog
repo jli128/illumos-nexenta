@@ -1,3 +1,10 @@
+sunwsmbskr (5.11.134-31-10364-0) nexenta; urgency=low
+
+ * Issue 10364: Fixes panic caused by a race between an smb share request
+ and sever shutdown. Backport of #9812
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 10 Aug 2012 13:30:15 -0700
+
 sunwsmbskr (5.11.134-31-8546-0) nexenta; urgency=high
 
   * Issue 7225: Codenomicon findings in smbsrv

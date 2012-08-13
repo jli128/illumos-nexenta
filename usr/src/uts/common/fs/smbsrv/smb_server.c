@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -230,8 +230,8 @@ typedef struct {
 static void smb_server_kstat_init(smb_server_t *);
 static void smb_server_kstat_fini(smb_server_t *);
 static void smb_server_timers(smb_thread_t *, void *);
-static int smb_server_lookup(smb_server_t **);
-static void smb_server_release(smb_server_t *);
+int smb_server_lookup(smb_server_t **);
+void smb_server_release(smb_server_t *);
 static void smb_server_store_cfg(smb_server_t *, smb_ioc_cfg_t *);
 static void smb_server_shutdown(smb_server_t *);
 static int smb_server_fsop_start(smb_server_t *);
@@ -1393,6 +1393,13 @@ smb_server_shutdown(smb_server_t *sv)
 	smb_server_listener_stop(&sv->sv_tcp_daemon);
 
 	if (sv->sv_session != NULL) {
+		/*
+		 * smb_kshare_export may have a request on here.
+		 * Normal sessions do this in smb_session_cancel()
+		 * but this is a "fake" session used only for the
+		 * requests used by the kshare thread(s).
+		 */
+		smb_slist_wait_for_empty(&sv->sv_session->s_req_list);
 		smb_session_delete(sv->sv_session);
 		sv->sv_session = NULL;
 	}
@@ -1622,7 +1629,7 @@ smb_server_receiver(void *arg)
  * This function tries to find the server associated with the zone of the
  * caller.
  */
-static int
+int
 smb_server_lookup(smb_server_t **psv)
 {
 	zoneid_t	zid;
@@ -1658,7 +1665,7 @@ smb_server_lookup(smb_server_t **psv)
  * This function decrements the reference count of the server and signals its
  * condition variable if the state of the server is SMB_SERVER_STATE_DELETING.
  */
-static void
+void
 smb_server_release(smb_server_t *sv)
 {
 	SMB_SERVER_VALID(sv);
