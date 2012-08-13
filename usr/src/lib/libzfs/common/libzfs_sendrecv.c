@@ -1676,15 +1676,21 @@ zfs_send(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
 
 	if (flags->sendsize) {
 		if (flags->verbose) {
-			fprintf(stderr, "Send stream header size (bytes): "
-			    "%u\n", sdd.hdr_send_sz);
-			fprintf(stderr, "Send stream data size (bytes):	 "
-			    "%llu\n", sdd.send_sz);
-			fprintf(stderr, "Total send stream size (bytes):  "
-			    "%llu\n", sdd.send_sz + (uint64_t)sdd.hdr_send_sz);
+			(void) fprintf(stderr,
+			"Send stream header size (bytes): %u\n",
+			    sdd.hdr_send_sz);
+			(void) fprintf(stderr,
+			"Send stream data size  (bytes):  %llu\n",
+			    (longlong_t)sdd.send_sz);
+			(void) fprintf(stderr,
+			"Total send stream size (bytes):  %llu\n",
+			    (longlong_t)(sdd.send_sz +
+			    (uint64_t)sdd.hdr_send_sz));
 		} else {
-			fprintf(stderr, "Total send stream size (bytes):  "
-			    "%llu\n", sdd.send_sz + (uint64_t)sdd.hdr_send_sz);
+			(void) fprintf(stderr,
+			"Total send stream size (bytes):  %llu\n",
+			    (longlong_t)(sdd.send_sz +
+			    (uint64_t)sdd.hdr_send_sz));
 		}
 	}
 

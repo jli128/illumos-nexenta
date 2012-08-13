@@ -3619,12 +3619,12 @@ zfs_do_send(int argc, char **argv)
 		int fd = open("/dev/null", O_WRONLY|O_LARGEFILE);
 		if (fd < 0) {
 			perror("failed to open /dev/null");
-			return 1;
-		} 
+			return (1);
+		}
 		if ((dup2(fd, STDOUT_FILENO)) < 0) {
-			perror("failed to dup2(/dev/null,STDOUT_FILENO)"); 
-			return 1;
-		} 
+			perror("failed to dup2(/dev/null,STDOUT_FILENO)");
+			return (1);
+		}
 	} else if (!flags.dryrun && isatty(STDOUT_FILENO)) {
 		(void) fprintf(stderr,
 		    gettext("Error: Stream can not be written to a terminal.\n"
