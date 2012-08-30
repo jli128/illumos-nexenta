@@ -171,10 +171,10 @@ extern struct mod_ops mod_driverops;
 volatile int	stmf_trace_on = 1;
 volatile int	stmf_trace_buf_size = (1 * 1024 * 1024);
 /*
- * The reason default task timeout is 75 is because we want the
- * host to timeout 1st and mostly host timeout is 60 seconds.
+ * We want to make sure that the server responds with a timeout and aborts a transaction
+ * as soon it notices that the IO request is not completing on time.
  */
-volatile int	stmf_default_task_timeout = 75;
+volatile int	stmf_default_task_timeout = 15;
 /*
  * Setting this to one means, you are responsible for config load and keeping
  * things in sync with persistent database.
@@ -4664,8 +4664,10 @@ stmf_do_ilu_timeouts(stmf_i_lu_t *ilu)
 			to = stmf_default_task_timeout;
 		else
 			to = task->task_timeout;
-		if ((itask->itask_start_time + (to * ps)) > l)
+
+		if ((itask->itask_start_time + (to * ps)) < l)
 			continue;
+
 		stmf_abort(STMF_QUEUE_TASK_ABORT, task,
 		    STMF_TIMEOUT, NULL);
 	}
@@ -5312,6 +5314,11 @@ stmf_queue_task_for_abort(scsi_task_t *task, stmf_status_t s)
 		return;
 	}
 
+	if (s == STMF_TIMEOUT) {
+		stmf_scsilib_send_status(task, STATUS_CHECK,
+		    STMF_SAA_TIMEOUT_ABORT);
+	}
+
 	/* Queue it and get out */
 	mutex_enter(&w->worker_lock);
 	if (itask->itask_flags & ITASK_IN_WORKER_QUEUE) {
@@ -5348,6 +5355,10 @@ stmf_abort(int abort_cmd, scsi_task_t *task, stmf_status_t s, void *arg)
 		stmf_task_lu_killall((stmf_lu_t *)arg, task, s);
 		return;
 	case STMF_QUEUE_TASK_ABORT:
+		if (s == STMF_TIMEOUT) {
+			stmf_scsilib_send_status(task, STATUS_CHECK,
+			    STMF_SAA_TIMEOUT_ABORT);
+		}
 		stmf_queue_task_for_abort(task, s);
 		return;
 	case STMF_REQUEUE_TASK_ABORT_LPORT:
