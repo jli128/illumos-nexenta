@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2010, Richard Lowe
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/developer/build/onbld@$(PKGVERS)
@@ -134,6 +135,7 @@ file path=opt/onbld/bin/xref.mk
 file path=opt/onbld/env/developer
 file path=opt/onbld/env/gatekeeper
 file path=opt/onbld/env/illumos
+file path=opt/onbld/env/nza
 file path=opt/onbld/etc/SampleLinks
 file path=opt/onbld/etc/SamplePkgLinks
 file path=opt/onbld/etc/exception_lists/check_rtime

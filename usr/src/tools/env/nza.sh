@@ -19,7 +19,8 @@
 # CDDL HEADER END
 #
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2010, 2011 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 # Configuration variables for the runtime environment of the nightly
@@ -59,6 +60,12 @@ export GATE='testws'
 
 # CODEMGR_WS - where is your workspace at (or what should nightly name it)
 export CODEMGR_WS="$HOME/ws/$GATE"
+
+# For builds without nza-closed
+export NZA_MAKEDEFS="$CODEMGR_WS/usr/src/Makefile.nza"
+
+# For builds with nza-closed
+# export NZA_MAKEDEFS="$CODEMGR_WS/usr/nza-closed/Makefile.nza"
 
 # Maximum number of dmake jobs.  The recommended number is 2 + NCPUS,
 # where NCPUS is the number of logical CPUs on your build system.
@@ -119,6 +126,10 @@ export CLONE_WS=''
 export STAFFER="$LOGNAME"
 export MAILTO="$STAFFER"
 
+# If you wish the mail messages to be From: an arbitrary address, export
+# MAILFROM.
+#export MAILFROM="user@example.com"
+
 # The project (see project(4)) under which to run this build.  If not
 # specified, the build is simply run in a new task in the current project.
 export BUILD_PROJECT=''
@@ -154,14 +165,16 @@ export NZA_CLOSED_SRC="$CLONE_WS/usr/nza-closed"
 #
 export REF_PROTO_LIST="$PARENT_WS/usr/src/proto_list_${MACH}"
 
+export ROOT="$CODEMGR_WS/proto/root_${MACH}"
+export SRC="$CODEMGR_WS/usr/src"
+export MULTI_PROTO="no"
+
 #
-#	build environment variables, including version info for mcs, motd,
+# Build environment variables, including version info for mcs, motd,
 # motd, uname and boot messages. Mostly you shouldn't change this except
 # when the release slips (nah) or you move an environment file to a new
 # release
 #
-export ROOT="$CODEMGR_WS/proto/root_${MACH}"
-export SRC="$CODEMGR_WS/usr/src"
 export VERSION="$GATE"
 
 #
@@ -188,6 +201,9 @@ export PARENT_TOOLS_ROOT="$PARENT_WS/usr/src/tools/proto/root_$MACH-nd"
 #
 export PKGARCHIVE="${CODEMGR_WS}/packages/${MACH}/nightly"
 # export PKGPUBLISHER_REDIST='on-redist'
+
+# Package manifest format version.
+export PKGFMT_OUTPUT='v1'
 
 # we want make to do as much as it can, just in case there's more than
 # one problem.
@@ -226,3 +242,6 @@ export SPRO_VROOT="$SPRO_ROOT"
 # POST_NIGHTLY can be any command to be run at the end of nightly.  See
 # nightly(1) for interactions between environment variables and this command.
 #POST_NIGHTLY=
+
+# Uncomment this to disable support for SMB printing.
+# export ENABLE_SMB_PRINTING='#'
