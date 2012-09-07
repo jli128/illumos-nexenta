@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <stdio.h>
@@ -1511,6 +1512,10 @@ static object_viewer_t *object_viewer[DMU_OT_NUMTYPES + 1] = {
 	dump_none,		/* deadlist hdr			*/
 	dump_zap,		/* dsl clones			*/
 	dump_none,		/* bpobj subobjs		*/
+#ifdef	NZA_CLOSED
+	dump_none,		/* cos props			*/
+	dump_none,		/* vdev props			*/
+#endif /* NZA_CLOSED */
 	dump_unknown,		/* Unknown type, must be last	*/
 };
 

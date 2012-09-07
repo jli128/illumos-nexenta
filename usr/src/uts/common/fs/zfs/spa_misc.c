@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -441,11 +441,20 @@ spa_add(const char *name, nvlist_t *config, const char *altroot)
 	mutex_init(&spa->spa_scrub_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&spa->spa_suspend_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&spa->spa_vdev_top_lock, NULL, MUTEX_DEFAULT, NULL);
+#ifdef	NZA_CLOSED
+	mutex_init(&spa->spa_cos_props_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&spa->spa_vdev_props_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&spa->spa_wrc.wrc_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&spa->spa_wrc_route.route_lock, NULL, MUTEX_DEFAULT, NULL);
+#endif /* NZA_CLOSED */
 
 	cv_init(&spa->spa_async_cv, NULL, CV_DEFAULT, NULL);
 	cv_init(&spa->spa_proc_cv, NULL, CV_DEFAULT, NULL);
 	cv_init(&spa->spa_scrub_io_cv, NULL, CV_DEFAULT, NULL);
 	cv_init(&spa->spa_suspend_cv, NULL, CV_DEFAULT, NULL);
+#ifdef	NZA_CLOSED
+	cv_init(&spa->spa_wrc.wrc_cv, NULL, CV_DEFAULT, NULL);
+#endif /* NZA_CLOSED */
 
 	for (int t = 0; t < TXG_SIZE; t++)
 		bplist_create(&spa->spa_free_bplist[t]);
@@ -501,6 +510,18 @@ spa_add(const char *name, nvlist_t *config, const char *altroot)
 		    KM_SLEEP) == 0);
 	}
 
+#ifdef	NZA_CLOSED
+	spa_cos_init(spa);
+
+	list_create(&spa->spa_wrc.wrc_blocks, sizeof (wrc_block_t),
+	    offsetof(wrc_block_t, node));
+	spa->spa_wrc.wrc_block_count = 0;
+	spa->spa_wrc.wrc_thread = NULL;
+	spa->spa_wrc_route.route_special = 0;
+	spa->spa_wrc_route.route_normal = 0;
+	spa->spa_wrc_route.route_perc = 0;
+#endif /* NZA_CLOSED */
+
 	return (spa);
 }
 
@@ -535,6 +556,9 @@ spa_remove(spa_t *spa)
 	}
 
 	list_destroy(&spa->spa_config_list);
+#ifdef	NZA_CLOSED
+	list_destroy(&spa->spa_wrc.wrc_blocks);
+#endif /* NZA_CLOSED */
 
 	nvlist_free(spa->spa_label_features);
 	nvlist_free(spa->spa_load_info);
@@ -551,6 +575,9 @@ spa_remove(spa_t *spa)
 	cv_destroy(&spa->spa_proc_cv);
 	cv_destroy(&spa->spa_scrub_io_cv);
 	cv_destroy(&spa->spa_suspend_cv);
+#ifdef	NZA_CLOSED
+	cv_destroy(&spa->spa_wrc.wrc_cv);
+#endif /* NZA_CLOSED */
 
 	mutex_destroy(&spa->spa_async_lock);
 	mutex_destroy(&spa->spa_errlist_lock);
@@ -561,6 +588,11 @@ spa_remove(spa_t *spa)
 	mutex_destroy(&spa->spa_scrub_lock);
 	mutex_destroy(&spa->spa_suspend_lock);
 	mutex_destroy(&spa->spa_vdev_top_lock);
+#ifdef	NZA_CLOSED
+	mutex_destroy(&spa->spa_cos_props_lock);
+	mutex_destroy(&spa->spa_vdev_props_lock);
+	mutex_destroy(&spa->spa_wrc_route.route_lock);
+#endif /* NZA_CLOSED */
 
 	kmem_free(spa, sizeof (spa_t));
 }
@@ -918,6 +950,9 @@ spa_vdev_config_exit(spa_t *spa, vdev_t *vd, uint64_t txg, int error, char *tag)
 	 */
 	ASSERT(metaslab_class_validate(spa_normal_class(spa)) == 0);
 	ASSERT(metaslab_class_validate(spa_log_class(spa)) == 0);
+#ifdef	NZA_CLOSED
+	ASSERT(metaslab_class_validate(spa_special_class(spa)) == 0);
+#endif /* NZA_CLOSED */
 
 	spa_config_exit(spa, SCL_ALL, spa);
 
@@ -1487,6 +1522,14 @@ spa_log_class(spa_t *spa)
 	return (spa->spa_log_class);
 }
 
+#ifdef	NZA_CLOSED
+metaslab_class_t *
+spa_special_class(spa_t *spa)
+{
+	return (spa->spa_special_class);
+}
+#endif /* NZA_CLOSED */
+
 int
 spa_max_replication(spa_t *spa)
 {
@@ -1609,6 +1652,10 @@ spa_init(int mode)
 	zfs_prop_init();
 	zpool_prop_init();
 	zpool_feature_init();
+#ifdef	NZA_CLOSED
+	vdev_prop_init();
+	cos_prop_init();
+#endif /* NZA_CLOSED */
 	spa_config_load();
 	l2arc_start();
 }
@@ -1671,6 +1718,14 @@ spa_writeable(spa_t *spa)
 {
 	return (!!(spa->spa_mode & FWRITE));
 }
+
+#ifdef	NZA_CLOSED
+boolean_t
+spa_has_special(spa_t *spa)
+{
+	return (spa->spa_special_class->mc_rotor != NULL);
+}
+#endif /* NZA_CLOSED */
 
 int
 spa_mode(spa_t *spa)

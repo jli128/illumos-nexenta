@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright (c) 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright (c) 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -36,6 +36,10 @@
 #include <sys/dmu_objset.h>
 #include <sys/arc.h>
 #include <sys/ddt.h>
+#ifdef	NZA_CLOSED
+#include <sys/special.h>
+extern int zil_use_sdev;
+#endif /* NZA_CLOSED */
 
 /*
  * ==========================================================================
@@ -1690,8 +1694,13 @@ zio_write_gang_block(zio_t *pio)
 	int gbh_copies = MIN(copies + 1, spa_max_replication(spa));
 	zio_prop_t zp;
 	int error;
+#ifdef	NZA_CLOSED
+	metaslab_class_t *mc = spa_select_class(spa, &pio->io_prop);
+#else /* !NZA_CLOSED */
+	metaslab_class_t *mc = spa_normal_class(spa);
+#endif /* NZA_CLOSED */
 
-	error = metaslab_alloc(spa, spa_normal_class(spa), SPA_GANGBLOCKSIZE,
+	error = metaslab_alloc(spa, mc, SPA_GANGBLOCKSIZE,
 	    bp, gbh_copies, txg, pio == gio ? NULL : gio->io_bp,
 	    METASLAB_HINTBP_FAVOR | METASLAB_GANG_HEADER);
 	if (error) {
@@ -2127,7 +2136,12 @@ static int
 zio_dva_allocate(zio_t *zio)
 {
 	spa_t *spa = zio->io_spa;
+#ifdef	NZA_CLOSED
+	metaslab_class_t *mc = spa_select_class(spa, &zio->io_prop);
+#else /* !NZA_CLOSED */
 	metaslab_class_t *mc = spa_normal_class(spa);
+#endif /* !NZA_CLOSED */
+
 	blkptr_t *bp = zio->io_bp;
 	int error;
 	int flags = 0;
@@ -2229,6 +2243,19 @@ zio_alloc_zil(spa_t *spa, uint64_t txg, blkptr_t *new_bp, blkptr_t *old_bp,
 		    new_bp, 1, txg, old_bp,
 		    METASLAB_HINTBP_AVOID | METASLAB_GANG_AVOID);
 	}
+
+#ifdef	NZA_CLOSED
+	/*
+	 * If there is no dedicated log device and pool has a special device,
+	 * then ZIL should be allocated on the special device.
+	 */
+	if (zil_use_sdev && error && spa_has_special(spa) &&
+	    spa->spa_usesc) {
+		error = metaslab_alloc(spa, spa_special_class(spa), size,
+		    new_bp, 1, txg, old_bp,
+		    METASLAB_HINTBP_AVOID | METASLAB_GANG_AVOID);
+	}
+#endif /* NZA_CLOSED */
 
 	if (error) {
 		error = metaslab_alloc(spa, spa_normal_class(spa), size,

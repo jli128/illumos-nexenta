@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -286,6 +287,10 @@ vdev_config_generate(spa_t *spa, vdev_t *vd, boolean_t getstats,
 		    vd->vdev_asize) == 0);
 		VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_IS_LOG,
 		    vd->vdev_islog) == 0);
+#ifdef	NZA_CLOSED
+		VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_IS_SPECIAL,
+		    vd->vdev_isspecial) == 0);
+#endif /* NZA_CLOSED */
 		if (vd->vdev_removing)
 			VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_REMOVING,
 			    vd->vdev_removing) == 0);

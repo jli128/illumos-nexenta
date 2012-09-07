@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
@@ -1267,6 +1267,22 @@ const struct ioc {
 		"zfs_cmd_t" },
 	{ (uint_t)ZFS_IOC_CLONE,		"ZFS_IOC_CLONE",
 		"zfs_cmd_t" },
+#ifdef	NZA_CLOSED
+	{ (uint_t)ZFS_IOC_VDEV_SET_PROPS,	"ZFS_IOC_VDEV_SET_PROPS",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_VDEV_GET_PROPS,	"ZFS_IOC_VDEV_GET_PROPS",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_COS_ALLOC,		"ZFS_IOC_COS_ALLOC",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_COS_FREE,		"ZFS_IOC_COS_FREE",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_COS_LIST,		"ZFS_IOC_COS_LIST",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_COS_SET_PROPS,	"ZFS_IOC_COS_SET_PROPS",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_COS_GET_PROPS,	"ZFS_IOC_COS_GET_PROPS",
+		"zfs_cmd_t" },
+#endif /* NZA_CLOSED */
 
 	/* kssl ioctls */
 	{ (uint_t)KSSL_ADD_ENTRY,		"KSSL_ADD_ENTRY",

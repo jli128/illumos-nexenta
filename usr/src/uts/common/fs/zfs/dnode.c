@@ -1201,6 +1201,14 @@ dnode_rele(dnode_t *dn, void *tag)
 void
 dnode_setdirty(dnode_t *dn, dmu_tx_t *tx)
 {
+#ifdef	NZA_CLOSED
+	dnode_setdirty_impl(dn, tx, B_TRUE);
+}
+
+void
+dnode_setdirty_impl(dnode_t *dn, dmu_tx_t *tx, boolean_t usesc)
+{
+#endif /* NZA_CLOSED */
 	objset_t *os = dn->dn_objset;
 	uint64_t txg = tx->tx_txg;
 
@@ -1261,7 +1269,11 @@ dnode_setdirty(dnode_t *dn, dmu_tx_t *tx)
 	 */
 	VERIFY(dnode_add_ref(dn, (void *)(uintptr_t)tx->tx_txg));
 
+#ifdef	NZA_CLOSED
+	(void) dbuf_dirty_impl(dn->dn_dbuf, tx, usesc);
+#else /* !NZA_CLOSED */
 	(void) dbuf_dirty(dn->dn_dbuf, tx);
+#endif /* !NZA_CLOSED */
 
 	dsl_dataset_dirty(os->os_dsl_dataset, tx);
 }
@@ -1371,7 +1383,12 @@ fail:
 
 /* read-holding callers must not rely on the lock being continuously held */
 void
+#ifdef	NZA_CLOSED
+dnode_new_blkid(dnode_t *dn, uint64_t blkid, dmu_tx_t *tx,
+    boolean_t usesc, boolean_t have_read)
+#else /* !NZA_CLOSED */
 dnode_new_blkid(dnode_t *dn, uint64_t blkid, dmu_tx_t *tx, boolean_t have_read)
+#endif /* !NZA_CLOSED */
 {
 	uint64_t txgoff = tx->tx_txg & TXG_MASK;
 	int epbs, new_nlevels;
@@ -1425,7 +1442,11 @@ dnode_new_blkid(dnode_t *dn, uint64_t blkid, dmu_tx_t *tx, boolean_t have_read)
 		/* dirty the left indirects */
 		db = dbuf_hold_level(dn, old_nlevels, 0, FTAG);
 		ASSERT(db != NULL);
+#ifdef	NZA_CLOSED
+		new = dbuf_dirty_impl(db, tx, usesc);
+#else /* !NZA_CLOSED */
 		new = dbuf_dirty(db, tx);
+#endif /* !NZA_CLOSED */
 		dbuf_rele(db, FTAG);
 
 		/* transfer the dirty records to the new indirect */

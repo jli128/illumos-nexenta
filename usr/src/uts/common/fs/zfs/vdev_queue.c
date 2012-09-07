@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -343,6 +344,10 @@ zio_t *
 vdev_queue_io(zio_t *zio)
 {
 	vdev_queue_t *vq = &zio->io_vd->vdev_queue;
+#ifdef	NZA_CLOSED
+	uint64_t vdev_min_pending = vdev_get_minpending(zio->io_vd,
+	    zfs_vdev_min_pending);
+#endif /* NZA_CLOSED */
 	zio_t *nio;
 
 	ASSERT(zio->io_type == ZIO_TYPE_READ || zio->io_type == ZIO_TYPE_WRITE);
@@ -364,7 +369,11 @@ vdev_queue_io(zio_t *zio)
 
 	vdev_queue_io_add(vq, zio);
 
+#ifdef	NZA_CLOSED
+	nio = vdev_queue_io_to_issue(vq, vdev_min_pending);
+#else /* !NZA_CLOSED */
 	nio = vdev_queue_io_to_issue(vq, zfs_vdev_min_pending);
+#endif /* !NZA_CLOSED */
 
 	mutex_exit(&vq->vq_lock);
 
@@ -383,13 +392,21 @@ void
 vdev_queue_io_done(zio_t *zio)
 {
 	vdev_queue_t *vq = &zio->io_vd->vdev_queue;
+#ifdef	NZA_CLOSED
+	uint64_t vdev_max_pending = vdev_get_maxpending(zio->io_vd,
+	    zfs_vdev_max_pending);
+#endif /* NZA_CLOSED */
 
 	mutex_enter(&vq->vq_lock);
 
 	avl_remove(&vq->vq_pending_tree, zio);
 
 	for (int i = 0; i < zfs_vdev_ramp_rate; i++) {
+#ifdef	NZA_CLOSED
+		zio_t *nio = vdev_queue_io_to_issue(vq, vdev_max_pending);
+#else /* !NZA_CLOSED */
 		zio_t *nio = vdev_queue_io_to_issue(vq, zfs_vdev_max_pending);
+#endif /* !NZA_CLOSED */
 		if (nio == NULL)
 			break;
 		mutex_exit(&vq->vq_lock);

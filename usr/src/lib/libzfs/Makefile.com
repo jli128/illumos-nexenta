@@ -21,6 +21,7 @@
 #
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 LIBRARY= libzfs.a
@@ -50,7 +51,13 @@ OBJS_COMMON=			\
 	libzfs_status.o		\
 	libzfs_util.o
 
+
 OBJECTS= $(OBJS_COMMON) $(OBJS_SHARED)
+#
+# ZFS Plus shared
+#
+include $(NZA_MAKEDEFS)
+OBJECTS += $(NZA_ZFSPLUS_SHARED_OBJS)
 
 include ../../Makefile.lib
 
@@ -65,6 +72,7 @@ INCS += -I$(SRCDIR)
 INCS += -I../../../uts/common/fs/zfs
 INCS += -I../../../common/zfs
 INCS += -I../../libc/inc
+INCS += $(NZA_ZFSPLUSBASE_FLAGS)
 
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
@@ -73,7 +81,8 @@ LDLIBS +=	-lc -lm -ldevid -lgen -lnvpair -luutil -lavl -lefi \
 CPPFLAGS +=	$(INCS) -D_LARGEFILE64_SOURCE=1 -D_REENTRANT
 
 SRCS=	$(OBJS_COMMON:%.o=$(SRCDIR)/%.c)	\
-	$(OBJS_SHARED:%.o=$(SRC)/common/zfs/%.c)
+	$(OBJS_SHARED:%.o=$(SRC)/common/zfs/%.c) \
+	$(NZA_ZFSPLUS_SHARED_SRC)
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
 
 .KEEP_STATE:

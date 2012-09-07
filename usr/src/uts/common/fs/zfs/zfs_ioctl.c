@@ -172,6 +172,9 @@
 #include <sys/dsl_scan.h>
 #include <sharefs/share.h>
 #include <sys/dmu_objset.h>
+#ifdef	NZA_CLOSED
+#include <sys/cos.h>
+#endif /* NZA_CLOSED */
 
 #include "zfs_namecheck.h"
 #include "zfs_prop.h"
@@ -5131,6 +5134,213 @@ zfs_ioc_space_snaps(const char *lastsnap, nvlist_t *innvl, nvlist_t *outnvl)
 	return (error);
 }
 
+#ifdef	NZA_CLOSED
+static int
+zfs_ioc_vdev_set_props(zfs_cmd_t *zc)
+{
+	nvlist_t *props;
+	spa_t *spa;
+	int error;
+	uint64_t vdev_guid = zc->zc_guid;
+
+	if (error = get_nvlist(zc->zc_nvlist_src, zc->zc_nvlist_src_size,
+	    zc->zc_iflags, &props))
+		return (error);
+
+	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0) {
+		nvlist_free(props);
+		return (error);
+	}
+
+	error = spa_vdev_prop_set(spa, vdev_guid, props);
+
+	nvlist_free(props);
+	spa_close(spa, FTAG);
+
+	return (error);
+}
+
+static int
+zfs_ioc_vdev_get_props(zfs_cmd_t *zc)
+{
+	spa_t *spa;
+	uint64_t vdev_guid = zc->zc_guid;
+	nvlist_t *nvp = NULL;
+	int error;
+
+	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0) {
+		/*
+		 * If the pool is faulted, there may be properties we can still
+		 * get (such as altroot and cachefile), so attempt to get them
+		 * anyway.
+		 */
+		mutex_enter(&spa_namespace_lock);
+		if ((spa = spa_lookup(zc->zc_name)) != NULL)
+			error = spa_vdev_prop_get(spa, vdev_guid, &nvp);
+		mutex_exit(&spa_namespace_lock);
+	} else {
+		error = spa_vdev_prop_get(spa, vdev_guid, &nvp);
+		spa_close(spa, FTAG);
+	}
+
+	if (error == 0 && zc->zc_nvlist_dst != NULL)
+		error = put_nvlist(zc, nvp);
+	else
+		error = EFAULT;
+
+	nvlist_free(nvp);
+	return (error);
+}
+
+static int
+zfs_ioc_cos_alloc(zfs_cmd_t *zc)
+{
+	nvlist_t *props;
+	spa_t *spa;
+	int error;
+
+	if (error = get_nvlist(zc->zc_nvlist_src, zc->zc_nvlist_src_size,
+	    zc->zc_iflags, &props))
+		return (error);
+
+	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0) {
+		nvlist_free(props);
+		return (error);
+	}
+
+	error = spa_alloc_cos(spa, zc->zc_string, 0);
+	if (!error)
+		error = spa_cos_prop_set(spa, zc->zc_string, props);
+
+	spa_close(spa, FTAG);
+	nvlist_free(props);
+
+	return (error);
+}
+
+static int
+zfs_ioc_cos_free(zfs_cmd_t *zc)
+{
+	spa_t *spa;
+	int error = 0;
+
+	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
+		return (error);
+
+	error = spa_free_cos(spa, zc->zc_string);
+
+	spa_close(spa, FTAG);
+
+	return (error);
+}
+
+static int
+zfs_ioc_cos_list(zfs_cmd_t *zc)
+{
+	spa_t *spa;
+	nvlist_t *nvl;
+	int error = 0;
+
+	VERIFY(nvlist_alloc(&nvl, NV_UNIQUE_NAME, KM_SLEEP) == 0);
+
+	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0) {
+		nvlist_free(nvl);
+		return (error);
+	}
+
+	error = spa_list_cos(spa, nvl);
+
+	if (error == 0 && zc->zc_nvlist_dst != NULL)
+		error = put_nvlist(zc, nvl);
+
+	spa_close(spa, FTAG);
+	nvlist_free(nvl);
+
+	return (error);
+}
+
+static int
+zfs_ioc_cos_set_props(zfs_cmd_t *zc)
+{
+	nvlist_t *props;
+	spa_t *spa;
+	cos_t *cos;
+	const char *cosname;
+	int error = 0;
+
+	if ((zc->zc_string == NULL || zc->zc_string[0] == '\0') &&
+	    zc->zc_guid == 0)
+		return (EINVAL);
+
+	if (error = get_nvlist(zc->zc_nvlist_src, zc->zc_nvlist_src_size,
+	    zc->zc_iflags, &props))
+		return (error);
+
+	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0) {
+		nvlist_free(props);
+		return (error);
+	}
+
+	if (zc->zc_guid == 0) {
+		cosname = zc->zc_string;
+	} else {
+		spa_cos_enter(spa);
+		cos = spa_lookup_cos_by_id(spa, zc->zc_guid);
+		if (cos != NULL)
+			cosname = cos->cos_name;
+		spa_cos_exit(spa);
+	}
+
+	if (error == 0)
+		error = spa_cos_prop_set(spa, cosname, props);
+
+	spa_close(spa, FTAG);
+	nvlist_free(props);
+
+	return (error);
+}
+
+static int
+zfs_ioc_cos_get_props(zfs_cmd_t *zc)
+{
+	spa_t *spa;
+	cos_t *cos;
+	nvlist_t *nvp = NULL;
+	const char *cosname = NULL;
+	int error = 0;
+
+	if ((zc->zc_string == NULL || zc->zc_string[0] == '\0') &&
+	    zc->zc_guid == 0)
+		return (EINVAL);
+
+	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
+		return (error);
+
+	if (zc->zc_guid == 0) {
+		cosname = zc->zc_string;
+	} else {
+		spa_cos_enter(spa);
+		cos = spa_lookup_cos_by_id(spa, zc->zc_guid);
+		if (cos != NULL)
+			cosname = cos->cos_name;
+		spa_cos_exit(spa);
+	}
+
+	if (error == 0)
+		error = spa_cos_prop_get(spa, cosname, &nvp);
+
+	spa_close(spa, FTAG);
+
+	if (error == 0 && zc->zc_nvlist_dst != NULL)
+		error = put_nvlist(zc, nvp);
+	else
+		error = EFAULT;
+
+	nvlist_free(nvp);
+	return (error);
+}
+#endif /* NZA_CLOSED */
+
 /*
  * innvl: {
  *     "fd" -> file descriptor to write stream to (int32)
@@ -5445,6 +5655,22 @@ zfs_ioctl_init(void)
 	    zfs_secpolicy_config, B_TRUE, POOL_CHECK_SUSPENDED);
 	zfs_ioctl_register_pool(ZFS_IOC_POOL_REOPEN, zfs_ioc_pool_reopen,
 	    zfs_secpolicy_config, B_TRUE, POOL_CHECK_SUSPENDED);
+#ifdef	NZA_CLOSED
+	zfs_ioctl_register_pool(ZFS_IOC_VDEV_SET_PROPS, zfs_ioc_vdev_set_props,
+	    zfs_secpolicy_config, B_TRUE, POOL_CHECK_SUSPENDED);
+	zfs_ioctl_register_pool(ZFS_IOC_VDEV_GET_PROPS, zfs_ioc_vdev_get_props,
+	    zfs_secpolicy_config, B_TRUE, POOL_CHECK_SUSPENDED);
+	zfs_ioctl_register_pool(ZFS_IOC_COS_ALLOC, zfs_ioc_cos_alloc,
+	    zfs_secpolicy_config, B_TRUE, POOL_CHECK_SUSPENDED);
+	zfs_ioctl_register_pool(ZFS_IOC_COS_FREE, zfs_ioc_cos_free,
+	    zfs_secpolicy_config, B_TRUE, POOL_CHECK_SUSPENDED);
+	zfs_ioctl_register_pool(ZFS_IOC_COS_LIST, zfs_ioc_cos_list,
+	    zfs_secpolicy_config, B_TRUE, POOL_CHECK_SUSPENDED);
+	zfs_ioctl_register_pool(ZFS_IOC_COS_SET_PROPS, zfs_ioc_cos_set_props,
+	    zfs_secpolicy_config, B_TRUE, POOL_CHECK_SUSPENDED);
+	zfs_ioctl_register_pool(ZFS_IOC_COS_GET_PROPS, zfs_ioc_cos_get_props,
+	    zfs_secpolicy_config, B_TRUE, POOL_CHECK_SUSPENDED);
+#endif /* NZA_CLOSED */
 
 	zfs_ioctl_register_dataset_read(ZFS_IOC_SPACE_WRITTEN,
 	    zfs_ioc_space_written);

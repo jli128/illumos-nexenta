@@ -21,6 +21,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 #	This makefile drives the production of the zfs file system
 #	kernel module.
@@ -68,6 +69,11 @@ INC_PATH	+= -I$(UTSBASE)/common/fs/zfs
 INC_PATH	+= -I$(SRC)/common
 INC_PATH	+= -I$(COMMONBASE)/zfs
 
+#
+#	NZA ZFS Plus
+#
+INC_PATH	+= $(NZA_ZFSPLUSBASE_FLAGS)
+
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
 
@@ -110,4 +116,5 @@ $(ROOTLINK):	$(ROOT_FS_DIR) $(ROOTMODULE)
 #
 #	Include common targets.
 #
+include $(NZA_MAKEDEFS)
 include ../Makefile.targ

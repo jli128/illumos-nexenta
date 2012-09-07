@@ -23,7 +23,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 
@@ -289,6 +289,10 @@ typedef struct zio_prop {
 	uint8_t			zp_copies;
 	uint8_t			zp_dedup;
 	uint8_t			zp_dedup_verify;
+#ifdef	NZA_CLOSED
+	boolean_t		zp_metadata;
+	boolean_t		zp_usesc;
+#endif /* NZA_CLOSED */
 } zio_prop_t;
 
 typedef struct zio_cksum_report zio_cksum_report_t;

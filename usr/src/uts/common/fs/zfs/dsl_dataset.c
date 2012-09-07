@@ -22,6 +22,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/dmu_objset.h>
@@ -40,11 +41,20 @@
 #include <sys/zfs_context.h>
 #include <sys/zfs_ioctl.h>
 #include <sys/spa.h>
+#ifdef	NZA_CLOSED
+#include <sys/spa_impl.h>
+#endif /* NZA_CLOSED */
 #include <sys/zfs_znode.h>
 #include <sys/zfs_onexit.h>
 #include <sys/zvol.h>
 #include <sys/dsl_scan.h>
 #include <sys/dsl_deadlist.h>
+
+#ifdef	NZA_CLOSED
+extern int zfs_txg_timeout;
+extern int zfs_scan_min_time_ms;
+extern uint64_t zfs_write_limit_max;
+#endif /* NZA_CLOSED */
 
 static char *dsl_reaper = "the grim reaper";
 
@@ -453,6 +463,26 @@ dsl_dataset_get_ref(dsl_pool_t *dp, uint64_t dsobj, void *tag,
 				    "refquota", sizeof (uint64_t), 1,
 				    &ds->ds_quota, NULL);
 			}
+#ifdef	NZA_CLOSED
+			if (err == 0) {
+				err = dsl_prop_get_ds(ds,
+				    "lstxg", sizeof (uint64_t), 1,
+				    &ds->ds_lstxg, NULL);
+
+				/*
+				 * Not all datasets have lstxg attribute,
+				 * if it doesn't exists, ignore the error and
+				 * set lstxg to the earliest txg in the pool.
+				 * This will result in correct behavior for both
+				 * "special" and "regular" vdevs.
+				 */
+				if (err == ENOENT) {
+					err = 0;
+					ds->ds_lstxg =
+					    spa_first_txg(dp->dp_spa);
+				}
+			}
+#endif /* NZA_CLOSED */
 
 			if (need_lock)
 				rw_exit(&dp->dp_config_rwlock);
@@ -1113,6 +1143,15 @@ dsl_dataset_destroy(dsl_dataset_t *ds, void *tag, boolean_t defer)
 
 	if (err)
 		goto out;
+
+#ifdef	NZA_CLOSED
+	/*
+	 * We should remove the blocks from writecache blocks list.
+	 */
+	wrc_hold(dd->dd_pool->dp_spa);
+	wrc_deactivate_blkhdr(dd->dd_pool->dp_spa, ds);
+	wrc_rele(dd->dd_pool->dp_spa);
+#endif /* NZA_CLOSED */
 
 	/*
 	 * Blow away the dsl_dir + head dataset.

@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/dmu.h>
@@ -1581,6 +1582,10 @@ dmu_write_policy(objset_t *os, dnode_t *dn, int level, int wp, zio_prop_t *zp)
 		dedup = B_FALSE;
 	}
 
+#ifdef	NZA_CLOSED
+	zp->zp_usesc = WP_GET_SPECIALCLASS(wp);
+	zp->zp_metadata = ismd;
+#endif /* NZA_CLOSED */
 	zp->zp_checksum = checksum;
 	zp->zp_compress = compress;
 	zp->zp_type = (wp & WP_SPILL) ? dn->dn_bonustype : type;

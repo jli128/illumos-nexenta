@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 
@@ -63,6 +63,9 @@
 #include <sys/zfs_ioctl.h>
 #include <sys/dsl_scan.h>
 #include <sys/zfeature.h>
+#ifdef	NZA_CLOSED
+#include <sys/special.h>
+#endif /* NZA_CLOSED */
 
 #ifdef	_KERNEL
 #include <sys/bootprops.h>
@@ -190,6 +193,16 @@ spa_prop_get_config(spa_t *spa, nvlist_t **nvp)
 		spa_prop_add_list(*nvp, ZPOOL_PROP_ALLOCATED, NULL, alloc, src);
 		spa_prop_add_list(*nvp, ZPOOL_PROP_FREE, NULL,
 		    size - alloc, src);
+#ifdef	NZA_CLOSED
+		spa_prop_add_list(*nvp, ZPOOL_PROP_SPECIALCLASS, NULL,
+		    spa_specialclass_id(spa), src);
+		spa_prop_add_list(*nvp, ZPOOL_PROP_ENABLESPECIAL, NULL,
+		    (uint64_t)spa->spa_usesc, src);
+		spa_prop_add_list(*nvp, ZPOOL_PROP_HIWATERMARK, NULL,
+		    spa->spa_hiwat, src);
+		spa_prop_add_list(*nvp, ZPOOL_PROP_LOWATERMARK, NULL,
+		    spa->spa_lowat, src);
+#endif /* NZA_CLOSED */
 
 		space = 0;
 		for (int c = 0; c < rvd->vdev_children; c++) {
@@ -375,6 +388,9 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 	int error = 0, reset_bootfs = 0;
 	uint64_t objnum;
 	boolean_t has_feature = B_FALSE;
+#ifdef	NZA_CLOSED
+	uint64_t lowat = spa->spa_lowat, hiwat = spa->spa_hiwat;
+#endif /* NZA_CLOSED */
 
 	elem = NULL;
 	while ((elem = nvlist_next_nvpair(props, elem)) != NULL) {
@@ -561,11 +577,37 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 			    intval != 0 && intval < ZIO_DEDUPDITTO_MIN)
 				error = EINVAL;
 			break;
+
+#ifdef	NZA_CLOSED
+		case ZPOOL_PROP_SPECIALCLASS:
+			error = nvpair_value_uint64(elem, &intval);
+			if (!error && (intval >= SPA_NUM_SPECIALCLASSES))
+				error = EINVAL;
+			break;
+		case ZPOOL_PROP_LOWATERMARK:
+			error = nvpair_value_uint64(elem, &intval);
+			if (!error && (intval > 100))
+				error = EINVAL;
+			lowat = intval;
+			break;
+		case ZPOOL_PROP_HIWATERMARK:
+			error = nvpair_value_uint64(elem, &intval);
+			if (!error && (intval > 100))
+				error = EINVAL;
+			hiwat = intval;
+			break;
+#endif /* NZA_CLOSED */
 		}
 
 		if (error)
 			break;
 	}
+
+#ifdef	NZA_CLOSED
+	/* check if low watermark is less than high watermark */
+	if (lowat > 0 && lowat >= hiwat)
+		error = EINVAL;
+#endif /* NZA_CLOSED */
 
 	if (!error && reset_bootfs) {
 		error = nvlist_remove(props,
@@ -932,6 +974,7 @@ spa_thread(void *arg)
 static void
 spa_activate(spa_t *spa, int mode)
 {
+
 	ASSERT(spa->spa_state == POOL_STATE_UNINITIALIZED);
 
 	spa->spa_state = POOL_STATE_ACTIVE;
@@ -939,6 +982,9 @@ spa_activate(spa_t *spa, int mode)
 
 	spa->spa_normal_class = metaslab_class_create(spa, zfs_metaslab_ops);
 	spa->spa_log_class = metaslab_class_create(spa, zfs_metaslab_ops);
+#ifdef	NZA_CLOSED
+	spa->spa_special_class = metaslab_class_create(spa, zfs_metaslab_ops);
+#endif /* NZA_CLOSED */
 
 	/* Try to create a covering process */
 	mutex_enter(&spa->spa_proc_lock);
@@ -1019,6 +1065,11 @@ spa_deactivate(spa_t *spa)
 
 	metaslab_class_destroy(spa->spa_log_class);
 	spa->spa_log_class = NULL;
+
+#ifdef	NZA_CLOSED
+	metaslab_class_destroy(spa->spa_special_class);
+	spa->spa_special_class = NULL;
+#endif /* NZA_CLOSED */
 
 	/*
 	 * If this was part of an import or the open otherwise failed, we may
@@ -2410,6 +2461,9 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 
 	if (error == 0) {
 		uint64_t autoreplace;
+#ifdef	NZA_CLOSED
+		uint64_t val = 0;
+#endif /* NZA_CLOSED */
 
 		spa_prop_find(spa, ZPOOL_PROP_BOOTFS, &spa->spa_bootfs);
 		spa_prop_find(spa, ZPOOL_PROP_AUTOREPLACE, &autoreplace);
@@ -2419,8 +2473,31 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 		spa_prop_find(spa, ZPOOL_PROP_DEDUPDITTO,
 		    &spa->spa_dedup_ditto);
 
+#ifdef	NZA_CLOSED
+		spa_prop_find(spa, ZPOOL_PROP_SPECIALCLASS, &val);
+		spa_set_specialclass(spa, (spa_specialclass_id_t)val);
+		spa->spa_hiwat = zpool_prop_default_numeric(
+		    ZPOOL_PROP_HIWATERMARK);
+		spa->spa_lowat = zpool_prop_default_numeric(
+		    ZPOOL_PROP_LOWATERMARK);
+		spa_prop_find(spa, ZPOOL_PROP_HIWATERMARK, &spa->spa_hiwat);
+		spa_prop_find(spa, ZPOOL_PROP_LOWATERMARK, &spa->spa_lowat);
+#endif /* NZA_CLOSED */
+
 		spa->spa_autoreplace = (autoreplace != 0);
 	}
+
+#ifdef	NZA_CLOSED
+	error = spa_dir_prop(spa, DMU_POOL_COS_PROPS,
+	    &spa->spa_cos_props_object);
+	if (error == 0)
+		(void) spa_load_cos_props(spa);
+	error = spa_dir_prop(spa, DMU_POOL_VDEV_PROPS,
+	    &spa->spa_vdev_props_object);
+	if (error == 0)
+		(void) vdev_load_props(spa);
+#endif /* NZA_CLOSED */
+
 
 	/*
 	 * If the 'autoreplace' property is set, then post a resource notifying
@@ -3281,6 +3358,9 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	uint_t nspares, nl2cache;
 	uint64_t version, obj;
 	boolean_t has_features;
+#ifdef	NZA_CLOSED
+	uint64_t val;
+#endif /* NZA_CLOSED */
 
 	/*
 	 * If this pool already exists, return failure.
@@ -3468,6 +3548,12 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	spa->spa_delegation = zpool_prop_default_numeric(ZPOOL_PROP_DELEGATION);
 	spa->spa_failmode = zpool_prop_default_numeric(ZPOOL_PROP_FAILUREMODE);
 	spa->spa_autoexpand = zpool_prop_default_numeric(ZPOOL_PROP_AUTOEXPAND);
+#ifdef	NZA_CLOSED
+	val = zpool_prop_default_numeric(ZPOOL_PROP_SPECIALCLASS);
+	spa_set_specialclass(spa, (spa_specialclass_id_t)val);
+	spa->spa_hiwat = zpool_prop_default_numeric(ZPOOL_PROP_HIWATERMARK);
+	spa->spa_lowat = zpool_prop_default_numeric(ZPOOL_PROP_LOWATERMARK);
+#endif /* NZA_CLOSED */
 
 	if (props != NULL) {
 		spa_configfile_set(spa, props, B_FALSE);
@@ -3990,6 +4076,9 @@ spa_export_common(char *pool, int new_state, nvlist_t **oldconfig,
     boolean_t force, boolean_t hardforce)
 {
 	spa_t *spa;
+#ifdef	NZA_CLOSED
+	boolean_t wrcthr_stopped = B_FALSE;
+#endif /* NZA_CLOSED */
 
 	if (oldconfig)
 		*oldconfig = NULL;
@@ -4009,6 +4098,9 @@ spa_export_common(char *pool, int new_state, nvlist_t **oldconfig,
 	 */
 	spa_open_ref(spa, FTAG);
 	mutex_exit(&spa_namespace_lock);
+#ifdef	NZA_CLOSED
+	wrcthr_stopped = stop_wrc_thread(spa); /* stop write cache thread */
+#endif /* NZA_CLOSED */
 	spa_async_suspend(spa);
 	mutex_enter(&spa_namespace_lock);
 	spa_close(spa, FTAG);
@@ -4034,6 +4126,10 @@ spa_export_common(char *pool, int new_state, nvlist_t **oldconfig,
 		    new_state != POOL_STATE_UNINITIALIZED)) {
 			spa_async_resume(spa);
 			mutex_exit(&spa_namespace_lock);
+#ifdef	NZA_CLOSED
+			if (wrcthr_stopped)
+				start_wrc_thread(spa);
+#endif /* NZA_CLOSED */
 			return (EBUSY);
 		}
 
@@ -4047,6 +4143,10 @@ spa_export_common(char *pool, int new_state, nvlist_t **oldconfig,
 		    spa_has_active_shared_spare(spa)) {
 			spa_async_resume(spa);
 			mutex_exit(&spa_namespace_lock);
+#ifdef	NZA_CLOSED
+			if (wrcthr_stopped)
+				start_wrc_thread(spa);
+#endif /* NZA_CLOSED */
 			return (EXDEV);
 		}
 
@@ -5316,6 +5416,11 @@ spa_vdev_resilver_done(spa_t *spa)
 }
 
 /*
+ * This is an open-source version of the vdev_set_common
+ * The corresponding closed source is found in vdev_props.c (closed-source repo)
+ */
+#ifndef	NZA_CLOSED
+/*
  * Update the stored path or FRU for this vdev.
  */
 int
@@ -5366,6 +5471,7 @@ spa_vdev_setfru(spa_t *spa, uint64_t guid, const char *newfru)
 {
 	return (spa_vdev_set_common(spa, guid, newfru, B_FALSE));
 }
+#endif /* !NZA_CLOSED */
 
 /*
  * ==========================================================================
@@ -5880,6 +5986,19 @@ spa_sync_props(void *arg1, void *arg2, dmu_tx_t *tx)
 			case ZPOOL_PROP_DEDUPDITTO:
 				spa->spa_dedup_ditto = intval;
 				break;
+#ifdef	NZA_CLOSED
+			case ZPOOL_PROP_SPECIALCLASS:
+				ASSERT(intval < SPA_NUM_SPECIALCLASSES);
+				spa_set_specialclass(spa,
+				    (spa_specialclass_id_t)intval);
+				break;
+			case ZPOOL_PROP_LOWATERMARK:
+				spa->spa_lowat = intval;
+				break;
+			case ZPOOL_PROP_HIWATERMARK:
+				spa->spa_hiwat = intval;
+				break;
+#endif /* NZA_CLOSED */
 			default:
 				break;
 			}
@@ -6149,6 +6268,9 @@ spa_sync(spa_t *spa, uint64_t txg)
 
 	spa->spa_sync_pass = 0;
 
+#ifdef	NZA_CLOSED
+	spa_check_special(spa);
+#endif /* NZA_CLOSED */
 	spa_config_exit(spa, SCL_CONFIG, FTAG);
 
 	spa_handle_ignored_writes(spa);

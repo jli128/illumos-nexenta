@@ -69,6 +69,9 @@
  * This global ZIL switch affects all pools
  */
 int zil_replay_disable = 0;    /* disable intent logging replay */
+#ifdef	NZA_CLOSED
+int zil_use_sdev = 1;		/* Use Special device for ZIL */
+#endif /* NZA_CLOSED */
 
 /*
  * Tunable parameter for debugging or performance analysis.  Setting

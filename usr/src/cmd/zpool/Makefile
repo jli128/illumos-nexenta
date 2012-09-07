@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 PROG= zpool
@@ -78,3 +79,7 @@ $(ROOTUSRSBINLINKS):
 	-$(RM) $@; $(SYMLINK) ../../sbin/$(@F) $@
 
 include ../Makefile.targ
+#
+# ZFS Plus
+#
+include $(NZA_MAKEDEFS)

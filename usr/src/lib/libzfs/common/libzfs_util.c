@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -642,6 +643,10 @@ libzfs_init(void)
 	zfs_prop_init();
 	zpool_prop_init();
 	zpool_feature_init();
+#ifdef	NZA_CLOSED
+	vdev_prop_init();
+	cos_prop_init();
+#endif /* NZA_CLOSED */
 	libzfs_mnttab_init(hdl);
 
 	return (hdl);
@@ -1168,10 +1173,22 @@ zprop_parse_value(libzfs_handle_t *hdl, nvpair_t *elem, int prop,
 	char *value;
 	boolean_t isnone = B_FALSE;
 
-	if (type == ZFS_TYPE_POOL) {
+	switch (type) {
+	case ZFS_TYPE_POOL:
 		proptype = zpool_prop_get_type(prop);
 		propname = zpool_prop_to_name(prop);
-	} else {
+		break;
+#ifdef	NZA_CLOSED
+	case ZFS_TYPE_VDEV:
+		proptype = vdev_prop_get_type(prop);
+		propname = vdev_prop_to_name(prop);
+		break;
+	case ZFS_TYPE_COS:
+		proptype = cos_prop_get_type(prop);
+		propname = cos_prop_to_name(prop);
+		break;
+#endif /* NZA_CLOSED */
+	default:
 		proptype = zfs_prop_get_type(prop);
 		propname = zfs_prop_to_name(prop);
 	}
@@ -1488,3 +1505,456 @@ zprop_iter(zprop_func func, void *cb, boolean_t show_all, boolean_t ordered,
 {
 	return (zprop_iter_common(func, cb, show_all, ordered, type));
 }
+
+#ifdef	NZA_CLOSED
+int
+vdev_get_proplist(libzfs_handle_t *hdl, char *props, zprop_list_t **listp)
+{
+	*listp = NULL;
+
+	/*
+	 * If 'all' is specified, return a NULL list.
+	 */
+	if (strcmp(props, "all") == 0) {
+		vdev_prop_t prop;
+		for (prop = VDEV_PROP_PATH; prop < VDEV_NUM_PROPS; prop++) {
+			const char *propname = vdev_prop_to_name(prop);
+			if (addlist(hdl, (char *)propname, listp,
+			    ZFS_TYPE_VDEV))
+				return (-1);
+			listp = &(*listp)->pl_next;
+		}
+
+		return (0);
+	}
+
+	/*
+	 * If no props were specified, return an error.
+	 */
+	if (props[0] == '\0') {
+		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+		    "no properties specified"));
+		return (zfs_error(hdl, EZFS_BADPROP, dgettext(TEXT_DOMAIN,
+		    "bad property list")));
+	}
+
+	/*
+	 * It would be nice to use getsubopt() here, but the inclusion of column
+	 * aliases makes this more effort than it's worth.
+	 */
+	while (*props != '\0') {
+		size_t len;
+		char *p;
+		char c;
+
+		if ((p = strchr(props, ',')) == NULL) {
+			len = strlen(props);
+			p = props + len;
+		} else {
+			len = p - props;
+		}
+
+		/*
+		 * Check for empty options.
+		 */
+		if (len == 0) {
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "empty property name"));
+			return (zfs_error(hdl, EZFS_BADPROP,
+			    dgettext(TEXT_DOMAIN, "bad property list")));
+		}
+
+		/*
+		 * Check all regular property names.
+		 */
+		c = props[len];
+		props[len] = '\0';
+
+		if (addlist(hdl, props, listp, ZFS_TYPE_VDEV))
+			return (-1);
+		listp = &(*listp)->pl_next;
+
+		props = p;
+		if (c == ',')
+			props++;
+	}
+
+	return (0);
+}
+
+int
+cos_get_proplist(libzfs_handle_t *hdl, char *props, zprop_list_t **listp)
+{
+	*listp = NULL;
+
+	/*
+	 * If 'all' is specified, return a NULL list.
+	 */
+	if (strcmp(props, "all") == 0) {
+		cos_prop_t prop;
+		for (prop = COS_PROP_ID; prop < COS_NUM_PROPS; prop++) {
+			const char *propname = cos_prop_to_name(prop);
+			if (addlist(hdl, (char *)propname, listp,
+			    ZFS_TYPE_COS))
+				return (-1);
+			listp = &(*listp)->pl_next;
+		}
+
+		return (0);
+	}
+
+	/*
+	 * If no props were specified, return an error.
+	 */
+	if (props[0] == '\0') {
+		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+		    "no properties specified"));
+		return (zfs_error(hdl, EZFS_BADPROP, dgettext(TEXT_DOMAIN,
+		    "bad property list")));
+	}
+
+	/*
+	 * It would be nice to use getsubopt() here, but the inclusion of column
+	 * aliases makes this more effort than it's worth.
+	 */
+	while (*props != '\0') {
+		size_t len;
+		char *p;
+		char c;
+
+		if ((p = strchr(props, ',')) == NULL) {
+			len = strlen(props);
+			p = props + len;
+		} else {
+			len = p - props;
+		}
+
+		/*
+		 * Check for empty options.
+		 */
+		if (len == 0) {
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "empty property name"));
+			return (zfs_error(hdl, EZFS_BADPROP,
+			    dgettext(TEXT_DOMAIN, "bad property list")));
+		}
+
+		/*
+		 * Check all regular property names.
+		 */
+		c = props[len];
+		props[len] = '\0';
+
+		if (addlist(hdl, props, listp, ZFS_TYPE_COS))
+			return (-1);
+		listp = &(*listp)->pl_next;
+
+		props = p;
+		if (c == ',')
+			props++;
+	}
+
+	return (0);
+}
+
+void
+vdev_print_headers(zprop_get_cbdata_t *cbp)
+{
+	zprop_list_t *pl = cbp->cb_proplist;
+	int i;
+	char *title;
+	size_t len;
+
+	cbp->cb_first = B_FALSE;
+	if (cbp->cb_scripted)
+		return;
+
+	/*
+	 * Start with the length of the column headers.
+	 */
+	cbp->cb_colwidths[GET_COL_NAME] = strlen(dgettext(TEXT_DOMAIN,
+	    "POOLNAME"));
+	cbp->cb_colwidths[GET_COL_SOURCE] = strlen(dgettext(TEXT_DOMAIN,
+	    "c0t0d0s0"));
+	cbp->cb_colwidths[GET_COL_PROPERTY] = strlen(dgettext(TEXT_DOMAIN,
+	    "PROPERTY"));
+	cbp->cb_colwidths[GET_COL_VALUE] = strlen(dgettext(TEXT_DOMAIN,
+	    "VALUE"));
+
+	for (pl = cbp->cb_proplist; pl != NULL; pl = pl->pl_next) {
+		/*
+		 * 'PROPERTY' column
+		 */
+		const char *propname = vdev_prop_to_name(pl->pl_prop);
+
+		len = strlen(propname);
+		if (len > cbp->cb_colwidths[GET_COL_PROPERTY])
+			cbp->cb_colwidths[GET_COL_PROPERTY] = len;
+
+		/*
+		 * 'VALUE' column.
+		 */
+		if (pl != cbp->cb_proplist &&
+		    pl->pl_width > cbp->cb_colwidths[GET_COL_VALUE])
+			cbp->cb_colwidths[GET_COL_VALUE] = pl->pl_width;
+
+		/*
+		 * 'NAME'
+		 */
+		if (pl->pl_prop == 0 &&
+		    pl->pl_width > cbp->cb_colwidths[GET_COL_NAME]) {
+			cbp->cb_colwidths[GET_COL_NAME] = pl->pl_width;
+		}
+		/*
+		 * 'SOURCE'
+		 */
+		if (pl->pl_prop == 0 &&
+		    pl->pl_width > cbp->cb_colwidths[GET_COL_SOURCE]) {
+			cbp->cb_colwidths[GET_COL_SOURCE] = pl->pl_width;
+		}
+	}
+
+	/*
+	 * Now go through and print the headers.
+	 */
+	for (i = 0; i < ZFS_GET_NCOLS-1; i++) {
+		switch (cbp->cb_columns[i]) {
+		case GET_COL_NAME:
+			title = dgettext(TEXT_DOMAIN, "POOLNAME");
+			break;
+		case GET_COL_SOURCE:
+			title = dgettext(TEXT_DOMAIN, "VDEV");
+			break;
+		case GET_COL_PROPERTY:
+			title = dgettext(TEXT_DOMAIN, "PROPERTY");
+			break;
+		case GET_COL_VALUE:
+			title = dgettext(TEXT_DOMAIN, "VALUE");
+			break;
+		default:
+			title = NULL;
+		}
+
+		if (title != NULL) {
+			if (i == (ZFS_GET_NCOLS - 1) ||
+			    cbp->cb_columns[i + 1] == GET_COL_NONE)
+				(void) printf("%s", title);
+			else
+				(void) printf("%-*s  ",
+				    cbp->cb_colwidths[cbp->cb_columns[i]],
+				    title);
+		}
+	}
+	(void) printf("\n");
+}
+
+void
+cos_print_headers(zprop_get_cbdata_t *cbp)
+{
+	zprop_list_t *pl = cbp->cb_proplist;
+	int i;
+	char *title;
+	size_t len;
+
+	cbp->cb_first = B_FALSE;
+	if (cbp->cb_scripted)
+		return;
+
+	/*
+	 * Start with the length of the column headers.
+	 */
+	cbp->cb_colwidths[GET_COL_NAME] = strlen(dgettext(TEXT_DOMAIN,
+	    "POOLNAME"));
+	cbp->cb_colwidths[GET_COL_SOURCE] = strlen(dgettext(TEXT_DOMAIN,
+	    "c0t0d0s0"));
+	cbp->cb_colwidths[GET_COL_PROPERTY] = strlen(dgettext(TEXT_DOMAIN,
+	    "PROPERTY"));
+	cbp->cb_colwidths[GET_COL_VALUE] = strlen(dgettext(TEXT_DOMAIN,
+	    "VALUE"));
+
+	for (pl = cbp->cb_proplist; pl != NULL; pl = pl->pl_next) {
+		/*
+		 * 'PROPERTY' column
+		 */
+		const char *propname = cos_prop_to_name(pl->pl_prop);
+
+		len = strlen(propname);
+		if (len > cbp->cb_colwidths[GET_COL_PROPERTY])
+			cbp->cb_colwidths[GET_COL_PROPERTY] = len;
+
+		/*
+		 * 'VALUE' column.
+		 */
+		if (pl != cbp->cb_proplist &&
+		    pl->pl_width > cbp->cb_colwidths[GET_COL_VALUE])
+			cbp->cb_colwidths[GET_COL_VALUE] = pl->pl_width;
+
+		/*
+		 * 'NAME'
+		 */
+		if (pl->pl_prop == 0 &&
+		    pl->pl_width > cbp->cb_colwidths[GET_COL_NAME]) {
+			cbp->cb_colwidths[GET_COL_NAME] = pl->pl_width;
+		}
+		/*
+		 * 'SOURCE'
+		 */
+		if (pl->pl_prop == 0 &&
+		    pl->pl_width > cbp->cb_colwidths[GET_COL_SOURCE]) {
+			cbp->cb_colwidths[GET_COL_SOURCE] = pl->pl_width;
+		}
+	}
+
+	/*
+	 * Now go through and print the headers.
+	 */
+	for (i = 0; i < ZFS_GET_NCOLS-1; i++) {
+		switch (cbp->cb_columns[i]) {
+		case GET_COL_NAME:
+			title = dgettext(TEXT_DOMAIN, "POOLNAME");
+			break;
+		case GET_COL_SOURCE:
+			title = dgettext(TEXT_DOMAIN, "COS");
+			break;
+		case GET_COL_PROPERTY:
+			title = dgettext(TEXT_DOMAIN, "PROPERTY");
+			break;
+		case GET_COL_VALUE:
+			title = dgettext(TEXT_DOMAIN, "VALUE");
+			break;
+		default:
+			title = NULL;
+		}
+
+		if (title != NULL) {
+			if (i == (ZFS_GET_NCOLS - 1) ||
+			    cbp->cb_columns[i + 1] == GET_COL_NONE)
+				(void) printf("%s", title);
+			else
+				(void) printf("%-*s  ",
+				    cbp->cb_colwidths[cbp->cb_columns[i]],
+				    title);
+		}
+	}
+	(void) printf("\n");
+}
+
+void
+vdev_print_one_property(const char *poolname, const char *vdevname,
+    zprop_get_cbdata_t *cbp, const char *propname, const char *value)
+{
+	int i;
+	const char *str;
+
+	if (cbp->cb_first)
+		vdev_print_headers(cbp);
+
+	for (i = 0; i < ZFS_GET_NCOLS; i++) {
+		switch (cbp->cb_columns[i]) {
+		case GET_COL_NAME:
+			str = poolname;
+			break;
+
+		case GET_COL_SOURCE:
+			str = vdevname;
+			break;
+
+		case GET_COL_PROPERTY:
+			str = propname;
+			break;
+
+		case GET_COL_VALUE:
+			str = value;
+			break;
+
+		default:
+			continue;
+		}
+
+		if (cbp->cb_columns[i + 1] == GET_COL_NONE)
+			(void) printf("%s", str);
+		else if (cbp->cb_scripted)
+			(void) printf("%s\t", str);
+		else
+			(void) printf("%-*s  ",
+			    cbp->cb_colwidths[cbp->cb_columns[i]],
+			    str);
+	}
+
+	(void) printf("\n");
+}
+
+void
+cos_print_one_property(const char *poolname, const char *cosname,
+    zprop_get_cbdata_t *cbp, const char *propname, const char *value)
+{
+	int i;
+	const char *str;
+
+	if (cbp->cb_first)
+		cos_print_headers(cbp);
+
+	for (i = 0; i < ZFS_GET_NCOLS; i++) {
+		switch (cbp->cb_columns[i]) {
+		case GET_COL_NAME:
+			str = poolname;
+			break;
+
+		case GET_COL_SOURCE:
+			str = cosname;
+			break;
+
+		case GET_COL_PROPERTY:
+			str = propname;
+			break;
+
+		case GET_COL_VALUE:
+			str = value;
+			break;
+
+		default:
+			continue;
+		}
+
+		if (cbp->cb_columns[i + 1] == GET_COL_NONE)
+			(void) printf("%s", str);
+		else if (cbp->cb_scripted)
+			(void) printf("%s\t", str);
+		else
+			(void) printf("%-*s  ",
+			    cbp->cb_colwidths[cbp->cb_columns[i]],
+			    str);
+	}
+
+	(void) printf("\n");
+}
+#else
+/* ARGSUSED */
+int
+vdev_get_proplist(libzfs_handle_t *hdl, char *props, zprop_list_t **listp)
+{
+	return (ENOTSUP);
+}
+
+/* ARGSUSED */
+int
+cos_get_proplist(libzfs_handle_t *hdl, char *props, zprop_list_t **listp)
+{
+	return (ENOTSUP);
+}
+
+/* ARGSUSED */
+void
+vdev_print_one_property(const char *poolname, const char *vdevname,
+    zprop_get_cbdata_t *cbp, const char *propname, const char *value)
+{
+}
+
+/* ARGSUSED */
+void
+cos_print_one_property(const char *poolname, const char *cosname,
+    zprop_get_cbdata_t *cbp, const char *propname, const char *value)
+{
+}
+
+#endif /* NZA_CLOSED */

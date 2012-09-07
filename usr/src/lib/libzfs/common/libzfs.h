@@ -262,6 +262,9 @@ extern int zpool_label_disk(libzfs_handle_t *, zpool_handle_t *, char *);
 /*
  * Functions to manage pool properties
  */
+#ifdef	NZA_CLOSED
+extern int zpool_set_proplist(zpool_handle_t *, nvlist_t *);
+#endif /* NZA_CLOSED */
 extern int zpool_set_prop(zpool_handle_t *, const char *, const char *);
 extern int zpool_get_prop(zpool_handle_t *, zpool_prop_t, char *,
     size_t proplen, zprop_source_t *);
@@ -446,7 +449,6 @@ extern nvlist_t *zfs_get_user_props(zfs_handle_t *);
 extern nvlist_t *zfs_get_recvd_props(zfs_handle_t *);
 extern nvlist_t *zfs_get_clones_nvl(zfs_handle_t *);
 
-
 typedef struct zprop_list {
 	int		pl_prop;
 	char		*pl_user_prop;
@@ -480,6 +482,27 @@ extern const char *zpool_prop_default_string(zpool_prop_t);
 extern uint64_t zpool_prop_default_numeric(zpool_prop_t);
 extern const char *zpool_prop_column_name(zpool_prop_t);
 extern boolean_t zpool_prop_align_right(zpool_prop_t);
+
+#ifdef	NZA_CLOSED
+/*
+ * Functions to manage vdev properties
+ */
+extern int vdev_set_proplist(zpool_handle_t *, const char *, nvlist_t *);
+extern int vdev_get_proplist(libzfs_handle_t *, char *, zprop_list_t **);
+extern int vdev_get_prop(zpool_handle_t *,  const char *, vdev_prop_t,
+    char *, size_t len, nvlist_t **);
+
+/*
+ * Functions to manage cos properties
+ */
+extern int cos_alloc(zpool_handle_t *, char *, nvlist_t *);
+extern int cos_free(zpool_handle_t *, char *, uint64_t);
+extern int cos_list(zpool_handle_t *, nvlist_t **);
+extern int cos_set_proplist(zpool_handle_t *, const char *, nvlist_t *);
+extern int cos_get_proplist(libzfs_handle_t *, char *, zprop_list_t **);
+extern int cos_get_prop(zpool_handle_t *,  const char *, cos_prop_t, char *,
+    size_t, nvlist_t **);
+#endif /* NZA_CLOSED */
 
 /*
  * Functions shared by zfs and zpool property management.
@@ -518,6 +541,12 @@ typedef struct zprop_get_cbdata {
 void zprop_print_one_property(const char *, zprop_get_cbdata_t *,
     const char *, const char *, zprop_source_t, const char *,
     const char *);
+#ifdef	NZA_CLOSED
+void vdev_print_one_property(const char *, const char *,
+    zprop_get_cbdata_t *, const char *, const char *);
+void cos_print_one_property(const char *, const char *,
+    zprop_get_cbdata_t *, const char *, const char *);
+#endif /* NZA_CLOSED */
 
 /*
  * Iterator functions.

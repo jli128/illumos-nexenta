@@ -25,6 +25,7 @@
 
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -219,15 +220,52 @@ vdev_mirror_child_select(zio_t *zio)
 	mirror_child_t *mc;
 	uint64_t txg = zio->io_txg;
 	int i, c;
+#ifdef	NZA_CLOSED
+	/*
+	 * Look at the weights of the vdevs in the mirror; the weights help
+	 * decide which vdev to read from; the highest-weight suitable child
+	 * index is returned, and its weight is decremented in order to avoid
+	 * creating "hot" devices; once all the vdevs' weights are zero, the
+	 * weights are set back to the ones configured in vdev props
+	 */
+	uint64_t max_weight = 0;
 
 	ASSERT(zio->io_bp == NULL || BP_PHYSICAL_BIRTH(zio->io_bp) == txg);
 
+	for (c = 0; c < mm->mm_children; c++) {
+		mc = &mm->mm_child[c];
+		if (max_weight < mc->mc_vd->vdev_weight)
+			max_weight = mc->mc_vd->vdev_weight;
+	}
+
+	/*
+	 * Recalculate weights
+	 */
+	if (!max_weight) {
+		for (c = 0; c < mm->mm_children; c++) {
+			mc = &mm->mm_child[c];
+			mc->mc_vd->vdev_weight = vdev_get_prefread(mc->mc_vd) +
+			    1;
+			if (max_weight < mc->mc_vd->vdev_weight)
+				max_weight = mc->mc_vd->vdev_weight;
+		}
+	}
+
+	if (max_weight == 1)
+		c = mm->mm_preferred;
+	else
+		c = 0;
+#endif /* NZA_CLOSED */
 	/*
 	 * Try to find a child whose DTL doesn't contain the block to read.
 	 * If a child is known to be completely inaccessible (indicated by
 	 * vdev_readable() returning B_FALSE), don't even try.
 	 */
+#ifdef	NZA_CLOSED
+	for (i = 0; i < mm->mm_children; i++, c++) {
+#else /* !NZA_CLOSED */
 	for (i = 0, c = mm->mm_preferred; i < mm->mm_children; i++, c++) {
+#endif /* !NZA_CLOSED */
 		if (c >= mm->mm_children)
 			c = 0;
 		mc = &mm->mm_child[c];
@@ -239,8 +277,17 @@ vdev_mirror_child_select(zio_t *zio)
 			mc->mc_skipped = 1;
 			continue;
 		}
+#ifdef	NZA_CLOSED
+		if (!vdev_dtl_contains(mc->mc_vd, DTL_MISSING, txg, 1)) {
+			if (mc->mc_vd->vdev_weight == max_weight) {
+				mc->mc_vd->vdev_weight--;
+				return (c);
+			}
+		}
+#else /* !NZA_CLOSED */
 		if (!vdev_dtl_contains(mc->mc_vd, DTL_MISSING, txg, 1))
 			return (c);
+#endif /* !NZA_CLOSED */
 		mc->mc_error = ESTALE;
 		mc->mc_skipped = 1;
 		mc->mc_speculative = 1;

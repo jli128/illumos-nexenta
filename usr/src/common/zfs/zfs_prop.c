@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 by Delphix. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 /* Portions Copyright 2010 Robert Milkowski */
@@ -387,6 +388,11 @@ zfs_prop_init(void)
 	    PROP_READONLY, ZFS_TYPE_DATASET, "UNIQUE");
 	zprop_register_hidden(ZFS_PROP_OBJSETID, "objsetid", PROP_TYPE_NUMBER,
 	    PROP_READONLY, ZFS_TYPE_DATASET, "OBJSETID");
+#ifdef	NZA_CLOSED
+	zprop_register_hidden(ZFS_PROP_LSTXG, "lstxg", PROP_TYPE_NUMBER,
+	    PROP_READONLY, ZFS_TYPE_DATASET, "LSTXG");
+#endif /* NZA_CLOSED */
+
 
 	/* oddball properties */
 	zprop_register_impl(ZFS_PROP_CREATION, "creation", PROP_TYPE_NUMBER, 0,
