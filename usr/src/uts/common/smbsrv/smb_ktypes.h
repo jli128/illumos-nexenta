@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -1268,6 +1268,7 @@ typedef enum {
 } smb_odir_state_t;
 
 typedef enum {
+	SMB_ODIR_RESUME_CONT,
 	SMB_ODIR_RESUME_IDX,
 	SMB_ODIR_RESUME_COOKIE,
 	SMB_ODIR_RESUME_FNAME
@@ -1307,9 +1308,11 @@ typedef struct smb_odir {
 		edirent_t	*u_edp;
 		dirent64_t	*u_dp;
 	} d_u;
+	uint32_t		d_last_cookie;
 	uint32_t		d_cookies[SMB_MAX_SEARCH];
 	char			d_pattern[MAXNAMELEN];
 	char			d_buf[SMB_ODIR_BUFSIZE];
+	char			d_last_name[MAXNAMELEN];
 } smb_odir_t;
 #define	d_bufptr	d_u.u_bufptr
 #define	d_edp		d_u.u_edp
@@ -1324,7 +1327,7 @@ typedef struct smb_odirent {
 typedef struct smb_fileinfo {
 	char		fi_name[MAXNAMELEN];
 	char		fi_shortname[SMB_SHORTNAMELEN];
-	uint32_t	fi_cookie;
+	uint32_t	fi_cookie;	/* Dir offset (of next entry) */
 	uint32_t	fi_dosattr;	/* DOS attributes */
 	uint64_t	fi_nodeid;	/* file system node id */
 	uint64_t	fi_size;	/* file size in bytes */
