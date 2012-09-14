@@ -27,8 +27,6 @@
 #ifndef	_GETENT_H
 #define	_GETENT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -51,6 +49,7 @@ extern int dogetproto(const char **);
 extern int dogetethers(const char **);
 extern int dogetnetmask(const char **);
 extern int dogetproject(const char **);
+extern int dogetnetgr(const char **);
 
 #ifdef	__cplusplus
 }

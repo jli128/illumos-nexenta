@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG=	getent
 
@@ -36,6 +34,7 @@ OBJECTS= \
 	dogethost.o	\
 	dogetipnodes.o	\
 	dogetnet.o	\
+	dogetnetgr.o	\
 	dogetnetmask.o	\
 	dogetproject.o	\
 	dogetproto.o	\

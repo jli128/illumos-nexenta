@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -51,6 +49,7 @@ static struct table t[] = {
 	{ "networks",	dogetnet },
 	{ "netmasks",	dogetnetmask },
 	{ "project",	dogetproject },
+	{ "netgroup",	dogetnetgr },
 	{ NULL,		NULL }
 };
 
@@ -82,7 +81,7 @@ main(int argc, const char **argv)
 			switch (rc) {
 			case EXC_SYNTAX:
 				(void) fprintf(stderr,
-					gettext("Syntax error\n"));
+				    gettext("Syntax error\n"));
 				break;
 			case EXC_ENUM_NOT_SUPPORTED:
 				(void) fprintf(stderr,
