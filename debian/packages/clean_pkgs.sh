@@ -10,7 +10,7 @@
 
 rm -f *.udeb *.deb *.dsc *.changes *.upload *.gz
 
-dirlist=`find . -maxdepth 1 -mindepth 1 -type d -name "sunw*" -o -type d -name "brcmbnx" -o -type d -name "libsunw-perl" -o -type d -name "nexenta-lu" -o -type -d -name "nexenta-sunw"`
+dirlist=`find . -maxdepth 1 -mindepth 1 -type d -name "sunw*" -o -type d -name "brcmbnx" -o -type d -name "libsunw-perl" -o -type d -name "nexenta-lu" -o -type -d -name "nexenta-sunw" -o -type d -name "openipmi"`
 set -- $dirlist
 
 i=1; n=$#

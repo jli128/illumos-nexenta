@@ -1,3 +1,9 @@
+sunwcsu (5.11.134-31-11126-0) nexenta; urgency=low
+
+  * Issue 11126: OpenIPMI driver support added
+
+ -- Nexenta Systems <support@nexenta.com>  Tue, 21 Aug 2012 12:51:30 -0700
+
 sunwcsu (5.11.134-31-9465-0) nexenta; urgency=low
 
   * Issue 8853: sharenfs property must accept more than 1024 bytes

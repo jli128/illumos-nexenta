@@ -54,6 +54,11 @@ function update_control
 		return 1
 	fi
 
+	grep ^$pkg_name\$ ${KEEP_CONTROL_PKGS_LIST} >/dev/null 2>&1
+	if [ $? -eq 0 ]; then
+		return 0
+	fi
+
 	sed -e "s/(>=${OS_REL}.${OLD_BUILD}-[0-9-]\+)/(>=${CORE_REVISION})/g" \
 	    ${file} > ${TMP_FILE}
 

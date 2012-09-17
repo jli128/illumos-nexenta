@@ -124,7 +124,7 @@ _fmd_init(fmd_hdl_t *hdl)
 	if ((ipmi_hdl = ipmi_open(&error, &msg, IPMI_TRANSPORT_BMC, NULL))
 	    == NULL) {
 		/*
-		 * If /dev/bmc doesn't exist on the system, then unload the
+		 * If /dev/ipmi doesn't exist on the system, then unload the
 		 * module without doing anything.
 		 */
 		if (error != EIPMI_BMC_OPEN_FAILED)

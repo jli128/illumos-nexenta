@@ -1,3 +1,9 @@
+sunwfmd (5.11.134-31-11126-0) nexenta; urgency=low
+
+  * Issue 11126: update libipmi and fma to use /dev/ipmi instead of /dev/bmc
+
+ -- Nexenta Systems <support@nexenta.com>  Tue, 21 Aug 2012 12:51:30 -0700
+
 sunwfmd (5.11.134-31-6490-0) nexenta; urgency=low
 
   * Issue 5639: FMD Service Segmentation Fault (core dumped)
