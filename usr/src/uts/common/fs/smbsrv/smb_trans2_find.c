@@ -704,7 +704,7 @@ static int
 smb_trans2_find_mbc_encode(smb_request_t *sr, smb_xa_t *xa,
     smb_fileinfo_t *fileinfo, smb_find_args_t *args)
 {
-	int		namelen, shortlen, buflen;
+	int		namelen, shortlen;
 	uint32_t	next_entry_offset;
 	uint32_t	dsize32, asize32;
 	uint32_t	mb_flags = 0;

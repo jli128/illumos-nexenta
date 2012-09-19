@@ -758,7 +758,7 @@ smb_odir_save_fname(smb_odir_t *od, uint32_t cookie, const char *fname)
 	od->d_last_cookie = cookie;
 	bzero(od->d_last_name, MAXNAMELEN);
 	if (fname != NULL)
-		strlcpy(od->d_last_name, fname, MAXNAMELEN);
+		(void) strlcpy(od->d_last_name, fname, MAXNAMELEN);
 
 	mutex_exit(&od->d_mutex);
 }
