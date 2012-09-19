@@ -86,7 +86,6 @@ CHKHDRS=			\
 	bitmap.h		\
 	bitset.h		\
 	bl.h			\
-	bmc_intf.h		\
 	bofi.h			\
 	bofi_impl.h		\
 	bpp_io.h		\
