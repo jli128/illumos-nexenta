@@ -855,7 +855,6 @@ usr/lib/sparcv9/llib-lHBAAPI.ln	sparc
 #
 usr/bin/dscfgcli
 usr/bin/netgr_get
-usr/bin/netgr_hhh
 usr/bin/netgr_in
 usr/bin/sd_diag
 usr/bin/sd_stats
