@@ -350,8 +350,6 @@ static void mptsas_update_phymask(mptsas_t *mpt);
 
 static dev_info_t *mptsas_get_dip_from_dev(dev_t dev,
     mptsas_phymask_t *phymask);
-static mptsas_target_t *mptsas_addr_to_ptgt(mptsas_t *mpt, char *addr,
-    mptsas_phymask_t phymask);
 
 
 /*
@@ -8544,7 +8542,6 @@ mptsas_flush_target(mptsas_t *mpt, ushort_t target, int lun, uint8_t tasktype)
 					reason = CMD_TIMEOUT;
 					stat |= STAT_TIMEOUT;
 				}
-				
 				NDBG25(("mptsas_flush_target discovered non-"
 				    "NULL cmd in slot %d, tasktype 0x%x", slot,
 				    tasktype));
@@ -9424,7 +9421,8 @@ mptsas_watchsubr(mptsas_t *mpt)
 				ptgt->m_timeout_interval +=
 				    mptsas_scsi_watchdog_tick;
 			}
-			if (ptgt->m_timeout_interval > mptsas_timeout_interval) {
+			if (ptgt->m_timeout_interval >
+			    mptsas_timeout_interval) {
 				ptgt->m_timeout_interval = 0;
 				ptgt->m_timeout_count = 0;
 			}
@@ -11367,10 +11365,6 @@ mptsas_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *credp,
 	int			iport_flag = 0;
 	dev_info_t		*dip = NULL;
 	mptsas_phymask_t	phymask = 0;
-	struct devctl_iocdata	*dcp = NULL;
-	uint32_t		slotstatus = 0;
-	char			*addr = NULL;
-	mptsas_target_t		*ptgt = NULL;
 
 	*rval = MPTIOCTL_STATUS_GOOD;
 	if (secpolicy_sys_config(credp, B_FALSE) != 0) {
@@ -15344,24 +15338,6 @@ mptsas_get_dip_from_dev(dev_t dev, mptsas_phymask_t *phymask)
 	*phymask = (mptsas_phymask_t)prop;
 	ddi_release_devi(dip);
 	return (dip);
-}
-static mptsas_target_t *
-mptsas_addr_to_ptgt(mptsas_t *mpt, char *addr, mptsas_phymask_t phymask)
-{
-	uint8_t			phynum;
-	uint64_t		wwn;
-	int			lun;
-	mptsas_target_t		*ptgt = NULL;
-
-	if (mptsas_parse_address(addr, &wwn, &phynum, &lun) != DDI_SUCCESS) {
-		return (NULL);
-	}
-	if (addr[0] == 'w') {
-		ptgt = mptsas_wwid_to_ptgt(mpt, (int)phymask, wwn);
-	} else {
-		ptgt = mptsas_phy_to_tgt(mpt, (int)phymask, phynum);
-	}
-	return (ptgt);
 }
 
 int
