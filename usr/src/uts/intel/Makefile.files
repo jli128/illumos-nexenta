@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 #
@@ -211,6 +212,8 @@ ACPICA_OBJS	+= dbcmds.o dbdisply.o \
 		   dbmethod.o dbnames.o dsargs.o dscontrol.o dswload2.o \
 		   evglock.o evgpeinit.o evgpeutil.o evxfgpe.o exdebug.o \
 		   hwpci.o utdecode.o utosi.o utxferror.o
+
+PVSCSI_OBJS += pvscsi.o
 
 
 AGP_OBJS += agpmaster.o

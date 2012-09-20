@@ -22,6 +22,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+#
 
 #
 #	This Makefile defines all file modules and build rules for the
@@ -269,6 +271,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/zfs/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/scsi/adapters/pvscsi/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 #
 # krtld compiled into unix
 #
@@ -478,6 +484,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/kdi/$(SUBARCH_DIR)/%.s
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/nskern/%.s
 	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/scsi/adapters/pvscsi/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 #
 # krtld lints
