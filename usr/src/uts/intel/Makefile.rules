@@ -275,6 +275,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/scsi/adapters/pvscsi/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/vmxnet3s/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 #
 # krtld compiled into unix
 #
@@ -486,6 +490,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/nskern/%.s
 	@($(LHEAD) $(LINT.s) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/scsi/adapters/pvscsi/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/vmxnet3s/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 #

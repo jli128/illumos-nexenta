@@ -9,7 +9,10 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+#
 
 include ../../Makefile.master
 
@@ -231,6 +234,7 @@ i386_MANFILES =	ahci.7d		\
 		uath.7d		\
 		ural.7d		\
 		urtw.7d		\
+		vmxnet3s.7d	\
 		wpi.7d		\
 		zyd.7d
 

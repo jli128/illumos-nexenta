@@ -441,6 +441,7 @@ DRV_KMODS	+= fp
 DRV_KMODS	+= qlc
 DRV_KMODS	+= iscsi
 DRV_KMODS	+= pvscsi
+DRV_KMODS	+= vmxnet3s
 
 #
 #	PCMCIA specific module(s)
