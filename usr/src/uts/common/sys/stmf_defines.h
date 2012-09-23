@@ -130,7 +130,6 @@ typedef	uint64_t		stmf_status_t;
 #define	STMF_SAA_CAPACITY_DATA_HAS_CHANGED	0x062A09
 #define	STMF_SAA_REPORT_LUN_DATA_HAS_CHANGED	0x063F0E
 #define	STMF_SAA_WRITE_PROTECTED		0X072700
-#define	STMF_SAA_TIMEOUT_ABORT			0X0B3E02
 
 struct stmf_lu_provider;
 struct stmf_lu;
