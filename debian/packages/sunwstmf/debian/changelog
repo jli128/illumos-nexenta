@@ -1,9 +1,3 @@
-sunwstmf (5.11.134-31-10283-0) nexenta; urgency=low
-
-  * Issue 10283: COMSTAR drops iSCSI request during zpool disk failure
-
- -- Gate Keeper <support@nexenta.com>  Thu, 30 Aug 2012 12:08:55 -0700
-
 sunwstmf (5.11.134-31-8499-0) nexenta; urgency=low
 
   * Issue 8499: Unreleased ATS lock possibly caused by concurrent svmotions
