@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -286,7 +287,8 @@ smb_odir_open(smb_request_t *sr, char *path, uint16_t sattr, uint32_t flags)
 
 	tree = sr->tid_tree;
 
-	smb_convert_wildcards(path);
+	if (sr->session->dialect < NT_LM_0_12)
+		smb_convert_wildcards(path);
 
 	rc = smb_pathname_reduce(sr, sr->user_cr, path,
 	    tree->t_snode, tree->t_snode, &dnode, pattern);
@@ -557,7 +559,7 @@ smb_odir_read(smb_request_t *sr, smb_odir_t *od,
  */
 int
 smb_odir_read_fileinfo(smb_request_t *sr, smb_odir_t *od,
-    smb_fileinfo_t *fileinfo, boolean_t *eof)
+    smb_fileinfo_t *fileinfo, uint16_t *eof)
 {
 	int		rc, errnum;
 	smb_odirent_t	*odirent;
@@ -582,7 +584,7 @@ smb_odir_read_fileinfo(smb_request_t *sr, smb_odir_t *od,
 		return (-1);
 	}
 
-	if (!(od->d_flags & SMB_ODIR_FLAG_WILDCARDS)) {
+	if ((od->d_flags & SMB_ODIR_FLAG_WILDCARDS) == 0) {
 		if (od->d_eof)
 			rc = ENOENT;
 		else
@@ -615,10 +617,10 @@ smb_odir_read_fileinfo(smb_request_t *sr, smb_odir_t *od,
 
 	switch (rc) {
 	case 0:
-		*eof = B_FALSE;
+		*eof = 0;
 		return (0);
 	case ENOENT:
-		*eof = B_TRUE;
+		*eof = 1;	/* per. FindFirst, FindNext spec. */
 		return (0);
 	default:
 		smbsr_errno(sr, rc);
@@ -741,6 +743,28 @@ smb_odir_save_cookie(smb_odir_t *od, int idx, uint32_t cookie)
 }
 
 /*
+ * smb_odir_save_fname
+ *
+ * Save a filename / offset pair, which are basically a
+ * one entry cache.  See smb_com_trans2_find_next2.
+ */
+void
+smb_odir_save_fname(smb_odir_t *od, uint32_t cookie, const char *fname)
+{
+	ASSERT(od);
+	ASSERT(od->d_magic == SMB_ODIR_MAGIC);
+
+	mutex_enter(&od->d_mutex);
+
+	od->d_last_cookie = cookie;
+	bzero(od->d_last_name, MAXNAMELEN);
+	if (fname != NULL)
+		(void) strlcpy(od->d_last_name, fname, MAXNAMELEN);
+
+	mutex_exit(&od->d_mutex);
+}
+
+/*
  * smb_odir_resume_at
  *
  * If SMB_ODIR_FLAG_WILDCARDS is not set the search is for a single
@@ -773,23 +797,45 @@ smb_odir_resume_at(smb_odir_t *od, smb_odir_resume_t *resume)
 	}
 
 	switch (resume->or_type) {
-		case SMB_ODIR_RESUME_IDX:
-			ASSERT(resume->or_idx >= 0);
-			ASSERT(resume->or_idx < SMB_MAX_SEARCH);
 
-			if ((resume->or_idx < 0) ||
-			    (resume->or_idx >= SMB_MAX_SEARCH)) {
-				resume->or_idx = 0;
-			}
-			od->d_offset = od->d_cookies[resume->or_idx];
-			break;
-		case SMB_ODIR_RESUME_COOKIE:
+	default:
+	case SMB_ODIR_RESUME_CONT:
+		/* Continue where we left off. */
+		break;
+
+	case SMB_ODIR_RESUME_IDX:
+		/*
+		 * This is used only by the (ancient) SMB_SEARCH.
+		 * Modern clients use trans2 FindFirst, FindNext.
+		 */
+		ASSERT(resume->or_idx >= 0);
+		ASSERT(resume->or_idx < SMB_MAX_SEARCH);
+
+		if ((resume->or_idx < 0) ||
+		    (resume->or_idx >= SMB_MAX_SEARCH)) {
+			resume->or_idx = 0;
+		}
+		od->d_offset = od->d_cookies[resume->or_idx];
+		break;
+
+	case SMB_ODIR_RESUME_COOKIE:
+		od->d_offset = resume->or_cookie;
+		break;
+
+	case SMB_ODIR_RESUME_FNAME:
+		/*
+		 * If the name matches the last one saved,
+		 * use the offset that was saved with it in
+		 * the odir.  Otherwise use the cookie value
+		 * in the resume data from the client.
+		 */
+		if (strcmp(resume->or_fname, od->d_last_name) &&
+		    od->d_last_cookie != 0) {
+			od->d_offset = od->d_last_cookie;
+		} else if (resume->or_cookie != 0) {
 			od->d_offset = resume->or_cookie;
-			break;
-		case SMB_ODIR_RESUME_FNAME:
-		default:
-			od->d_offset = od->d_cookies[0];
-			break;
+		} /* else continue where we left off */
+		break;
 	}
 
 	/* Force a vop_readdir to refresh d_buf */
@@ -1278,22 +1324,23 @@ smb_odir_lookup_link(smb_request_t *sr, smb_odir_t *od,
  * - If shortnames are supported, generate the shortname from
  *   odirent->od_name and check if it matches od->d_pattern.
  */
-boolean_t
+static boolean_t
 smb_odir_match_name(smb_odir_t *od, smb_odirent_t *odirent)
 {
 	char	*name = odirent->od_name;
 	char	shortname[SMB_SHORTNAMELEN];
 	ino64_t	ino = odirent->od_ino;
+	boolean_t ci = (od->d_flags & SMB_ODIR_FLAG_IGNORE_CASE) != 0;
 
 	if (smb_is_reserved_dos_name(name))
 		return (B_FALSE);
 
-	if (smb_match_ci(od->d_pattern, name))
+	if (smb_match(od->d_pattern, name, ci))
 		return (B_TRUE);
 
 	if (od->d_flags & SMB_ODIR_FLAG_SHORTNAMES) {
 		smb_mangle(name, ino, shortname, SMB_SHORTNAMELEN);
-		if (smb_match_ci(od->d_pattern, shortname))
+		if (smb_match(od->d_pattern, shortname, ci))
 			return (B_TRUE);
 	}
 

@@ -1,3 +1,11 @@
+sunwsmbskr (5.11.134-31-10734-0) nexenta; urgency=high
+
+  * Issue 10734: NT Trans. Notify returning too quickly
+  * Issue 10733: Windows 7 directory listing keeps restarting
+  * Issue 6854:  FindFirstFile,FindFirstFileEx,... are not working correctly on Nexenta CIFS-shares
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 10 Oct 2012 17:26:00 -0700
+
 sunwsmbskr (5.11.134-31-10364-0) nexenta; urgency=low
 
  * Issue 10364: Fixes panic caused by a race between an smb share request
