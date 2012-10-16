@@ -22,6 +22,7 @@
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright (c) 2012, Joyent, Inc. All rights reserved.
 #
 
 #
@@ -250,6 +251,10 @@ CORE_PCBE_OBJS = core_pcbe.o
 #	AMR module
 #
 AMR_OBJS = amr.o
+
+#
+#	IPMI module
+IPMI_OBJS +=	ipmi_main.o ipmi.o ipmi_kcs.o
 
 #
 #	IOMMULIB module
