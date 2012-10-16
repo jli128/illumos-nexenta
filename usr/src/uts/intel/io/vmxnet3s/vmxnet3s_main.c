@@ -947,7 +947,7 @@ vmxnet3s_m_setprop(void *arg, const char *propname, mac_prop_id_t propnum,
 {
 	vmxnet3s_softc_t *dp = arg;
 	uint32_t	new_mtu;
-	int		ret;
+	int		ret = 0;
 	boolean_t	do_reset = B_FALSE;
 
 	switch (propnum) {

@@ -27,6 +27,8 @@ ALL_TARGET=	$(BINARY) $(CONFMOD)
 LINT_TARGET=	$(MODULE).lint
 INSTALL_TARGET=	$(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
+CERRWARN +=	-_gcc=-Wno-parentheses
+
 LDFLAGS	+=	-dy -N misc/scsi -N drv/scsi_vhci
 
 LINTTAGS +=	-erroff=E_BAD_PTR_CAST_ALIGN

@@ -2617,7 +2617,7 @@ pvscsi_unmask_irq(pvscsi_softc_t *pvs)
 static void
 pvscsi_process_irq_deffered(pvscsi_softc_t *pvs)
 {
-	pvscsi_cmd_t	**pnext_cmd;
+	pvscsi_cmd_t	**pnext_cmd = NULL;
 	pvscsi_cmd_t	*cmds_for_workers[MAX_WORKER_THREADS];
 	struct rings_state *sdesc = RINGS_STATE(pvs);
 	uint32_t	e = sdesc->cmp_num_entries_log2;
