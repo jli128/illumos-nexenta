@@ -703,7 +703,7 @@ makeConnection(Connection **conp, const char *serverAddr,
 	if (conp == NULL || errorp == NULL || auth == NULL)
 		return (NS_LDAP_INVALID_PARAM);
 	if (*errorp)
-		__ns_ldap_freeError(errorp);
+		(void) __ns_ldap_freeError(errorp);
 	*conp = NULL;
 	(void) memset(&sinfo, 0, sizeof (sinfo));
 
