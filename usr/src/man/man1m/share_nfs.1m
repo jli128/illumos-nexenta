@@ -1,5 +1,6 @@
 '\" te
 .\" Copyright (C) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2012 Nexenta Systems, Inc.  All rights reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
@@ -127,6 +128,31 @@ in \fBetc/nfs/nfslog.conf\fR. If no \fBtag\fR is specified, the default values
 associated with the \fBglobal\fR \fBtag\fR in \fBetc/nfs/nfslog.conf\fR is
 used. Support of NFS server logging is only available for NFS Version 2 and
 Version 3 requests.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnohide\fR\fR
+.ad
+.sp .6
+.RS 4n
+
+By default, if a server exports two filesystems, one of which is mounted as a
+child of the other, NFS Version 2 and Version 3 clients must mount both
+filesystems explicitly in order to access them. If a client only mounts
+the parent, it will see an empty directory at the location where the other
+filesystem is mounted.
+
+Setting the \fBnohide\fR option on a filesystem causes it to no longer be
+hidden in this manner, and a client will be able to move from the parent
+filesystem to this one without noticing the change. However, some NFS clients
+or applications may not function correctly when this option is used. In
+particular, files on different underlying filesystems may appear to have the
+same inode numbers.
+
+This option is equivalent to the option of the same name provided in \fBLinux
+NFS\fR, and only applies to NFS Version 2 and Version 3 requests.
 .RE
 
 .sp

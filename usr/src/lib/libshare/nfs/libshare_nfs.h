@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -53,6 +54,7 @@ extern "C" {
 #define	SHOPT_LOG	"log"
 #define	SHOPT_CKSUM	"cksum"
 #define	SHOPT_NOACLFAB	"noaclfab"
+#define	SHOPT_NOHIDE	"nohide"
 
 /*
  * defined options types. These should be in a file rather than

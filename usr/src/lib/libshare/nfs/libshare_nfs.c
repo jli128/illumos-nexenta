@@ -169,8 +169,11 @@ struct option_defs optdefs[] = {
 	{"", OPT_CHARSET_MAP, OPT_TYPE_ACCLIST},
 #define	OPT_NOACLFAB	17
 	{SHOPT_NOACLFAB, OPT_NOACLFAB, OPT_TYPE_BOOLEAN},
+#define	OPT_NOHIDE	18
+	{SHOPT_NOHIDE, OPT_NOHIDE, OPT_TYPE_BOOLEAN},
+
 #ifdef VOLATILE_FH_TEST	/* XXX added for testing volatile fh's only */
-#define	OPT_VOLFH	18
+#define	OPT_VOLFH	19
 	{SHOPT_VOLFH, OPT_VOLFH},
 #endif /* VOLATILE_FH_TEST */
 	NULL
@@ -1015,6 +1018,14 @@ fill_export_from_optionset(struct exportdata *export, sa_optionset_t optionset)
 				export->ex_flags |= EX_NOACLFAB;
 			else
 				export->ex_flags &= ~EX_NOACLFAB;
+			break;
+		case OPT_NOHIDE:
+			if (value != NULL && (strcasecmp(value, "true") == 0 ||
+			    strcmp(value, "1") == 0))
+				export->ex_flags |= EX_NOHIDE;
+			else
+				export->ex_flags &= ~EX_NOHIDE;
+
 			break;
 		default:
 			/* have a syntactic error */
