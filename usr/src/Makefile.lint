@@ -21,6 +21,7 @@
 
 # Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 
 # include global definitions
 include Makefile.master
@@ -31,6 +32,7 @@ include Makefile.master
 #
 COMMON_SUBDIRS = \
 	cmd/acctadm \
+	cmd/aoeadm \
 	cmd/asa \
 	cmd/amt \
 	cmd/audio/audioctl \
@@ -347,6 +349,7 @@ COMMON_SUBDIRS = \
 	lib/libadutils \
 	lib/libadt_jni \
 	lib/libaio \
+	lib/libaoe \
 	lib/libavl \
 	lib/libbrand \
 	lib/libbsdmalloc \

@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -363,6 +364,7 @@ main(void)
 	extern int	(*mp_init_tbl[])();
 	extern id_t	syscid, defaultcid;
 	extern int	swaploaded;
+	extern char	*aoepath_prop;
 	extern int	netboot;
 	extern ib_boot_prop_t *iscsiboot_prop;
 	extern void	vm_init(void);
@@ -497,7 +499,7 @@ main(void)
 	 * Plumb the protocol modules and drivers only if we are not
 	 * networked booted, in this case we already did it in rootconf().
 	 */
-	if (netboot == 0 && iscsiboot_prop == NULL)
+	if (aoepath_prop == NULL && iscsiboot_prop == NULL && !netboot)
 		(void) strplumb();
 
 	gethrestime(&PTOU(curproc)->u_start);

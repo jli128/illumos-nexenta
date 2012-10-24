@@ -20,6 +20,8 @@ MANSECT = 	7d
 
 COMMON_MANFILES = 	aac.7d		\
 	 	 	afe.7d		\
+			aoe.7d		\
+			aoeblk.7d	\
 	 	 	audio.7d	\
 	 	 	audio1575.7d	\
 	 	 	audioens.7d	\

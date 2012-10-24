@@ -42,3 +42,8 @@ NZA_STMFSBDBASE_FLAGS=
 NZA_ZFSPLUSBASE_FLAGS=
 NZA_ZFSPLUS_SHARED_OBJS=libzfs_closed_stubs.o
 NZA_ZFSPLUS_SHARED_SRCS=
+
+# Trick kernel Makefiles into ignoring AOE target
+NZA_KMODS=$(POUND_SIGN)
+NZA_OPEN_ONLY=
+

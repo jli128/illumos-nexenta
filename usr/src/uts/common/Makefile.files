@@ -956,6 +956,10 @@ QLT_OBJS += 2400.o 2500.o 8100.o qlt.o qlt_dma.o
 
 SRPT_OBJS += srpt_mod.o srpt_ch.o srpt_cm.o srpt_ioc.o srpt_stp.o
 
+AOE_OBJS += aoe.o
+
+AOEBLK_OBJS += aoeblk.o
+
 FCOE_OBJS += fcoe.o fcoe_eth.o fcoe_fc.o
 
 FCOET_OBJS += fcoet.o fcoet_eth.o fcoet_fc.o

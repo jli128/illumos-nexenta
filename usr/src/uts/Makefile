@@ -20,9 +20,11 @@
 #
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 # include global definitions
 include ../Makefile.master
+include $(NZA_MAKEDEFS)
 
 #
 # List of architectures to build as part of the standard build.
@@ -221,10 +223,12 @@ ONC_PLUS:	$(ONC_FILES:%=%_onc_plus)
 SHARED_XRDIRS = $(sparc_ARCHITECTURES) $(i386_ARCHITECTURES) sun4 sfmmu	\
 	sun common
 CLOSED_XRDIRS = $(SHARED_XRDIRS:%=% ../../closed/uts/%)
+NZA_XRDIRS = $(SHARED_XRDIRS:%=% ../../nza-closed/uts/%)
 XRDIRS = $(SHARED_XRDIRS)
 CLOSED_XRDIRS_XEN = $(CLOSED_XRDIRS:../../closed/uts/i86xpv=)
 CLOSED_XRDIRS_1 = $(CLOSED_XRDIRS_XEN:../../closed/uts/i86pc=)
 $(CLOSED_BUILD)XRDIRS = $(CLOSED_XRDIRS_1:../../closed/uts/sfmmu=)
+$(NZA_MODS)XRDIRS = $(NZA_XRDIRS)
 
 XRINCDIRS = $(XRDIRS)
 

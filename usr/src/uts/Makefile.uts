@@ -23,6 +23,7 @@
 # Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 # Copyright (c) 2011 by Delphix. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 #
@@ -34,6 +35,7 @@
 #	Include global definitions:
 #
 include $(SRC)/Makefile.master
+include $(NZA_MAKEDEFS)
 
 #
 #	No text domain in the kernel.
@@ -628,6 +630,8 @@ KMODS = $(GENUNIX_KMODS) $(PARALLEL_KMODS)
 
 $(PARALLEL_KMODS): $(GENUNIX_KMODS)
 
+$(NZA_MODS)NZA_KMODS = $(NZA_DRV_KMODS)
+
 $(CLOSED_BUILD)CLOSED_KMODS = $(CLOSED_DRV_KMODS) $(CLOSED_TOD_KMODS) \
 	$(CLOSED_MISC_KMODS) $(CLOSED_CPU_KMODS) \
 	$(CLOSED_NLMISC_KMODS) $(CLOSED_DRV_KMODS_$(CLASS))
@@ -641,6 +645,7 @@ LINT_KMODS = $(DRV_KMODS) $(EXEC_KMODS) $(FS_KMODS) $(SCHED_KMODS) \
 
 $(CLOSED_BUILD)CLOSED_LINT_KMODS = $(CLOSED_DRV_KMODS) $(CLOSED_TOD_KMODS) \
 	  $(CLOSED_MISC_KMODS) $(CLOSED_DRV_KMODS_$(CLASS))
+$(NZA_MODS)NZA_LINT_KMODS = $(NZA_DRV_KMODS)
 
 THIS_YEAR:sh=	/bin/date +%Y
 $(OBJS_DIR)/logsubr.o	:= CPPFLAGS += -DTHIS_YEAR=$(THIS_YEAR)

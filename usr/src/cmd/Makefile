@@ -25,6 +25,7 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 
 include ../Makefile.master
+include $(NZA_MAKEDEFS)
 
 #
 #	Note that the commands 'agents', 'lp', 'perl', and 'man' are first in
@@ -57,6 +58,8 @@ COMMON_SUBDIRS=		\
 	adbgen		\
 	acct		\
 	acctadm		\
+	aoeadm		\
+	aoesvc		\
 	arch		\
 	asa		\
 	ast		\
@@ -470,6 +473,8 @@ COMMON_SUBDIRS=		\
 	zstreamdump	\
 	ztest
 
+$(NZA_KMODS)COMMON_SUBDIRS += $(NZA_CLOSED_CMD)
+
 $(CLOSED_BUILD)COMMON_SUBDIRS += \
 	$(CLOSED)/cmd/iconv	\
 	$(CLOSED)/cmd/ksh	\
@@ -521,6 +526,7 @@ MSGSUBDIRS=		\
 	abi		\
 	acctadm		\
 	allocate	\
+	aoeadm		\
 	asa		\
 	audio		\
 	audit		\

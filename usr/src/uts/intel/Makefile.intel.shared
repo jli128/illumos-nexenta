@@ -360,6 +360,7 @@ DRV_KMODS	+= simnet
 DRV_KMODS	+= stmf
 DRV_KMODS	+= stmf_sbd
 DRV_KMODS	+= fct
+DRV_KMODS	+= aoe aoeblk
 DRV_KMODS	+= fcoe
 DRV_KMODS	+= fcoet
 DRV_KMODS	+= fcoei

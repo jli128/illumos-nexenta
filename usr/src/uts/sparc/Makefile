@@ -18,9 +18,9 @@
 #
 # CDDL HEADER END
 #
+
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
+# Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -42,6 +42,7 @@ LINT_LIBS	= $(LINT_LIB) $(GEN_LINT_LIB) \
 		  $(LINT_KMODLIBS:%=$(LINT_LIB_DIR)/llib-l%.ln)
 
 $(CLOSED_BUILD)LINT_LIBS += $(CLOSED_LINT_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln)
+$(NZA_MODS)LINT_LIBS += $(NZA_LINT_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln)
 
 # EXPORT DELETE START
 $(CLOSED_BUILD)LINT_LIBS	+= $(SVVS_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln)
@@ -68,19 +69,22 @@ install_h	:=	TARGET= install_h
 .KEEP_STATE:
 
 .PARALLEL:	$(PARALLEL_KMODS) $(CLOSED_KMODS) $(SVVS) $(XMODS) \
-		$(CLOSED_XMODS) config $(LINT_DEPS)
+		%(NZA_KMODS) $(CLOSED_XMODS) config $(LINT_DEPS)
 
 def all install clean clobber modlist: $(KMODS) $(CLOSED_KMODS) $(SVVS) \
-	$(XMODS) $(CLOSED_XMODS) config
+	$(XMODS) $(NZA_KMODS) $(CLOSED_XMODS) config
 
 modlintlib clean.lint: $(LINT_KMODS) $(CLOSED_LINT_KMODS) $(SVVS) \
-	$(XMODS) $(CLOSED_XMODS)
+	$(NZA_LINT_KMODS) $(XMODS) $(CLOSED_XMODS)
 
 $(KMODS) config:	FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
 
 $(CLOSED_KMODS):	FRC
 	cd $(CLOSED)/uts/sparc/$@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
+
+$(NZA_KMODS):	FRC
+	cd $(NZA_UTS)/sparc/$@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
 
 $(XMODS):	FRC
 	@if [ -f $@/Makefile  ]; then \
@@ -126,3 +130,4 @@ EXPORT_SRC:
 # EXPORT DELETE END
 
 include ../Makefile.targ
+include $(NZA_MAKEDEFS)
