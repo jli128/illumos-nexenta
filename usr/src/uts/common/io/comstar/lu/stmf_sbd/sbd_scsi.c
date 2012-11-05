@@ -2814,19 +2814,19 @@ sbd_handle_inquiry(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 		if (sl->sl_flags & SL_VID_VALID) {
 			bcopy(sl->sl_vendor_id, inq->inq_vid, 8);
 		} else {
-			bcopy(sbd_vendor_id, inq->inq_vid, 8);
+			bcopy(STMF_VENDOR_ID, inq->inq_vid, 8);
 		}
 
 		if (sl->sl_flags & SL_PID_VALID) {
 			bcopy(sl->sl_product_id, inq->inq_pid, 16);
 		} else {
-			bcopy(sbd_product_id, inq->inq_pid, 16);
+			bcopy(STMF_PRODUCT_ID, inq->inq_pid, 16);
 		}
 
 		if (sl->sl_flags & SL_REV_VALID) {
 			bcopy(sl->sl_revision, inq->inq_revision, 4);
 		} else {
-			bcopy(sbd_revision, inq->inq_revision, 4);
+			bcopy(STMF_REVISION, inq->inq_revision, 4);
 		}
 
 		/* Adding Version Descriptors */
