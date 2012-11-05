@@ -1,3 +1,9 @@
+sunwstmf (5.11.134-31-9665-0) nexenta; urgency=low
+
+  * Issue 9665: MPIO display Windows r2008 3.1.3
+
+ -- Nexenta Systems <steve.ma@nexenta.com>  Mon, 05 Nov 2012 12:08:55 -0700
+
 sunwstmf (5.11.134-31-8499-0) nexenta; urgency=low
 
   * Issue 8499: Unreleased ATS lock possibly caused by concurrent svmotions
