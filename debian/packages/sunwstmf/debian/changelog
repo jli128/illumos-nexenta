@@ -1,6 +1,6 @@
-sunwstmf (5.11.134-31-9665-0) nexenta; urgency=low
+sunwstmf (5.11.134-31-9965-0) nexenta; urgency=low
 
-  * Issue 9665: MPIO display Windows r2008 3.1.3
+  * Issue 9965: MPIO display Windows r2008 3.1.3
 
  -- Nexenta Systems <steve.ma@nexenta.com>  Mon, 05 Nov 2012 11:13:55 -0700
 
