@@ -20,8 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- *
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 #ifndef	_STMF_H
 #define	_STMF_H
@@ -62,6 +61,10 @@ typedef void *data_seg_handle_t;
 
 #define	COMPANY_ID_NONE			0xFFFFFFFF
 #define	COMPANY_ID_SUN			0x00144F
+
+#define	STMF_VENDOR_ID			"NEXENTA "
+#define	STMF_PRODUCT_ID			"COMSTAR         "
+#define	STMF_REVISION			"1.0 "
 
 /*
  * The scatter/gather list buffer format is used in 2 different

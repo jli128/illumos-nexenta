@@ -20,8 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- *
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/conf.h>
@@ -109,9 +108,6 @@ static dev_info_t	*sbd_dip;
 static uint32_t		sbd_lu_count = 0;
 
 /* Global property settings for the logical unit */
-char sbd_vendor_id[]	= "SUN     ";
-char sbd_product_id[]	= "COMSTAR         ";
-char sbd_revision[]	= "1.0 ";
 char *sbd_mgmt_url = NULL;
 uint16_t sbd_mgmt_url_alloc_size = 0;
 krwlock_t sbd_global_prop_lock;
@@ -3316,19 +3312,19 @@ sbd_get_lu_props(sbd_lu_props_t *islp, uint32_t islp_sz,
 		oslp->slp_lu_vid = 1;
 		bcopy(sl->sl_vendor_id, oslp->slp_vid, 8);
 	} else {
-		bcopy(sbd_vendor_id, oslp->slp_vid, 8);
+		bcopy(STMF_VENDOR_ID, oslp->slp_vid, 8);
 	}
 	if (sl->sl_flags & SL_PID_VALID) {
 		oslp->slp_lu_pid = 1;
 		bcopy(sl->sl_product_id, oslp->slp_pid, 16);
 	} else {
-		bcopy(sbd_product_id, oslp->slp_pid, 16);
+		bcopy(STMF_PRODUCT_ID, oslp->slp_pid, 16);
 	}
 	if (sl->sl_flags & SL_REV_VALID) {
 		oslp->slp_lu_rev = 1;
 		bcopy(sl->sl_revision, oslp->slp_rev, 4);
 	} else {
-		bcopy(sbd_revision, oslp->slp_rev, 4);
+		bcopy(STMF_REVISION, oslp->slp_rev, 4);
 	}
 	bcopy(sl->sl_device_id + 4, oslp->slp_guid, 16);
 
