@@ -68,19 +68,9 @@ typedef struct mlist_head mlist_t;
 
 void mlist_add(struct mlist_head *, struct mlist_head *);
 void mlist_add_tail(struct mlist_head *, struct mlist_head *);
-#if 0
-void mlist_del(struct mlist_head *);
-#endif
 void mlist_del_init(struct mlist_head *);
 int mlist_empty(struct mlist_head *);
 void mlist_splice(struct mlist_head *, struct mlist_head *);
-
-/* TODO: set this */
-#if 0
-#pragma	inline(list_add, list_add_tail, __list_del, list_del,
-		list_del_init, list_empty, list_splice)
-#endif
-
 
 /*
  * mlist_entry - get the struct for this entry
