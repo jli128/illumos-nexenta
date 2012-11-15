@@ -3622,6 +3622,7 @@ dsl_dataset_user_release_onexit(void *arg)
 
 	(void) dsl_dataset_user_release_tmp(ca->dp, ca->dsobj, ca->htag,
 	    B_TRUE);
+	spa_close(ca->dp->dp_spa, ca->htag);
 	kmem_free(ca, sizeof (zfs_hold_cleanup_arg_t));
 }
 
@@ -3635,6 +3636,7 @@ dsl_register_onexit_hold_cleanup(dsl_dataset_t *ds, const char *htag,
 	ca->dp = ds->ds_dir->dd_pool;
 	ca->dsobj = ds->ds_object;
 	(void) strlcpy(ca->htag, htag, sizeof (ca->htag));
+	spa_open_ref(ca->dp->dp_spa, ca->htag);
 	VERIFY3U(0, ==, zfs_onexit_add_cb(minor,
 	    dsl_dataset_user_release_onexit, ca, NULL));
 }
