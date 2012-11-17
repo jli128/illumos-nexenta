@@ -20,7 +20,9 @@
  */
 /*
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
+
 /*
  * Copyright (c) 2010, Intel Corporation.
  * All rights reserved.
@@ -2294,7 +2296,7 @@ post_startup(void)
 		 * Startup the memory scrubber.
 		 * XXPV	This should be running somewhere ..
 		 */
-		if (get_hwenv() != HW_XEN_HVM)
+		if ((get_hwenv() & HW_VIRTUAL) == 0)
 			memscrub_init();
 #endif
 	}
