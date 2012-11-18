@@ -589,7 +589,7 @@ aoe_detach_devices_from_hal(int portid)
 	char **dev_iter;
 	int dev_amount;
 
-	snprintf(sign, MAX_SIGN_SIZE, "%x", portid);
+	(void) snprintf(sign, MAX_SIGN_SIZE, "%x", portid);
 
 	dbus_error_init(&err);
 
@@ -599,7 +599,7 @@ aoe_detach_devices_from_hal(int portid)
 		dbus_error_free(&err);
 		return;
 	}
-	dbus_connection_ref(conn);
+	(void) dbus_connection_ref(conn);
 
 	/* Get list of devices handled by hal */
 	msg = dbus_message_new_method_call(
@@ -609,7 +609,7 @@ aoe_detach_devices_from_hal(int portid)
 	    DBUS_HAL_COM_DEV_LIST);
 	if (!msg)
 		goto exit_ref;
-	dbus_connection_send_with_reply(conn, msg, &pending, -1);
+	(void) dbus_connection_send_with_reply(conn, msg, &pending, -1);
 	dbus_connection_flush(conn);
 	dbus_message_unref(msg);
 	dbus_pending_call_block(pending);
@@ -617,8 +617,8 @@ aoe_detach_devices_from_hal(int portid)
 	dbus_pending_call_unref(pending);
 	if (!msg)
 		goto exit_ref;
-	dbus_message_get_args(msg, &err, DBUS_TYPE_ARRAY, DBUS_TYPE_STRING,
-	    &dev_list, &dev_amount, DBUS_TYPE_INVALID);
+	(void) dbus_message_get_args(msg, &err, DBUS_TYPE_ARRAY,
+	    DBUS_TYPE_STRING, &dev_list, &dev_amount, DBUS_TYPE_INVALID);
 	dbus_message_unref(msg);
 	if (dbus_error_is_set(&err)) {
 		dbus_error_free(&err);
@@ -638,9 +638,9 @@ aoe_detach_devices_from_hal(int portid)
 			    DBUS_HAL_COM_DEV_REM);
 			if (!msg)
 				break;
-			dbus_message_append_args(msg, DBUS_TYPE_STRING,
+			(void) dbus_message_append_args(msg, DBUS_TYPE_STRING,
 			    dev_iter, DBUS_TYPE_INVALID);
-			dbus_connection_send_with_reply(conn,
+			(void) dbus_connection_send_with_reply(conn,
 			    msg, &pending, -1);
 			dbus_connection_flush(conn);
 			dbus_message_unref(msg);
