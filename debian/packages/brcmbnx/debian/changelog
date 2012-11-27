@@ -1,3 +1,9 @@
+brcmbnx (5.11.134-31-8813-0) nexenta; urgency=low
+
+  * Issue 8813: Failed to set DHCP on bnx0 network interface
+
+ -- Gate Keeper <support@nexenta.com>  Wed, 14 Nov 2012 23:33:12 +0100
+
 brcmbnx (5.11.134-31-0-100) nexenta; urgency=low
 
   * Renumber packages in preparation for 3.1 release

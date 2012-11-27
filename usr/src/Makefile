@@ -140,6 +140,9 @@ closedbins: FRC $(ROOTDIRS)
 		$(ECHO) "Copying closed binaries from $$CLOSED_ROOT"; \
 		(cd $$CLOSED_ROOT; tar cf - .) | \
 		    (cd $(ROOT); tar xBpf -); \
+		( cd $(ROOT)/kernel/drv; cp bnx.conf bnx.conf.bak; \
+		  $(SED) -e "/^#mtu=/s/^#//" bnx.conf.bak > bnx.conf; \
+		  rm bnx.conf.bak ); \
 	fi
 
 #
