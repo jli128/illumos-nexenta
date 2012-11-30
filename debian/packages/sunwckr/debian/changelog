@@ -1,3 +1,9 @@
+sunwckr (5.11.134-31-12236-0) nexenta; urgency=low
+
+  * Issue 12235: ZFS extensions for intelligent placement of data and metadata
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 28 Nov 2012 20:54:09 +0400
+
 sunwckr (5.11.134-31-12262-0) nexenta; urgency=low
 
   * Issue 11462: Backport Illumos 1618
