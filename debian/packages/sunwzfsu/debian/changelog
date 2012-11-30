@@ -1,3 +1,9 @@
+sunwzfsu (5.11.134-31-12262-0) nexenta; urgency=low
+
+  * Issue 11462: Backport Illumos 1618
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 10 Oct 2012 14:40:47 +0400
+
 sunwzfsu (5.11.134-31-9465-0) nexenta; urgency=low
 
   * Issue 8853: sharenfs property must accept more than 1024 bytes

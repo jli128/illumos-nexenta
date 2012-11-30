@@ -1,3 +1,9 @@
+sunwhea (5.11.134-31-12262-0) nexenta; urgency=low
+
+  * Issue 11462: Backport Illumos 1618
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 10 Oct 2012 16:43:02 +0400
+
 sunwhea (5.11.134-31-11339-1) nexenta; urgency=low
 
   * Issue 7246: uuid.h is missing in 3.1.1

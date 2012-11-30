@@ -1,8 +1,14 @@
+sunwckr (5.11.134-31-12262-0) nexenta; urgency=low
+
+  * Issue 11462: Backport Illumos 1618
+
+ -- Nexenta Systems <support@nexenta.com>  Fri, 02 Nov 2012 14:45:39 +0400
+
 sunwckr (5.11.134-31-11965-0) nexenta; urgency=low
 
   * Issue 11843: NFSv3/UDP server sends packets with wrong Source IP in header
 
- -- Nexenta Systems <support@nexenta.com>  Fri, 02 Nov 2012 14:45:39 +0400
+ -- Nexenta Systems <support@nexenta.com>  Wed, 10 Oct 2012 16:43:02 +0400
 
 sunwckr (5.11.134-31-10491-0) nexenta; urgency=low
 
