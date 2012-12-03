@@ -1,4 +1,4 @@
-sunwzfsr (5.11.134-31-12236-0) nexenta; urgency=low
+sunwzfsr (5.11.134-31-9466-12236) nexenta; urgency=low
 
   * Issue 12235: ZFS extensions for intelligent placement of data and metadata
 
