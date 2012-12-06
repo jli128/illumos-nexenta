@@ -9,36 +9,38 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+#
 
-ROOTMAN			= $(ROOT)/usr/share/man
-ROOTHASMAN		= $(ROOT)/usr/has/man
-
-FILEMODE= 0444
+MANDOC=		$(ROOT)/usr/bin/mandoc
+ROOTHASMAN=	$(ROOT)/usr/has/man
+ROOTMAN=	$(ROOT)/usr/share/man
+FILEMODE=	0444
 
 # The manual section being built, client Makefiles must set this to, for e.g.
 # "3perl", with case matching that of the section name as installed.
 #
 # MANSECT=
 
-ROOTMANFILES = 	$(MANFILES:%=$(ROOTMAN)/man$(MANSECT)/%)
-
-CLOBBERFILES = $(MANSOFILES)
+ROOTMANFILES= 	$(MANFILES:%=$(ROOTMAN)/man$(MANSECT)/%)
+ROOTMANLINKS=	$(MANLINKS:%=$(ROOTMAN)/man$(MANSECT)/%)
 
 $(ROOTMAN)/man$(MANSECT)/% $(ROOTHASMAN)/man$(MANSECT)/%: %
-	$(INS.file)
+		$(INS.file)
 
-$(MANSOFILES):
-	$(RM) $@; $(ECHO) ".so $(SOSRC)" > $@
+$(ROOTMAN)/man$(MANSECT)/%:
+		$(RM) $@; $(SYMLINK) $($(@:$(ROOTMAN)/man$(MANSECT)/%=%)) $@
 
 all:
+
+check:
+		@[[ -z "$(MANFILES)" ]] || $(MANDOC) -Tlint $(MANFILES)
 
 clean:
 
 clobber:
-	$(RM) $(CLOBBERFILES)
-
-lint:
 
 .PARALLEL:
 

@@ -9,13 +9,16 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+#
 
-include ../../Makefile.master
+include		$(SRC)/Makefile.master
 
-MANSECT = 	2
+MANSECT= 	2
 
-MANFILES = 	Intro.2			\
+MANFILES=	Intro.2			\
 	 	__sparc_utrap_install.2 \
 	 	_lwp_cond_signal.2	\
 	 	_lwp_cond_wait.2	\
@@ -158,7 +161,7 @@ MANFILES = 	Intro.2			\
 	 	write.2			\
 	 	yield.2			\
 
-MANSOFILES =	_Exit.2				\
+MANLINKS=	_Exit.2				\
 	 	_exit.2				\
 	 	_lwp_cond_broadcast.2		\
 	 	_lwp_cond_reltimedwait.2	\
@@ -240,141 +243,139 @@ MANSOFILES =	_Exit.2				\
 	 	wracct.2			\
 	 	writev.2
 
-MANFILES +=	$(MANSOFILES)
+intro.2			= Intro.2
 
-intro.2				:= SOSRC = man2/Intro.2
+_lwp_cond_broadcast.2		= _lwp_cond_signal.2
 
-_lwp_cond_broadcast.2		:= SOSRC = man2/_lwp_cond_signal.2
+_lwp_cond_reltimedwait.2	= _lwp_cond_wait.2
+_lwp_cond_timedwait.2		= _lwp_cond_wait.2
 
-_lwp_cond_reltimedwait.2	:= SOSRC = man2/_lwp_cond_wait.2
-_lwp_cond_timedwait.2		:= SOSRC = man2/_lwp_cond_wait.2
+_lwp_mutex_trylock.2		= _lwp_mutex_lock.2
+_lwp_mutex_unlock.2		= _lwp_mutex_lock.2
 
-_lwp_mutex_trylock.2		:= SOSRC = man2/_lwp_mutex_lock.2
-_lwp_mutex_unlock.2		:= SOSRC = man2/_lwp_mutex_lock.2
+_lwp_sema_init.2		= _lwp_sema_wait.2
+_lwp_sema_post.2		= _lwp_sema_wait.2
+_lwp_sema_trywait.2		= _lwp_sema_wait.2
 
-_lwp_sema_init.2		:= SOSRC = man2/_lwp_sema_wait.2
-_lwp_sema_post.2		:= SOSRC = man2/_lwp_sema_wait.2
-_lwp_sema_trywait.2		:= SOSRC = man2/_lwp_sema_wait.2
+_lwp_continue.2			= _lwp_suspend.2
 
-_lwp_continue.2			:= SOSRC = man2/_lwp_suspend.2
+faccessat.2			= access.2
 
-faccessat.2			:= SOSRC = man2/access.2
+facl.2				= acl.2
 
-facl.2				:= SOSRC = man2/acl.2
+sbrk.2				= brk.2
 
-sbrk.2				:= SOSRC = man2/brk.2
+fchdir.2			= chdir.2
 
-fchdir.2			:= SOSRC = man2/chdir.2
+fchmod.2			= chmod.2
 
-fchmod.2			:= SOSRC = man2/chmod.2
+fchown.2			= chown.2
+fchownat.2			= chown.2
+lchown.2			= chown.2
 
-fchown.2			:= SOSRC = man2/chown.2
-fchownat.2			:= SOSRC = man2/chown.2
-lchown.2			:= SOSRC = man2/chown.2
+fchroot.2			= chroot.2
 
-fchroot.2			:= SOSRC = man2/chroot.2
+execl.2				= exec.2
+execle.2			= exec.2
+execlp.2			= exec.2
+execv.2				= exec.2
+execve.2			= exec.2
+execvp.2			= exec.2
 
-execl.2				:= SOSRC = man2/exec.2
-execle.2			:= SOSRC = man2/exec.2
-execlp.2			:= SOSRC = man2/exec.2
-execv.2				:= SOSRC = man2/exec.2
-execve.2			:= SOSRC = man2/exec.2
-execvp.2			:= SOSRC = man2/exec.2
+_Exit.2				= exit.2
+_exit.2				= exit.2
 
-_Exit.2				:= SOSRC = man2/exit.2
-_exit.2				:= SOSRC = man2/exit.2
+fork1.2				= fork.2
+forkall.2			= fork.2
+forkallx.2			= fork.2
+forkx.2				= fork.2
 
-fork1.2				:= SOSRC = man2/fork.2
-forkall.2			:= SOSRC = man2/fork.2
-forkallx.2			:= SOSRC = man2/fork.2
-forkx.2				:= SOSRC = man2/fork.2
+pathconf.2			= fpathconf.2
 
-pathconf.2			:= SOSRC = man2/fpathconf.2
+putacct.2			= getacct.2
+wracct.2			= getacct.2
 
-putacct.2			:= SOSRC = man2/getacct.2
-wracct.2			:= SOSRC = man2/getacct.2
+getaudit_addr.2			= getaudit.2
+setaudit.2			= getaudit.2
+setaudit_addr.2			= getaudit.2
 
-getaudit_addr.2			:= SOSRC = man2/getaudit.2
-setaudit.2			:= SOSRC = man2/getaudit.2
-setaudit_addr.2			:= SOSRC = man2/getaudit.2
+setauid.2			= getauid.2
 
-setauid.2			:= SOSRC = man2/getauid.2
+setcontext.2			= getcontext.2
 
-setcontext.2			:= SOSRC = man2/getcontext.2
+setgroups.2			= getgroups.2
 
-setgroups.2			:= SOSRC = man2/getgroups.2
+setitimer.2			= getitimer.2
 
-setitimer.2			:= SOSRC = man2/getitimer.2
+fgetlabel.2			= getlabel.2
 
-fgetlabel.2			:= SOSRC = man2/getlabel.2
+getpmsg.2			= getmsg.2
 
-getpmsg.2			:= SOSRC = man2/getmsg.2
+setpflags.2			= getpflags.2
 
-setpflags.2			:= SOSRC = man2/getpflags.2
+getpgid.2			= getpid.2
+getpgrp.2			= getpid.2
+getppid.2			= getpid.2
 
-getpgid.2			:= SOSRC = man2/getpid.2
-getpgrp.2			:= SOSRC = man2/getpid.2
-getppid.2			:= SOSRC = man2/getpid.2
+setppriv.2			= getppriv.2
 
-setppriv.2			:= SOSRC = man2/getppriv.2
+setrlimit.2			= getrlimit.2
 
-setrlimit.2			:= SOSRC = man2/getrlimit.2
+getegid.2			= getuid.2
+geteuid.2			= getuid.2
+getgid.2			= getuid.2
 
-getegid.2			:= SOSRC = man2/getuid.2
-geteuid.2			:= SOSRC = man2/getuid.2
-getgid.2			:= SOSRC = man2/getuid.2
+setustack.2			= getustack.2
 
-setustack.2			:= SOSRC = man2/getustack.2
+openat.2			= open.2
 
-openat.2			:= SOSRC = man2/open.2
+pset_assign.2			= pset_create.2
+pset_destroy.2			= pset_create.2
 
-pset_assign.2			:= SOSRC = man2/pset_create.2
-pset_destroy.2			:= SOSRC = man2/pset_create.2
+pset_getattr.2			= pset_setattr.2
 
-pset_getattr.2			:= SOSRC = man2/pset_setattr.2
+putpmsg.2			= putmsg.2
 
-putpmsg.2			:= SOSRC = man2/putmsg.2
+pread.2				= read.2
+readv.2				= read.2
 
-pread.2				:= SOSRC = man2/read.2
-readv.2				:= SOSRC = man2/read.2
+renameat.2			= rename.2
 
-renameat.2			:= SOSRC = man2/rename.2
+semtimedop.2			= semop.2
 
-semtimedop.2			:= SOSRC = man2/semop.2
+getrctl.2			= setrctl.2
 
-getrctl.2			:= SOSRC = man2/setrctl.2
+getprojid.2			= settaskid.2
+gettaskid.2			= settaskid.2
 
-getprojid.2			:= SOSRC = man2/settaskid.2
-gettaskid.2			:= SOSRC = man2/settaskid.2
+setegid.2			= setuid.2
+seteuid.2			= setuid.2
+setgid.2			= setuid.2
 
-setegid.2			:= SOSRC = man2/setuid.2
-seteuid.2			:= SOSRC = man2/setuid.2
-setgid.2			:= SOSRC = man2/setuid.2
+shmat.2				= shmop.2
+shmdt.2				= shmop.2
 
-shmat.2				:= SOSRC = man2/shmop.2
-shmdt.2				:= SOSRC = man2/shmop.2
+sigsendset.2			= sigsend.2
 
-sigsendset.2			:= SOSRC = man2/sigsend.2
+fstat.2				= stat.2
+fstatat.2			= stat.2
+lstat.2				= stat.2
 
-fstat.2				:= SOSRC = man2/stat.2
-fstatat.2			:= SOSRC = man2/stat.2
-lstat.2				:= SOSRC = man2/stat.2
+fstatvfs.2			= statvfs.2
 
-fstatvfs.2			:= SOSRC = man2/statvfs.2
+umount2.2			= umount.2
 
-umount2.2			:= SOSRC = man2/umount.2
+unlinkat.2			= unlink.2
 
-unlinkat.2			:= SOSRC = man2/unlink.2
+futimesat.2			= utimes.2
 
-futimesat.2			:= SOSRC = man2/utimes.2
+vforkx.2			= vfork.2
 
-vforkx.2			:= SOSRC = man2/vfork.2
-
-pwrite.2			:= SOSRC = man2/write.2
-writev.2			:= SOSRC = man2/write.2
+pwrite.2			= write.2
+writev.2			= write.2
 
 .KEEP_STATE:
 
-include ../Makefile.man
+include		$(SRC)/man/Makefile.man
 
-install: $(ROOTMANFILES)
+install:	$(ROOTMANFILES) $(ROOTMANLINKS)

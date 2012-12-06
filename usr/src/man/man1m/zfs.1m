@@ -105,7 +105,7 @@ zfs \- configures ZFS file systems
 
 .LP
 .nf
-\fBzfs\fR \fBget\fR [\fB-r\fR|\fB-d\fR \fIdepth\fR][\fB-Hp\fR][\fB-o\fR \fIfield\fR[,...]] [\fB-t\fR \fItype\fR[,...]] 
+\fBzfs\fR \fBget\fR [\fB-r\fR|\fB-d\fR \fIdepth\fR][\fB-Hp\fR][\fB-o\fR \fIfield\fR[,...]] [\fB-t\fR \fItype\fR[,...]]
     [\fB-s\fR \fIsource\fR[,...]] "\fIall\fR" | \fIproperty\fR[,...] \fIfilesystem\fR|\fIvolume\fR|\fIsnapshot\fR ...
 .fi
 
@@ -2837,8 +2837,8 @@ data will be sent.
 .sp .6
 .RS 4n
 Calculate send stream size.  Do not generate any actual send data.  This is
-useful when one needs to know stream size in order to store the stream externally. 
-With \fB-v\fR specified, provides info on stream header and stream data portion 
+useful when one needs to know stream size in order to store the stream externally.
+With \fB-v\fR specified, provides info on stream header and stream data portion
 sizes, in addition to the total stream size.
 .RE
 

@@ -213,7 +213,7 @@ all_xmod_sparc install_xmod_sparc: FRC
 all_xmod_i386 install_xmod_i386: FRC
 	@cd uts/i86; pwd; $(MAKE) TARGET=$(TARGET) svvs
 
-check:	$(CHKHDRSUBDIRS) $(CHKMFSTSUBDIRS)
+check:	$(CHKHDRSUBDIRS) $(CHKMFSTSUBDIRS) man
 
 #
 # Cross-reference customization: skip all of the subdirectories that

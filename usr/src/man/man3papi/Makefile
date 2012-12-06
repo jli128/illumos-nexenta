@@ -9,20 +9,23 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+#
 
-include ../../Makefile.master
+include		$(SRC)/Makefile.master
 
-MANSECT = 	3papi
+MANSECT= 	3papi
 
-MANFILES =	papiAttributeListAddValue.3papi		\
+MANFILES=	papiAttributeListAddValue.3papi		\
 	 	papiJobSubmit.3papi			\
 	 	papiLibrarySupportedCall.3papi		\
 	 	papiPrintersList.3papi			\
 	 	papiServiceCreate.3papi			\
 	 	papiStatusString.3papi
 
-MANSOFILES =	papiAttributeListAddBoolean.3papi	\
+MANLINKS=	papiAttributeListAddBoolean.3papi	\
 		papiAttributeListAddCollection.3papi	\
 		papiAttributeListAddDatetime.3papi	\
 		papiAttributeListAddInteger.3papi	\
@@ -92,84 +95,82 @@ MANSOFILES =	papiAttributeListAddBoolean.3papi	\
 		papiServiceSetPassword.3papi		\
 		papiServiceSetUserName.3papi
 
-MANFILES +=	$(MANSOFILES)
+papiAttributeListAddBoolean.3papi	= papiAttributeListAddValue.3papi
+papiAttributeListAddCollection.3papi	= papiAttributeListAddValue.3papi
+papiAttributeListAddDatetime.3papi	= papiAttributeListAddValue.3papi
+papiAttributeListAddInteger.3papi	= papiAttributeListAddValue.3papi
+papiAttributeListAddMetadata.3papi	= papiAttributeListAddValue.3papi
+papiAttributeListAddRange.3papi		= papiAttributeListAddValue.3papi
+papiAttributeListAddResolution.3papi	= papiAttributeListAddValue.3papi
+papiAttributeListAddString.3papi	= papiAttributeListAddValue.3papi
+papiAttributeListDelete.3papi		= papiAttributeListAddValue.3papi
+papiAttributeListFind.3papi		= papiAttributeListAddValue.3papi
+papiAttributeListFree.3papi		= papiAttributeListAddValue.3papi
+papiAttributeListFromString.3papi	= papiAttributeListAddValue.3papi
+papiAttributeListGetBoolean.3papi	= papiAttributeListAddValue.3papi
+papiAttributeListGetCollection.3papi	= papiAttributeListAddValue.3papi
+papiAttributeListGetDatetime.3papi	= papiAttributeListAddValue.3papi
+papiAttributeListGetInteger.3papi	= papiAttributeListAddValue.3papi
+papiAttributeListGetMetadata.3papi	= papiAttributeListAddValue.3papi
+papiAttributeListGetNext.3papi		= papiAttributeListAddValue.3papi
+papiAttributeListGetRange.3papi		= papiAttributeListAddValue.3papi
+papiAttributeListGetResolution.3papi	= papiAttributeListAddValue.3papi
+papiAttributeListGetString.3papi	= papiAttributeListAddValue.3papi
+papiAttributeListGetValue.3papi		= papiAttributeListAddValue.3papi
+papiAttributeListToString.3papi		= papiAttributeListAddValue.3papi
 
-papiAttributeListAddBoolean.3papi	:= SOSRC = man3papi/papiAttributeListAddValue.3papi
-papiAttributeListAddCollection.3papi	:= SOSRC = man3papi/papiAttributeListAddValue.3papi
-papiAttributeListAddDatetime.3papi	:= SOSRC = man3papi/papiAttributeListAddValue.3papi
-papiAttributeListAddInteger.3papi	:= SOSRC = man3papi/papiAttributeListAddValue.3papi
-papiAttributeListAddMetadata.3papi	:= SOSRC = man3papi/papiAttributeListAddValue.3papi
-papiAttributeListAddRange.3papi		:= SOSRC = man3papi/papiAttributeListAddValue.3papi
-papiAttributeListAddResolution.3papi	:= SOSRC = man3papi/papiAttributeListAddValue.3papi
-papiAttributeListAddString.3papi	:= SOSRC = man3papi/papiAttributeListAddValue.3papi
-papiAttributeListDelete.3papi		:= SOSRC = man3papi/papiAttributeListAddValue.3papi
-papiAttributeListFind.3papi		:= SOSRC = man3papi/papiAttributeListAddValue.3papi
-papiAttributeListFree.3papi		:= SOSRC = man3papi/papiAttributeListAddValue.3papi
-papiAttributeListFromString.3papi	:= SOSRC = man3papi/papiAttributeListAddValue.3papi
-papiAttributeListGetBoolean.3papi	:= SOSRC = man3papi/papiAttributeListAddValue.3papi
-papiAttributeListGetCollection.3papi	:= SOSRC = man3papi/papiAttributeListAddValue.3papi
-papiAttributeListGetDatetime.3papi	:= SOSRC = man3papi/papiAttributeListAddValue.3papi
-papiAttributeListGetInteger.3papi	:= SOSRC = man3papi/papiAttributeListAddValue.3papi
-papiAttributeListGetMetadata.3papi	:= SOSRC = man3papi/papiAttributeListAddValue.3papi
-papiAttributeListGetNext.3papi		:= SOSRC = man3papi/papiAttributeListAddValue.3papi
-papiAttributeListGetRange.3papi		:= SOSRC = man3papi/papiAttributeListAddValue.3papi
-papiAttributeListGetResolution.3papi	:= SOSRC = man3papi/papiAttributeListAddValue.3papi
-papiAttributeListGetString.3papi	:= SOSRC = man3papi/papiAttributeListAddValue.3papi
-papiAttributeListGetValue.3papi		:= SOSRC = man3papi/papiAttributeListAddValue.3papi
-papiAttributeListToString.3papi		:= SOSRC = man3papi/papiAttributeListAddValue.3papi
+papiJobCancel.3papi			= papiJobSubmit.3papi
+papiJobFree.3papi			= papiJobSubmit.3papi
+papiJobGetAttributeList.3papi		= papiJobSubmit.3papi
+papiJobGetId.3papi			= papiJobSubmit.3papi
+papiJobGetJobTicket.3papi		= papiJobSubmit.3papi
+papiJobGetPrinterName.3papi		= papiJobSubmit.3papi
+papiJobHold.3papi			= papiJobSubmit.3papi
+papiJobListFree.3papi			= papiJobSubmit.3papi
+papiJobModify.3papi			= papiJobSubmit.3papi
+papiJobMove.3papi			= papiJobSubmit.3papi
+papiJobPromote.3papi			= papiJobSubmit.3papi
+papiJobQuery.3papi			= papiJobSubmit.3papi
+papiJobRelease.3papi			= papiJobSubmit.3papi
+papiJobRestart.3papi			= papiJobSubmit.3papi
+papiJobStreamClose.3papi		= papiJobSubmit.3papi
+papiJobStreamOpen.3papi			= papiJobSubmit.3papi
+papiJobStreamWrite.3papi		= papiJobSubmit.3papi
+papiJobSubmitByReference.3papi		= papiJobSubmit.3papi
+papiJobValidate.3papi			= papiJobSubmit.3papi
 
-papiJobCancel.3papi			:= SOSRC = man3papi/papiJobSubmit.3papi
-papiJobFree.3papi			:= SOSRC = man3papi/papiJobSubmit.3papi
-papiJobGetAttributeList.3papi		:= SOSRC = man3papi/papiJobSubmit.3papi
-papiJobGetId.3papi			:= SOSRC = man3papi/papiJobSubmit.3papi
-papiJobGetJobTicket.3papi		:= SOSRC = man3papi/papiJobSubmit.3papi
-papiJobGetPrinterName.3papi		:= SOSRC = man3papi/papiJobSubmit.3papi
-papiJobHold.3papi			:= SOSRC = man3papi/papiJobSubmit.3papi
-papiJobListFree.3papi			:= SOSRC = man3papi/papiJobSubmit.3papi
-papiJobModify.3papi			:= SOSRC = man3papi/papiJobSubmit.3papi
-papiJobMove.3papi			:= SOSRC = man3papi/papiJobSubmit.3papi
-papiJobPromote.3papi			:= SOSRC = man3papi/papiJobSubmit.3papi
-papiJobQuery.3papi			:= SOSRC = man3papi/papiJobSubmit.3papi
-papiJobRelease.3papi			:= SOSRC = man3papi/papiJobSubmit.3papi
-papiJobRestart.3papi			:= SOSRC = man3papi/papiJobSubmit.3papi
-papiJobStreamClose.3papi		:= SOSRC = man3papi/papiJobSubmit.3papi
-papiJobStreamOpen.3papi			:= SOSRC = man3papi/papiJobSubmit.3papi
-papiJobStreamWrite.3papi		:= SOSRC = man3papi/papiJobSubmit.3papi
-papiJobSubmitByReference.3papi		:= SOSRC = man3papi/papiJobSubmit.3papi
-papiJobValidate.3papi			:= SOSRC = man3papi/papiJobSubmit.3papi
+papiLibrarySupportedCalls.3papi		= papiLibrarySupportedCall.3papi
 
-papiLibrarySupportedCalls.3papi		:= SOSRC = man3papi/papiLibrarySupportedCall.3papi
+papiPrinterAdd.3papi			= papiPrintersList.3papi
+papiPrinterDisable.3papi		= papiPrintersList.3papi
+papiPrinterEnable.3papi			= papiPrintersList.3papi
+papiPrinterFree.3papi			= papiPrintersList.3papi
+papiPrinterGetAttributeList.3papi	= papiPrintersList.3papi
+papiPrinterListFree.3papi		= papiPrintersList.3papi
+papiPrinterListJobs.3papi		= papiPrintersList.3papi
+papiPrinterModify.3papi			= papiPrintersList.3papi
+papiPrinterPause.3papi			= papiPrintersList.3papi
+papiPrinterPurgeJobs.3papi		= papiPrintersList.3papi
+papiPrinterQuery.3papi			= papiPrintersList.3papi
+papiPrinterRemove.3papi			= papiPrintersList.3papi
+papiPrinterResume.3papi			= papiPrintersList.3papi
 
-papiPrinterAdd.3papi			:= SOSRC = man3papi/papiPrintersList.3papi
-papiPrinterDisable.3papi		:= SOSRC = man3papi/papiPrintersList.3papi
-papiPrinterEnable.3papi			:= SOSRC = man3papi/papiPrintersList.3papi
-papiPrinterFree.3papi			:= SOSRC = man3papi/papiPrintersList.3papi
-papiPrinterGetAttributeList.3papi	:= SOSRC = man3papi/papiPrintersList.3papi
-papiPrinterListFree.3papi		:= SOSRC = man3papi/papiPrintersList.3papi
-papiPrinterListJobs.3papi		:= SOSRC = man3papi/papiPrintersList.3papi
-papiPrinterModify.3papi			:= SOSRC = man3papi/papiPrintersList.3papi
-papiPrinterPause.3papi			:= SOSRC = man3papi/papiPrintersList.3papi
-papiPrinterPurgeJobs.3papi		:= SOSRC = man3papi/papiPrintersList.3papi
-papiPrinterQuery.3papi			:= SOSRC = man3papi/papiPrintersList.3papi
-papiPrinterRemove.3papi			:= SOSRC = man3papi/papiPrintersList.3papi
-papiPrinterResume.3papi			:= SOSRC = man3papi/papiPrintersList.3papi
-
-papiServiceDestroy.3papi		:= SOSRC = man3papi/papiServiceCreate.3papi
-papiServiceGetAppData.3papi		:= SOSRC = man3papi/papiServiceCreate.3papi
-papiServiceGetAttributeList.3papi	:= SOSRC = man3papi/papiServiceCreate.3papi
-papiServiceGetEncryption.3papi		:= SOSRC = man3papi/papiServiceCreate.3papi
-papiServiceGetPassword.3papi		:= SOSRC = man3papi/papiServiceCreate.3papi
-papiServiceGetServiceName.3papi		:= SOSRC = man3papi/papiServiceCreate.3papi
-papiServiceGetStatusMessage.3papi	:= SOSRC = man3papi/papiServiceCreate.3papi
-papiServiceGetUserName.3papi		:= SOSRC = man3papi/papiServiceCreate.3papi
-papiServiceSetAppData.3papi		:= SOSRC = man3papi/papiServiceCreate.3papi
-papiServiceSetAuthCB.3papi		:= SOSRC = man3papi/papiServiceCreate.3papi
-papiServiceSetEncryption.3papi		:= SOSRC = man3papi/papiServiceCreate.3papi
-papiServiceSetPassword.3papi		:= SOSRC = man3papi/papiServiceCreate.3papi
-papiServiceSetUserName.3papi		:= SOSRC = man3papi/papiServiceCreate.3papi
+papiServiceDestroy.3papi		= papiServiceCreate.3papi
+papiServiceGetAppData.3papi		= papiServiceCreate.3papi
+papiServiceGetAttributeList.3papi	= papiServiceCreate.3papi
+papiServiceGetEncryption.3papi		= papiServiceCreate.3papi
+papiServiceGetPassword.3papi		= papiServiceCreate.3papi
+papiServiceGetServiceName.3papi		= papiServiceCreate.3papi
+papiServiceGetStatusMessage.3papi	= papiServiceCreate.3papi
+papiServiceGetUserName.3papi		= papiServiceCreate.3papi
+papiServiceSetAppData.3papi		= papiServiceCreate.3papi
+papiServiceSetAuthCB.3papi		= papiServiceCreate.3papi
+papiServiceSetEncryption.3papi		= papiServiceCreate.3papi
+papiServiceSetPassword.3papi		= papiServiceCreate.3papi
+papiServiceSetUserName.3papi		= papiServiceCreate.3papi
 
 .KEEP_STATE:
 
-include ../Makefile.man
+include		$(SRC)/man/Makefile.man
 
-install: $(ROOTMANFILES)
+install:	$(ROOTMANFILES) $(ROOTMANLINKS)

@@ -28,7 +28,7 @@ include ../Makefile.master
 include $(NZA_MAKEDEFS)
 
 #
-#	Note that the commands 'agents', 'lp', 'perl', and 'man' are first in
+#	Note that the commands 'lp' and 'perl' are first in
 #	the list, violating alphabetical order.  This is because they are very
 #	long-running and should be given the most wall-clock time for a
 #	parallel build.
@@ -52,7 +52,6 @@ COMMON_SUBDIRS=		\
 	availdevs	\
 	lp		\
 	perl		\
-	man		\
 	Adm		\
 	abi		\
 	adbgen		\
@@ -255,6 +254,8 @@ COMMON_SUBDIRS=		\
 	mail		\
 	mailx		\
 	makekey		\
+	man		\
+	mandoc		\
 	mdb		\
 	mesg		\
 	mkdir		\
@@ -315,6 +316,7 @@ COMMON_SUBDIRS=		\
 	plockstat	\
 	pr		\
 	prctl		\
+	preconv		\
 	print		\
 	printf		\
 	priocntl	\
@@ -517,12 +519,11 @@ sparc_SUBDIRS=		\
 	vntsd
 
 #
-# Commands that are messaged.  Note that 'lp' and 'man' come first
-# (see previous comment about 'lp' and 'man').
+# Commands that are messaged.  Note that 'lp' comes first
+# (see previous comment about 'lp').
 #
 MSGSUBDIRS=		\
 	lp		\
-	man		\
 	abi		\
 	acctadm		\
 	allocate	\
@@ -638,6 +639,7 @@ MSGSUBDIRS=		\
 	luxadm		\
 	lvm		\
 	mailx		\
+	man		\
 	mesg		\
 	mkdir		\
 	mkpwdict	\

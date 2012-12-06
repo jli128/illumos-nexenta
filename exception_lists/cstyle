@@ -61,6 +61,8 @@ usr/src/cmd/krb5/ldap_util/kdb5_ldap_util.h
 usr/src/cmd/krb5/slave/kprop.c
 usr/src/cmd/krb5/slave/kprop.h
 usr/src/cmd/krb5/slave/kpropd.c
+usr/src/cmd/mandoc
+usr/src/cmd/preconv
 usr/src/common/bzip2/bzlib.h
 usr/src/common/bzip2/crctable.c
 usr/src/common/bzip2/randtable.c

@@ -21,7 +21,7 @@
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2011, Richard Lowe
-# Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
 #
 
@@ -364,7 +364,6 @@ DIRS= \
 	/usr/share/man/man3ldap \
 	/usr/share/man/man3lgrp \
 	/usr/share/man/man3lib \
-	/usr/share/man/man3libucb \
 	/usr/share/man/man3mail \
 	/usr/share/man/man3malloc \
 	/usr/share/man/man3mp \
@@ -394,7 +393,6 @@ DIRS= \
 	/usr/share/man/man3tecla \
 	/usr/share/man/man3tnf \
 	/usr/share/man/man3tsol \
-	/usr/share/man/man3ucb \
 	/usr/share/man/man3uuid \
 	/usr/share/man/man3volmgt \
 	/usr/share/man/man3xcurses \

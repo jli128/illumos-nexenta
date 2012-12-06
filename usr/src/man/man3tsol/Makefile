@@ -9,13 +9,16 @@
 # at http://www.illumos.org/license/CDDL.
 #
 
+#
 # Copyright 2011, Richard Lowe
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+#
 
-include ../../Makefile.master
+include		$(SRC)/Makefile.master
 
-MANSECT = 	3tsol
+MANSECT= 	3tsol
 
-MANFILES = blcompare.3tsol		\
+MANFILES=	blcompare.3tsol		\
 	 	blminmax.3tsol		\
 	 	bltocolor.3tsol		\
 	 	bltos.3tsol		\
@@ -37,7 +40,7 @@ MANFILES = blcompare.3tsol		\
 	 	str_to_label.3tsol	\
 	 	tsol_getrhtype.3tsol
 
-MANSOFILES =	Xbcleartos.3tsol		\
+MANLINKS=	Xbcleartos.3tsol		\
 		Xbsltos.3tsol			\
 		bcleartoh.3tsol			\
 		bcleartoh_r.3tsol		\
@@ -68,52 +71,50 @@ MANSOFILES =	Xbcleartos.3tsol		\
 		stobclear.3tsol			\
 		stobsl.3tsol
 
-MANFILES +=	$(MANSOFILES)
+bldominates.3tsol		= blcompare.3tsol
+blequal.3tsol			= blcompare.3tsol
+blinrange.3tsol			= blcompare.3tsol
+blstrictdom.3tsol		= blcompare.3tsol
 
-bldominates.3tsol		:= SOSRC = man3tsol/blcompare.3tsol
-blequal.3tsol			:= SOSRC = man3tsol/blcompare.3tsol
-blinrange.3tsol			:= SOSRC = man3tsol/blcompare.3tsol
-blstrictdom.3tsol		:= SOSRC = man3tsol/blcompare.3tsol
+blmaximum.3tsol			= blminmax.3tsol
+blminimum.3tsol			= blminmax.3tsol
 
-blmaximum.3tsol			:= SOSRC = man3tsol/blminmax.3tsol
-blminimum.3tsol			:= SOSRC = man3tsol/blminmax.3tsol
+bltocolor_r.3tsol		= bltocolor.3tsol
 
-bltocolor_r.3tsol		:= SOSRC = man3tsol/bltocolor.3tsol
+bcleartos.3tsol			= bltos.3tsol
+bsltos.3tsol			= bltos.3tsol
 
-bcleartos.3tsol			:= SOSRC = man3tsol/bltos.3tsol
-bsltos.3tsol			:= SOSRC = man3tsol/bltos.3tsol
+bcleartoh.3tsol			= btohex.3tsol
+bcleartoh_r.3tsol		= btohex.3tsol
+bsltoh.3tsol			= btohex.3tsol
+bsltoh_r.3tsol			= btohex.3tsol
+h_alloc.3tsol			= btohex.3tsol
+h_free.3tsol			= btohex.3tsol
 
-bcleartoh.3tsol			:= SOSRC = man3tsol/btohex.3tsol
-bcleartoh_r.3tsol		:= SOSRC = man3tsol/btohex.3tsol
-bsltoh.3tsol			:= SOSRC = man3tsol/btohex.3tsol
-bsltoh_r.3tsol			:= SOSRC = man3tsol/btohex.3tsol
-h_alloc.3tsol			:= SOSRC = man3tsol/btohex.3tsol
-h_free.3tsol			:= SOSRC = man3tsol/btohex.3tsol
+getzoneidbylabel.3tsol		= getzonelabelbyid.3tsol
+getzonelabelbyname.3tsol	= getzonelabelbyid.3tsol
 
-getzoneidbylabel.3tsol		:= SOSRC = man3tsol/getzonelabelbyid.3tsol
-getzonelabelbyname.3tsol	:= SOSRC = man3tsol/getzonelabelbyid.3tsol
+getzonerootbylabel.3tsol	= getzonerootbyid.3tsol
+getzonerootbyname.3tsol		= getzonerootbyid.3tsol
 
-getzonerootbylabel.3tsol	:= SOSRC = man3tsol/getzonerootbyid.3tsol
-getzonerootbyname.3tsol		:= SOSRC = man3tsol/getzonerootbyid.3tsol
+htobclear.3tsol			= hextob.3tsol
+htobsl.3tsol			= hextob.3tsol
 
-htobclear.3tsol			:= SOSRC = man3tsol/hextob.3tsol
-htobsl.3tsol			:= SOSRC = man3tsol/hextob.3tsol
+Xbcleartos.3tsol		= labelclipping.3tsol
+Xbsltos.3tsol			= labelclipping.3tsol
 
-Xbcleartos.3tsol		:= SOSRC = man3tsol/labelclipping.3tsol
-Xbsltos.3tsol			:= SOSRC = man3tsol/labelclipping.3tsol
+m_label_alloc.3tsol		= m_label.3tsol
+m_label_dup.3tsol		= m_label.3tsol
+m_label_free.3tsol		= m_label.3tsol
 
-m_label_alloc.3tsol		:= SOSRC = man3tsol/m_label.3tsol
-m_label_dup.3tsol		:= SOSRC = man3tsol/m_label.3tsol
-m_label_free.3tsol		:= SOSRC = man3tsol/m_label.3tsol
+sbcleartos.3tsol		= sbltos.3tsol
+sbsltos.3tsol			= sbltos.3tsol
 
-sbcleartos.3tsol		:= SOSRC = man3tsol/sbltos.3tsol
-sbsltos.3tsol			:= SOSRC = man3tsol/sbltos.3tsol
-
-stobclear.3tsol			:= SOSRC = man3tsol/stobl.3tsol
-stobsl.3tsol			:= SOSRC = man3tsol/stobl.3tsol
+stobclear.3tsol			= stobl.3tsol
+stobsl.3tsol			= stobl.3tsol
 
 .KEEP_STATE:
 
-include ../Makefile.man
+include		$(SRC)/man/Makefile.man
 
-install: $(ROOTMANFILES)
+install:	$(ROOTMANFILES) $(ROOTMANLINKS)

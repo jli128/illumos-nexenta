@@ -1,342 +1,911 @@
-'\" te
-.\" Copyright (c) 1995, Sun Microsystems, Inc.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MAN 5 "Jan 30, 1995"
-.SH NAME
-man \- macros to format Reference Manual pages
-.SH SYNOPSIS
-.LP
-.nf
-\fBnroff\fR \fB-man\fR \fIfilename\fR...
-.fi
-
-.LP
-.nf
-\fBtroff\fR  \fB-man\fR \fIfilename\fR...
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-These macros are used to lay out the reference pages in this manual. Note: if
-\fIfilename\fR contains format input for a preprocessor, the commands shown
-above must be piped through the appropriate preprocessor. This is handled
-automatically by the \fBman\fR(1) command. See the ``Conventions'' section.
-.sp
-.LP
-Any text argument \fIt\fR may be zero to six words. Quotes may be used to
-include SPACE characters in a "word".  If \fItext\fR is empty, the special
-treatment is applied to the next input line with text to be printed. In this
-way \fB\&.I\fR may be used to italicize a whole line, or \fB\&.SB\fR may be
-used to make small bold letters.
-.sp
-.LP
-A prevailing indent distance is remembered between successive indented
-paragraphs, and is reset to default value upon reaching a non-indented
-paragraph.  Default units for indents \fIi\fR are ens.
-.sp
-.LP
-Type font and size are reset to default values before each paragraph, and after
-processing font and size setting macros.
-.sp
-.LP
-These strings are predefined by \fB-man\fR:
-.sp
-.ne 2
-.na
-\fB\fB\e*R\fR\fR
-.ad
-.RS 8n
-`\(rg', `(Reg)' in \fBnroff\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB\e*S\fR\fR
-.ad
-.RS 8n
-Change to default type size.
-.RE
-
-.SS "Requests"
-.sp
-.LP
-* n.t.l. = next text line; p.i. = prevailing indent
-.sp
-
-.sp
-.TS
-c c c c
-c c c c .
-\fIRequest\fR	\fICause\fR	\fIIf no\fR	\fIExplanation\fR
-	\fIBreak\fR	\fIArgument\fR	
-\fB\&.B \fR\fIt\fR	no	\fIt\fR=n.t.l.*	Text is in bold font.
-\fB\&.BI \fR\fIt\fR	no	\fIt\fR=n.t.l.	Join words, alternating bold and italic.
-\fB\&.BR \fR\fIt\fR	no	\fIt\fR=n.t.l.	Join words, alternating bold and roman.
-\fB\&.DT\fR	no	\&.5i 1i...	Restore default tabs.
-\fB\&.HP \fR\fIi\fR	yes	\fIi\fR=p.i.*	T{
-Begin paragraph with hanging indent. Set prevailing indent to \fIi\fR.
-T}
-\fB\&.I \fR\fIt\fR	no	\fIt\fR=n.t.l.	Text is italic.
-\fB\&.IB \fR\fIt\fR	no	\fIt\fR=n.t.l.	Join words, alternating italic and bold.
-\fB\&.IP \fR\fIx i\fR	yes	\fIx\fR=""	Same as \fB\&.TP\fR with tag \fIx\fR.
-\fB\&.IR \fR\fIt\fR	no	\fIt\fR=n.t.l.	T{
-Join words, alternating italic and roman.
-T}
-\fB\&.IX \fR\fIt\fR	no	-	Index macro, for SunSoft internal use.
-\fB\&.LP\fR	yes	-	T{
-Begin left-aligned paragraph. Set prevailing indent to .5i.
-T}
-\fB\&.P\fR	yes	-	Same as \fB\&.LP\fR.
-\fB\&.PD \fR\fId\fR	no	\fId\fR=.4v	T{
-Set vertical distance between paragraphs.
-T}
-\fB\&.PP\fR	yes	-	Same as \fB\&.LP\fR.
-\fB\&.RE\fR	yes	-	T{
-End of relative indent. Restores prevailing indent.
-T}
-\fB\&.RB \fR\fIt\fR	no	\fIt\fR=n.t.l.	Join words, alternating roman and bold.
-\fB\&.RI \fR\fIt\fR	no	\fIt\fR=n.t.l.	T{
-Join words, alternating roman and italic.
-T}
-\fB\&.RS \fR\fIi\fR	yes	\fIi\fR=p.i.	T{
-Start relative indent, increase indent by \fIi\fR. Sets prevailing indent to .5i for nested indents.
-T}
-\fB\&.SB \fR\fIt\fR	no	-	T{
-Reduce size of text by 1 point, make text bold.
-T}
-\fB\&.SH \fR\fIt\fR	yes	-	Section Heading.
-\fB\&.SM \fR\fIt\fR	no	\fIt\fR=n.t.l.	Reduce size of text by 1 point.
-\fB\&.SS \fR\fIt\fR	yes	\fIt\fR=n.t.l.	Section Subheading.
-\fB\&.TH \FR\FIN S "f d, m\fR"
-\fB\&.TH \fR\fIn s d f m\fR	yes	-	T{
-Begin reference page \fIn\fR, of of section \fIs\fR; \fId\fR is the date of the most recent change.  If present, \fIf\fR is the left page footer; \fIm\fR is the main page (center) header.  Sets prevailing indent and tabs to .5i.
-T}
-\fB\&.TP \fR\fIi\fR	yes	\fIi\fR=p.i.	T{
-Begin indented paragraph, with the tag given on the next text line. Set prevailing indent to \fIi\fR.
-T}
-\fB\&.TX \fR\fIt \fR\fIp\fR	no	-	T{
-Resolve the title abbreviation \fIt\fR; join to punctuation mark (or text) \fIp\fR.
-T}
-.TE
-
-.SS "Conventions"
-.sp
-.LP
-When formatting a manual page, \fBman\fR examines the first line to determine
-whether it requires special processing. For example a first line consisting of:
-.sp
-.LP
-\fB\&'\e" t\fR
-.sp
-.LP
-indicates that the manual page must be run through the \fBtbl\fR(1)
-preprocessor.
-.sp
-.LP
-A typical manual page for a command or function is laid out as follows:
-.sp
-.ne 2
-.na
-\fB\&.TH\fI TITLE \FR[1-9]\FR " , "
-.ad
-.RS 23n
-The name of the command or function, which serves as the title of the manual
-page. This is followed by the number of the section in which it appears.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\&.SH NAME\fR
-.ad
-.RS 23n
-The name, or list of names, by which the command is called, followed by a dash
-and then a one-line summary of the action performed. All in roman font, this
-section contains no \fBtroff\fR(1) commands or escapes, and no macro requests.
-It is used to generate the \fBwindex\fR database, which is used by the
-\fBwhatis\fR(1) command.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\&.SH SYNOPSIS\fR
-.ad
-.RS 23n
-.sp
-.ne 2
-.na
-\fBCommands:\fR
-.ad
-.RS 13n
-The syntax of the command and its arguments, as typed on the command line.
-When in boldface, a word must be typed exactly as printed.  When in italics, a
-word can be replaced with an argument that you supply. References to bold or
-italicized items are not capitalized in other sections, even when they begin a
-sentence.
-.sp
-Syntactic symbols appear in roman face:
-.sp
-.ne 2
-.na
-\fB[ ]\fR
-.ad
-.RS 13n
-An argument, when surrounded by brackets is optional.
-.RE
-
-.sp
-.ne 2
-.na
-\fB|\fR
-.ad
-.RS 13n
-Arguments separated by a vertical bar are exclusive. You can supply only one
-item from such a list.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\&.\|.\|.\fR
-.ad
-.RS 13n
-Arguments followed by an ellipsis can be repeated. When an ellipsis follows a
-bracketed set, the expression within the brackets can be repeated.
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fBFunctions:\fR
-.ad
-.RS 14n
-If required, the data declaration, or \fB#include\fR directive, is shown first,
-followed by the  function declaration. Otherwise, the function declaration is
-shown.
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\&.SH DESCRIPTION\fR
-.ad
-.RS 23n
-A narrative overview of the command or function's external behavior. This
-includes how it interacts with files or data, and how it handles the standard
-input, standard output and standard error. Internals and implementation details
-are normally omitted. This section attempts to provide a succinct overview in
-answer to the question, "what does it do?"
-.sp
-Literal text from the synopsis appears in constant width, as do literal
-filenames and references to items that appear elsewhere in the  reference
-manuals. Arguments are italicized.
-.sp
-If a command interprets either subcommands or an input grammar, its command
-interface or input grammar is normally described in a \fBUSAGE\fR section,
-which follows the \fBOPTIONS\fR section.  The  \fBDESCRIPTION\fR section only
-describes the behavior of the command itself, not that of subcommands.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\&.SH OPTIONS\fR
-.ad
-.RS 23n
-The list of options along with a description of how each affects the command's
-operation.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\&.SH RETURN VALUES\fR
-.ad
-.RS 23n
-A list of the values the library routine will return to the calling  program
-and the conditions that cause these values to be returned.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\&.SH EXIT STATUS\fR
-.ad
-.RS 23n
-A list of the values the utility will return to the calling  program or shell,
-and the conditions that cause these values to be  returned.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\&.SH FILES\fR
-.ad
-.RS 23n
-A list of files associated with the command or function.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\&.SH SEE ALSO\fR
-.ad
-.RS 23n
-A comma-separated list of related manual pages, followed by references to other
-published materials.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\&.SH DIAGNOSTICS\fR
-.ad
-.RS 23n
-A list of diagnostic messages and an explanation of each.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\&.SH BUGS\fR
-.ad
-.RS 23n
-A description of limitations, known defects, and possible problems associated
-with the command or function.
-.RE
-
-.SH FILES
-.sp
-.ne 2
-.na
-\fB\fB/usr/share/lib/tmac/an\fR \fR
-.ad
-.RS 27n
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/share/man/windex\fR\fR
-.ad
-.RS 27n
-
-.RE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBman\fR(1), \fBnroff\fR(1), \fBtroff\fR(1), \fBwhatis\fR(1)
-.sp
-.LP
-Dale Dougherty and   Tim O'Reilly, \fIUnix\fR \fIText\fR \fIProcessing\fR
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.\"
+.\" Copyright (c) 2009, 2010, 2011 Kristaps Dzonsons <kristaps@bsd.lv>
+.\" Copyright (c) 2011 Ingo Schwarze <schwarze@openbsd.org>
+.\" Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+.\"
+.Dd Jan 3, 2012
+.Dt MAN 5
+.Os
+.Sh NAME
+.Nm man
+.Nd legacy formatting language for manual pages
+.Sh DESCRIPTION
+Traditionally, the
+.Nm man
+language has been used to write
+.Ux
+manuals for the
+.Xr man 1
+utility.
+It supports limited control of presentational details like fonts,
+indentation and spacing.
+This reference document describes the structure of manual pages
+and the syntax and usage of the man language.
+.Pp
+.Bf -emphasis
+Do not use
+.Nm
+to write your manuals:
+.Ef
+It lacks support for semantic markup.
+Use the
+.Xr mdoc 5
+language, instead.
+.Pp
+In a
+.Nm
+document, lines beginning with the control character
+.Sq \&.
+are called
+.Dq macro lines .
+The first word is the macro name.
+It usually consists of two capital letters.
+For a list of available macros, see
+.Sx MACRO OVERVIEW .
+The words following the macro name are arguments to the macro.
+.Pp
+Lines not beginning with the control character are called
+.Dq text lines .
+They provide free-form text to be printed; the formatting of the text
+depends on the respective processing context:
+.Bd -literal -offset indent
+\&.SH Macro lines change control state.
+Text lines are interpreted within the current state.
+.Ed
+.Pp
+Many aspects of the basic syntax of the
+.Nm
+language are based on the
+.Xr roff 5
+language; see the
+.Em LANGUAGE SYNTAX
+and
+.Em MACRO SYNTAX
+sections in the
+.Xr roff 5
+manual for details, in particular regarding
+comments, escape sequences, whitespace, and quoting.
+.Sh MANUAL STRUCTURE
+Each
+.Nm
+document must contain the
+.Sx \&TH
+macro describing the document's section and title.
+It may occur anywhere in the document, although conventionally it
+appears as the first macro.
+.Pp
+Beyond
+.Sx \&TH ,
+at least one macro or text line must appear in the document.
+.Pp
+The following is a well-formed skeleton
+.Nm
+file for a utility
+.Qq progname :
+.Bd -literal -offset indent
+\&.TH PROGNAME 1 "Oct 10, 2009"
+\&.SH NAME
+\efBprogname\efR \e(en a description goes here
+\&.\e\(dq .SH LIBRARY
+\&.\e\(dq For sections 2 & 3 only.
+\&.SH SYNOPSIS
+\efBprogname\efR [\efB\e-options\efR] arguments...
+\&.SH DESCRIPTION
+The \efBfoo\efR utility processes files...
+\&.\e\(dq .SH IMPLEMENTATION NOTES
+\&.\e\(dq .SH RETURN VALUES
+\&.\e\(dq For sections 2, 3, & 9 only.
+\&.\e\(dq .SH ENVIRONMENT
+\&.\e\(dq For sections 1, 1M, 5, & 6 only.
+\&.\e\(dq .SH FILES
+\&.\e\(dq .SH EXIT STATUS
+\&.\e\(dq For sections 1, 1M, & 6 only.
+\&.\e\(dq .SH EXAMPLES
+\&.\e\(dq .SH DIAGNOSTICS
+\&.\e\(dq For sections 1, 1M, 5, 6, & 7 only.
+\&.\e\(dq .SH ERRORS
+\&.\e\(dq For sections 2, 3, & 9 only.
+\&.\e\(dq .SH SEE ALSO
+\&.\e\(dq .BR foo ( 1 )
+\&.\e\(dq .SH STANDARDS
+\&.\e\(dq .SH HISTORY
+\&.\e\(dq .SH AUTHORS
+\&.\e\(dq .SH CAVEATS
+\&.\e\(dq .SH BUGS
+\&.\e\(dq .SH SECURITY CONSIDERATIONS
+.Ed
+.Pp
+The sections in a
+.Nm
+document are conventionally ordered as they appear above.
+Sections should be composed as follows:
+.Bl -ohang -offset indent
+.It Em NAME
+The name(s) and a short description of the documented material.
+The syntax for this is generally as follows:
+.Pp
+.D1 \efBname\efR \e(en description
+.It Em LIBRARY
+The name of the library containing the documented material, which is
+assumed to be a function in a section 2 or 3 manual.
+For functions in the C library, this may be as follows:
+.Pp
+.D1 Standard C Library (libc, -lc)
+.It Em SYNOPSIS
+Documents the utility invocation syntax, function call syntax, or device
+configuration.
+.Pp
+For the first, utilities (sections 1, 1M, and 6), this is
+generally structured as follows:
+.Pp
+.D1 \efBname\efR [-\efBab\efR] [-\efBc\efR\efIarg\efR] \efBpath\efR...
+.Pp
+For the second, function calls (sections 2, 3, 9):
+.Pp
+.D1 \&.B char *name(char *\efIarg\efR);
+.Pp
+And for the third, configurations (section 7):
+.Pp
+.D1 \&.B name* at cardbus ? function ?
+.Pp
+Manuals not in these sections generally don't need a
+.Em SYNOPSIS .
+.It Em DESCRIPTION
+This expands upon the brief, one-line description in
+.Em NAME .
+It usually contains a break-down of the options (if documenting a
+command).
+.It Em IMPLEMENTATION NOTES
+Implementation-specific notes should be kept here.
+This is useful when implementing standard functions that may have side
+effects or notable algorithmic implications.
+.It Em RETURN VALUES
+This section documents the return values of functions in sections 2, 3, and 9.
+.It Em ENVIRONMENT
+Documents any usages of environment variables, e.g.,
+.Xr environ 5 .
+.It Em FILES
+Documents files used.
+It's helpful to document both the file name and a short description of how
+the file is used (created, modified, etc.).
+.It Em EXIT STATUS
+This section documents the command exit status for
+section 1, 6, and 8 utilities.
+Historically, this information was described in
+.Em DIAGNOSTICS ,
+a practise that is now discouraged.
+.It Em EXAMPLES
+Example usages.
+This often contains snippets of well-formed,
+well-tested invocations.
+Make sure that examples work properly!
+.It Em DIAGNOSTICS
+Documents error conditions.
+This is most useful in section 4 manuals.
+Historically, this section was used in place of
+.Em EXIT STATUS
+for manuals in sections 1, 6, and 8; however, this practise is
+discouraged.
+.It Em ERRORS
+Documents error handling in sections 2, 3, and 9.
+.It Em SEE ALSO
+References other manuals with related topics.
+This section should exist for most manuals.
+.Pp
+.D1 \&.BR bar \&( 1 \&),
+.Pp
+Cross-references should conventionally be ordered
+first by section, then alphabetically.
+.It Em STANDARDS
+References any standards implemented or used, such as
+.Pp
+.D1 IEEE Std 1003.2 (\e(lqPOSIX.2\e(rq)
+.Pp
+If not adhering to any standards, the
+.Em HISTORY
+section should be used.
+.It Em HISTORY
+A brief history of the subject, including where support first appeared.
+.It Em AUTHORS
+Credits to the person or persons who wrote the code and/or documentation.
+Authors should generally be noted by both name and email address.
+.It Em CAVEATS
+Common misuses and misunderstandings should be explained
+in this section.
+.It Em BUGS
+Known bugs, limitations, and work-arounds should be described
+in this section.
+.It Em SECURITY CONSIDERATIONS
+Documents any security precautions that operators should consider.
+.El
+.Sh MACRO OVERVIEW
+This overview is sorted such that macros of similar purpose are listed
+together, to help find the best macro for any given purpose.
+Deprecated macros are not included in the overview, but can be found
+in the alphabetical reference below.
+.Ss Page header and footer meta-data
+.Bl -column "PP, LP, P" description
+.It Sx TH Ta set the title: Ar title section date Op Ar source Op Ar volume
+.It Sx AT Ta display AT&T UNIX version in the page footer (<= 1 argument)
+.It Sx UC Ta display BSD version in the page footer (<= 1 argument)
+.El
+.Ss Sections and paragraphs
+.Bl -column "PP, LP, P" description
+.It Sx SH Ta section header (one line)
+.It Sx SS Ta subsection header (one line)
+.It Sx PP , LP , P Ta start an undecorated paragraph (no arguments)
+.It Sx RS , RE Ta reset the left margin: Op Ar width
+.It Sx IP Ta indented paragraph: Op Ar head Op Ar width
+.It Sx TP Ta tagged paragraph: Op Ar width
+.It Sx HP Ta hanged paragraph: Op Ar width
+.It Sx \&br Ta force output line break in text mode (no arguments)
+.It Sx \&sp Ta force vertical space: Op Ar height
+.It Sx fi , nf Ta fill mode and no-fill mode (no arguments)
+.It Sx in Ta additional indent: Op Ar width
+.El
+.Ss Physical markup
+.Bl -column "PP, LP, P" description
+.It Sx B Ta boldface font
+.It Sx I Ta italic font
+.It Sx R Ta roman (default) font
+.It Sx SB Ta small boldface font
+.It Sx SM Ta small roman font
+.It Sx BI Ta alternate between boldface and italic fonts
+.It Sx BR Ta alternate between boldface and roman fonts
+.It Sx IB Ta alternate between italic and boldface fonts
+.It Sx IR Ta alternate between italic and roman fonts
+.It Sx RB Ta alternate between roman and boldface fonts
+.It Sx RI Ta alternate between roman and italic fonts
+.El
+.Ss Semantic markup
+.Bl -column "PP, LP, P" description
+.It Sx OP Ta optional arguments
+.El
+.Sh MACRO REFERENCE
+This section is a canonical reference to all macros, arranged
+alphabetically.
+For the scoping of individual macros, see
+.Sx MACRO SYNTAX .
+.Ss \&AT
+Sets the volume for the footer for compatibility with man pages from
+.Tn AT&T UNIX
+releases.
+The optional arguments specify which release it is from.
+.Ss \&B
+Text is rendered in bold face.
+.Pp
+See also
+.Sx \&I
+and
+.Sx \&R .
+.Ss \&BI
+Text is rendered alternately in bold face and italic.
+Thus,
+.Sq .BI this word and that
+causes
+.Sq this
+and
+.Sq and
+to render in bold face, while
+.Sq word
+and
+.Sq that
+render in italics.
+Whitespace between arguments is omitted in output.
+.Pp
+Examples:
+.Pp
+.Dl \&.BI bold italic bold italic
+.Pp
+The output of this example will be emboldened
+.Dq bold
+and italicised
+.Dq italic ,
+with spaces stripped between arguments.
+.Pp
+See also
+.Sx \&IB ,
+.Sx \&BR ,
+.Sx \&RB ,
+.Sx \&RI ,
+and
+.Sx \&IR .
+.Ss \&BR
+Text is rendered alternately in bold face and roman (the default font).
+Whitespace between arguments is omitted in output.
+.Pp
+See
+.Sx \&BI
+for an equivalent example.
+.Pp
+See also
+.Sx \&BI ,
+.Sx \&IB ,
+.Sx \&RB ,
+.Sx \&RI ,
+and
+.Sx \&IR .
+.Ss \&DT
+Has no effect.
+Included for compatibility.
+.Ss \&HP
+Begin a paragraph whose initial output line is left-justified, but
+subsequent output lines are indented, with the following syntax:
+.Bd -filled -offset indent
+.Pf \. Sx \&HP
+.Op Cm width
+.Ed
+.Pp
+The
+.Cm width
+argument must conform to
+.Sx Scaling Widths .
+If specified, it's saved for later paragraph left-margins; if unspecified, the
+saved or default width is used.
+.Pp
+See also
+.Sx \&IP ,
+.Sx \&LP ,
+.Sx \&P ,
+.Sx \&PP ,
+and
+.Sx \&TP .
+.Ss \&I
+Text is rendered in italics.
+.Pp
+See also
+.Sx \&B
+and
+.Sx \&R .
+.Ss \&IB
+Text is rendered alternately in italics and bold face.
+Whitespace between arguments is omitted in output.
+.Pp
+See
+.Sx \&BI
+for an equivalent example.
+.Pp
+See also
+.Sx \&BI ,
+.Sx \&BR ,
+.Sx \&RB ,
+.Sx \&RI ,
+and
+.Sx \&IR .
+.Ss \&IP
+Begin an indented paragraph with the following syntax:
+.Bd -filled -offset indent
+.Pf \. Sx \&IP
+.Op Cm head Op Cm width
+.Ed
+.Pp
+The
+.Cm width
+argument defines the width of the left margin and is defined by
+.Sx Scaling Widths .
+It's saved for later paragraph left-margins; if unspecified, the saved or
+default width is used.
+.Pp
+The
+.Cm head
+argument is used as a leading term, flushed to the left margin.
+This is useful for bulleted paragraphs and so on.
+.Pp
+See also
+.Sx \&HP ,
+.Sx \&LP ,
+.Sx \&P ,
+.Sx \&PP ,
+and
+.Sx \&TP .
+.Ss \&IR
+Text is rendered alternately in italics and roman (the default font).
+Whitespace between arguments is omitted in output.
+.Pp
+See
+.Sx \&BI
+for an equivalent example.
+.Pp
+See also
+.Sx \&BI ,
+.Sx \&IB ,
+.Sx \&BR ,
+.Sx \&RB ,
+and
+.Sx \&RI .
+.Ss \&LP
+Begin an undecorated paragraph.
+The scope of a paragraph is closed by a subsequent paragraph,
+sub-section, section, or end of file.
+The saved paragraph left-margin width is reset to the default.
+.Pp
+See also
+.Sx \&HP ,
+.Sx \&IP ,
+.Sx \&P ,
+.Sx \&PP ,
+and
+.Sx \&TP .
+.Ss \&OP
+Optional command-line argument.
+This has the following syntax:
+.Bd -filled -offset indent
+.Pf \. Sx \&OP
+.Cm key Op Cm value
+.Ed
+.Pp
+The
+.Cm key
+is usually a command-line flag and
+.Cm value
+its argument.
+.Ss \&P
+Synonym for
+.Sx \&LP .
+.Pp
+See also
+.Sx \&HP ,
+.Sx \&IP ,
+.Sx \&LP ,
+.Sx \&PP ,
+and
+.Sx \&TP .
+.Ss \&PP
+Synonym for
+.Sx \&LP .
+.Pp
+See also
+.Sx \&HP ,
+.Sx \&IP ,
+.Sx \&LP ,
+.Sx \&P ,
+and
+.Sx \&TP .
+.Ss \&R
+Text is rendered in roman (the default font).
+.Pp
+See also
+.Sx \&I
+and
+.Sx \&B .
+.Ss \&RB
+Text is rendered alternately in roman (the default font) and bold face.
+Whitespace between arguments is omitted in output.
+.Pp
+See
+.Sx \&BI
+for an equivalent example.
+.Pp
+See also
+.Sx \&BI ,
+.Sx \&IB ,
+.Sx \&BR ,
+.Sx \&RI ,
+and
+.Sx \&IR .
+.Ss \&RE
+Explicitly close out the scope of a prior
+.Sx \&RS .
+The default left margin is restored to the state of the original
+.Sx \&RS
+invocation.
+.Ss \&RI
+Text is rendered alternately in roman (the default font) and italics.
+Whitespace between arguments is omitted in output.
+.Pp
+See
+.Sx \&BI
+for an equivalent example.
+.Pp
+See also
+.Sx \&BI ,
+.Sx \&IB ,
+.Sx \&BR ,
+.Sx \&RB ,
+and
+.Sx \&IR .
+.Ss \&RS
+Temporarily reset the default left margin.
+This has the following syntax:
+.Bd -filled -offset indent
+.Pf \. Sx \&RS
+.Op Cm width
+.Ed
+.Pp
+The
+.Cm width
+argument must conform to
+.Sx Scaling Widths .
+If not specified, the saved or default width is used.
+.Pp
+See also
+.Sx \&RE .
+.Ss \&SB
+Text is rendered in small size (one point smaller than the default font)
+bold face.
+.Ss \&SH
+Begin a section.
+The scope of a section is only closed by another section or the end of
+file.
+The paragraph left-margin width is reset to the default.
+.Ss \&SM
+Text is rendered in small size (one point smaller than the default
+font).
+.Ss \&SS
+Begin a sub-section.
+The scope of a sub-section is closed by a subsequent sub-section,
+section, or end of file.
+The paragraph left-margin width is reset to the default.
+.Ss \&TH
+Sets the title of the manual page with the following syntax:
+.Bd -filled -offset indent
+.Pf \. Sx \&TH
+.Ar title section date
+.Op Ar source Op Ar volume
+.Ed
+.Pp
+Conventionally, the document
+.Ar title
+is given in all caps.
+The recommended
+.Ar date
+format is
+.Sy YYYY-MM-DD
+as specified in the ISO-8601 standard;
+if the argument does not conform, it is printed verbatim.
+If the
+.Ar date
+is empty or not specified, the current date is used.
+The optional
+.Ar source
+string specifies the organisation providing the utility.
+The
+.Ar volume
+string replaces the default rendered volume, which is dictated by the
+manual section.
+.Pp
+Examples:
+.Pp
+.Dl \&.TH CVS 5 "1992-02-12" GNU
+.Ss \&TP
+Begin a paragraph where the head, if exceeding the indentation width, is
+followed by a newline; if not, the body follows on the same line after a
+buffer to the indentation width.
+Subsequent output lines are indented.
+The syntax is as follows:
+.Bd -filled -offset indent
+.Pf \. Sx \&TP
+.Op Cm width
+.Ed
+.Pp
+The
+.Cm width
+argument must conform to
+.Sx Scaling Widths .
+If specified, it's saved for later paragraph left-margins; if
+unspecified, the saved or default width is used.
+.Pp
+See also
+.Sx \&HP ,
+.Sx \&IP ,
+.Sx \&LP ,
+.Sx \&P ,
+and
+.Sx \&PP .
+.Ss \&UC
+Sets the volume for the footer for compatibility with man pages from
+BSD releases.
+The optional first argument specifies which release it is from.
+.Ss \&br
+Breaks the current line.
+Consecutive invocations have no further effect.
+.Pp
+See also
+.Sx \&sp .
+.Ss \&fi
+End literal mode begun by
+.Sx \&nf .
+.Ss \&ft
+Change the current font mode.
+See
+.Sx Text Decoration
+for a listing of available font modes.
+.Ss \&in
+Indent relative to the current indentation:
+.Pp
+.D1 Pf \. Sx \&in Op Cm width
+.Pp
+If
+.Cm width
+is signed, the new offset is relative.
+Otherwise, it is absolute.
+This value is reset upon the next paragraph, section, or sub-section.
+.Ss \&na
+Don't align to the right margin.
+.Ss \&nf
+Begin literal mode: all subsequent free-form lines have their end of
+line boundaries preserved.
+May be ended by
+.Sx \&fi .
+Literal mode is implicitly ended by
+.Sx \&SH
+or
+.Sx \&SS .
+.Ss \&sp
+Insert vertical spaces into output with the following syntax:
+.Bd -filled -offset indent
+.Pf \. Sx \&sp
+.Op Cm height
+.Ed
+.Pp
+Insert
+.Cm height
+spaces, which must conform to
+.Sx Scaling Widths .
+If 0, this is equivalent to the
+.Sx \&br
+macro.
+Defaults to 1, if unspecified.
+.Pp
+See also
+.Sx \&br .
+.Sh MACRO SYNTAX
+The
+.Nm
+macros are classified by scope: line scope or block scope.
+Line macros are only scoped to the current line (and, in some
+situations, the subsequent line).
+Block macros are scoped to the current line and subsequent lines until
+closed by another block macro.
+.Ss Line Macros
+Line macros are generally scoped to the current line, with the body
+consisting of zero or more arguments.
+If a macro is scoped to the next line and the line arguments are empty,
+the next line, which must be text, is used instead.
+Thus:
+.Bd -literal -offset indent
+\&.I
+foo
+.Ed
+.Pp
+is equivalent to
+.Sq \&.I foo .
+If next-line macros are invoked consecutively, only the last is used.
+If a next-line macro is followed by a non-next-line macro, an error is
+raised, except for
+.Sx \&br ,
+.Sx \&sp ,
+and
+.Sx \&na .
+.Pp
+The syntax is as follows:
+.Bd -literal -offset indent
+\&.YO \(lBbody...\(rB
+\(lBbody...\(rB
+.Ed
+.Bl -column "MacroX" "ArgumentsX" "ScopeXXXXX" "CompatX" -offset indent
+.It Em Macro Ta Em Arguments Ta Em Scope     Ta Em Notes
+.It Sx \&AT  Ta    <=1       Ta    current   Ta    \&
+.It Sx \&B   Ta    n         Ta    next-line Ta    \&
+.It Sx \&BI  Ta    n         Ta    current   Ta    \&
+.It Sx \&BR  Ta    n         Ta    current   Ta    \&
+.It Sx \&DT  Ta    0         Ta    current   Ta    \&
+.It Sx \&I   Ta    n         Ta    next-line Ta    \&
+.It Sx \&IB  Ta    n         Ta    current   Ta    \&
+.It Sx \&IR  Ta    n         Ta    current   Ta    \&
+.It Sx \&OP  Ta    0, 1      Ta    current   Ta    compat
+.It Sx \&R   Ta    n         Ta    next-line Ta    \&
+.It Sx \&RB  Ta    n         Ta    current   Ta    \&
+.It Sx \&RI  Ta    n         Ta    current   Ta    \&
+.It Sx \&SB  Ta    n         Ta    next-line Ta    \&
+.It Sx \&SM  Ta    n         Ta    next-line Ta    \&
+.It Sx \&TH  Ta    >1, <6    Ta    current   Ta    \&
+.It Sx \&UC  Ta    <=1       Ta    current   Ta    \&
+.It Sx \&br  Ta    0         Ta    current   Ta    compat
+.It Sx \&fi  Ta    0         Ta    current   Ta    compat
+.It Sx \&ft  Ta    1         Ta    current   Ta    compat
+.It Sx \&in  Ta    1         Ta    current   Ta    compat
+.It Sx \&na  Ta    0         Ta    current   Ta    compat
+.It Sx \&nf  Ta    0         Ta    current   Ta    compat
+.It Sx \&sp  Ta    1         Ta    current   Ta    compat
+.El
+.Pp
+Macros marked as
+.Qq compat
+are included for compatibility with the significant corpus of existing
+manuals that mix dialects of roff.
+These macros should not be used for portable
+.Nm
+manuals.
+.Ss Block Macros
+Block macros comprise a head and body.
+As with in-line macros, the head is scoped to the current line and, in
+one circumstance, the next line (the next-line stipulations as in
+.Sx Line Macros
+apply here as well).
+.Pp
+The syntax is as follows:
+.Bd -literal -offset indent
+\&.YO \(lBhead...\(rB
+\(lBhead...\(rB
+\(lBbody...\(rB
+.Ed
+.Pp
+The closure of body scope may be to the section, where a macro is closed
+by
+.Sx \&SH ;
+sub-section, closed by a section or
+.Sx \&SS ;
+part, closed by a section, sub-section, or
+.Sx \&RE ;
+or paragraph, closed by a section, sub-section, part,
+.Sx \&HP ,
+.Sx \&IP ,
+.Sx \&LP ,
+.Sx \&P ,
+.Sx \&PP ,
+or
+.Sx \&TP .
+No closure refers to an explicit block closing macro.
+.Pp
+As a rule, block macros may not be nested; thus, calling a block macro
+while another block macro scope is open, and the open scope is not
+implicitly closed, is syntactically incorrect.
+.Bl -column "MacroX" "ArgumentsX" "Head ScopeX" "sub-sectionX" "compatX" -offset indent
+.It Em Macro Ta Em Arguments Ta Em Head Scope Ta Em Body Scope  Ta Em Notes
+.It Sx \&HP  Ta    <2        Ta    current    Ta    paragraph   Ta    \&
+.It Sx \&IP  Ta    <3        Ta    current    Ta    paragraph   Ta    \&
+.It Sx \&LP  Ta    0         Ta    current    Ta    paragraph   Ta    \&
+.It Sx \&P   Ta    0         Ta    current    Ta    paragraph   Ta    \&
+.It Sx \&PP  Ta    0         Ta    current    Ta    paragraph   Ta    \&
+.It Sx \&RE  Ta    0         Ta    current    Ta    none        Ta    compat
+.It Sx \&RS  Ta    1         Ta    current    Ta    part        Ta    compat
+.It Sx \&SH  Ta    >0        Ta    next-line  Ta    section     Ta    \&
+.It Sx \&SS  Ta    >0        Ta    next-line  Ta    sub-section Ta    \&
+.It Sx \&TP  Ta    n         Ta    next-line  Ta    paragraph   Ta    \&
+.El
+.Pp
+Macros marked
+.Qq compat
+are as mentioned in
+.Sx Line Macros .
+.Pp
+If a block macro is next-line scoped, it may only be followed by in-line
+macros for decorating text.
+.Ss Font handling
+In
+.Nm
+documents, both
+.Sx Physical markup
+macros and
+.Xr roff 5
+.Ql \ef
+font escape sequences can be used to choose fonts.
+In text lines, the effect of manual font selection by escape sequences
+only lasts until the next macro invocation; in macro lines, it only lasts
+until the end of the macro scope.
+Note that macros like
+.Sx \&BR
+open and close a font scope for each argument.
+.Sh COMPATIBILITY
+This section documents areas of questionable portability between
+implementations of the
+.Nm
+language.
+.Pp
+.Bl -dash -compact
+.It
+Do not depend on
+.Sx \&SH
+or
+.Sx \&SS
+to close out a literal context opened with
+.Sx \&nf .
+This behaviour may not be portable.
+.It
+In quoted literals, GNU troff allowed pair-wise double-quotes to produce
+a standalone double-quote in formatted output.
+It is not known whether this behaviour is exhibited by other formatters.
+.It
+troff suppresses a newline before
+.Sq \(aq
+macro output; in mandoc, it is an alias for the standard
+.Sq \&.
+control character.
+.It
+The
+.Sq \eh
+.Pq horizontal position ,
+.Sq \ev
+.Pq vertical position ,
+.Sq \em
+.Pq text colour ,
+.Sq \eM
+.Pq text filling colour ,
+.Sq \ez
+.Pq zero-length character ,
+.Sq \ew
+.Pq string length ,
+.Sq \ek
+.Pq horizontal position marker ,
+.Sq \eo
+.Pq text overstrike ,
+and
+.Sq \es
+.Pq text size
+escape sequences are all discarded in mandoc.
+.It
+The
+.Sq \ef
+scaling unit is accepted by mandoc, but rendered as the default unit.
+.It
+The
+.Sx \&sp
+macro does not accept negative values in mandoc.
+In GNU troff, this would result in strange behaviour.
+.It
+In page header lines, GNU troff versions up to and including 1.21
+only print
+.Ar volume
+names explicitly specified in the
+.Sx \&TH
+macro; mandoc and newer groff print the default volume name
+corresponding to the
+.Ar section
+number when no
+.Ar volume
+is given, like in
+.Xr mdoc 5 .
+.El
+.Pp
+The
+.Sx OP
+macro is part of the extended
+.Nm
+macro set, and may not be portable to non-GNU troff implementations.
+.Sh SEE ALSO
+.Xr man 1 ,
+.Xr mandoc 1 ,
+.Xr eqn 5 ,
+.Xr mandoc_char 5 ,
+.Xr mdoc 5 ,
+.Xr roff 5 ,
+.Xr tbl 5
+.Sh HISTORY
+The
+.Nm
+language first appeared as a macro package for the roff typesetting
+system in
+.At v7 .
+It was later rewritten by James Clark as a macro package for groff.
+Eric S. Raymond wrote the extended
+.Nm
+macros for groff in 2007.
+The stand-alone implementation that is part of the
+.Xr mandoc 1
+utility written by Kristaps Dzonsons appeared in
+.Ox 4.6 .
+.Sh AUTHORS
+This
+.Nm
+reference was written by
+.An Kristaps Dzonsons ,
+.Mt kristaps@bsd.lv .
+.Sh CAVEATS
+Do not use this language.
+Use
+.Xr mdoc 5 ,
+instead.
