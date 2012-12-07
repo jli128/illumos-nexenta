@@ -235,13 +235,13 @@ typedef struct aoe_atahdr {
 #define	ATA_ATA_IDENTIFY	0xec	/* get ATA params */
 #define	ATA_CHECK_POWER_MODE	0xe5	/* Check power mode */
 
-struct aoe_cfghdr {
+typedef struct aoe_cfghdr {
 	uint16_t	ac_bufcnt;	/* Buffer Count */
 	uint16_t	ac_fwver;	/* Firmware Version */
 	uint8_t		ac_scnt;	/* Sector Count */
 	uint8_t		ac_aoeccmd;	/* AoE Ver + CCmd */
 	uint8_t		ac_cslen[2];	/* Config String Length */
-};
+} aoe_cfghdr_t;
 
 #define	AOEHDRSZ	(sizeof (aoe_hdr_t) + sizeof (aoe_atahdr_t))
 #define	FREETAG		-1	/* tag magic; denotes free frame */
@@ -254,11 +254,11 @@ struct aoe_cfghdr {
 #define	AOE_CFGCMD_SET		3
 #define	AOE_CFGCMD_FORCE_SET	4
 
-struct aoe_rsvhdr {
+typedef struct aoe_rsvhdr {
 	uint8_t		al_rcmd;
 	uint8_t		al_nmacs;
 	ether_addr_t	al_addr[];
-};
+} aoe_rsvhdr_t;
 
 #define	AOE_RCMD_READ_LIST		0
 #define	AOE_RCMD_SET_LIST		1
@@ -269,14 +269,14 @@ struct aoe_rsvhdr {
  *               mblk HBA driver could use eport_alloc_netb() or manually
  *               via f->frm_netb field
  */
-struct aoe_port;
+struct aoe_eport;
 typedef struct aoe_frame {
-	void		*af_netb;	/* Pointer to the mblk_t */
-	struct aoe_port	*af_eport;	/* Port object */
-	void		*af_mac;	/* Library's private MAC object */
-	uint8_t		*af_data;	/* Typically netb->b_rptr */
-	ether_addr_t	af_addr;	/* Destination address */
-	uint16_t	af_rsvd0;
+	void		 *af_netb;	/* Pointer to the mblk_t */
+	struct aoe_eport *af_eport;	/* Port object */
+	void		 *af_mac;	/* Library's private MAC object */
+	uint8_t		 *af_data;	/* Typically netb->b_rptr */
+	ether_addr_t	 af_addr;	/* Destination address */
+	uint16_t	 af_rsvd0;
 } aoe_frame_t;
 
 #define	FRM2MBLK(x_frm)		((mblk_t *)(x_frm)->af_netb)
@@ -284,7 +284,7 @@ typedef struct aoe_frame {
 #define	PRIV2FRM(x_frm)		((void *)(((aoe_frame_t *)(x_frm))-1))
 
 /*
- * aoe_port_t - main interface for HBA driver
+ * aoe_eport_t - main interface for HBA driver
  *
  * eport_maxxfer: calculated based on MTU sizes as a minimal size in group
  * eport_mac: array of MAC objects of all MAC interfaces in the group
@@ -303,7 +303,7 @@ typedef struct aoe_frame {
  * eport_get_mac_link_state(): Used to get MAC object link state
  * eport_allow_port_detach():Returns nonzero if detaching port is not allowed
  */
-typedef struct aoe_port {
+typedef struct aoe_eport {
 	void		*eport_aoe_private;	/* Library internal */
 	void		*eport_client_private;	/* HBA internal */
 	uint32_t	eport_maxxfer;		/* Calculate max xfer size */
@@ -312,21 +312,21 @@ typedef struct aoe_port {
 	uint32_t	cache_unit_size;
 
 	void		(*eport_tx_frame)(aoe_frame_t *frame);
-	aoe_frame_t	*(*eport_alloc_frame)(struct aoe_port *eport,
+	aoe_frame_t	*(*eport_alloc_frame)(struct aoe_eport *eport,
 				int unit_id, void *mac, int kmflag);
 	void		(*eport_release_frame)(aoe_frame_t *frame);
 	void		*(*eport_alloc_netb)(aoe_frame_t *frame,
 				uint32_t buf_size, caddr_t buf, int kmflag);
 	void		(*eport_free_netb)(void *netb);
-	void		(*eport_deregister_client)(struct aoe_port *eport);
-	int		(*eport_ctl)(struct aoe_port *eport, void *mac,
+	void		(*eport_deregister_client)(struct aoe_eport *eport);
+	int		(*eport_ctl)(struct aoe_eport *eport, void *mac,
 				int cmd, void *arg);
-	int		(*eport_report_unit)(struct aoe_port *eport, void *mac,
+	int		(*eport_report_unit)(struct aoe_eport *eport, void *mac,
 				unsigned long unit, char *);
 	uint8_t		*(*eport_get_mac_addr)(void *mac);
 	int		(*eport_get_mac_link_state)(void *mac);
-	uint32_t	(*eport_allow_port_detach)(struct aoe_port *eport);
-} aoe_port_t;
+	uint32_t	(*eport_allow_port_detach)(struct aoe_eport *eport);
+} aoe_eport_t;
 
 /*
  * aoe_client_t - passed to Library via aoe_register_client()
@@ -352,7 +352,7 @@ typedef struct aoe_client {
 	uint32_t	 ect_channelid;
 	void		*ect_client_port_struct;
 	void		 (*ect_rx_frame)(aoe_frame_t *frame);
-	void		 (*ect_port_event)(aoe_port_t *eport, uint32_t event);
+	void		 (*ect_port_event)(aoe_eport_t *eport, uint32_t event);
 } aoe_client_t;
 
 #define	EPORT_FLAG_TGT_MODE		0x01
@@ -372,11 +372,11 @@ typedef struct aoe_client {
 
 /*
  * AOE Target/Initiator will only call this aoe function explicitly, all others
- * should be called through vectors in struct aoe_port.
+ * should be called through vectors in struct aoe_eport.
  * AOE client call this to register one port to AOE, AOE need initialize
  * and return the corresponding aoe_port.
  */
-extern aoe_port_t *aoe_register_client(aoe_client_t *client);
+extern aoe_eport_t *aoe_register_client(aoe_client_t *client);
 
 #endif	/* _KERNEL */
 

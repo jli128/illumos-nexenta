@@ -118,7 +118,7 @@ typedef struct aoeblk_stats {
 
 typedef struct aoeblk_softc {
 	dev_info_t		*dev;
-	aoe_port_t		*eport;
+	aoe_eport_t		*eport;
 	aoe_frame_t		*bcast_f[AOE_MAX_MACOBJ];
 	aoeblk_stats_t		*ks_data;
 	kstat_t			*sc_intrstat;
@@ -158,7 +158,7 @@ typedef struct aoedisk {
 	bd_handle_t		bd_h;
 	dev_info_t		*dev;
 	void			*master_mac;
-	aoe_port_t		*eport;
+	aoe_eport_t		*eport;
 	volatile timeout_id_t	rexmit_timeout_id;
 	kmutex_t		ad_mutex;
 	uint32_t		ad_flags;
@@ -211,7 +211,7 @@ static bd_ops_t aoeblk_ops = {
 static void
 aoeblk_driveinfo(void *arg, bd_drive_t *drive)
 {
-	aoedisk_t *d = (void *)arg;
+	aoedisk_t *d = (aoedisk_t *)arg;
 
 	drive->d_removable = B_FALSE;
 	drive->d_hotpluggable = B_TRUE;
@@ -240,7 +240,7 @@ aoeblk_driveinfo(void *arg, bd_drive_t *drive)
 static int
 aoeblk_mediainfo(void *arg, bd_media_t *media)
 {
-	aoedisk_t *d = (void *)arg;
+	aoedisk_t *d = (aoedisk_t *)arg;
 
 	media->m_nblks = d->ad_nsectors;
 	media->m_blksize = DEV_BSIZE;
@@ -283,7 +283,7 @@ aoeblk_get_modser(char *buf, int len)
 static int
 aoeblk_devid_init(void *arg, dev_info_t *dip, ddi_devid_t *devid)
 {
-	aoedisk_t *d = (void *)arg;
+	aoedisk_t *d = (aoedisk_t *)arg;
 	char *hwid;
 	int verlen, modlen, serlen, ret;
 	unsigned short *tmp_ptr;
@@ -299,7 +299,7 @@ aoeblk_devid_init(void *arg, dev_info_t *dip, ddi_devid_t *devid)
 	 * WORD 23 LEN  8: VERSION
 	 * WORD 10 LEN 20: SERIAL
 	 */
-	tmp_ptr = (void *)d->ad_ident;
+	tmp_ptr = (unsigned short *)d->ad_ident;
 
 	/*
 	 * Device ID is a concatenation of model number, '=', serial number.
@@ -374,7 +374,7 @@ allocframe(aoedisk_t *d, void *mac, aoe_frame_t **af_out, int kmflag)
 {
 	aoe_frame_t *af;
 	aoeblk_frame_t *f;
-	aoe_port_t *eport = d->eport;
+	aoe_eport_t *eport = d->eport;
 
 	af = eport->eport_alloc_frame(eport, d->ad_unit_id, mac, kmflag);
 	if (af == NULL) {
@@ -486,9 +486,9 @@ rexmit(aoedisk_t *d, aoeblk_frame_t *f)
 	uint32_t oldtag;
 	void *oldnetb;
 	mblk_t *mp;
-	aoe_port_t *eport = d->eport;
+	aoe_eport_t *eport = d->eport;
 
-	h = (void *)f->frm_hdr;
+	h = (aoe_hdr_t *)f->frm_hdr;
 	ah = (aoe_atahdr_t *)(h+1);
 
 	if (f->frm_tag == (uint32_t)INPROCTAG ||
@@ -543,7 +543,7 @@ aoeblk_downdisk(aoedisk_t *d, void *mac, int media_change)
 	atomic_or_32(&d->ad_flags, DEVFL_TKILL);
 
 	if (media_change && d->ad_flags & DEVFL_UP) {
-		struct aoe_port	*eport = d->sc->eport;
+		aoe_eport_t *eport = d->sc->eport;
 
 		atomic_and_32(&d->ad_flags, ~DEVFL_UP);
 		atomic_or_32(&d->ad_flags, DEVFL_CLOSEWAIT);
@@ -699,13 +699,13 @@ aoeblk_atawc(aoedisk_t *d, void *mac)
 	aoe_atahdr_t *ah;
 	aoe_frame_t *af;
 	aoeblk_frame_t *f;
-	aoe_port_t *eport = d->eport;
+	aoe_eport_t *eport = d->eport;
 
 	f = allocframe(d, mac, &af, KM_NOSLEEP);
 	if (f == NULL) {
 		return;
 	}
-	h = (void *)f->frm_hdr;
+	h = (aoe_hdr_t *)f->frm_hdr;
 	ah = (aoe_atahdr_t *)(h+1);
 
 	/* Initialize the headers & frame. */
@@ -800,7 +800,7 @@ static void
 aoeblk_ata_rsp(aoeblk_softc_t *sc, aoe_frame_t *fin)
 {
 	aoedisk_t *d;
-	aoe_hdr_t *hin = (void *)fin->af_data, *hout;
+	aoe_hdr_t *hin = (aoe_hdr_t *)fin->af_data, *hout;
 	aoe_atahdr_t *ahin, *ahout;
 	unsigned long unit;
 	register int tag;
@@ -836,7 +836,7 @@ aoeblk_ata_rsp(aoeblk_softc_t *sc, aoe_frame_t *fin)
 		return;
 	}
 
-	hout = (void *)fout->frm_hdr;
+	hout = (aoe_hdr_t *)fout->frm_hdr;
 	ahout = (aoe_atahdr_t *)(hout+1);
 
 	xfer = fout->frm_req;
@@ -948,13 +948,13 @@ aoeblk_ataid(aoedisk_t *d, void *mac)
 	aoe_atahdr_t *ah;
 	aoeblk_frame_t *f;
 	aoe_frame_t *af;
-	aoe_port_t *eport = d->eport;
+	aoe_eport_t *eport = d->eport;
 
 	f = allocframe(d, mac, &af, KM_NOSLEEP);
 	if (f == NULL) {
 		return;
 	}
-	h = (void *)f->frm_hdr;
+	h = (aoe_hdr_t *)f->frm_hdr;
 	ah = (aoe_atahdr_t *)(h+1);
 
 	/* Initialize the headers & frame. */
@@ -976,8 +976,8 @@ aoeblk_ataid(aoedisk_t *d, void *mac)
 static void
 aoeblk_cfg_rsp(aoeblk_softc_t *sc, aoe_frame_t *fin)
 {
-	aoe_hdr_t *h = (void *)fin->af_data;
-	struct aoe_cfghdr *ch = (void *) (h+1);
+	aoe_hdr_t *h = (aoe_hdr_t *)fin->af_data;
+	aoe_cfghdr_t *ch = (aoe_cfghdr_t *)(h+1);
 	unsigned long unit;
 	aoedisk_t *d;
 
@@ -1083,7 +1083,7 @@ send_ataid:
 }
 
 static aoe_frame_t *
-aoeblk_cfg(aoe_port_t *eport, int mac_id, unsigned short aoemajor,
+aoeblk_cfg(aoe_eport_t *eport, int mac_id, unsigned short aoemajor,
     unsigned short aoeminor)
 {
 	aoeblk_softc_t *sc = eport->eport_client_private;
@@ -1099,11 +1099,11 @@ aoeblk_cfg(aoe_port_t *eport, int mac_id, unsigned short aoemajor,
 	f = FRM2PRIV(af);
 	af->af_netb = NULL;
 	if (!eport->eport_alloc_netb(af, sizeof (*h) +
-	    sizeof (struct aoe_cfghdr), f->frm_hdr, KM_SLEEP)) {
+	    sizeof (aoe_cfghdr_t), f->frm_hdr, KM_SLEEP)) {
 		eport->eport_release_frame(af);
 		return (NULL);
 	}
-	h = (void *)f->frm_hdr;
+	h = (aoe_hdr_t *)f->frm_hdr;
 
 	(void *) memset((void *)h->aoeh_dst, 0xff, sizeof (h->aoeh_dst));
 	h->aoeh_type = htons(ETHERTYPE_AOE);
@@ -1146,7 +1146,7 @@ aoeblk_ata_rw(aoedisk_t *d, bd_xfer_t *xfer, int op)
 	int frags, kmflag;
 	unsigned int msgs, i;
 	xfer_private_t *x_priv = xfer_priv(xfer);
-	aoe_port_t *eport = d->eport;
+	aoe_eport_t *eport = d->eport;
 
 	frags = eport->eport_maxxfer >> 9;
 
@@ -1185,7 +1185,7 @@ aoeblk_ata_rw(aoedisk_t *d, bd_xfer_t *xfer, int op)
 			d->sc->ks_data->sts_rw_outofmemory.value.ui64++;
 			return (ENOMEM);
 		}
-		h = (void *)f->frm_hdr;
+		h = (aoe_hdr_t *)f->frm_hdr;
 		ah = (aoe_atahdr_t *)(h+1);
 
 		f->frm_tag = (uint32_t)aoehdr_atainit(d, h);
@@ -1250,7 +1250,7 @@ static void
 aoeblk_rsv_rsp(aoeblk_softc_t *sc, aoe_frame_t *fin)
 {
 	aoedisk_t *d;
-	aoe_hdr_t *hin = (void *)fin->af_data;
+	aoe_hdr_t *hin = (aoe_hdr_t *)fin->af_data;
 	unsigned long unit;
 	register int tag;
 	aoeblk_frame_t *fout;
@@ -1301,10 +1301,10 @@ aoeblk_reserve(void *arg, bd_xfer_t *xfer)
 {
 	aoedisk_t *d = (aoedisk_t *)arg;
 	aoe_hdr_t *h;
-	struct aoe_rsvhdr *rh;
+	aoe_rsvhdr_t *rh;
 	aoe_frame_t *af;
 	aoeblk_frame_t *f;
-	aoe_port_t *eport = d->eport;
+	aoe_eport_t *eport = d->eport;
 	aoeblk_softc_t *sc;
 	uint8_t *addr;
 	int hlen, rhlen, i;
@@ -1339,7 +1339,7 @@ aoeblk_reserve(void *arg, bd_xfer_t *xfer)
 	}
 	free_mem -= hlen + rhlen;
 
-	h = (void *)f->frm_hdr;
+	h = (aoe_hdr_t *)f->frm_hdr;
 	f->frm_tag = newtag(d);
 	f->frm_req = xfer;
 	f->frm_kaddr = xfer->x_kaddr;
@@ -1353,7 +1353,7 @@ aoeblk_reserve(void *arg, bd_xfer_t *xfer)
 	h->aoeh_cmd = (unsigned char)AOECMD_RSV;
 	h->aoeh_tag = htonl(f->frm_tag);
 
-	rh = (struct aoe_rsvhdr *)(h+1);
+	rh = (aoe_rsvhdr_t *)(h+1);
 	if (xfer->x_flags & BD_XFER_MHD_TKOWN ||
 	    xfer->x_flags & BD_XFER_MHD_QRESERVE) {
 		rh->al_rcmd = AOE_RCMD_SET_LIST;
@@ -1413,7 +1413,7 @@ aoeblk_ksupdate(kstat_t *ksp, int rw)
 static void
 aoeblk_rx_frame(aoe_frame_t *fin)
 {
-	aoe_hdr_t *h = (void *)fin->af_data;
+	aoe_hdr_t *h = (aoe_hdr_t *)fin->af_data;
 	aoeblk_softc_t *sc = fin->af_eport->eport_client_private;
 	uint32_t n;
 
@@ -1464,7 +1464,7 @@ release_exit:
 }
 
 static void
-aoeblk_port_event(aoe_port_t *eport, uint32_t event)
+aoeblk_port_event(aoe_eport_t *eport, uint32_t event)
 {
 	aoeblk_softc_t *sc = eport->eport_client_private;
 	aoedisk_t *d;

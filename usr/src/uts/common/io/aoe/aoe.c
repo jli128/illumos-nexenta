@@ -65,14 +65,14 @@ typedef struct aoe_soft_state {
 /*
  * One for each ethernet interface
  */
-struct port;
+struct aoe_port;
 typedef struct aoe_mac
 {
 	list_node_t		am_ss_node;
 	datalink_id_t		am_linkid;
 	char			am_ifname[MAXNAMELEN];
 
-	struct port		*am_port;
+	struct aoe_port		*am_port;
 	aoe_soft_state_t	*am_ss;
 
 	mac_handle_t		am_handle;
@@ -118,10 +118,10 @@ typedef struct aoe_unit
 	uint32_t		au_rrp_next;
 } aoe_unit_t;
 
-typedef struct port
+typedef struct aoe_port
 {
 	list_node_t		p_ss_node;
-	aoe_port_t		p_eport;
+	aoe_eport_t		p_eport;
 	aoe_soft_state_t	*p_ss;
 	dev_info_t		*p_client_dev;
 	aoe_client_t		p_client;
@@ -136,9 +136,9 @@ typedef struct port
 	uint32_t		p_unit_cnt;
 	aoe_unit_t		p_unit[AOE_MAX_UNIT];
 	aoe_mac_t		*p_mac[AOE_MAX_MACOBJ];
-} port_t;
+} aoe_port_t;
 
-#define	EPORT2PORT(x_eport)	((port_t *)(x_eport)->eport_aoe_private)
+#define	EPORT2PORT(x_eport)	((aoe_port_t *)(x_eport)->eport_aoe_private)
 #define	FRM2MAC(x_frm)		((aoe_mac_t *)(x_frm)->af_mac)
 
 #define	AOE_PORT_FLAG_BOUND	0x01
@@ -153,10 +153,10 @@ typedef struct port
 static int	aoe_open_mac(aoe_mac_t *, int);
 static int	aoe_close_mac(aoe_mac_t *);
 static void	aoe_destroy_mac(aoe_mac_t *);
-static void	aoe_destroy_port(port_t *port);
-static aoe_mac_t *aoe_lookup_mac_by_id(datalink_id_t);
-static port_t	*aoe_lookup_port_by_id(uint32_t);
-static aoe_mac_t *aoe_create_mac_by_id(uint32_t, datalink_id_t, int *);
+static void	aoe_destroy_port(aoe_port_t *port);
+static aoe_mac_t  *aoe_lookup_mac_by_id(datalink_id_t);
+static aoe_port_t *aoe_lookup_port_by_id(uint32_t);
+static aoe_mac_t  *aoe_create_mac_by_id(uint32_t, datalink_id_t, int *);
 static int	aoe_mac_set_address(aoe_mac_t *, uint8_t *, boolean_t);
 static void	aoe_port_notify_link_up(void *);
 static void	aoe_port_notify_link_down(void *);
@@ -186,30 +186,30 @@ static int	aoe_copyin_iocdata(intptr_t, int, aoeio_t **, void **, void **,
     void **);
 static int	aoe_copyout_iocdata(intptr_t, int, aoeio_t *, void *);
 static int	aoe_iocmd(aoe_soft_state_t *, intptr_t, int);
-static int	aoe_create_port(dev_info_t *, port_t *, aoe_cli_type_t,
+static int	aoe_create_port(dev_info_t *, aoe_port_t *, aoe_cli_type_t,
     aoe_cli_policy_t, char *);
 static int	aoe_delete_port(dev_info_t *, aoeio_t *, uint32_t);
 static int	aoe_get_port_list(aoe_port_instance_t *, int);
 static int	aoe_i_port_autoconf(uint32_t);
-static void	aoe_unit_update(port_t *, aoe_mac_t *, int, int);
+static void	aoe_unit_update(aoe_port_t *, aoe_mac_t *, int, int);
 
 /*
  * Client functions
  */
-static void	aoe_deregister_client(aoe_port_t *);
+static void	aoe_deregister_client(aoe_eport_t *);
 static void	aoe_rx(void *, mac_resource_handle_t, mblk_t *, boolean_t);
 static int	aoe_enable_callback(aoe_mac_t *);
 static int	aoe_disable_callback(aoe_mac_t *);
-static int	aoe_ctl(aoe_port_t *, void *, int, void *);
-static int	aoe_report_unit(aoe_port_t *, void *, unsigned long, char *);
+static int	aoe_ctl(aoe_eport_t *, void *, int, void *);
+static int	aoe_report_unit(aoe_eport_t *, void *, unsigned long, char *);
 static void	aoe_tx_frame(aoe_frame_t *);
 static void	aoe_release_frame(aoe_frame_t *);
 static void	*aoe_alloc_netb(aoe_frame_t *, uint32_t, caddr_t, int);
 static void	aoe_free_netb(void *);
-static aoe_frame_t *aoe_allocate_frame(aoe_port_t *, int, void *, int);
+static aoe_frame_t *aoe_allocate_frame(aoe_eport_t *, int, void *, int);
 static uint8_t	*aoe_get_mac_addr(void *);
 static int	aoe_get_mac_link_state(void *);
-static uint32_t aoe_allow_port_detach(aoe_port_t *);
+static uint32_t aoe_allow_port_detach(aoe_eport_t *);
 
 /*
  * Driver identificaton stuff
@@ -490,10 +490,10 @@ aoe_lookup_mac_by_id(datalink_id_t linkid)
 /*
  * Return port instance if it exist, or else return NULL.
  */
-static port_t *
+static aoe_port_t *
 aoe_lookup_port_by_id(uint32_t portid)
 {
-	port_t *port = NULL;
+	aoe_port_t *port = NULL;
 
 	ASSERT(MUTEX_HELD(&aoe_global_ss->ss_ioctl_mutex));
 	for (port = list_head(&aoe_global_ss->ss_port_list); port;
@@ -511,7 +511,7 @@ static aoe_mac_t *
 aoe_create_mac_by_id(uint32_t portid, datalink_id_t linkid,
     int *is_port_created)
 {
-	port_t *port;
+	aoe_port_t *port;
 	aoe_mac_t *mac;
 	int port_created = 0;
 	ASSERT(MUTEX_HELD(&aoe_global_ss->ss_ioctl_mutex));
@@ -519,7 +519,7 @@ aoe_create_mac_by_id(uint32_t portid, datalink_id_t linkid,
 	*is_port_created = 0;
 	port = aoe_lookup_port_by_id(portid);
 	if (port == NULL) {
-		port = kmem_zalloc(sizeof (port_t), KM_SLEEP);
+		port = kmem_zalloc(sizeof (aoe_port_t), KM_SLEEP);
 		if (!port)
 			return (NULL);
 		port->p_portid = portid;
@@ -554,18 +554,18 @@ aoe_create_mac_by_id(uint32_t portid, datalink_id_t linkid,
 }
 
 static void
-aoe_destroy_port(port_t *port)
+aoe_destroy_port(aoe_port_t *port)
 {
 	ASSERT(port != NULL);
 	ASSERT(port->p_mac_cnt == 0);
 	list_remove(&port->p_ss->ss_port_list, port);
-	kmem_free(port, sizeof (port_t));
+	kmem_free(port, sizeof (aoe_port_t));
 }
 
 static void
 aoe_destroy_mac(aoe_mac_t *mac)
 {
-	port_t *port;
+	aoe_port_t *port;
 	ASSERT(mac != NULL);
 
 	port = mac->am_port;
@@ -577,7 +577,7 @@ aoe_destroy_mac(aoe_mac_t *mac)
 
 
 /*
- * The following routines will be called through vectors in aoe_port_t
+ * The following routines will be called through vectors in aoe_eport_t
  */
 
 /*
@@ -585,9 +585,9 @@ aoe_destroy_mac(aoe_mac_t *mac)
  * offline status already
  */
 static void
-aoe_deregister_client(aoe_port_t *eport)
+aoe_deregister_client(aoe_eport_t *eport)
 {
-	port_t *port = EPORT2PORT(eport);
+	aoe_port_t *port = EPORT2PORT(eport);
 	int i, found = 0;
 
 	/*
@@ -618,7 +618,7 @@ aoe_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp, boolean_t loopback)
 	mblk_t *next;
 	aoe_frame_t *frm;
 	uint16_t frm_type;
-	port_t *port;
+	aoe_port_t *port;
 
 	port = mac->am_port;
 
@@ -655,11 +655,11 @@ aoe_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp, boolean_t loopback)
 
 		frm = aoe_allocate_frame(&port->p_eport, -1, mac, KM_NOSLEEP);
 		if (frm != NULL) {
-			aoe_hdr_t *h = (void *) mp->b_rptr;
+			aoe_hdr_t *h = (aoe_hdr_t *)mp->b_rptr;
 
 			ether_copy((void *)h->aoeh_src, (void *)frm->af_addr);
 			frm->af_netb = mp;
-			frm->af_data = (void *) mp->b_rptr;
+			frm->af_data = (uint8_t *)mp->b_rptr;
 			port->p_client.ect_rx_frame(frm);
 			mac->am_rx_frames++;
 		} else
@@ -763,13 +763,13 @@ aoe_update_path_info(aoe_unit_t *u, aoe_path_t *p)
 }
 
 static int
-aoe_report_unit(aoe_port_t *eport, void *mac, unsigned long unit,
+aoe_report_unit(aoe_eport_t *eport, void *mac, unsigned long unit,
     char *dst_addr)
 {
 	int i, j;
 	aoe_unit_t *u = NULL;
 	aoe_path_t *p = NULL;
-	port_t *port = EPORT2PORT(eport);
+	aoe_port_t *port = EPORT2PORT(eport);
 
 	for (i = 0; i < port->p_unit_cnt; i++) {
 		if (port->p_unit[i].au_unit == unit) {
@@ -817,7 +817,7 @@ aoe_report_unit(aoe_port_t *eport, void *mac, unsigned long unit,
 }
 
 static void
-aoe_unit_update(port_t *port, aoe_mac_t *mac, int cmd, int unit_id)
+aoe_unit_update(aoe_port_t *port, aoe_mac_t *mac, int cmd, int unit_id)
 {
 	aoe_unit_t *u;
 	aoe_path_t *p = NULL;
@@ -850,9 +850,9 @@ aoe_unit_update(port_t *port, aoe_mac_t *mac, int cmd, int unit_id)
 
 /* ARGSUSED */
 static int
-aoe_ctl(aoe_port_t *eport, void *mac, int cmd, void *arg)
+aoe_ctl(aoe_eport_t *eport, void *mac, int cmd, void *arg)
 {
-	port_t *port = EPORT2PORT(eport);
+	aoe_port_t *port = EPORT2PORT(eport);
 	int i;
 
 	switch (cmd) {
@@ -984,10 +984,10 @@ aoe_alloc_netb(aoe_frame_t *af, uint32_t buf_size, caddr_t buf, int kmflag)
 
 	if (mp) {
 		if (af->af_netb == NULL) {
-			aoe_hdr_t *h = (void *) mp->b_rptr;
+			aoe_hdr_t *h = (aoe_hdr_t *)mp->b_rptr;
 
 			af->af_netb = mp;
-			af->af_data = (void *)mp->b_rptr;
+			af->af_data = (uint8_t *)mp->b_rptr;
 			ether_copy((void *)mac->am_current_addr,
 			    (void *)h->aoeh_src);
 			ether_copy((void *)af->af_addr,
@@ -1009,9 +1009,9 @@ aoe_free_netb(void *netb)
 static void
 aoe_release_frame(aoe_frame_t *af)
 {
-	port_t *port = EPORT2PORT(af->af_eport);
+	aoe_port_t *port = EPORT2PORT(af->af_eport);
 	aoe_mac_t *mac = FRM2MAC(af);
-	aoe_hdr_t *h = (void *)af->af_data;
+	aoe_hdr_t *h = (aoe_hdr_t *)af->af_data;
 
 	if (h->aoeh_cmd == AOECMD_ATA && mac->am_rtt_cnt)
 		mac->am_rtt_cnt--;
@@ -1081,9 +1081,9 @@ load_balancing(aoe_unit_t *u)
 }
 
 static aoe_frame_t *
-aoe_allocate_frame(aoe_port_t *eport, int unit_id, void *xmac, int kmflag)
+aoe_allocate_frame(aoe_eport_t *eport, int unit_id, void *xmac, int kmflag)
 {
-	port_t *port = EPORT2PORT(eport);
+	aoe_port_t *port = EPORT2PORT(eport);
 	aoe_frame_t *af;
 	aoe_mac_t *mac = xmac;
 	int i;
@@ -1209,12 +1209,12 @@ aoe_get_mac_addr(void *xmac)
  * Only this function will be called explicitly by clients
  * Register the specified client port (initiator/target)
  */
-aoe_port_t *
+aoe_eport_t *
 aoe_register_client(aoe_client_t *client)
 {
-	aoe_port_t	*eport;
+	aoe_eport_t	*eport;
 	char		cache_string[32];
-	port_t		*port;
+	aoe_port_t	*port;
 	uint32_t	alloc_size;
 	uint32_t	i;
 	uint32_t	min_mtu = 0;
@@ -1255,7 +1255,7 @@ aoe_register_client(aoe_client_t *client)
 	atomic_or_32(&port->p_flags, AOE_PORT_FLAG_BUSY);
 
 	/*
-	 * aoe_port_t initialization
+	 * aoe_eport_t initialization
 	 */
 	eport = &port->p_eport;
 	eport->eport_aoe_private = port;
@@ -1321,7 +1321,7 @@ aoe_mac_set_address(aoe_mac_t *mac, uint8_t *addr, boolean_t assigned)
 static void
 aoe_port_notify_link_up(void *arg)
 {
-	port_t *port = (port_t *)arg;
+	aoe_port_t *port = (aoe_port_t *)arg;
 
 	ASSERT(port->p_flags & AOE_PORT_FLAG_BOUND);
 
@@ -1332,7 +1332,7 @@ aoe_port_notify_link_up(void *arg)
 static void
 aoe_port_notify_link_down(void *arg)
 {
-	port_t *port = (port_t *)arg;
+	aoe_port_t *port = (aoe_port_t *)arg;
 
 	if (port->p_flags & AOE_PORT_FLAG_BOUND) {
 		port->p_client.ect_port_event(&port->p_eport,
@@ -1345,7 +1345,7 @@ aoe_mac_notify(void *arg, mac_notify_type_t type)
 {
 	aoe_mac_t *mac = (aoe_mac_t *)arg;
 	int link_cnt = 0, i;
-	port_t *port;
+	aoe_port_t *port;
 
 	port = mac->am_port;
 
@@ -1537,7 +1537,7 @@ aoe_close(dev_t dev, int flag, int otype, cred_t *credp)
 }
 
 static int
-aoe_create_port(dev_info_t *parent, port_t *port,
+aoe_create_port(dev_info_t *parent, aoe_port_t *port,
     aoe_cli_type_t type, aoe_cli_policy_t policy, char *module)
 {
 	int rval = 0, i;
@@ -1586,7 +1586,7 @@ static int
 aoe_delete_port(dev_info_t *parent, aoeio_t *aoeio, uint32_t portid)
 {
 	int rval, i, mac_cnt;
-	port_t *port;
+	aoe_port_t *port;
 	int mac_in_use = 0;
 
 	port = aoe_lookup_port_by_id(portid);
@@ -1654,9 +1654,9 @@ aoe_delete_port(dev_info_t *parent, aoeio_t *aoeio, uint32_t portid)
 static int
 aoe_get_port_list(aoe_port_instance_t *ports, int count)
 {
-	int	i = 0;
-	int	j;
-	port_t	*port;
+	int i = 0;
+	int j;
+	aoe_port_t *port;
 
 	ASSERT(ports != NULL);
 	ASSERT(MUTEX_HELD(&aoe_global_ss->ss_ioctl_mutex));
@@ -1851,7 +1851,7 @@ aoe_iocmd(aoe_soft_state_t *ss, intptr_t data, int mode)
 
 	switch (aoeio->aoeio_cmd) {
 	case AOEIO_CREATE_PORT: {
-		port_t *created_port = NULL;
+		aoe_port_t *created_port = NULL;
 		aoe_mac_t *created_mac[AOE_MAX_MACOBJ];
 		aoe_mac_t *opened_mac[AOE_MAX_MACOBJ];
 		int mac_used = 0, m = 0, n = 0;
@@ -2040,7 +2040,7 @@ aoe_i_port_autoconf(uint32_t portid)
 	aoe_soft_state_t *ss = aoe_global_ss;
 	aoe_mac_t *mac;
 	uint32_t linkid = rootfs.bo_ppa;
-	port_t *created_port = NULL;
+	aoe_port_t *created_port = NULL;
 	int is_port_created = 0;
 
 	/*
@@ -2160,8 +2160,8 @@ aoe_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	mutex_init(&ss->ss_ioctl_mutex, NULL, MUTEX_DRIVER, NULL);
 	list_create(&ss->ss_mac_list, sizeof (aoe_mac_t),
 	    offsetof(aoe_mac_t, am_ss_node));
-	list_create(&ss->ss_port_list, sizeof (port_t),
-	    offsetof(port_t, p_ss_node));
+	list_create(&ss->ss_port_list, sizeof (aoe_port_t),
+	    offsetof(aoe_port_t, p_ss_node));
 
 	ret = ddi_create_minor_node(dip, "admin", S_IFCHR,
 	    ddi_get_instance(dip), DDI_PSEUDO, 0);
@@ -2226,9 +2226,9 @@ aoe_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
  * Check if AoE port can be detached
  */
 static uint32_t
-aoe_allow_port_detach(aoe_port_t *eport)
+aoe_allow_port_detach(aoe_eport_t *eport)
 {
-	port_t	*port = EPORT2PORT(eport);
+	aoe_port_t *port = EPORT2PORT(eport);
 
 	return (port->p_flags & AOE_PORT_FLAG_BUSY);
 }
