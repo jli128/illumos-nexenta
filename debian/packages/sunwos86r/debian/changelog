@@ -1,3 +1,9 @@
+sunwos86r (5.11.134-31-9674-8622) nexenta; urgency=low
+
+  * Issue 8622: SSD added to a zpool does not appear to be recognised with a 4KB native block size
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 05 Dec 2012 22:36:21 +0100
+
 sunwos86r (5.11.134-31-9673-0) nexenta; urgency=low
 
   * Issue 8825: unsupported disks in MD1200 JBOD
