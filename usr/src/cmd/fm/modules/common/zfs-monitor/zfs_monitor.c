@@ -10,17 +10,18 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <libzfs.h>
+#include <errno.h>
+#include <note.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <fm/fmd_api.h>
-#include <fm/libtopo.h>
 #include <sys/fs/zfs.h>
 #include <sys/fm/protocol.h>
 #include <sys/fm/fs/zfs.h>

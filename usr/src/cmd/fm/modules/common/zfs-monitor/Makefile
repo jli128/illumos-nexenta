@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 
 MODULE = zfs-monitor
@@ -29,5 +28,4 @@ SRCS = zfs_monitor.c
 
 include ../../Makefile.plugin
 
-LDLIBS += -L$(ROOTLIB)/fm -luutil -lzfs -ltopo
-LDFLAGS += -R/usr/lib/fm
+LDLIBS += -luutil -lzfs
