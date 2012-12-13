@@ -21,6 +21,9 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #include <assert.h>
 #include <stddef.h>
@@ -57,6 +60,7 @@ typedef struct zfs_case_data {
 	char		zc_serd_checksum[MAX_SERDLEN];
 	char		zc_serd_io[MAX_SERDLEN];
 	int		zc_has_remove_timer;
+	char		zc_serd_timeout[MAX_SERDLEN];
 } zfs_case_data_t;
 
 /*
@@ -84,7 +88,7 @@ typedef struct zfs_case {
 #define	CASE_DATA			"data"
 #define	CASE_FRU			"fru"
 #define	CASE_DATA_VERSION_INITIAL	1
-#define	CASE_DATA_VERSION_SERD		2
+#define	CASE_DATA_VERSION_SERD		3
 
 typedef struct zfs_de_stats {
 	fmd_stat_t	old_drops;
@@ -578,6 +582,8 @@ zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	    fmd_nvl_class_match(hdl, nvl,
 	    ZFS_MAKE_EREPORT(FM_EREPORT_ZFS_IO)) ||
 	    fmd_nvl_class_match(hdl, nvl,
+	    ZFS_MAKE_EREPORT(FM_EREPORT_ZFS_TIMEOUT)) ||
+	    fmd_nvl_class_match(hdl, nvl,
 	    ZFS_MAKE_EREPORT(FM_EREPORT_ZFS_PROBE_FAILURE)))) {
 		zfs_stats.dev_drops.fmds_value.ui64++;
 		return;
@@ -767,6 +773,9 @@ zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 			if (zcp->zc_data.zc_serd_checksum[0] != '\0')
 				fmd_serd_reset(hdl,
 				    zcp->zc_data.zc_serd_checksum);
+			if (zcp->zc_data.zc_serd_timeout[0] != '\0')
+				fmd_serd_reset(hdl,
+				    zcp->zc_data.zc_serd_timeout);
 		}
 		zfs_stats.resource_drops.fmds_value.ui64++;
 		return;
@@ -828,6 +837,8 @@ zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	    fmd_nvl_class_match(hdl, nvl,
 	    ZFS_MAKE_EREPORT(FM_EREPORT_ZFS_CHECKSUM)) ||
 	    fmd_nvl_class_match(hdl, nvl,
+	    ZFS_MAKE_EREPORT(FM_EREPORT_ZFS_TIMEOUT)) ||
+	    fmd_nvl_class_match(hdl, nvl,
 	    ZFS_MAKE_EREPORT(FM_EREPORT_ZFS_IO_FAILURE)) ||
 	    fmd_nvl_class_match(hdl, nvl,
 	    ZFS_MAKE_EREPORT(FM_EREPORT_ZFS_PROBE_FAILURE))) {
@@ -868,6 +879,22 @@ zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 			    zcp->zc_data.zc_serd_checksum, ep)) {
 				zfs_case_solve(hdl, zcp,
 				    "fault.fs.zfs.vdev.checksum", B_FALSE);
+			}
+		} else if (fmd_nvl_class_match(hdl, nvl,
+		    ZFS_MAKE_EREPORT(FM_EREPORT_ZFS_TIMEOUT))) {
+			if (zcp->zc_data.zc_serd_timeout[0] == '\0') {
+				zfs_serd_name(zcp->zc_data.zc_serd_timeout,
+				    pool_guid, vdev_guid, "timeout");
+				fmd_serd_create(hdl,
+				    zcp->zc_data.zc_serd_timeout,
+				    fmd_prop_get_int32(hdl, "timeout_N"),
+				    fmd_prop_get_int64(hdl, "timeout_T"));
+				zfs_case_serialize(hdl, zcp);
+			}
+			if (fmd_serd_record(hdl,
+			    zcp->zc_data.zc_serd_timeout, ep)) {
+				zfs_case_solve(hdl, zcp,
+				    "fault.fs.zfs.vdev.timeout", B_FALSE);
 			}
 		} else if (fmd_nvl_class_match(hdl, nvl,
 		    ZFS_MAKE_EREPORT(FM_EREPORT_ZFS_IO_FAILURE)) &&
@@ -926,6 +953,8 @@ zfs_fm_close(fmd_hdl_t *hdl, fmd_case_t *cs)
 {
 	zfs_case_t *zcp = fmd_case_getspecific(hdl, cs);
 
+	if (zcp->zc_data.zc_serd_timeout[0] != '\0')
+		fmd_serd_destroy(hdl, zcp->zc_data.zc_serd_timeout);
 	if (zcp->zc_data.zc_serd_checksum[0] != '\0')
 		fmd_serd_destroy(hdl, zcp->zc_data.zc_serd_checksum);
 	if (zcp->zc_data.zc_serd_io[0] != '\0')
@@ -959,6 +988,8 @@ static const fmd_prop_t fmd_props[] = {
 	{ "checksum_T", FMD_TYPE_TIME, "10min" },
 	{ "io_N", FMD_TYPE_UINT32, "10" },
 	{ "io_T", FMD_TYPE_TIME, "10min" },
+	{ "timeout_N", FMD_TYPE_UINT32, "10" },
+	{ "timeout_T", FMD_TYPE_TIME, "10min" },
 	{ "remove_timeout", FMD_TYPE_TIME, "15sec" },
 	{ NULL, 0, NULL }
 };

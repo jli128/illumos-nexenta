@@ -20,8 +20,8 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SYS_ZFS_CONTEXT_H
@@ -489,6 +489,11 @@ extern vnode_t *rootdir;
 #define	hz	119	/* frequency when using gethrtime() >> 23 for lbolt */
 
 extern void delay(clock_t ticks);
+extern timeout_id_t timeout(void (*)(void *), void *, clock_t);
+extern clock_t untimeout(timeout_id_t);
+
+#define	SEC_TO_TICK(sec)	((sec) * hz)
+#define	NSEC_TO_TICK(usec)	((usec) / (NANOSEC / hz))
 
 #define	gethrestime_sec() time(NULL)
 #define	gethrestime(t) \

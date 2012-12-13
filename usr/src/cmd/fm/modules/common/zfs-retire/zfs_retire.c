@@ -21,6 +21,9 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 /*
  * The ZFS retire agent is responsible for managing hot spares across all pools.
@@ -438,6 +441,9 @@ zfs_retire_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 		} else if (fmd_nvl_class_match(hdl, fault,
 		    "fault.fs.zfs.vdev.checksum")) {
 			degrade_device = B_TRUE;
+		} else if (fmd_nvl_class_match(hdl, fault,
+		    "fault.fs.zfs.vdev.timeout")) {
+			fault_device = B_TRUE;
 		} else if (fmd_nvl_class_match(hdl, fault,
 		    "fault.fs.zfs.device")) {
 			fault_device = B_FALSE;

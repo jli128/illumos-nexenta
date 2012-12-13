@@ -1,3 +1,10 @@
+sunwzfskr (5.11.134-31-12265-11612) nexenta; urgency=high
+
+  * Issue 11612: Failing vdev of a mirrored pool should not take zfs
+    operations out of action for extended periods of time.
+
+ -- Nexenta Systems <support@nexenta.com>  Tue, 04 Dec 2012 10:00:00 -0400
+
 sunwzfskr (5.11.134-31-12264-8622) nexenta; urgency=low
 
   * Issue 8622: SSD added to a zpool does not appear to be recognised with a 4KB native block size

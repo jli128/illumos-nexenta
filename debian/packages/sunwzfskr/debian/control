@@ -6,7 +6,7 @@ Maintainer: Nexenta Systems <support@nexenta.com>
 Package: sunwzfskr
 Architecture: solaris-i386
 Conflicts: sunwzfsr (<< 5.11.33-1)
-Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-31-0-100), sunwkvm (>=5.11.134-31-0-100), sunwcsr (>=5.11.134-31-0-100), sunwckr (>=5.11.134-31-0-101), sunwcsu (>=5.11.134-31-0-100), sunwcsd (>=5.11.134-31-0-100), sunwcsl (>=5.11.134-31-0-100)
+Depends: ${shlibs:Depends}, sunwcakr (>=5.11.134-31-0-100), sunwkvm (>=5.11.134-31-0-100), sunwcsr (>=5.11.134-31-0-100), sunwckr (>=5.11.134-31-12263-12236), sunwcsu (>=5.11.134-31-0-100), sunwcsd (>=5.11.134-31-0-100), sunwcsl (>=5.11.134-31-0-100)
 Description: ZFS Kernel (Root)
  ZFS kernel root components
  .
