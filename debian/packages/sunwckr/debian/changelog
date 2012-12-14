@@ -1,3 +1,9 @@
+sunwckr (5.11.134-31-12264-8622) nexenta; urgency=low
+
+  * Issue 8622: SSD added to a zpool does not appear to be recognised with a 4KB native block size
+
+ -- Nexenta Systems <support@nexenta.com>  Fri, 14 Dec 2012 15:07:02 +0100
+
 sunwckr (5.11.134-31-12263-12236) nexenta; urgency=low
 
   * Issue 12235: ZFS extensions for intelligent placement of data and metadata
