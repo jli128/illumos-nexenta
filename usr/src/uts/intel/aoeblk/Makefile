@@ -36,6 +36,8 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 # Overrides and depends_on
 LDFLAGS		+= -r -dy -N drv/aoe -N drv/blkdev
 
+LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
+
 .KEEP_STATE:
 
 # Default build targets.

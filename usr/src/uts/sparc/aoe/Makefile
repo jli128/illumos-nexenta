@@ -26,7 +26,7 @@ ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/aoe
 
 # Include common rules
-include		../Makefile.intel
+include		../Makefile.sparc
 
 # Define targets
 ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
@@ -35,6 +35,8 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 # Overrides and depends_on
 LDFLAGS		+= -r -dy -N misc/dls -N misc/mac 
+
+LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 
 .KEEP_STATE:
 
