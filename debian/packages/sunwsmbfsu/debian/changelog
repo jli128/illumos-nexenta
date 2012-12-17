@@ -1,3 +1,10 @@
+sunwsmbfsu (5.11.134-31-12464-0) nexenta; urgency=high
+
+  * Issue 12464: Spurious errors setting up new sessions
+  * Issue 12394: Even NULL sessions should use SPNEGO
+
+ -- Gate Keeper <support@nexenta.com> Fri, 14 Dec 2012 19:35:29 -0500
+
 sunwsmbfsu (5.11.134-31-11128-0) nexenta; urgency=severe
 
   * Issue 11128: nsmb_close locking and teardown deadlock
