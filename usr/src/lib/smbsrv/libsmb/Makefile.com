@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
 #
 
 LIBRARY= libsmb.a
@@ -75,8 +76,9 @@ include ../../Makefile.lib
 INCS += -I$(SRC)/common/smbsrv
 
 LDLIBS +=	$(MACH_LDLIBS)
-LDLIBS +=	-lscf -lmd -luuid -lnsl -lpkcs11 -lsec -lsocket -lresolv
-LDLIBS +=	-lidmap -lreparse -lnvpair -lavl -lc
+LDLIBS +=	-lscf -lmd -luuid -lpkcs11 -lcryptoutil
+LDLIBS +=	-lsec -lidmap -lnsl -lsocket -lresolv
+LDLIBS +=	-lreparse -lnvpair -lavl -lc
 CPPFLAGS +=	$(INCS) -D_REENTRANT
 
 SRCS=   $(OBJS_COMMON:%.o=$(SRCDIR)/%.c)	\

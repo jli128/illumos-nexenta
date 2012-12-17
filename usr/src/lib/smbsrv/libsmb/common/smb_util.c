@@ -329,29 +329,6 @@ trim_whitespace(char *buf)
 }
 
 /*
- * randomize
- *
- * Randomize the contents of the specified buffer.
- */
-void
-randomize(char *data, unsigned len)
-{
-	unsigned dwlen = len / 4;
-	unsigned remlen = len % 4;
-	unsigned tmp;
-	unsigned i; /*LINTED E_BAD_PTR_CAST_ALIGN*/
-	unsigned *p = (unsigned *)data;
-
-	for (i = 0; i < dwlen; ++i)
-		*p++ = random();
-
-	if (remlen) {
-		tmp = random();
-		(void) memcpy(p, &tmp, remlen);
-	}
-}
-
-/*
  * This is the hash mechanism used to encrypt passwords for commands like
  * SamrSetUserInformation. It uses a 256 byte s-box.
  */

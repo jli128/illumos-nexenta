@@ -1,3 +1,9 @@
+sunwsmbsu (5.11.134-31-12393-0) nexenta; urgency=high
+
+  * Issue 12393: Kerberos and smbd disagree about who is our AD server
+
+ -- Nexenta Systems <support@nexenta.com>  Sun, 16 Dec 2012 22:41:29 -0500
+
 sunwsmbsu (5.11.134-31-10734-0) nexenta; urgency=high
 
   * Issue 10734: NT Trans. Notify returning too quickly
