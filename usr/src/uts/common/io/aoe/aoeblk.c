@@ -1612,7 +1612,7 @@ aoeblk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * Get the configured maximum number of outstanding frames.
 	 */
 	aoedisk_maxframes = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "aoe_disk_max_frames",
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "disk-max-frames",
 	    AOEDISK_MAXFRAMES);
 
 	client.ect_channelid = ret;
