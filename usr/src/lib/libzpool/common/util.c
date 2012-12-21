@@ -73,7 +73,7 @@ show_vdev_stats(const char *desc, const char *ctype, nvlist_t *nv, int indent)
 	nvlist_t **child;
 	uint_t c, children;
 	char used[6], avail[6];
-	char rops[6], wops[6], rbytes[6], wbytes[6], rerr[6], werr[6], cerr[6];
+	char rops[6], wops[6], rbytes[6], wbytes[6], riotime[6], wiotime[6], rerr[6], werr[6], cerr[6];
 	char *prefix = "";
 
 	if (indent == 0 && desc != NULL) {
@@ -101,18 +101,20 @@ show_vdev_stats(const char *desc, const char *ctype, nvlist_t *nv, int indent)
 		nicenum(vs->vs_ops[ZIO_TYPE_WRITE] / sec, wops);
 		nicenum(vs->vs_bytes[ZIO_TYPE_READ] / sec, rbytes);
 		nicenum(vs->vs_bytes[ZIO_TYPE_WRITE] / sec, wbytes);
+		nicenum(vs->vs_iotime[ZIO_TYPE_READ] / vs->vs_ops[ZIO_TYPE_READ], riotime);
+		nicenum(vs->vs_iotime[ZIO_TYPE_WRITE] / vs->vs_ops[ZIO_TYPE_WRITE], wiotime);
 		nicenum(vs->vs_read_errors, rerr);
 		nicenum(vs->vs_write_errors, werr);
 		nicenum(vs->vs_checksum_errors, cerr);
 
-		(void) printf("%*s%s%*s%*s%*s %5s %5s %5s %5s %5s %5s %5s\n",
+		(void) printf("%*s%s%*s%*s%*s %5s %5s %5s %5s %10s %10s %5s %5s %5s\n",
 		    indent, "",
 		    prefix,
 		    indent + strlen(prefix) - 25 - (vs->vs_space ? 0 : 12),
 		    desc,
 		    vs->vs_space ? 6 : 0, vs->vs_space ? used : "",
 		    vs->vs_space ? 6 : 0, vs->vs_space ? avail : "",
-		    rops, wops, rbytes, wbytes, rerr, werr, cerr);
+		    rops, wops, rbytes, wbytes, riotime, wiotime, rerr, werr, cerr);
 	}
 
 	if (nvlist_lookup_nvlist_array(nv, ctype, &child, &children) != 0)

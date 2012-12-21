@@ -786,6 +786,8 @@ typedef struct vdev_stat {
 	uint64_t	vs_self_healed;		/* self-healed bytes	*/
 	uint64_t	vs_scan_removing;	/* removing?	*/
 	uint64_t	vs_scan_processed;	/* scan processed bytes	*/
+	hrtime_t	vs_latency[ZIO_TYPES];	/* moving average of latency */
+	hrtime_t	vs_iotime[ZIO_TYPES];	/* time spent doing i/o */
 } vdev_stat_t;
 
 /*

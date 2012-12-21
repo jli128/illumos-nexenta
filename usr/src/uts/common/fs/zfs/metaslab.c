@@ -91,6 +91,12 @@ int metaslab_prefetch_limit = SPA_DVAS_PER_BP;
 int metaslab_smo_bonus_pct = 150;
 
 /*
+ * Toggle between space-based DVA allocator 0, latency-based 1 or hybrid 2.
+ * A value other than 0, 1 or 2 will be considered 0 (default).
+ */
+int metaslab_alloc_dva_algorithm = 0;
+
+/*
  * ==========================================================================
  * Metaslab classes
  * ==========================================================================
@@ -1406,10 +1412,15 @@ top:
 			 */
 			if (mc->mc_aliquot == 0) {
 				vdev_stat_t *vs = &vd->vdev_stat;
-				int64_t vu, cu;
+				vdev_stat_t *pvs = &vd->vdev_parent->vdev_stat;
+				int64_t vu, cu, vu_io;
 
 				vu = (vs->vs_alloc * 100) / (vs->vs_space + 1);
 				cu = (mc->mc_alloc * 100) / (mc->mc_space + 1);
+				vu_io =
+				    (((vs->vs_iotime[ZIO_TYPE_WRITE] * 100) /
+				    (pvs->vs_iotime[ZIO_TYPE_WRITE] + 1)) *
+				    (vd->vdev_parent->vdev_children)) - 100;
 
 				/*
 				 * Calculate how much more or less we should
@@ -1426,6 +1437,25 @@ top:
 				 */
 				mg->mg_bias = ((cu - vu) *
 				    (int64_t)mg->mg_aliquot) / 100;
+				/*
+				 * Experiment: space-based DVA allocator 0,
+				 * latency-based 1 or hybrid 2.
+				 */
+				switch (metaslab_alloc_dva_algorithm) {
+				case 1:
+					mg->mg_bias =
+					    (vu_io * (int64_t)mg->mg_aliquot) /
+					    100;
+					break;
+				case 2:
+					mg->mg_bias =
+					    ((((cu - vu) + vu_io) / 2) *
+					    (int64_t)mg->mg_aliquot) / 100;
+					break;
+				default:
+					break;
+				}
+
 			}
 
 			if (atomic_add_64_nv(&mc->mc_aliquot, asize) >=

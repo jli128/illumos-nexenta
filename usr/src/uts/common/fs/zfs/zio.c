@@ -2312,7 +2312,7 @@ zio_vdev_io_start(zio_t *zio)
 	vdev_t *vd = zio->io_vd;
 	uint64_t align;
 	spa_t *spa = zio->io_spa;
-
+	zio->io_vd_timestamp = gethrtime();
 	ASSERT(zio->io_error == 0);
 	ASSERT(zio->io_child_error[ZIO_CHILD_VDEV] == 0);
 
@@ -2443,6 +2443,12 @@ zio_vdev_io_done(zio_t *zio)
 
 	if (unexpected_error)
 		VERIFY(vdev_probe(vd, zio) == NULL);
+
+	/*
+	 * Measure delta between start and end of the I/O in nanoseconds.
+	 * XXX: Handle overflow.
+	 */
+	zio->io_vd_timestamp = gethrtime() - zio->io_vd_timestamp;
 
 	return (ZIO_PIPELINE_CONTINUE);
 }

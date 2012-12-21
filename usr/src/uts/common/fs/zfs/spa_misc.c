@@ -249,6 +249,11 @@ int zfs_flags = 0;
  */
 int zfs_recover = 0;
 
+/*
+ * alpha for spa_update_latency() rolling average of pool latency, which
+ * is updated on every txg commit.
+ */
+int64_t zfs_root_latency_alpha = 10;
 
 /*
  * ==========================================================================
@@ -1481,6 +1486,92 @@ spa_update_dspace(spa_t *spa)
 	spa->spa_dspace = metaslab_class_get_dspace(spa_normal_class(spa)) +
 	    ddt_get_dedup_dspace(spa);
 }
+
+/*
+ * After every spa_sync, we will update the root vdev's vdev_stat_t to get sum
+ * of top vdev iotime statistics, for use in the metaslab allocator.
+ */
+
+void
+spa_update_iotime(spa_t *spa)
+{
+	vdev_t *rvd = spa->spa_root_vdev;
+	vdev_stat_t *rvs = &rvd->vdev_stat;
+	for (int c = 0; c < rvd->vdev_children; c++) {
+		vdev_t *cvd = rvd->vdev_child[c];
+		vdev_stat_t *cvs = &cvd->vdev_stat;
+		mutex_enter(&rvd->vdev_stat_lock);
+
+		/*
+		 * FIXME - need a prettier way to account for the fact that
+		 * we're zeroing the rvs->vs_* every time before summing the
+		 * children
+		 */
+
+		for (int t = 0; t < ZIO_TYPES; t++) {
+			if (c == 0) {
+				rvs->vs_ops[t] = cvs->vs_ops[t];
+				rvs->vs_bytes[t] = cvs->vs_bytes[t];
+				rvs->vs_iotime[t] = cvs->vs_iotime[t];
+			} else {
+				rvs->vs_ops[t] += cvs->vs_ops[t];
+				rvs->vs_bytes[t] += cvs->vs_bytes[t];
+				rvs->vs_iotime[t] += cvs->vs_iotime[t];
+			}
+		}
+		mutex_exit(&rvd->vdev_stat_lock);
+	}
+}
+
+/*
+ * EXPERIMENTAL
+ * Use exponential moving average to track root vdev iotime, as well as top
+ * level vdev iotime.
+ * The principle: avg_new = avg_prev + (cur - avg_prev) * a / 100; a is
+ * tuneable. For example, if a = 10 (alpha = 0.1), it will take 20 iterations,
+ * or 100 seconds at 5 second txg commit intervals for the values from last 20
+ * iterations to account for 66% of the moving average.
+ * Currently, the challenge is that we keep track of iotime in cumulative
+ * nanoseconds since zpool import, both for leaf and top vdevs, so a way of
+ * getting delta pre/post txg commit is required.
+ */
+
+void
+spa_update_latency(spa_t *spa)
+{
+	vdev_t *rvd = spa->spa_root_vdev;
+	vdev_stat_t *rvs = &rvd->vdev_stat;
+	for (int c = 0; c < rvd->vdev_children; c++) {
+		vdev_t *cvd = rvd->vdev_child[c];
+		vdev_stat_t *cvs = &cvd->vdev_stat;
+		mutex_enter(&rvd->vdev_stat_lock);
+
+		for (int t = 0; t < ZIO_TYPES; t++) {
+
+			/*
+			 * Non-trivial bit here. We update the moving latency
+			 * average for each child vdev separately, but since we
+			 * want the average to settle at the same rate
+			 * regardless of top level vdev count, we effectively
+			 * divide our alpha by number of children of the root
+			 * vdev to account for that.
+			 */
+			zfs_dbgmsg("RLO %llu d %lld t %d t_d %llu",
+			    rvs->vs_latency[t], ((((int64_t)cvs->vs_latency[t] -
+			    (int64_t)rvs->vs_latency[t]) *
+			    (int64_t)zfs_root_latency_alpha) / 100) /
+			    (int64_t)rvd->vdev_children, t, cvs->vs_latency[t]);
+
+
+			rvs->vs_latency[t] += ((((int64_t)cvs->vs_latency[t] -
+			    (int64_t)rvs->vs_latency[t]) *
+			    (int64_t)zfs_root_latency_alpha) / 100) /
+			    (int64_t)(rvd->vdev_children);
+		}
+		mutex_exit(&rvd->vdev_stat_lock);
+	}
+}
+
 
 /*
  * Return the failure mode that has been set to this pool. The default

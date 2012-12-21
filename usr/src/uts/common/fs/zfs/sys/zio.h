@@ -437,6 +437,9 @@ struct zio {
 
 	/* Taskq dispatching state */
 	taskq_ent_t	io_tqent;
+
+	/* Timestamp for tracking vdev I/O latency */
+	hrtime_t io_vd_timestamp;
 };
 
 extern zio_t *zio_null(zio_t *pio, spa_t *spa, vdev_t *vd,
