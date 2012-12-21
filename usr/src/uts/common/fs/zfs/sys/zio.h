@@ -431,6 +431,10 @@ struct zio {
 	kmutex_t	io_lock;
 	kcondvar_t	io_cv;
 
+	/* Timeout state */
+	timeout_id_t	io_timeout_id;
+	boolean_t	io_timeout_active;
+
 	/* FMA state */
 	zio_cksum_report_t *io_cksum_report;
 	uint64_t	io_ena;

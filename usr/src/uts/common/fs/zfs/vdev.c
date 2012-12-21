@@ -66,7 +66,7 @@ int zfs_scrub_limit = 10;
 /*
  * alpha for exponential moving average of I/O latency (in 1/10th of a percent)
  */
-int zfs_vs_latency_alpha = 10;
+int zfs_vs_latency_alpha = 100;
 
 /*
  * Given a vdev type, return the appropriate ops vector.

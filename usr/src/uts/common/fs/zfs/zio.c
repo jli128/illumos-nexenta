@@ -42,6 +42,13 @@ extern int zil_use_sdev;
 #endif /* NZA_CLOSED */
 
 /*
+ * Latency alpha is used to determine when latency stats can be trusted.
+ * Default minimum timeout is a multiple of txg synctime.
+ */
+extern int zfs_vs_latency_alpha;
+extern int zfs_txg_synctime_ms;
+
+/*
  * ==========================================================================
  * I/O priority table
  * ==========================================================================
@@ -96,9 +103,29 @@ boolean_t	zio_requeue_io_start_cut_in_line = B_TRUE;
 
 #ifdef ZFS_DEBUG
 int zio_buf_debug_limit = 16384;
+/*
+ * Fault insertion for stress testing
+ */
+int zio_faulty_vdev_enabled = 0;
+uint64_t zio_faulty_vdev_guid;
+uint64_t zio_faulty_vdev_delay_us = 1000000;	/* 1 second */
 #else
 int zio_buf_debug_limit = 0;
 #endif
+
+/*
+ * ==========================================================================
+ * I/O timeout parameters
+ * ==========================================================================
+ */
+/*
+ * Minimum zio completion delay before an event is generated
+ */
+int zio_min_timeout_ms = -1; /* default: 2 * zfs_txg_synctime_ms */
+/*
+ * Shift used on average latency to calculate timeout
+ */
+int zio_timeout_shift = 3;
 
 void
 zio_init(void)
@@ -310,6 +337,13 @@ zio_pop_transforms(zio_t *zio)
 		zio->io_transform_stack = zt->zt_next;
 
 		kmem_free(zt, sizeof (zio_transform_t));
+	}
+
+	/*
+	 * Initialize minimum timeout if not set.
+	 */
+	if (zio_min_timeout_ms == -1) {
+		zio_min_timeout_ms = 2 * zfs_txg_synctime_ms;
 	}
 }
 
@@ -2306,12 +2340,63 @@ zio_free_zil(spa_t *spa, uint64_t txg, blkptr_t *bp)
  * Read and write to physical devices
  * ==========================================================================
  */
+
+static void
+zio_timeout_handler(void *arg)
+{
+	zio_t *zio = (zio_t *)arg;
+	vdev_t *vd = zio->io_vd;
+	zio_type_t type = zio->io_type;
+	uint64_t delta;
+	uint64_t io_timeout;
+
+	ASSERT(vd != NULL);
+	mutex_enter(&zio->io_lock);
+
+	if (zio->io_timeout_id == 0) {
+		mutex_exit(&zio->io_lock);
+		return;
+	}
+
+	delta = gethrtime() - zio->io_vd_timestamp;
+	/*
+	 * Use latency stats for next timeout only if sufficient I/Os have
+	 * completed on this vdev.
+	 */
+	io_timeout =
+	     (vd->vdev_stat.vs_ops[type] > (2 * 1000 / zfs_vs_latency_alpha)) ?
+	     vd->vdev_stat.vs_latency[type] :
+	     zio_min_timeout_ms * (NANOSEC / MILLISEC);
+
+	/*
+	 * A faulty vdev will either block I/O indefinitely or increment
+	 * the average I/O latency gradually. If our delta is less than the
+	 * average, it is not yet indicative of a problem with *this* I/O.
+	 */
+	if (delta < io_timeout) {
+		io_timeout -= delta;
+	} else {
+		zfs_ereport_post(FM_EREPORT_ZFS_TIMEOUT, zio->io_spa, vd, zio,
+		    io_timeout / (NANOSEC / MICROSEC),
+		    delta / (NANOSEC / MICROSEC));
+	}
+
+	/*
+	 * Re-arm timeout handler for this zio.
+	 */
+	zio->io_timeout_id =
+	    timeout(zio_timeout_handler, zio, NSEC_TO_TICK(io_timeout));
+
+	mutex_exit(&zio->io_lock);
+}
+
 static int
 zio_vdev_io_start(zio_t *zio)
 {
 	vdev_t *vd = zio->io_vd;
 	uint64_t align;
 	spa_t *spa = zio->io_spa;
+	zio_type_t type = zio->io_type;
 	zio->io_vd_timestamp = gethrtime();
 	ASSERT(zio->io_error == 0);
 	ASSERT(zio->io_child_error[ZIO_CHILD_VDEV] == 0);
@@ -2352,7 +2437,7 @@ zio_vdev_io_start(zio_t *zio)
 		uint64_t asize = P2ROUNDUP(zio->io_size, align);
 		char *abuf = zio_buf_alloc(asize);
 		ASSERT(vd == vd->vdev_top);
-		if (zio->io_type == ZIO_TYPE_WRITE) {
+		if (type == ZIO_TYPE_WRITE) {
 			bcopy(zio->io_data, abuf, zio->io_size);
 			bzero(abuf + zio->io_size, asize - zio->io_size);
 		}
@@ -2361,7 +2446,7 @@ zio_vdev_io_start(zio_t *zio)
 
 	ASSERT(P2PHASE(zio->io_offset, align) == 0);
 	ASSERT(P2PHASE(zio->io_size, align) == 0);
-	VERIFY(zio->io_type != ZIO_TYPE_WRITE || spa_writeable(spa));
+	VERIFY(type != ZIO_TYPE_WRITE || spa_writeable(spa));
 
 	/*
 	 * If this is a repair I/O, and there's no self-healing involved --
@@ -2380,15 +2465,16 @@ zio_vdev_io_start(zio_t *zio)
 	    !(zio->io_flags & ZIO_FLAG_SELF_HEAL) &&
 	    zio->io_txg != 0 &&	/* not a delegated i/o */
 	    !vdev_dtl_contains(vd, DTL_PARTIAL, zio->io_txg, 1)) {
-		ASSERT(zio->io_type == ZIO_TYPE_WRITE);
+		ASSERT(type == ZIO_TYPE_WRITE);
 		zio_vdev_io_bypass(zio);
 		return (ZIO_PIPELINE_CONTINUE);
 	}
 
 	if (vd->vdev_ops->vdev_op_leaf &&
-	    (zio->io_type == ZIO_TYPE_READ || zio->io_type == ZIO_TYPE_WRITE)) {
+	    (type == ZIO_TYPE_READ || type == ZIO_TYPE_WRITE)) {
+		uint64_t io_timeout;
 
-		if (zio->io_type == ZIO_TYPE_READ && vdev_cache_read(zio) == 0)
+		if (type == ZIO_TYPE_READ && vdev_cache_read(zio) == 0)
 			return (ZIO_PIPELINE_CONTINUE);
 
 		if ((zio = vdev_queue_io(zio)) == NULL)
@@ -2399,6 +2485,38 @@ zio_vdev_io_start(zio_t *zio)
 			zio_interrupt(zio);
 			return (ZIO_PIPELINE_STOP);
 		}
+
+		/*
+		 * To hasten the demise of a long-lived I/O, we use
+		 * zio_timeout_shift only for the initial timeout.
+		 */
+		io_timeout =
+		    MAX(vd->vdev_stat.vs_latency[type] << zio_timeout_shift,
+		    zio_min_timeout_ms * (NANOSEC / MILLISEC));
+
+		/*
+		 * If this is a high priority I/O, the minimum timeout possible
+		 * is zio_min_timeout_ms; otherwise, it is twice that.
+		 */
+		if (zio->io_priority != ZIO_PRIORITY_NOW)
+			io_timeout += zio_min_timeout_ms * (NANOSEC / MILLISEC);
+
+		/*
+		 * Arm timeout handler for this zio.
+		 */
+		ASSERT(zio->io_timeout_id == 0);
+		zio->io_timeout_id =
+		    timeout(zio_timeout_handler, zio, NSEC_TO_TICK(io_timeout));
+#ifdef ZFS_DEBUG
+		/*
+		 * Insert a fault simulation delay for a particular vdev.
+		 */
+		if (zio_faulty_vdev_enabled &&
+		    (zio->io_vd->vdev_guid == zio_faulty_vdev_guid)) {
+			delay(NSEC_TO_TICK(zio_faulty_vdev_delay_us *
+			    (NANOSEC / MICROSEC)));
+		}
+#endif
 	}
 
 	return (vd->vdev_ops->vdev_op_io_start(zio));
@@ -2417,6 +2535,18 @@ zio_vdev_io_done(zio_t *zio)
 	ASSERT(zio->io_type == ZIO_TYPE_READ || zio->io_type == ZIO_TYPE_WRITE);
 
 	if (vd != NULL && vd->vdev_ops->vdev_op_leaf) {
+		timeout_id_t tid;
+
+		/*
+		 * Leaf I/O has completed, cancel the pending timeout.
+		 */
+		mutex_enter(&zio->io_lock);
+		tid = zio->io_timeout_id;
+		ASSERT(tid != 0);
+		zio->io_timeout_id = 0;
+		mutex_exit(&zio->io_lock);
+
+		(void) untimeout(tid);
 
 		vdev_queue_io_done(zio);
 
@@ -2961,6 +3091,7 @@ zio_done(zio_t *zio)
 	ASSERT(zio->io_child_count == 0);
 	ASSERT(zio->io_reexecute == 0);
 	ASSERT(zio->io_error == 0 || (zio->io_flags & ZIO_FLAG_CANFAIL));
+	ASSERT(zio->io_timeout_id == 0);
 
 	/*
 	 * Report any checksum errors, since the I/O is complete.
