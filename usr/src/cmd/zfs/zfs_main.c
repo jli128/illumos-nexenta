@@ -1912,6 +1912,7 @@ upgrade_set_callback(zfs_handle_t *zhp, void *data)
 			 * the normal history logging that happens in main().
 			 */
 			(void) zpool_log_history(g_zfs, history_str);
+			verify(zpool_stage_history(g_zfs, history_str) == 0);
 			log_history = B_FALSE;
 		}
 		if (zfs_prop_set(zhp, "version", verstr) == 0)
@@ -6515,6 +6516,7 @@ main(int argc, char **argv)
 	}
 
 	zfs_save_arguments(argc, argv, history_str, sizeof (history_str));
+	verify(zpool_stage_history(g_zfs, history_str) == 0);
 
 	libzfs_print_on_error(g_zfs, B_TRUE);
 

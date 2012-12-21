@@ -5845,6 +5845,7 @@ main(int argc, char **argv)
 		usage(B_TRUE);
 
 	zfs_save_arguments(argc, argv, history_str, sizeof (history_str));
+	verify(zpool_stage_history(g_zfs, history_str) == 0);
 
 	/*
 	 * Run the appropriate command.

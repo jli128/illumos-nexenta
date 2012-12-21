@@ -221,6 +221,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zpool_scan;
 	zpool_search_import;
 	zpool_set_prop;
+	zpool_stage_history;
 	zpool_state_to_name;
 	zpool_unmount_datasets;
 	zpool_upgrade;

@@ -58,6 +58,7 @@ OBJECTS= $(OBJS_COMMON) $(OBJS_SHARED)
 #
 include $(NZA_MAKEDEFS)
 OBJECTS += $(NZA_ZFSPLUS_SHARED_OBJS)
+OBJECTS += $(LIBZFS_LOG_EVENT_OBJS)
 
 include ../../Makefile.lib
 
@@ -87,7 +88,8 @@ CERRWARN +=	-_gcc=-Wno-unused-function
 
 SRCS=	$(OBJS_COMMON:%.o=$(SRCDIR)/%.c)	\
 	$(OBJS_SHARED:%.o=$(SRC)/common/zfs/%.c) \
-	$(NZA_ZFSPLUS_SHARED_SRC)
+	$(NZA_ZFSPLUS_SHARED_SRC) \
+	$(LIBZFS_LOG_EVENT_SRC)
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
 
 .KEEP_STATE:

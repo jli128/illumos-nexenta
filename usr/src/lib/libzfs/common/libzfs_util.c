@@ -660,6 +660,8 @@ libzfs_fini(libzfs_handle_t *hdl)
 		(void) fclose(hdl->libzfs_mnttab);
 	if (hdl->libzfs_sharetab)
 		(void) fclose(hdl->libzfs_sharetab);
+	if (hdl->libzfs_log_str)
+		free(hdl->libzfs_log_str);
 	zfs_uninit_libshare(hdl);
 	zpool_free_handles(hdl);
 	libzfs_fru_clear(hdl, B_TRUE);
@@ -824,10 +826,22 @@ zcmd_read_dst_nvlist(libzfs_handle_t *hdl, zfs_cmd_t *zc, nvlist_t **nvlp)
 	return (0);
 }
 
+#pragma weak libzfs_log_event=libzfs_log_event_stub
+void
+libzfs_log_event_stub(libzfs_handle_t *hdl, const char *zc)
+{
+}
+
 int
 zfs_ioctl(libzfs_handle_t *hdl, int request, zfs_cmd_t *zc)
 {
-	return (ioctl(hdl->libzfs_fd, request, zc));
+	int error;
+
+	error = ioctl(hdl->libzfs_fd, request, zc);
+	if (error == 0)
+		libzfs_log_event(hdl, zc->zc_name);
+
+	return (error);
 }
 
 /*

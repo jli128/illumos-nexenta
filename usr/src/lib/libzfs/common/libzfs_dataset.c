@@ -3007,6 +3007,8 @@ zfs_create(libzfs_handle_t *hdl, const char *path, zfs_type_t type,
 	/* create the dataset */
 	ret = lzc_create(path, ost, props);
 	nvlist_free(props);
+	if (ret == 0)
+		libzfs_log_event(hdl, path);
 
 	/* check for failure */
 	if (ret != 0) {
@@ -3146,9 +3148,15 @@ int
 zfs_destroy_snaps_nvl(zfs_handle_t *zhp, nvlist_t *snaps, boolean_t defer)
 {
 	int ret;
+	nvpair_t *elem;
 	nvlist_t *errlist;
 
 	ret = lzc_destroy_snaps(snaps, defer, &errlist);
+	if (ret == 0) {
+		for (elem = nvlist_next_nvpair(snaps, NULL); elem != NULL;
+		    elem = nvlist_next_nvpair(snaps, elem))
+			libzfs_log_event(zhp->zfs_hdl, nvpair_name(elem));
+	}
 
 	if (ret != 0) {
 		for (nvpair_t *pair = nvlist_next_nvpair(errlist, NULL);
@@ -3220,6 +3228,8 @@ zfs_clone(zfs_handle_t *zhp, const char *target, nvlist_t *props)
 
 	ret = lzc_clone(target, zhp->zfs_name, props);
 	nvlist_free(props);
+	if (ret == 0)
+		libzfs_log_event(hdl, target);
 
 	if (ret != 0) {
 		switch (errno) {
@@ -3362,6 +3372,11 @@ zfs_snapshot_nvl(libzfs_handle_t *hdl, nvlist_t *snaps, nvlist_t *props)
 	}
 
 	ret = lzc_snapshot(snaps, props, &errors);
+	if (ret == 0) {
+		for (elem = nvlist_next_nvpair(snaps, NULL); elem != NULL;
+		    elem = nvlist_next_nvpair(snaps, elem))
+			libzfs_log_event(hdl, nvpair_name(elem));
+	}
 
 	if (ret != 0) {
 		boolean_t printed = B_FALSE;

@@ -3664,6 +3664,21 @@ zpool_log_history(libzfs_handle_t *hdl, const char *message)
 	return (err);
 }
 
+int
+zpool_stage_history(libzfs_handle_t * hdl, const char *history_str)
+{
+	if (history_str == NULL)
+		return (EINVAL);
+
+	if (hdl->libzfs_log_str != NULL)
+		free(hdl->libzfs_log_str);
+
+	if ((hdl->libzfs_log_str = strdup(history_str)) == NULL)
+		return (no_memory(hdl));
+
+	return (0);
+}
+
 /*
  * Perform ioctl to get some command history of a pool.
  *

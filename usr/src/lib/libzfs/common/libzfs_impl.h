@@ -79,6 +79,7 @@ struct libzfs_handle {
 	libzfs_fru_t **libzfs_fru_hash;
 	libzfs_fru_t *libzfs_fru_list;
 	char libzfs_chassis_id[256];
+	char *libzfs_log_str;
 };
 
 #define	ZFSSHARE_MISS	0x01	/* Didn't find entry in cache */
@@ -208,6 +209,7 @@ extern int zfs_unshare_proto(zfs_handle_t *,
     const char *, zfs_share_proto_t *);
 
 extern void libzfs_fru_clear(libzfs_handle_t *, boolean_t);
+extern void libzfs_log_event(libzfs_handle_t *, const char *name);
 
 #ifdef	__cplusplus
 }
