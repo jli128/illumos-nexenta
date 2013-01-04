@@ -21,8 +21,8 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -323,9 +323,7 @@ vdev_alloc_common(spa_t *spa, uint_t id, uint64_t guid, vdev_ops_t *ops)
 	mutex_init(&vd->vdev_dtl_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&vd->vdev_stat_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&vd->vdev_probe_lock, NULL, MUTEX_DEFAULT, NULL);
-#ifdef	NZA_CLOSED
 	mutex_init(&vd->vdev_cos_lock, NULL, MUTEX_DEFAULT, NULL);
-#endif /* NZA_CLOSED */
 	for (int t = 0; t < DTL_TYPES; t++) {
 		space_map_create(&vd->vdev_dtl[t], 0, -1ULL, 0,
 		    &vd->vdev_dtl_lock);
@@ -352,10 +350,8 @@ vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent, uint_t id,
 {
 	vdev_ops_t *ops;
 	char *type;
-	uint64_t guid = 0, islog = 0, nparity;
-#ifdef	NZA_CLOSED
-	uint64_t isspecial = 0;
-#endif /* NZA_CLOSED */
+	uint64_t guid = 0, nparity;
+	uint64_t isspecial = 0, islog = 0;
 	vdev_t *vd;
 
 	ASSERT(spa_config_held(spa, SCL_ALL, RW_WRITER) == SCL_ALL);
@@ -403,12 +399,10 @@ vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent, uint_t id,
 	if (islog && spa_version(spa) < SPA_VERSION_SLOGS)
 		return (ENOTSUP);
 
-#ifdef	NZA_CLOSED
 	/*
 	 * Determine whether we're a special vdev.
 	 */
 	(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_IS_SPECIAL, &isspecial);
-#endif /* NZA_CLOSED */
 
 	if (ops == &vdev_hole_ops && spa_version(spa) < SPA_VERSION_HOLES)
 		return (ENOTSUP);
@@ -452,9 +446,7 @@ vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent, uint_t id,
 	vd = vdev_alloc_common(spa, id, guid, ops);
 
 	vd->vdev_islog = islog;
-#ifdef	NZA_CLOSED
 	vd->vdev_isspecial = isspecial;
-#endif /* NZA_CLOSED */
 	vd->vdev_nparity = nparity;
 
 	if (nvlist_lookup_string(nv, ZPOOL_CONFIG_PATH, &vd->vdev_path) == 0)
@@ -509,22 +501,15 @@ vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent, uint_t id,
 	}
 
 	if (parent && !parent->vdev_parent && alloctype != VDEV_ALLOC_ATTACH) {
-#ifdef	NZA_CLOSED
 		metaslab_class_t *mc = isspecial ? spa_special_class(spa) :
 		    (islog ? spa_log_class(spa) : spa_normal_class(spa));
-#endif /* NZA_CLOSED */
 
 		ASSERT(alloctype == VDEV_ALLOC_LOAD ||
 		    alloctype == VDEV_ALLOC_ADD ||
 		    alloctype == VDEV_ALLOC_SPLIT ||
 		    alloctype == VDEV_ALLOC_ROOTPOOL);
 
-#ifdef	NZA_CLOSED
 		vd->vdev_mg = metaslab_group_create(mc, vd);
-#else /* !NZA_CLOSED */
-		vd->vdev_mg = metaslab_group_create(islog ?
-		    spa_log_class(spa) : spa_normal_class(spa), vd);
-#endif /* !NZA_CLOSED */
 	}
 
 	/*
@@ -666,9 +651,7 @@ vdev_free(vdev_t *vd)
 	mutex_destroy(&vd->vdev_dtl_lock);
 	mutex_destroy(&vd->vdev_stat_lock);
 	mutex_destroy(&vd->vdev_probe_lock);
-#ifdef	NZA_CLOSED
 	mutex_destroy(&vd->vdev_cos_lock);
-#endif /* NZA_CLOSED */
 
 	if (vd == spa->spa_root_vdev)
 		spa->spa_root_vdev = NULL;
@@ -741,10 +724,8 @@ vdev_top_transfer(vdev_t *svd, vdev_t *tvd)
 	tvd->vdev_islog = svd->vdev_islog;
 	svd->vdev_islog = 0;
 
-#ifdef	NZA_CLOSED
 	tvd->vdev_isspecial = svd->vdev_isspecial;
 	svd->vdev_isspecial = 0;
-#endif /* NZA_CLOSED */
 }
 
 static void
@@ -2753,11 +2734,7 @@ vdev_space_update(vdev_t *vd, int64_t alloc_delta, int64_t defer_delta,
 	vd->vdev_stat.vs_dspace += dspace_delta;
 	mutex_exit(&vd->vdev_stat_lock);
 
-#ifdef	NZA_CLOSED
 	if (mc == spa_normal_class(spa) || mc == spa_special_class(spa)) {
-#else /* !NZA_CLOSED */
-	if (mc == spa_normal_class(spa)) {
-#endif /* !NZA_CLOSED */
 		mutex_enter(&rvd->vdev_stat_lock);
 		rvd->vdev_stat.vs_alloc += alloc_delta;
 		rvd->vdev_stat.vs_space += space_delta;

@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifndef _SYS_VDEV_IMPL_H
@@ -35,9 +35,7 @@
 #include <sys/vdev.h>
 #include <sys/dkio.h>
 #include <sys/uberblock_impl.h>
-#ifdef	NZA_CLOSED
 #include <sys/cos.h>
-#endif /* NZA_CLOSED */
 
 #ifdef	__cplusplus
 extern "C" {
@@ -164,9 +162,7 @@ struct vdev {
 	uint64_t	vdev_deflate_ratio; /* deflation ratio (x512)	*/
 	uint64_t	vdev_islog;	/* is an intent log device	*/
 	uint64_t	vdev_ishole;	/* is a hole in the namespace 	*/
-#ifdef	NZA_CLOSED
 	uint64_t	vdev_isspecial;	/* is a special device	*/
-#endif /* NZA_CLOSED */
 
 	/*
 	 * Leaf vdev state.
@@ -185,12 +181,10 @@ struct vdev {
 	char		*vdev_devid;	/* vdev devid (if any)		*/
 	char		*vdev_physpath;	/* vdev device path (if any)	*/
 	char		*vdev_fru;	/* physical FRU location	*/
-#ifdef	NZA_CLOSED
 	uint64_t	vdev_min_pending; /* min concurently pending IOs */
 	uint64_t	vdev_max_pending; /* max concurently pending IOs */
 	uint64_t	vdev_preferred_read; /* preferred for reading */
 	uint64_t	vdev_weight;	/* preferred for reading */
-#endif /* NZA_CLOSED */
 	uint64_t	vdev_not_present; /* not present during import	*/
 	uint64_t	vdev_unspare;	/* unspare when resilvering done */
 	hrtime_t	vdev_last_try;	/* last reopen time		*/
@@ -211,9 +205,7 @@ struct vdev {
 	zio_t		*vdev_probe_zio; /* root of current probe	*/
 	vdev_aux_t	vdev_label_aux;	/* on-disk aux state		*/
 
-#ifdef	NZA_CLOSED
 	cos_t		*vdev_cos;	  /* assigned class of storage */
-#endif /* NZA_CLOSED */
 
 	/*
 	 * For DTrace to work in userland (libzpool) context, these fields must
@@ -225,9 +217,7 @@ struct vdev {
 	kmutex_t	vdev_dtl_lock;	/* vdev_dtl_{map,resilver}	*/
 	kmutex_t	vdev_stat_lock;	/* vdev_stat			*/
 	kmutex_t	vdev_probe_lock; /* protects vdev_probe_zio	*/
-#ifdef	NZA_CLOSED
 	kmutex_t	vdev_cos_lock; /* protects vdev_cos	*/
-#endif /* NZA_CLOSED */
 };
 
 #define	VDEV_RAIDZ_MAXPARITY	3
@@ -340,14 +330,12 @@ extern void vdev_set_min_asize(vdev_t *vd);
  */
 extern int zfs_vdev_cache_size;
 
-#ifdef	NZA_CLOSED
 /*
  * Persist vdev properties if ALL_PROPS_PERSISTENT is defined
  */
 #ifdef	ALL_PROPS_PERSISTENT
 #define	VDEV_PROPS_PERSISTENT
 #endif
-#endif /* NZA_CLOSED */
 
 #ifdef	__cplusplus
 }

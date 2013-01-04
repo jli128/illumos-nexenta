@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright (c) 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright (c) 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -36,10 +36,9 @@
 #include <sys/dmu_objset.h>
 #include <sys/arc.h>
 #include <sys/ddt.h>
-#ifdef	NZA_CLOSED
 #include <sys/special.h>
+
 extern int zil_use_sdev;
-#endif /* NZA_CLOSED */
 
 /*
  * Latency alpha is used to determine when latency stats can be trusted.
@@ -133,6 +132,7 @@ zio_init(void)
 	size_t c;
 	vmem_t *data_alloc_arena = NULL;
 
+	zio_parallel_checksum_init();
 #ifdef _KERNEL
 	data_alloc_arena = zio_alloc_arena;
 #endif
@@ -236,6 +236,8 @@ zio_fini(void)
 	kmem_cache_destroy(zio_cache);
 
 	zio_inject_fini();
+
+	zio_parallel_checksum_fini();
 }
 
 /*
@@ -951,7 +953,7 @@ zio_read_bp_init(zio_t *zio)
 		zio_push_transform(zio, cbuf, psize, psize, zio_decompress);
 	}
 
-	if (!DMU_OT_IS_METADATA(BP_GET_TYPE(bp)) && BP_GET_LEVEL(bp) == 0)
+	if (!BP_IS_METADATA(bp))
 		zio->io_flags |= ZIO_FLAG_DONT_CACHE;
 
 	if (BP_GET_TYPE(bp) == DMU_OT_DDT_ZAP)
@@ -961,6 +963,23 @@ zio_read_bp_init(zio_t *zio)
 		zio->io_pipeline = ZIO_DDT_READ_PIPELINE;
 
 	return (ZIO_PIPELINE_CONTINUE);
+}
+
+/*
+ * Tunable: best-effort dedup - only dedup this percentage
+ */
+uint64_t zfs_dedup_percentage = 100;
+
+static void
+best_effort_dedup(zio_prop_t *zp)
+{
+	static uint64_t zfs_dedup_rotor;
+
+	uint64_t val = atomic_inc_64_nv(&zfs_dedup_rotor);
+	if ((val % 100) > zfs_dedup_percentage) {
+		zp->zp_dedup = 0;
+		zp->zp_checksum = zp->zp_os_checksum;
+	}
 }
 
 static int
@@ -1067,6 +1086,8 @@ zio_write_bp_init(zio_t *zio)
 	if (psize == 0) {
 		zio->io_pipeline = ZIO_INTERLOCK_PIPELINE;
 	} else {
+		if (zp->zp_dedup && (zfs_dedup_percentage < 100))
+			best_effort_dedup(zp);
 		ASSERT(zp->zp_checksum != ZIO_CHECKSUM_GANG_HEADER);
 		BP_SET_LSIZE(bp, lsize);
 		BP_SET_PSIZE(bp, psize);
@@ -1194,6 +1215,7 @@ zio_execute(zio_t *zio)
 
 	while (zio->io_stage < ZIO_STAGE_DONE) {
 		enum zio_stage pipeline = zio->io_pipeline;
+		enum zio_stage old_stage = zio->io_stage;
 		enum zio_stage stage = zio->io_stage;
 		int rv;
 
@@ -1229,6 +1251,12 @@ zio_execute(zio_t *zio)
 
 		if (rv == ZIO_PIPELINE_STOP)
 			return;
+
+		if (rv == ZIO_PIPELINE_RESTART_STAGE) {
+			zio->io_stage = old_stage;
+			(void) zio_issue_async(zio);
+			return;
+		}
 
 		ASSERT(rv == ZIO_PIPELINE_CONTINUE);
 	}
@@ -1398,6 +1426,38 @@ zio_resume_wait(spa_t *spa)
 	mutex_exit(&spa->spa_suspend_lock);
 }
 
+
+/*
+ * Tunables: consider several types of metadata: ddt-related, 'general'
+ * (e.g. object tree), zpl (e.g. inodes, directory contents), and 'other'
+ * (none of the above); control which types go to special vdevs
+ */
+uint64_t zfs_enable_meta_selection = 1;
+uint64_t zfs_ddt_to_special = 1;
+uint64_t zfs_general_meta_to_special = 1;
+uint64_t zfs_zpl_meta_to_special = 1;
+uint64_t zfs_other_meta_to_special = 0;
+
+static boolean_t
+zio_refine_meta_placement(zio_prop_t *io_prop)
+{
+	boolean_t isddt = ZIO_IS_DDT(io_prop),
+	    isgen = ZIO_IS_GENERAL_META(io_prop),
+	    iszpl = ZIO_IS_ZPL_META(io_prop);
+
+	if ((isddt) && (zfs_ddt_to_special == 0))
+		return (B_FALSE);
+	else if ((isgen) && (zfs_general_meta_to_special == 0))
+		return (B_FALSE);
+	else if ((iszpl) && (zfs_zpl_meta_to_special == 0))
+		return (B_FALSE);
+	else if ((isddt == 0) && (isgen == 0) && (iszpl == 0) &&
+	    (zfs_other_meta_to_special == 0))
+		return (B_FALSE);
+	else
+		return (B_TRUE);
+}
+
 /*
  * ==========================================================================
  * Gang blocks.
@@ -1494,8 +1554,12 @@ zio_rewrite_gang(zio_t *pio, blkptr_t *bp, zio_gang_node_t *gn, void *data)
 		 * this is just good hygiene.)
 		 */
 		if (gn != pio->io_gang_leader->io_gang_tree) {
-			zio_checksum_compute(zio, BP_GET_CHECKSUM(bp),
-			    data, BP_GET_PSIZE(bp));
+			/*
+			 * given that 'can_accumulate' argument is 0, we can
+			 * drop the error code
+			 */
+			(void) zio_checksum_compute(zio, BP_GET_CHECKSUM(bp),
+			    data, BP_GET_PSIZE(bp), 0);
 		}
 		/*
 		 * If we are here to damage data for testing purposes,
@@ -1738,11 +1802,7 @@ zio_write_gang_block(zio_t *pio)
 	int gbh_copies = MIN(copies + 1, spa_max_replication(spa));
 	zio_prop_t zp;
 	int error;
-#ifdef	NZA_CLOSED
 	metaslab_class_t *mc = spa_select_class(spa, &pio->io_prop);
-#else /* !NZA_CLOSED */
-	metaslab_class_t *mc = spa_normal_class(spa);
-#endif /* NZA_CLOSED */
 
 	error = metaslab_alloc(spa, mc, SPA_GANGBLOCKSIZE,
 	    bp, gbh_copies, txg, pio == gio ? NULL : gio->io_bp,
@@ -1938,7 +1998,7 @@ zio_ddt_collision(zio_t *zio, ddt_t *ddt, ddt_entry_t *dde)
 
 			ddt_bp_fill(ddp, &blk, ddp->ddp_phys_birth);
 
-			ddt_exit(ddt);
+			dde_exit(dde);
 
 			error = arc_read_nolock(NULL, spa, &blk,
 			    arc_getbuf_func, &abuf, ZIO_PRIORITY_SYNC_READ,
@@ -1953,7 +2013,7 @@ zio_ddt_collision(zio_t *zio, ddt_t *ddt, ddt_entry_t *dde)
 				VERIFY(arc_buf_remove_ref(abuf, &abuf) == 1);
 			}
 
-			ddt_enter(ddt);
+			dde_enter(dde);
 			return (error != 0);
 		}
 	}
@@ -1973,7 +2033,7 @@ zio_ddt_child_write_ready(zio_t *zio)
 	if (zio->io_error)
 		return;
 
-	ddt_enter(ddt);
+	dde_enter(dde);
 
 	ASSERT(dde->dde_lead_zio[p] == zio);
 
@@ -1982,7 +2042,7 @@ zio_ddt_child_write_ready(zio_t *zio)
 	while ((pio = zio_walk_parents(zio)) != NULL)
 		ddt_bp_fill(ddp, pio->io_bp, zio->io_txg);
 
-	ddt_exit(ddt);
+	dde_exit(dde);
 }
 
 static void
@@ -1993,7 +2053,7 @@ zio_ddt_child_write_done(zio_t *zio)
 	ddt_entry_t *dde = zio->io_private;
 	ddt_phys_t *ddp = &dde->dde_phys[p];
 
-	ddt_enter(ddt);
+	dde_enter(dde);
 
 	ASSERT(ddp->ddp_refcnt == 0);
 	ASSERT(dde->dde_lead_zio[p] == zio);
@@ -2006,7 +2066,7 @@ zio_ddt_child_write_done(zio_t *zio)
 		ddt_phys_clear(ddp);
 	}
 
-	ddt_exit(ddt);
+	dde_exit(dde);
 }
 
 static void
@@ -2020,7 +2080,7 @@ zio_ddt_ditto_write_done(zio_t *zio)
 	ddt_phys_t *ddp = &dde->dde_phys[p];
 	ddt_key_t *ddk = &dde->dde_key;
 
-	ddt_enter(ddt);
+	dde_enter(dde);
 
 	ASSERT(ddp->ddp_refcnt == 0);
 	ASSERT(dde->dde_lead_zio[p] == zio);
@@ -2035,7 +2095,7 @@ zio_ddt_ditto_write_done(zio_t *zio)
 		ddt_phys_fill(ddp, bp);
 	}
 
-	ddt_exit(ddt);
+	dde_exit(dde);
 }
 
 static int
@@ -2057,7 +2117,6 @@ zio_ddt_write(zio_t *zio)
 	ASSERT(BP_GET_CHECKSUM(bp) == zp->zp_checksum);
 	ASSERT(BP_IS_HOLE(bp) || zio->io_bp_override);
 
-	ddt_enter(ddt);
 	dde = ddt_lookup(ddt, bp, B_TRUE);
 	ddp = &dde->dde_phys[p];
 
@@ -2077,7 +2136,7 @@ zio_ddt_write(zio_t *zio)
 			zp->zp_dedup = 0;
 		}
 		zio->io_pipeline = ZIO_WRITE_PIPELINE;
-		ddt_exit(ddt);
+		dde_exit(dde);
 		return (ZIO_PIPELINE_CONTINUE);
 	}
 
@@ -2103,7 +2162,7 @@ zio_ddt_write(zio_t *zio)
 			zio->io_pipeline = ZIO_WRITE_PIPELINE;
 			zio->io_bp_override = NULL;
 			BP_ZERO(bp);
-			ddt_exit(ddt);
+			dde_exit(dde);
 			return (ZIO_PIPELINE_CONTINUE);
 		}
 
@@ -2138,7 +2197,7 @@ zio_ddt_write(zio_t *zio)
 		dde->dde_lead_zio[p] = cio;
 	}
 
-	ddt_exit(ddt);
+	dde_exit(dde);
 
 	if (cio)
 		zio_nowait(cio);
@@ -2162,11 +2221,11 @@ zio_ddt_free(zio_t *zio)
 	ASSERT(BP_GET_DEDUP(bp));
 	ASSERT(zio->io_child_type == ZIO_CHILD_LOGICAL);
 
-	ddt_enter(ddt);
 	freedde = dde = ddt_lookup(ddt, bp, B_TRUE);
 	ddp = ddt_phys_select(dde, bp);
-	ddt_phys_decref(ddp);
-	ddt_exit(ddt);
+	if (ddp)
+		ddt_phys_decref(ddp);
+	dde_exit(dde);
 
 	return (ZIO_PIPELINE_CONTINUE);
 }
@@ -2180,11 +2239,7 @@ static int
 zio_dva_allocate(zio_t *zio)
 {
 	spa_t *spa = zio->io_spa;
-#ifdef	NZA_CLOSED
 	metaslab_class_t *mc = spa_select_class(spa, &zio->io_prop);
-#else /* !NZA_CLOSED */
-	metaslab_class_t *mc = spa_normal_class(spa);
-#endif /* !NZA_CLOSED */
 
 	blkptr_t *bp = zio->io_bp;
 	int error;
@@ -2288,7 +2343,6 @@ zio_alloc_zil(spa_t *spa, uint64_t txg, blkptr_t *new_bp, blkptr_t *old_bp,
 		    METASLAB_HINTBP_AVOID | METASLAB_GANG_AVOID);
 	}
 
-#ifdef	NZA_CLOSED
 	/*
 	 * If there is no dedicated log device and pool has a special device,
 	 * then ZIL should be allocated on the special device.
@@ -2299,7 +2353,6 @@ zio_alloc_zil(spa_t *spa, uint64_t txg, blkptr_t *new_bp, blkptr_t *old_bp,
 		    new_bp, 1, txg, old_bp,
 		    METASLAB_HINTBP_AVOID | METASLAB_GANG_AVOID);
 	}
-#endif /* NZA_CLOSED */
 
 	if (error) {
 		error = metaslab_alloc(spa, spa_normal_class(spa), size,
@@ -2364,9 +2417,9 @@ zio_timeout_handler(void *arg)
 	 * completed on this vdev.
 	 */
 	io_timeout =
-	     (vd->vdev_stat.vs_ops[type] > (2 * 1000 / zfs_vs_latency_alpha)) ?
-	     vd->vdev_stat.vs_latency[type] :
-	     zio_min_timeout_ms * (NANOSEC / MILLISEC);
+	    (vd->vdev_stat.vs_ops[type] > (2 * 1000 / zfs_vs_latency_alpha)) ?
+	    vd->vdev_stat.vs_latency[type] :
+	    zio_min_timeout_ms * (NANOSEC / MILLISEC);
 
 	/*
 	 * A faulty vdev will either block I/O indefinitely or increment
@@ -2727,9 +2780,8 @@ zio_checksum_generate(zio_t *zio)
 		}
 	}
 
-	zio_checksum_compute(zio, checksum, zio->io_data, zio->io_size);
-
-	return (ZIO_PIPELINE_CONTINUE);
+	return (zio_checksum_compute(zio, checksum, zio->io_data,
+	    zio->io_size, 1));
 }
 
 static int
@@ -2737,7 +2789,7 @@ zio_checksum_verify(zio_t *zio)
 {
 	zio_bad_cksum_t info;
 	blkptr_t *bp = zio->io_bp;
-	int error;
+	int error, zio_progress = ZIO_PIPELINE_CONTINUE;
 
 	ASSERT(zio->io_vd != NULL);
 
@@ -2752,7 +2804,7 @@ zio_checksum_verify(zio_t *zio)
 		ASSERT(zio->io_prop.zp_checksum == ZIO_CHECKSUM_LABEL);
 	}
 
-	if ((error = zio_checksum_error(zio, &info)) != 0) {
+	if ((error = zio_checksum_error(zio, &info, &zio_progress)) != 0) {
 		zio->io_error = error;
 		if (!(zio->io_flags & ZIO_FLAG_SPECULATIVE)) {
 			zfs_ereport_start_checksum(zio->io_spa,
@@ -2761,7 +2813,7 @@ zio_checksum_verify(zio_t *zio)
 		}
 	}
 
-	return (ZIO_PIPELINE_CONTINUE);
+	return (zio_progress);
 }
 
 /*
@@ -2937,6 +2989,10 @@ zio_done(zio_t *zio)
 	zio_pop_transforms(zio);	/* note: may set zio->io_error */
 
 	vdev_stat_update(zio, psize);
+
+	/* update spa latency stats as needed */
+	if (spa_special_selection_enable)
+		spa_special_stats_update(spa);
 
 	if (zio->io_error) {
 		/*

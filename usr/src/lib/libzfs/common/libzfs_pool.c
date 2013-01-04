@@ -21,8 +21,8 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <ctype.h>
@@ -3665,7 +3665,7 @@ zpool_log_history(libzfs_handle_t *hdl, const char *message)
 }
 
 int
-zpool_stage_history(libzfs_handle_t * hdl, const char *history_str)
+zpool_stage_history(libzfs_handle_t *hdl, const char *history_str)
 {
 	if (history_str == NULL)
 		return (EINVAL);
@@ -4832,8 +4832,6 @@ cos_set_proplist(zpool_handle_t *zhp, const char *cos, nvlist_t *nvl)
 /*
  * Stubs for NZA_CLOSED functions
  */
-typedef int vdev_prop_t;
-typedef int cos_prop_t;
 
 /* ARGSUSED */
 int

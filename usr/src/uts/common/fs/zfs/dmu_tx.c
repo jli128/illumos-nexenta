@@ -20,8 +20,8 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/dmu.h>
@@ -58,35 +58,26 @@ dmu_tx_create_dd(dsl_dir_t *dd)
 	refcount_create(&tx->tx_space_written);
 	refcount_create(&tx->tx_space_freed);
 #endif
-#ifdef	NZA_CLOSED
 	tx->tx_wrc_io = B_FALSE;
-#endif /* NZA_CLOSED */
 	return (tx);
 }
 
+#pragma	weak	dmu_tx_create_wrc = dmu_tx_create_impl
+/* ARGSUSED */
 dmu_tx_t *
-#ifdef	NZA_CLOSED
 dmu_tx_create_impl(objset_t *os, boolean_t wrc_io)
-#else /* !NZA_CLOSED */
+{
+	return (dmu_tx_create(os));
+}
+
+dmu_tx_t *
 dmu_tx_create(objset_t *os)
-#endif /* NZA_CLOSED */
 {
 	dmu_tx_t *tx = dmu_tx_create_dd(os->os_dsl_dataset->ds_dir);
 	tx->tx_objset = os;
 	tx->tx_lastsnap_txg = dsl_dataset_prev_snap_txg(os->os_dsl_dataset);
-#ifdef	NZA_CLOSED
-	tx->tx_wrc_io = wrc_io;
-#endif /* NZA_CLOSED */
 	return (tx);
 }
-
-#ifdef	NZA_CLOSED
-dmu_tx_t *
-dmu_tx_create(objset_t *os)
-{
-	return (dmu_tx_create_impl(os, B_FALSE));
-}
-#endif /* NZA_CLOSED */
 
 dmu_tx_t *
 dmu_tx_create_assigned(struct dsl_pool *dp, uint64_t txg)
@@ -99,6 +90,15 @@ dmu_tx_create_assigned(struct dsl_pool *dp, uint64_t txg)
 	tx->tx_anyobj = TRUE;
 
 	return (tx);
+}
+
+#pragma weak dmu_tx_is_wrcio = _dmu_tx_is_wrcio
+
+/* ARGSUSED */
+boolean_t
+_dmu_tx_is_wrcio(dmu_tx_t *dummy)
+{
+	return (FALSE);
 }
 
 int

@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /* Portions Copyright 2010 Robert Milkowski */
@@ -69,9 +70,7 @@
  * This global ZIL switch affects all pools
  */
 int zil_replay_disable = 0;    /* disable intent logging replay */
-#ifdef	NZA_CLOSED
 int zil_use_sdev = 1;		/* Use Special device for ZIL */
-#endif /* NZA_CLOSED */
 
 /*
  * Tunable parameter for debugging or performance analysis.  Setting

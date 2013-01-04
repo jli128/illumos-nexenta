@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SYS_SPA_IMPL_H
@@ -38,11 +38,8 @@
 #include <sys/refcount.h>
 #include <sys/bplist.h>
 #include <sys/bpobj.h>
-#ifdef	NZA_CLOSED
 #include <sys/special_impl.h>
-#include <sys/cos_impl.h>
 #include <sys/wrcache.h>
-#endif /* NZA_CLOSED */
 
 #ifdef	__cplusplus
 extern "C" {
@@ -112,13 +109,42 @@ typedef enum spa_proc_state {
 	SPA_PROC_GONE		/* spa_thread() is exiting, spa_proc = &p0 */
 } spa_proc_state_t;
 
-#ifdef	NZA_CLOSED
 typedef enum spa_watermark {
 	SPA_WM_NONE,
 	SPA_WM_LOW,
 	SPA_WM_HIGH
 } spa_watermark_t;
-#endif /* NZA_CLOSED */
+
+/* Tunables and default values for special/normal class selection */
+extern uint64_t spa_special_selection_enable;
+
+#define	SPA_SPECIAL_RATIO	1024
+#define	SPA_SPECIAL_RATIO_MIN	1
+#define	SPA_SPECIAL_RATIO_MAX	(1ULL<<43)
+#define	SPA_SPECIAL_ADJUSTMENT	2
+#define	SPA_SPECIAL_UTILIZATION	70
+
+typedef enum {
+	SPA_SPECIAL_SELECTION_MIN,
+	SPA_SPECIAL_SELECTION_LATENCY,
+	SPA_SPECIAL_SELECTION_THROUGHPUT,
+	SPA_SPECIAL_SELECTION_LATENCY_BIAS,
+	SPA_SPECIAL_SELECTION_THROUGHPUT_BIAS,
+	SPA_SPECIAL_SELECTION_MAX
+} spa_special_selection_t;
+
+#define	SPA_SPECIAL_SELECTION_VALID(sel)	\
+	(((sel) > SPA_SPECIAL_SELECTION_MIN) &&	\
+	    ((sel) < SPA_SPECIAL_SELECTION_MAX))
+
+typedef struct spa_special_stat {
+	int nspecial;
+	int nnormal;
+	int special_ut;
+	int normal_ut;
+	hrtime_t normal_lt;
+	hrtime_t special_lt;
+} spa_special_stat_t;
 
 struct spa {
 	/*
@@ -143,9 +169,7 @@ struct spa {
 	boolean_t	spa_is_initializing;	/* true while opening pool */
 	metaslab_class_t *spa_normal_class;	/* normal data class */
 	metaslab_class_t *spa_log_class;	/* intent log data class */
-#ifdef	NZA_CLOSED
 	metaslab_class_t *spa_special_class;	/* special usage class */
-#endif /* NZA_CLOSED */
 	uint64_t	spa_first_txg;		/* first txg after spa_open() */
 	uint64_t	spa_final_txg;		/* txg of export/destroy */
 	uint64_t	spa_freeze_txg;		/* freeze pool at this txg */
@@ -209,12 +233,10 @@ struct spa {
 	vdev_t		*spa_pending_vdev;	/* pending vdev additions */
 	kmutex_t	spa_props_lock;		/* property lock */
 	uint64_t	spa_pool_props_object;	/* object for properties */
-#ifdef	NZA_CLOSED
 	kmutex_t	spa_cos_props_lock;	/* property lock */
 	uint64_t	spa_cos_props_object;	/* object for cos properties */
 	kmutex_t	spa_vdev_props_lock;	/* property lock */
 	uint64_t	spa_vdev_props_object;	/* object for vdev properties */
-#endif /* NZA_CLOSED */
 	uint64_t	spa_bootfs;		/* default boot filesystem */
 	uint64_t	spa_failmode;		/* failure mode for the pool */
 	uint64_t	spa_delegation;		/* delegation on/off */
@@ -249,7 +271,6 @@ struct spa {
 	uint64_t	spa_feat_for_write_obj;	/* required to write to pool */
 	uint64_t	spa_feat_for_read_obj;	/* required to read from pool */
 	uint64_t	spa_feat_desc_obj;	/* Feature descriptions */
-#ifdef	NZA_CLOSED
 	/* specialclass support */
 	boolean_t	spa_usesc;		/* enable special class */
 	spa_specialclass_t spa_specialclass;	/* class of special device */
@@ -268,7 +289,24 @@ struct spa {
 
 	/* cos list */
 	list_t		spa_cos_list;
-#endif /* NZA_CLOSED */
+
+	/*
+	 * latency stats per metaslab_class to aid dynamic balancing of io
+	 * across normal and special classes
+	 */
+	kmutex_t		spa_special_stat_lock;
+	hrtime_t		spa_special_stat_timestamp;
+	uint64_t		spa_special_stat_rotor;
+	spa_special_stat_t	spa_special_stat;
+
+	/*
+	 * ratio of writes to special class vs writes to normal class;
+	 * if the ratio is N, then N-1 writes go to special and 1 to normal
+	 * the ratio is adjusted dynamically by the factor specified below
+	 * depending on the relation between average perf param for normal and
+	 * special classes; the parameters are either latency or throughput
+	 */
+	uint64_t spa_special_to_normal_ratio;
 
 	/*
 	 * spa_refcnt & spa_config_lock must be the last elements

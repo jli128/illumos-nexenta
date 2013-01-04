@@ -21,9 +21,9 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright (c) 2012 by Frederik Wessels. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <assert.h>
@@ -89,7 +89,6 @@ static int zpool_do_history(int, char **);
 static int zpool_do_get(int, char **);
 static int zpool_do_set(int, char **);
 
-#ifdef	NZA_CLOSED
 static int zpool_do_vdev_get(int, char **);
 static int zpool_do_vdev_set(int, char **);
 
@@ -98,7 +97,6 @@ static int zpool_do_cos_free(int, char **);
 static int zpool_do_cos_list(int, char **);
 static int zpool_do_cos_get(int, char **);
 static int zpool_do_cos_set(int, char **);
-#endif /* NZA_CLOSED */
 
 /*
  * These libumem hooks provide a reasonable set of defaults for the allocator's
@@ -142,9 +140,6 @@ typedef enum {
 	HELP_SET,
 	HELP_SPLIT,
 	HELP_REGUID,
-#ifndef	NZA_CLOSED
-	HELP_REOPEN
-#else
 	HELP_REOPEN,
 	HELP_VDEV_GET,
 	HELP_VDEV_SET,
@@ -153,7 +148,6 @@ typedef enum {
 	HELP_COS_LIST,
 	HELP_COS_GET,
 	HELP_COS_SET
-#endif /* NZA_CLOSED */
 } zpool_help_t;
 
 
@@ -203,7 +197,6 @@ static zpool_command_t command_table[] = {
 	{ "history",	zpool_do_history,	HELP_HISTORY		},
 	{ "get",	zpool_do_get,		HELP_GET		},
 	{ "set",	zpool_do_set,		HELP_SET		},
-#ifdef	NZA_CLOSED
 	{ "vdev-get",	zpool_do_vdev_get,	HELP_VDEV_GET		},
 	{ "vdev-set",	zpool_do_vdev_set,	HELP_VDEV_SET		},
 	{ "cos-alloc",	zpool_do_cos_alloc,	HELP_COS_ALLOC		},
@@ -211,7 +204,6 @@ static zpool_command_t command_table[] = {
 	{ "cos-list",	zpool_do_cos_list,	HELP_COS_LIST		},
 	{ "cos-get",	zpool_do_cos_get,	HELP_COS_GET		},
 	{ "cos-set",	zpool_do_cos_set,	HELP_COS_SET		}
-#endif /* NZA_CLOSED */
 };
 
 #define	NCOMMAND	(sizeof (command_table) / sizeof (command_table[0]))
@@ -290,7 +282,6 @@ get_usage(zpool_help_t idx) {
 		    "[<device> ...]\n"));
 	case HELP_REGUID:
 		return (gettext("\treguid <pool>\n"));
-#ifdef	NZA_CLOSED
 	case HELP_VDEV_GET:
 		return (gettext("\tvdev-get <property | all> <pool>"
 		    "<vdev name | GUID>\n"));
@@ -309,7 +300,6 @@ get_usage(zpool_help_t idx) {
 	case HELP_COS_SET:
 		return (gettext("\tcos-set <property=value> <pool>"
 		    "<cos name | ID>\n"));
-#endif /* NZA_CLOSED */
 	}
 
 	abort();
@@ -519,7 +509,6 @@ add_prop_list(const char *propname, char *propval, nvlist_t **props,
 	return (0);
 }
 
-#ifdef	NZA_CLOSED
 /*
  * Add a property pair (name, string-value) into a vdev property nvlist.
  */
@@ -585,7 +574,6 @@ add_cos_prop_list(const char *propname, char *propval, nvlist_t **props)
 
 	return (0);
 }
-#endif /* NZA_CLOSED */
 
 /*
  * zpool add [-fn] <pool> <vdev> ...
@@ -1389,25 +1377,17 @@ print_status_config(zpool_handle_t *zhp, const char *name, nvlist_t *nv,
 	(void) printf("\n");
 
 	for (c = 0; c < children; c++) {
-		uint64_t islog = B_FALSE, ishole = B_FALSE;
-#ifdef	NZA_CLOSED
-		uint64_t isspecial = B_FALSE;
-#endif /* NZA_CLOSED */
+		uint64_t islog = B_FALSE, ishole = B_FALSE, isspecial = B_FALSE;
 
 		/* Don't print logs or holes here */
 		(void) nvlist_lookup_uint64(child[c], ZPOOL_CONFIG_IS_LOG,
 		    &islog);
 		(void) nvlist_lookup_uint64(child[c], ZPOOL_CONFIG_IS_HOLE,
 		    &ishole);
-#ifdef	NZA_CLOSED
 		(void) nvlist_lookup_uint64(child[c], ZPOOL_CONFIG_IS_SPECIAL,
 		    &isspecial);
 		if (islog || ishole || isspecial)
 			continue;
-#else /* !NZA_CLOSED */
-		if (islog || ishole)
-			continue;
-#endif /* !NZA_CLOSED */
 		vname = zpool_vdev_name(g_zfs, zhp, child[c], B_TRUE);
 		print_status_config(zhp, vname, child[c],
 		    namewidth, depth + 2, isspare);
@@ -1479,22 +1459,14 @@ print_import_config(const char *name, nvlist_t *nv, int namewidth, int depth)
 		return;
 
 	for (c = 0; c < children; c++) {
-		uint64_t is_log = B_FALSE;
-#ifdef	NZA_CLOSED
-		uint64_t is_special = B_FALSE;
-#endif /* NZA_CLOSED */
+		uint64_t is_log = B_FALSE, is_special = B_FALSE;
 
 		(void) nvlist_lookup_uint64(child[c], ZPOOL_CONFIG_IS_LOG,
 		    &is_log);
-#ifdef	NZA_CLOSED
 		(void) nvlist_lookup_uint64(child[c], ZPOOL_CONFIG_IS_SPECIAL,
 		    &is_special);
 		if (is_log || is_special)
 			continue;
-#else /* !NZA_CLOSED */
-		if (is_log)
-			continue;
-#endif /* !NZA_CLOSED */
 
 		vname = zpool_vdev_name(g_zfs, NULL, child[c], B_TRUE);
 		print_import_config(vname, child[c], namewidth, depth + 2);
@@ -1560,7 +1532,6 @@ print_logs(zpool_handle_t *zhp, nvlist_t *nv, int namewidth, boolean_t verbose)
 	}
 }
 
-#ifdef	NZA_CLOSED
 /*
  * Print special vdevs.
  * Special vdevs are recorded as top level vdevs in the main pool child array
@@ -1599,7 +1570,6 @@ print_special(zpool_handle_t *zhp, nvlist_t *nv, int namewidth,
 		free(name);
 	}
 }
-#endif /* NZA_CLOSED */
 
 /*
  * Display the status for the given pool.
@@ -1818,10 +1788,8 @@ show_import(nvlist_t *config)
 		namewidth = 10;
 
 	print_import_config(name, nvroot, namewidth, 0);
-#ifdef	NZA_CLOSED
 	if (num_special(nvroot) > 0)
 		print_special(NULL, nvroot, namewidth, B_FALSE);
-#endif /* NZA_CLOSED */
 
 	if (num_logs(nvroot) > 0)
 		print_logs(NULL, nvroot, namewidth, B_FALSE);
@@ -2450,10 +2418,7 @@ print_vdev_stats(zpool_handle_t *zhp, const char *name, nvlist_t *oldnv,
 		return;
 
 	for (c = 0; c < children; c++) {
-		uint64_t ishole = B_FALSE, islog = B_FALSE;
-#ifdef	NZA_CLOSED
-		uint64_t isspec = B_FALSE;
-#endif /* NZA_CLOSED */
+		uint64_t ishole = B_FALSE, islog = B_FALSE, isspec = B_FALSE;
 
 		(void) nvlist_lookup_uint64(newchild[c], ZPOOL_CONFIG_IS_HOLE,
 		    &ishole);
@@ -2461,16 +2426,11 @@ print_vdev_stats(zpool_handle_t *zhp, const char *name, nvlist_t *oldnv,
 		(void) nvlist_lookup_uint64(newchild[c], ZPOOL_CONFIG_IS_LOG,
 		    &islog);
 
-#ifdef	NZA_CLOSED
 		(void) nvlist_lookup_uint64(newchild[c],
 		    ZPOOL_CONFIG_IS_SPECIAL, &isspec);
 
 		if (ishole || islog || isspec)
 			continue;
-#else /* !NZA_CLOSED */
-		if (ishole || islog)
-			continue;
-#endif /* NZA_CLOSED */
 
 		vname = zpool_vdev_name(g_zfs, zhp, newchild[c], B_FALSE);
 		print_vdev_stats(zhp, vname, oldnv ? oldchild[c] : NULL,
@@ -2502,7 +2462,6 @@ print_vdev_stats(zpool_handle_t *zhp, const char *name, nvlist_t *oldnv,
 		}
 	}
 
-#ifdef	NZA_CLOSED
 	/*
 	 * Special device section
 	 */
@@ -2526,7 +2485,6 @@ print_vdev_stats(zpool_handle_t *zhp, const char *name, nvlist_t *oldnv,
 			}
 		}
 	}
-#endif /* NZA_CLOSED */
 
 	/*
 	 * Include level 2 ARC devices in iostat output
@@ -4403,10 +4361,8 @@ status_callback(zpool_handle_t *zhp, void *data)
 		print_status_config(zhp, zpool_get_name(zhp), nvroot,
 		    namewidth, 0, B_FALSE);
 
-#ifdef	NZA_CLOSED
 		if (num_special(nvroot) > 0)
 			print_special(zhp, nvroot, namewidth, B_TRUE);
-#endif /* NZA_CLOSED */
 		if (num_logs(nvroot) > 0)
 			print_logs(zhp, nvroot, namewidth, B_TRUE);
 		if (nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_L2CACHE,
@@ -5250,12 +5206,7 @@ zpool_do_get(int argc, char **argv)
 }
 
 typedef struct set_cbdata {
-#ifdef	NZA_CLOSED
 	nvlist_t *cb_nvl;
-#else /* !NZA_CLOSED */
-	char *cb_propname;
-	char *cb_value;
-#endif /* !NZA_CLOSED */
 	boolean_t cb_any_successful;
 } set_cbdata_t;
 
@@ -5265,18 +5216,13 @@ set_callback(zpool_handle_t *zhp, void *data)
 	int error;
 	set_cbdata_t *cb = (set_cbdata_t *)data;
 
-#ifdef	NZA_CLOSED
 	error = zpool_set_proplist(zhp, cb->cb_nvl);
-#else /* !NZA_CLOSED */
-	error = zpool_set_prop(zhp, cb->cb_propname, cb->cb_value);
-#endif /* !NZA_CLOSED */
 	if (!error)
 		cb->cb_any_successful = B_TRUE;
 
 	return (error);
 }
 
-#ifdef	NZA_CLOSED
 static void
 parse_props(char *propname, nvlist_t **nvl, zfs_type_t prop_type)
 {
@@ -5318,7 +5264,6 @@ parse_props(char *propname, nvlist_t **nvl, zfs_type_t prop_type)
 		propname = delim;
 	} while (delim != NULL);
 }
-#endif /* NZA_CLOSED */
 
 int
 zpool_do_set(int argc, char **argv)
@@ -5348,20 +5293,7 @@ zpool_do_set(int argc, char **argv)
 		usage(B_FALSE);
 	}
 
-#ifdef	NZA_CLOSED
 	parse_props(argv[1], &cb.cb_nvl, ZFS_TYPE_POOL);
-#else /* !NZA_CLOSED */
-	cb.cb_propname = argv[1];
-	cb.cb_value = strchr(cb.cb_propname, '=');
-	if (cb.cb_value == NULL) {
-		(void) fprintf(stderr, gettext("missing value in "
-		    "property=value argument\n"));
-		usage(B_FALSE);
-	}
-
-	*(cb.cb_value) = '\0';
-	cb.cb_value++;
-#endif /* !NZA_CLOSED */
 
 	error = for_each_pool(argc - 2, argv + 2, B_TRUE, NULL,
 	    set_callback, &cb);
@@ -5369,7 +5301,6 @@ zpool_do_set(int argc, char **argv)
 	return (error);
 }
 
-#ifdef	NZA_CLOSED
 typedef struct vdev_cbdata {
 	char *vcb_vdev;
 	nvlist_t *vcb_nvl; /* values */
@@ -5789,7 +5720,6 @@ zpool_do_cos_set(int argc, char **argv)
 
 	return (error);
 }
-#endif /* NZA_CLOSED */
 
 static int
 find_command_idx(char *command, int *idx)

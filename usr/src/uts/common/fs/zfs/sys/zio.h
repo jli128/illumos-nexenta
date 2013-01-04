@@ -25,6 +25,7 @@
 /*
  * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifndef _ZIO_H
@@ -40,6 +41,16 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+/*
+ * Checksum state w.r.t. SHA256 acceleration.
+ */
+typedef enum {
+	CKSTATE_NONE = 0,
+	CKSTATE_WAITING,
+	CKSTATE_CHECKSUMMING,
+	CKSTATE_CHECKSUM_DONE
+} zio_checksum_state_t;
 
 /*
  * Embedded checksum
@@ -80,6 +91,7 @@ enum zio_checksum {
 	ZIO_CHECKSUM_FLETCHER_4,
 	ZIO_CHECKSUM_SHA256,
 	ZIO_CHECKSUM_ZILOG2,
+	ZIO_CHECKSUM_SHA1CRC32,
 	ZIO_CHECKSUM_FUNCTIONS
 };
 
@@ -140,6 +152,7 @@ enum zio_compress {
 
 #define	ZIO_PIPELINE_CONTINUE		0x100
 #define	ZIO_PIPELINE_STOP		0x101
+#define	ZIO_PIPELINE_RESTART_STAGE	0x102
 
 enum zio_flag {
 	/*
@@ -283,17 +296,38 @@ typedef struct zbookmark {
 
 typedef struct zio_prop {
 	enum zio_checksum	zp_checksum;
+	enum zio_checksum	zp_os_checksum;
 	enum zio_compress	zp_compress;
 	dmu_object_type_t	zp_type;
 	uint8_t			zp_level;
 	uint8_t			zp_copies;
 	uint8_t			zp_dedup;
 	uint8_t			zp_dedup_verify;
-#ifdef	NZA_CLOSED
 	boolean_t		zp_metadata;
 	boolean_t		zp_usesc;
-#endif /* NZA_CLOSED */
 } zio_prop_t;
+
+#define	ZIO_IS_DDT(io_prop)                        \
+	(((io_prop)->zp_type == DMU_OT_DDT_ZAP) || \
+	    ((io_prop)->zp_type == DMU_OT_DDT_STATS))
+
+#define	ZIO_IS_ZPL_META(io_prop)                                    \
+	(((io_prop)->zp_type == DMU_OT_ZNODE)			 || \
+	    ((io_prop)->zp_type == DMU_OT_OLDACL)		 || \
+	    ((io_prop)->zp_type == DMU_OT_DIRECTORY_CONTENTS)	 || \
+	    ((io_prop)->zp_type == DMU_OT_MASTER_NODE)		 || \
+	    ((io_prop)->zp_type == DMU_OT_UNLINKED_SET))
+
+#define	ZIO_IS_GENERAL_META(io_prop)                          \
+	(((io_prop)->zp_type == DMU_OT_DNODE)			 || \
+	    ((io_prop)->zp_type == DMU_OT_OBJSET)		 || \
+	    ((io_prop)->zp_type == DMU_OT_OBJECT_DIRECTORY)	 || \
+	    ((io_prop)->zp_type == DMU_OT_OBJECT_ARRAY)	 || \
+	    ((io_prop)->zp_type == DMU_OT_PACKED_NVLIST)	 || \
+	    ((io_prop)->zp_type == DMU_OT_PACKED_NVLIST_SIZE)	 || \
+	    ((io_prop)->zp_type == DMU_OT_OBJECT_ARRAY)	 || \
+	    ((io_prop)->zp_type == DMU_OT_BPOBJ)		 || \
+	    ((io_prop)->zp_type == DMU_OT_BPOBJ_HDR))
 
 typedef struct zio_cksum_report zio_cksum_report_t;
 
@@ -444,6 +478,14 @@ struct zio {
 
 	/* Timestamp for tracking vdev I/O latency */
 	hrtime_t io_vd_timestamp;
+
+	/* Checksum acceleration */
+	zio_checksum_state_t	zio_checksum_state;
+	zio_cksum_t		*zio_checksump;
+	void			*zio_checksum_datap;
+	uint64_t		zio_checksum_data_size;
+	struct zio		*zio_checksum_next;
+	zio_cksum_t		actual_cksum;
 };
 
 extern zio_t *zio_null(zio_t *pio, spa_t *spa, vdev_t *vd,

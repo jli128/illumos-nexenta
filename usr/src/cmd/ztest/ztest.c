@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -119,6 +119,8 @@
 #include <sys/fs/zfs.h>
 #include <libnvpair.h>
 
+#include <sys/special.h>
+
 static int ztest_fd_data = -1;
 static int ztest_fd_rand = -1;
 
@@ -191,6 +193,12 @@ typedef struct ztest_shared_ds {
 
 static ztest_shared_ds_t *ztest_shared_ds;
 #define	ZTEST_GET_SHARED_DS(d) (&ztest_shared_ds[d])
+
+/* special vdev config */
+static uint64_t zopt_special_class = SPA_SPECIALCLASS_META;
+static int zopt_special_vdevs = 2;
+static size_t zopt_special_size = SPA_MINDEVSIZE;
+static int zopt_special_mirrors = 2;
 
 #define	BT_MAGIC	0x123456789abcdefULL
 #define	MAXFAULTS() \
@@ -569,6 +577,9 @@ usage(boolean_t requested)
 	    "\t[-F freezeloops (default: %llu)] max loops in spa_freeze()\n"
 	    "\t[-P passtime (default: %llu sec)] time per pass\n"
 	    "\t[-B alt_ztest (default: <none>)] alternate ztest path\n"
+	    "\t[-N special vdevs per mirror (default: %llu)]\n"
+	    "\t[-S special vdev size (default: %llu)]\n"
+	    "\t[-M special vdev mirrors (default: %llu)]\n"
 	    "\t[-h] (print help)\n"
 	    "",
 	    zo->zo_pool,
@@ -587,7 +598,10 @@ usage(boolean_t requested)
 	    zo->zo_dir,					/* -f */
 	    (u_longlong_t)zo->zo_time,			/* -T */
 	    (u_longlong_t)zo->zo_maxloops,		/* -F */
-	    (u_longlong_t)zo->zo_passtime);
+	    (u_longlong_t)zo->zo_passtime,		/* -P */
+	    zopt_special_vdevs,				/* -N */
+	    (u_longlong_t)zopt_special_size,		/* -S */
+	    zopt_special_mirrors);			/* -M */
 	exit(requested ? 0 : 1);
 }
 
@@ -621,6 +635,9 @@ process_options(int argc, char **argv)
 		case 'T':
 		case 'P':
 		case 'F':
+		case 'N':
+		case 'S':
+		case 'M':
 			value = nicenumtoull(optarg);
 		}
 		switch (opt) {
@@ -690,6 +707,15 @@ process_options(int argc, char **argv)
 			break;
 		case 'B':
 			(void) strlcpy(altdir, optarg, sizeof (altdir));
+			break;
+		case 'N':
+			zopt_special_vdevs = MAX(0, value);
+			break;
+		case 'S':
+			zopt_special_size = MAX(SPA_MINDEVSIZE, value);
+			break;
+		case 'M':
+			zopt_special_mirrors = MAX(0, value);
 			break;
 		case 'h':
 			usage(B_TRUE);
@@ -795,7 +821,8 @@ ztest_get_ashift(void)
 }
 
 static nvlist_t *
-make_vdev_file(char *path, char *aux, size_t size, uint64_t ashift)
+make_vdev_file(char *path, char *aux, size_t size, uint64_t ashift,
+	boolean_t is_special)
 {
 	char pathbuf[MAXPATHLEN];
 	uint64_t vdev;
@@ -825,7 +852,7 @@ make_vdev_file(char *path, char *aux, size_t size, uint64_t ashift)
 		if (fd == -1)
 			fatal(1, "can't open %s", path);
 		if (ftruncate(fd, size) != 0)
-			fatal(1, "can't ftruncate %s", path);
+			fatal(1, "can't ftruncate %s to %lld", path, size);
 		(void) close(fd);
 	}
 
@@ -833,22 +860,27 @@ make_vdev_file(char *path, char *aux, size_t size, uint64_t ashift)
 	VERIFY(nvlist_add_string(file, ZPOOL_CONFIG_TYPE, VDEV_TYPE_FILE) == 0);
 	VERIFY(nvlist_add_string(file, ZPOOL_CONFIG_PATH, path) == 0);
 	VERIFY(nvlist_add_uint64(file, ZPOOL_CONFIG_ASHIFT, ashift) == 0);
-
+	VERIFY(nvlist_add_uint64(file, ZPOOL_CONFIG_IS_SPECIAL, is_special)
+	    == 0);
 	return (file);
 }
 
 static nvlist_t *
-make_vdev_raidz(char *path, char *aux, size_t size, uint64_t ashift, int r)
+make_vdev_raidz(char *path, char *aux, size_t size, uint64_t ashift, int r,
+	boolean_t is_special)
 {
 	nvlist_t *raidz, **child;
 	int c;
 
+	/* do not support raid-z special devices, only mirrors or leaves */
+	VERIFY((r < 2) || (is_special == B_FALSE));
+
 	if (r < 2)
-		return (make_vdev_file(path, aux, size, ashift));
+		return (make_vdev_file(path, aux, size, ashift, is_special));
 	child = umem_alloc(r * sizeof (nvlist_t *), UMEM_NOFAIL);
 
 	for (c = 0; c < r; c++)
-		child[c] = make_vdev_file(path, aux, size, ashift);
+		child[c] = make_vdev_file(path, aux, size, ashift, B_FALSE);
 
 	VERIFY(nvlist_alloc(&raidz, NV_UNIQUE_NAME, 0) == 0);
 	VERIFY(nvlist_add_string(raidz, ZPOOL_CONFIG_TYPE,
@@ -868,24 +900,30 @@ make_vdev_raidz(char *path, char *aux, size_t size, uint64_t ashift, int r)
 
 static nvlist_t *
 make_vdev_mirror(char *path, char *aux, size_t size, uint64_t ashift,
-	int r, int m)
+    int r, int m, boolean_t is_special)
 {
 	nvlist_t *mirror, **child;
 	int c;
 
+	/* do not support raid-z special devices, only mirrors or leaves */
+	VERIFY((r < 2) || (is_special == B_FALSE));
+
 	if (m < 1)
-		return (make_vdev_raidz(path, aux, size, ashift, r));
+		return (make_vdev_raidz(path, aux, size, ashift, r,
+		    is_special));
 
 	child = umem_alloc(m * sizeof (nvlist_t *), UMEM_NOFAIL);
 
 	for (c = 0; c < m; c++)
-		child[c] = make_vdev_raidz(path, aux, size, ashift, r);
+		child[c] = make_vdev_raidz(path, aux, size, ashift, r, B_FALSE);
 
 	VERIFY(nvlist_alloc(&mirror, NV_UNIQUE_NAME, 0) == 0);
 	VERIFY(nvlist_add_string(mirror, ZPOOL_CONFIG_TYPE,
 	    VDEV_TYPE_MIRROR) == 0);
 	VERIFY(nvlist_add_nvlist_array(mirror, ZPOOL_CONFIG_CHILDREN,
 	    child, m) == 0);
+	VERIFY(nvlist_add_uint64(mirror, ZPOOL_CONFIG_IS_SPECIAL, is_special)
+	    == 0);
 
 	for (c = 0; c < m; c++)
 		nvlist_free(child[c]);
@@ -897,17 +935,21 @@ make_vdev_mirror(char *path, char *aux, size_t size, uint64_t ashift,
 
 static nvlist_t *
 make_vdev_root(char *path, char *aux, size_t size, uint64_t ashift,
-	int log, int r, int m, int t)
+    int log, int r, int m, int t)
 {
 	nvlist_t *root, **child;
 	int c;
+
+	/* all vdevs are "regular", not "special" */
+	boolean_t special = B_FALSE;
 
 	ASSERT(t > 0);
 
 	child = umem_alloc(t * sizeof (nvlist_t *), UMEM_NOFAIL);
 
 	for (c = 0; c < t; c++) {
-		child[c] = make_vdev_mirror(path, aux, size, ashift, r, m);
+		child[c] = make_vdev_mirror(path, aux, size, ashift, r, m,
+		    special);
 		VERIFY(nvlist_add_uint64(child[c], ZPOOL_CONFIG_IS_LOG,
 		    log) == 0);
 	}
@@ -923,6 +965,62 @@ make_vdev_root(char *path, char *aux, size_t size, uint64_t ashift,
 	umem_free(child, t * sizeof (nvlist_t *));
 
 	return (root);
+}
+
+/*
+ * Add special top-level vdev(s) to the vdev tree
+ */
+static void
+add_special_vdevs(nvlist_t *root, size_t size, int m, int t)
+{
+	nvlist_t **child = NULL, **prev_child = NULL, **new_child = NULL;
+	int c = 0, new = 0;
+	unsigned int prev = 0;
+
+	if ((m == 0) || (t == 0))
+		return;
+
+	child = umem_alloc(t * sizeof (nvlist_t *), UMEM_NOFAIL);
+
+	/*
+	 * special flag that is added to the top-level vdevs
+	 */
+	for (c = 0; c < t; c++) {
+		child[c] = make_vdev_mirror(NULL, NULL, size, 0, 0, m,
+		    B_TRUE);
+	}
+
+	/*
+	 * Extend the children's array in the root"
+	 *  - get previously added children
+	 *  - allocate new array
+	 *  - and copy the previous and new children there
+	 *  - replace the children nvlist adday with the new one
+	 */
+	VERIFY(nvlist_lookup_nvlist_array(root, ZPOOL_CONFIG_CHILDREN,
+	    &prev_child, &prev) == 0);
+
+	new = prev + t;
+
+	new_child = umem_alloc(new * sizeof (nvlist_t *),
+	    UMEM_NOFAIL);
+	for (c = 0; c < prev; c++) {
+		VERIFY(nvlist_dup(prev_child[c], &new_child[c], 0) == 0);
+	}
+	for (; c < new; c++) {
+		new_child[c] = child[c-prev];
+	}
+
+	VERIFY(nvlist_add_nvlist_array(root, ZPOOL_CONFIG_CHILDREN,
+	    new_child, new) == 0);
+
+	/* free children */
+	for (c = 0; c < new; c++) {
+		nvlist_free(new_child[c]);
+	}
+	umem_free(child, t * sizeof (nvlist_t *));
+
+	umem_free(new_child, new * sizeof (nvlist_t *));
 }
 
 static int
@@ -5613,6 +5711,17 @@ make_random_props()
 		return (props);
 	VERIFY(nvlist_add_uint64(props, "autoreplace", 1) == 0);
 
+	/*
+	 * Set special class randomly
+	 */
+	if (ztest_random(100) < 50)
+		zopt_special_class = SPA_SPECIALCLASS_WRCACHE;
+	else
+		zopt_special_class = SPA_SPECIALCLASS_META;
+
+	VERIFY(nvlist_add_uint64(props, "specialclass",
+	    zopt_special_class) == 0);
+
 	return (props);
 }
 
@@ -5640,6 +5749,11 @@ ztest_init(ztest_shared_t *zs)
 	zs->zs_mirrors = ztest_opts.zo_mirrors;
 	nvroot = make_vdev_root(NULL, NULL, ztest_opts.zo_vdev_size, 0,
 	    0, ztest_opts.zo_raidz, zs->zs_mirrors, 1);
+	/*
+	 * Add special vdevs
+	 */
+	add_special_vdevs(nvroot, zopt_special_size, zopt_special_vdevs,
+	    zopt_special_mirrors);
 	props = make_random_props();
 	for (int i = 0; i < SPA_FEATURES; i++) {
 		char buf[1024];

@@ -20,8 +20,8 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -37,9 +37,7 @@
 #include <sys/zio.h>
 #include <sys/dmu_zfetch.h>
 #include <sys/sa.h>
-#ifdef	NZA_CLOSED
 #include <sys/sa_impl.h>
-#endif /* NZA_CLOSED */
 
 static void dbuf_destroy(dmu_buf_impl_t *db);
 static int dbuf_undirty(dmu_buf_impl_t *db, dmu_tx_t *tx);
@@ -1001,11 +999,7 @@ dbuf_release_bp(dmu_buf_impl_t *db)
 }
 
 dbuf_dirty_record_t *
-#ifdef	NZA_CLOSED
-dbuf_dirty_impl(dmu_buf_impl_t *db, dmu_tx_t *tx, boolean_t usesc)
-#else /* !NZA_CLOSED */
-dbuf_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
-#endif /* !NZA_CLOSED */
+dbuf_dirty_sc(dmu_buf_impl_t *db, dmu_tx_t *tx, boolean_t usesc)
 {
 	dnode_t *dn;
 	objset_t *os;
@@ -1087,13 +1081,11 @@ dbuf_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 				arc_buf_thaw(db->db_buf);
 		}
 
-#ifdef	NZA_CLOSED
 		/*
 		 * Special class usage of dirty dbuf could be changed,
 		 * update the dirty entry.
 		 */
 		dr->dr_usesc = usesc;
-#endif /* NZA_CLOSED */
 		mutex_exit(&db->db_mtx);
 		return (dr);
 	}
@@ -1177,9 +1169,7 @@ dbuf_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 	dr->dr_dbuf = db;
 	dr->dr_txg = tx->tx_txg;
 	dr->dr_next = *drp;
-#ifdef	NZA_CLOSED
 	dr->dr_usesc = usesc;
-#endif /* NZA_CLOSED */
 	*drp = dr;
 
 	/*
@@ -1210,11 +1200,7 @@ dbuf_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 		ASSERT(!list_link_active(&dr->dr_dirty_node));
 		list_insert_tail(&dn->dn_dirty_records[txgoff], dr);
 		mutex_exit(&dn->dn_mtx);
-#ifdef	NZA_CLOSED
-		dnode_setdirty_impl(dn, tx, usesc);
-#else /* !NZA_CLOSED */
-		dnode_setdirty(dn, tx);
-#endif /* !NZA_CLOSED */
+		dnode_setdirty_sc(dn, tx, usesc);
 		DB_DNODE_EXIT(db);
 		return (dr);
 	} else if (do_free_accounting) {
@@ -1239,11 +1225,7 @@ dbuf_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 	}
 
 	if (db->db_level == 0) {
-#ifdef	NZA_CLOSED
 		dnode_new_blkid(dn, db->db_blkid, tx, usesc, drop_struct_lock);
-#else /* !NZA_CLOSED */
-		dnode_new_blkid(dn, db->db_blkid, tx, drop_struct_lock);
-#endif /* !NZA_CLOSED */
 		ASSERT(dn->dn_maxblkid >= db->db_blkid);
 	}
 
@@ -1263,11 +1245,7 @@ dbuf_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 		if (drop_struct_lock)
 			rw_exit(&dn->dn_struct_rwlock);
 		ASSERT3U(db->db_level+1, ==, parent->db_level);
-#ifdef	NZA_CLOSED
-		di = dbuf_dirty_impl(parent, tx, usesc);
-#else /* !NZA_CLOSED */
-		di = dbuf_dirty(parent, tx);
-#endif /* !NZA_CLOSED */
+		di = dbuf_dirty_sc(parent, tx, usesc);
 		if (parent_held)
 			dbuf_rele(parent, FTAG);
 
@@ -1282,6 +1260,12 @@ dbuf_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 			mutex_exit(&di->dt.di.dr_mtx);
 			dr->dr_parent = di;
 		}
+
+		/*
+		 * Special class usage of dirty dbuf could be changed,
+		 * update the dirty entry.
+		 */
+		dr->dr_usesc = usesc;
 		mutex_exit(&db->db_mtx);
 	} else {
 		ASSERT(db->db_level+1 == dn->dn_nlevels);
@@ -1295,16 +1279,11 @@ dbuf_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 			rw_exit(&dn->dn_struct_rwlock);
 	}
 
-#ifdef	NZA_CLOSED
-	dnode_setdirty_impl(dn, tx, usesc);
-#else /* !NZA_CLOSED */
-	dnode_setdirty(dn, tx);
-#endif /* !NZA_CLOSED */
+	dnode_setdirty_sc(dn, tx, usesc);
 	DB_DNODE_EXIT(db);
 	return (dr);
 }
 
-#ifdef	NZA_CLOSED
 dbuf_dirty_record_t *
 dbuf_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 {
@@ -1313,9 +1292,8 @@ dbuf_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 	ASSERT(db->db_objset != NULL);
 	spa = db->db_objset->os_spa;
 
-	return (dbuf_dirty_impl(db, tx, spa->spa_usesc));
+	return (dbuf_dirty_sc(db, tx, spa->spa_usesc));
 }
-#endif /* NZA_CLOSED */
 
 static int
 dbuf_undirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
@@ -1427,7 +1405,7 @@ dbuf_undirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 }
 
 #pragma weak dmu_buf_will_dirty = dbuf_will_dirty
-#ifdef	NZA_CLOSED
+
 void
 dbuf_will_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 {
@@ -1435,14 +1413,9 @@ dbuf_will_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 }
 
 #pragma weak dmu_buf_will_dirty_sc = dbuf_will_dirty_sc
-#endif /* NZA_CLOSED */
 
 void
-#ifdef	NZA_CLOSED
 dbuf_will_dirty_sc(dmu_buf_impl_t *db, dmu_tx_t *tx, boolean_t usesc)
-#else /* !NZA_CLOSED */
-dbuf_will_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
-#endif /* NZA_CLOSED */
 {
 	int rf = DB_RF_MUST_SUCCEED | DB_RF_NOPREFETCH;
 
@@ -1454,11 +1427,7 @@ dbuf_will_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 		rf |= DB_RF_HAVESTRUCT;
 	DB_DNODE_EXIT(db);
 	(void) dbuf_read(db, NULL, rf);
-#ifdef	NZA_CLOSED
-	(void) dbuf_dirty_impl(db, tx, usesc);
-#else /* !NZA_CLOSED */
-	(void) dbuf_dirty(db, tx);
-#endif /* NZA_CLOSED */
+	(void) dbuf_dirty_sc(db, tx, usesc);
 }
 
 
@@ -2771,9 +2740,7 @@ dbuf_write(dbuf_dirty_record_t *dr, arc_buf_t *data, dmu_tx_t *tx)
 	if (db->db_blkid == DMU_SPILL_BLKID)
 		wp_flag = WP_SPILL;
 	wp_flag |= (db->db_state == DB_NOFILL) ? WP_NOFILL : 0;
-#ifdef	NZA_CLOSED
 	WP_SET_SPECIALCLASS(wp_flag, dr->dr_usesc);
-#endif /* NZA_CLOSED */
 
 	dmu_write_policy(os, dn, db->db_level, wp_flag, &zp);
 	DB_DNODE_EXIT(db);

@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -162,6 +162,78 @@ vdev_queue_agg_io_done(zio_t *aio)
 
 	zio_buf_free(aio->io_data, aio->io_size);
 }
+
+/*
+ * Compute vdev utilization
+ *
+ * we use pending queue add/remove events to accummulate two things:
+ *   busy time (when there are zios on the pending queue);
+ *   wall clock time (total elapsed time)
+ * we also keep track of the last utilization reading, sample
+ * utilization telemetry every so often, and use EMA to smooth out
+ * instantaneous changes
+ *
+ * an important detail: this specific way of accummulating busy time
+ * works correctly only if vdev_busy_update() is invoked in the following
+ * order with respect to the add/remove events
+ *
+ * ...
+ * vdev_buzy_update(vd);
+ * avl_add(pending_tree, zio);
+ * ...
+ * vdev_busy_update(vd);
+ * avl_remove(pending_tree, zio);
+ * ...
+ */
+int64_t vdev_busy_alpha = 100;		/* 0.1 */
+hrtime_t vdev_busy_delay = 10*1000000;	/* 10 msec */
+
+static void
+vdev_util_update(vdev_t *vd)
+{
+	ulong_t pending;
+	vdev_queue_t *vq = &vd->vdev_queue;
+	vdev_stat_t *vs = &vd->vdev_stat;
+	hrtime_t ts;
+
+	ASSERT(MUTEX_HELD(&vq->vq_lock));
+
+	pending = avl_numnodes(&vq->vq_pending_tree);
+
+	DTRACE_PROBE2(vdev_util_comp, uint64_t, vd->vdev_guid,
+	    ulong_t, pending);
+
+	ts = gethrtime();
+
+	mutex_enter(&vd->vdev_stat_lock);
+	/* accumulate wall clock time */
+	if (vs->vs_wcstart) {
+		ASSERT(vs->vs_wcstart <= ts);
+		vs->vs_wctotal += ts - vs->vs_wcstart;
+	}
+	vs->vs_wcstart = ts;
+	/* accumulate busy time; see the comment above */
+	if (pending) {
+		ASSERT(vs->vs_bzstart);
+		ASSERT(vs->vs_bzstart <= ts);
+		vs->vs_bztotal += ts - vs->vs_bzstart;
+	}
+	vs->vs_bzstart = ts;
+	/* update utilization stats */
+	if (vs->vs_wctotal && (ts - vs->vs_bztimestamp) > vdev_busy_delay) {
+		int64_t busy = 100*vs->vs_bztotal/vs->vs_wctotal;
+		vs->vs_bztimestamp = ts;
+		vs->vs_busy += (int64_t)(busy - vs->vs_busy) *
+		    vdev_busy_alpha/1000;
+		/* reset the accumulators */
+		vs->vs_bztotal = vs->vs_wctotal = 0;
+
+		DTRACE_PROBE3(vdev_util_diff, uint64_t, vd->vdev_guid,
+		    uint64_t, busy, uint64_t, vs->vs_busy);
+	}
+	mutex_exit(&vd->vdev_stat_lock);
+}
+
 
 /*
  * Compute the range spanned by two i/os, which is the endpoint of the last
@@ -313,6 +385,9 @@ again:
 			zio_execute(dio);
 		} while (dio != lio);
 
+		/* update vdev utilization statistics */
+		vdev_util_update(aio->io_vd);
+
 		avl_add(&vq->vq_pending_tree, aio);
 
 		return (aio);
@@ -335,19 +410,38 @@ again:
 		goto again;
 	}
 
+	/* update vdev utilization statistics */
+	vdev_util_update(fio->io_vd);
+
 	avl_add(&vq->vq_pending_tree, fio);
 
 	return (fio);
+}
+
+uint64_t vdev_maxpending(vdev_t *vdev, uint64_t default_val);
+#pragma	weak	vdev_get_maxpending = vdev_maxpending
+/* ARGSUSED */
+uint64_t
+vdev_maxpending(vdev_t *vdev, uint64_t default_val)
+{
+	return (zfs_vdev_max_pending);
+}
+
+uint64_t vdev_minpending(vdev_t *vdev, uint64_t default_val);
+#pragma	weak	vdev_get_minpending = vdev_minpending
+/* ARGSUSED */
+uint64_t
+vdev_minpending(vdev_t *vdev, uint64_t default_val)
+{
+	return (zfs_vdev_min_pending);
 }
 
 zio_t *
 vdev_queue_io(zio_t *zio)
 {
 	vdev_queue_t *vq = &zio->io_vd->vdev_queue;
-#ifdef	NZA_CLOSED
 	uint64_t vdev_min_pending = vdev_get_minpending(zio->io_vd,
 	    zfs_vdev_min_pending);
-#endif /* NZA_CLOSED */
 	zio_t *nio;
 
 	ASSERT(zio->io_type == ZIO_TYPE_READ || zio->io_type == ZIO_TYPE_WRITE);
@@ -369,11 +463,7 @@ vdev_queue_io(zio_t *zio)
 
 	vdev_queue_io_add(vq, zio);
 
-#ifdef	NZA_CLOSED
 	nio = vdev_queue_io_to_issue(vq, vdev_min_pending);
-#else /* !NZA_CLOSED */
-	nio = vdev_queue_io_to_issue(vq, zfs_vdev_min_pending);
-#endif /* !NZA_CLOSED */
 
 	mutex_exit(&vq->vq_lock);
 
@@ -392,21 +482,18 @@ void
 vdev_queue_io_done(zio_t *zio)
 {
 	vdev_queue_t *vq = &zio->io_vd->vdev_queue;
-#ifdef	NZA_CLOSED
 	uint64_t vdev_max_pending = vdev_get_maxpending(zio->io_vd,
 	    zfs_vdev_max_pending);
-#endif /* NZA_CLOSED */
 
 	mutex_enter(&vq->vq_lock);
+
+	/* update vdev utilization statistics */
+	vdev_util_update(zio->io_vd);
 
 	avl_remove(&vq->vq_pending_tree, zio);
 
 	for (int i = 0; i < zfs_vdev_ramp_rate; i++) {
-#ifdef	NZA_CLOSED
 		zio_t *nio = vdev_queue_io_to_issue(vq, vdev_max_pending);
-#else /* !NZA_CLOSED */
-		zio_t *nio = vdev_queue_io_to_issue(vq, zfs_vdev_max_pending);
-#endif /* !NZA_CLOSED */
 		if (nio == NULL)
 			break;
 		mutex_exit(&vq->vq_lock);

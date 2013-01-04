@@ -21,8 +21,8 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -63,9 +63,7 @@
 #include <sys/zfs_ioctl.h>
 #include <sys/dsl_scan.h>
 #include <sys/zfeature.h>
-#ifdef	NZA_CLOSED
 #include <sys/special.h>
-#endif /* NZA_CLOSED */
 
 #ifdef	_KERNEL
 #include <sys/bootprops.h>
@@ -193,7 +191,6 @@ spa_prop_get_config(spa_t *spa, nvlist_t **nvp)
 		spa_prop_add_list(*nvp, ZPOOL_PROP_ALLOCATED, NULL, alloc, src);
 		spa_prop_add_list(*nvp, ZPOOL_PROP_FREE, NULL,
 		    size - alloc, src);
-#ifdef	NZA_CLOSED
 		spa_prop_add_list(*nvp, ZPOOL_PROP_SPECIALCLASS, NULL,
 		    spa_specialclass_id(spa), src);
 		spa_prop_add_list(*nvp, ZPOOL_PROP_ENABLESPECIAL, NULL,
@@ -202,7 +199,6 @@ spa_prop_get_config(spa_t *spa, nvlist_t **nvp)
 		    spa->spa_hiwat, src);
 		spa_prop_add_list(*nvp, ZPOOL_PROP_LOWATERMARK, NULL,
 		    spa->spa_lowat, src);
-#endif /* NZA_CLOSED */
 
 		space = 0;
 		for (int c = 0; c < rvd->vdev_children; c++) {
@@ -388,9 +384,7 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 	int error = 0, reset_bootfs = 0;
 	uint64_t objnum;
 	boolean_t has_feature = B_FALSE;
-#ifdef	NZA_CLOSED
 	uint64_t lowat = spa->spa_lowat, hiwat = spa->spa_hiwat;
-#endif /* NZA_CLOSED */
 
 	elem = NULL;
 	while ((elem = nvlist_next_nvpair(props, elem)) != NULL) {
@@ -578,7 +572,6 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 				error = EINVAL;
 			break;
 
-#ifdef	NZA_CLOSED
 		case ZPOOL_PROP_SPECIALCLASS:
 			error = nvpair_value_uint64(elem, &intval);
 			if (!error && (intval >= SPA_NUM_SPECIALCLASSES))
@@ -596,18 +589,15 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 				error = EINVAL;
 			hiwat = intval;
 			break;
-#endif /* NZA_CLOSED */
 		}
 
 		if (error)
 			break;
 	}
 
-#ifdef	NZA_CLOSED
 	/* check if low watermark is less than high watermark */
 	if (lowat > 0 && lowat >= hiwat)
 		error = EINVAL;
-#endif /* NZA_CLOSED */
 
 	if (!error && reset_bootfs) {
 		error = nvlist_remove(props,
@@ -974,7 +964,6 @@ spa_thread(void *arg)
 static void
 spa_activate(spa_t *spa, int mode)
 {
-
 	ASSERT(spa->spa_state == POOL_STATE_UNINITIALIZED);
 
 	spa->spa_state = POOL_STATE_ACTIVE;
@@ -982,9 +971,7 @@ spa_activate(spa_t *spa, int mode)
 
 	spa->spa_normal_class = metaslab_class_create(spa, zfs_metaslab_ops);
 	spa->spa_log_class = metaslab_class_create(spa, zfs_metaslab_ops);
-#ifdef	NZA_CLOSED
 	spa->spa_special_class = metaslab_class_create(spa, zfs_metaslab_ops);
-#endif /* NZA_CLOSED */
 
 	/* Try to create a covering process */
 	mutex_enter(&spa->spa_proc_lock);
@@ -1033,6 +1020,7 @@ spa_activate(spa_t *spa, int mode)
 	avl_create(&spa->spa_errlist_last,
 	    spa_error_entry_compare, sizeof (spa_error_entry_t),
 	    offsetof(spa_error_entry_t, se_avl));
+
 }
 
 /*
@@ -1066,10 +1054,8 @@ spa_deactivate(spa_t *spa)
 	metaslab_class_destroy(spa->spa_log_class);
 	spa->spa_log_class = NULL;
 
-#ifdef	NZA_CLOSED
 	metaslab_class_destroy(spa->spa_special_class);
 	spa->spa_special_class = NULL;
-#endif /* NZA_CLOSED */
 
 	/*
 	 * If this was part of an import or the open otherwise failed, we may
@@ -1106,6 +1092,7 @@ spa_deactivate(spa_t *spa)
 		thread_join(spa->spa_did);
 		spa->spa_did = 0;
 	}
+
 }
 
 /*
@@ -1770,8 +1757,7 @@ spa_load_verify_done(zio_t *zio)
 	int error = zio->io_error;
 
 	if (error) {
-		if ((BP_GET_LEVEL(bp) != 0 || DMU_OT_IS_METADATA(type)) &&
-		    type != DMU_OT_INTENT_LOG)
+		if (BP_IS_METADATA(bp) && type != DMU_OT_INTENT_LOG)
 			atomic_add_64(&sle->sle_meta_count, 1);
 		else
 			atomic_add_64(&sle->sle_data_count, 1);
@@ -2461,9 +2447,7 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 
 	if (error == 0) {
 		uint64_t autoreplace;
-#ifdef	NZA_CLOSED
 		uint64_t val = 0;
-#endif /* NZA_CLOSED */
 
 		spa_prop_find(spa, ZPOOL_PROP_BOOTFS, &spa->spa_bootfs);
 		spa_prop_find(spa, ZPOOL_PROP_AUTOREPLACE, &autoreplace);
@@ -2473,7 +2457,6 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 		spa_prop_find(spa, ZPOOL_PROP_DEDUPDITTO,
 		    &spa->spa_dedup_ditto);
 
-#ifdef	NZA_CLOSED
 		spa_prop_find(spa, ZPOOL_PROP_SPECIALCLASS, &val);
 		spa_set_specialclass(spa, (spa_specialclass_id_t)val);
 		spa->spa_hiwat = zpool_prop_default_numeric(
@@ -2482,12 +2465,10 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 		    ZPOOL_PROP_LOWATERMARK);
 		spa_prop_find(spa, ZPOOL_PROP_HIWATERMARK, &spa->spa_hiwat);
 		spa_prop_find(spa, ZPOOL_PROP_LOWATERMARK, &spa->spa_lowat);
-#endif /* NZA_CLOSED */
 
 		spa->spa_autoreplace = (autoreplace != 0);
 	}
 
-#ifdef	NZA_CLOSED
 	error = spa_dir_prop(spa, DMU_POOL_COS_PROPS,
 	    &spa->spa_cos_props_object);
 	if (error == 0)
@@ -2496,7 +2477,6 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 	    &spa->spa_vdev_props_object);
 	if (error == 0)
 		(void) vdev_load_props(spa);
-#endif /* NZA_CLOSED */
 
 
 	/*
@@ -3105,6 +3085,7 @@ spa_get_stats(const char *name, nvlist_t **config,
 {
 	int error;
 	spa_t *spa;
+	boolean_t wrcthr_stopped = B_FALSE;
 
 	*config = NULL;
 	error = spa_open_common(name, &spa, FTAG, NULL, config);
@@ -3358,9 +3339,7 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	uint_t nspares, nl2cache;
 	uint64_t version, obj;
 	boolean_t has_features;
-#ifdef	NZA_CLOSED
 	uint64_t val;
-#endif /* NZA_CLOSED */
 
 	/*
 	 * If this pool already exists, return failure.
@@ -3548,12 +3527,10 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	spa->spa_delegation = zpool_prop_default_numeric(ZPOOL_PROP_DELEGATION);
 	spa->spa_failmode = zpool_prop_default_numeric(ZPOOL_PROP_FAILUREMODE);
 	spa->spa_autoexpand = zpool_prop_default_numeric(ZPOOL_PROP_AUTOEXPAND);
-#ifdef	NZA_CLOSED
 	val = zpool_prop_default_numeric(ZPOOL_PROP_SPECIALCLASS);
 	spa_set_specialclass(spa, (spa_specialclass_id_t)val);
 	spa->spa_hiwat = zpool_prop_default_numeric(ZPOOL_PROP_HIWATERMARK);
 	spa->spa_lowat = zpool_prop_default_numeric(ZPOOL_PROP_LOWATERMARK);
-#endif /* NZA_CLOSED */
 
 	if (props != NULL) {
 		spa_configfile_set(spa, props, B_FALSE);
@@ -4076,9 +4053,7 @@ spa_export_common(char *pool, int new_state, nvlist_t **oldconfig,
     boolean_t force, boolean_t hardforce)
 {
 	spa_t *spa;
-#ifdef	NZA_CLOSED
 	boolean_t wrcthr_stopped = B_FALSE;
-#endif /* NZA_CLOSED */
 
 	if (oldconfig)
 		*oldconfig = NULL;
@@ -4093,14 +4068,13 @@ spa_export_common(char *pool, int new_state, nvlist_t **oldconfig,
 	}
 
 	/*
-	 * Put a hold on the pool, drop the namespace lock, stop async tasks,
-	 * reacquire the namespace lock, and see if we can export.
+	 * Put a hold on the pool, drop the namespace lock, stop async tasks
+	 * and write cache thread, reacquire the namespace lock, and see
+	 * if we can export.
 	 */
 	spa_open_ref(spa, FTAG);
 	mutex_exit(&spa_namespace_lock);
-#ifdef	NZA_CLOSED
 	wrcthr_stopped = stop_wrc_thread(spa); /* stop write cache thread */
-#endif /* NZA_CLOSED */
 	spa_async_suspend(spa);
 	mutex_enter(&spa_namespace_lock);
 	spa_close(spa, FTAG);
@@ -4126,10 +4100,8 @@ spa_export_common(char *pool, int new_state, nvlist_t **oldconfig,
 		    new_state != POOL_STATE_UNINITIALIZED)) {
 			spa_async_resume(spa);
 			mutex_exit(&spa_namespace_lock);
-#ifdef	NZA_CLOSED
 			if (wrcthr_stopped)
 				start_wrc_thread(spa);
-#endif /* NZA_CLOSED */
 			return (EBUSY);
 		}
 
@@ -4143,10 +4115,8 @@ spa_export_common(char *pool, int new_state, nvlist_t **oldconfig,
 		    spa_has_active_shared_spare(spa)) {
 			spa_async_resume(spa);
 			mutex_exit(&spa_namespace_lock);
-#ifdef	NZA_CLOSED
 			if (wrcthr_stopped)
 				start_wrc_thread(spa);
-#endif /* NZA_CLOSED */
 			return (EXDEV);
 		}
 
@@ -5419,11 +5389,10 @@ spa_vdev_resilver_done(spa_t *spa)
  * This is an open-source version of the vdev_set_common
  * The corresponding closed source is found in vdev_props.c (closed-source repo)
  */
-#ifndef	NZA_CLOSED
 /*
  * Update the stored path or FRU for this vdev.
  */
-int
+static int
 spa_vdev_set_common(spa_t *spa, uint64_t guid, const char *value,
     boolean_t ispath)
 {
@@ -5460,19 +5429,224 @@ spa_vdev_set_common(spa_t *spa, uint64_t guid, const char *value,
 	return (spa_vdev_state_exit(spa, sync ? vd : NULL, 0));
 }
 
+#pragma	weak	spa_vdev_setpath = _spa_vdev_setpath
 int
-spa_vdev_setpath(spa_t *spa, uint64_t guid, const char *newpath)
+_spa_vdev_setpath(spa_t *spa, uint64_t guid, const char *newpath)
 {
 	return (spa_vdev_set_common(spa, guid, newpath, B_TRUE));
 }
 
+#pragma	weak	spa_vdev_setfru = _spa_vdev_setfru
 int
-spa_vdev_setfru(spa_t *spa, uint64_t guid, const char *newfru)
+_spa_vdev_setfru(spa_t *spa, uint64_t guid, const char *newfru)
 {
 	return (spa_vdev_set_common(spa, guid, newfru, B_FALSE));
 }
-#endif /* !NZA_CLOSED */
 
+/*
+ * Tunable: enable selection between special and normal classes
+ * if true, enables distribution of I/O between special and normal
+ * classes according to the spa->spa_special_to_normal_ratio
+ * if false, the ratio is disregarded, special class is used when possible
+ */
+uint64_t spa_special_selection_enable = 0;
+/* Tunable: nanosec period for updating stats (10 msec default) */
+hrtime_t spa_special_stat_update_period = 10*1000000;
+/*
+ * Tunable: special selection goal
+ * selects among special and normal vdevs in order to optimize specific
+ * system parameter, e.g. latency or throughput
+ */
+spa_special_selection_t spa_special_selection =
+    SPA_SPECIAL_SELECTION_LATENCY;
+/* Tunable: limits on the ratio of special to normal writes */
+uint64_t spa_special_ratio_max = SPA_SPECIAL_RATIO_MAX;
+uint64_t spa_special_ratio_min = SPA_SPECIAL_RATIO_MIN;
+/* Tunable: factor used to adjust the ratio up/down */
+uint64_t spa_special_factor = SPA_SPECIAL_ADJUSTMENT;
+/*
+ * Tunable: vdev utilization threshold
+ * once reached, start re-distributing I/O requests to other vdev classes
+ */
+uint64_t spa_special_vdev_busy = SPA_SPECIAL_UTILIZATION;
+uint64_t spa_normal_vdev_busy = SPA_SPECIAL_UTILIZATION;
+
+static void
+spa_special_ratio_adjust(spa_t *spa, spa_special_stat_t *stat)
+{
+	/* calculate averages */
+	if (stat->nnormal) {
+		stat->normal_lt = stat->normal_lt/stat->nnormal;
+		stat->normal_ut = stat->normal_ut/stat->nnormal;
+	}
+	if (stat->nspecial) {
+		stat->special_lt = stat->special_lt/stat->nspecial;
+		stat->special_ut = stat->special_ut/stat->nspecial;
+	}
+
+	/* update */
+	mutex_enter(&spa->spa_special_stat_lock);
+	spa->spa_special_stat = *stat;
+
+	/*
+	 * write to special until utilization threshold is reached
+	 * then look at either patency or bandwidth and adjust
+	 * request distribution accordingly
+	 */
+	ASSERT(SPA_SPECIAL_SELECTION_VALID(spa_special_selection));
+	switch (spa_special_selection) {
+	case SPA_SPECIAL_SELECTION_LATENCY:
+		/*
+		 * bias selection toward class with smaller
+		 * average latency
+		 */
+		if (stat->normal_lt && stat->special_lt) {
+			if (stat->normal_lt > stat->special_lt)
+				spa->spa_special_to_normal_ratio *=
+				    spa_special_factor;
+			if (stat->normal_lt < stat->special_lt)
+				spa->spa_special_to_normal_ratio /=
+				    spa_special_factor;
+		}
+		break;
+	case SPA_SPECIAL_SELECTION_THROUGHPUT:
+		if (stat->special_ut < spa_special_vdev_busy) {
+			/*
+			 * keep using special class until
+			 * the threshold is reached
+			 */
+			spa->spa_special_to_normal_ratio *= spa_special_factor;
+		} else if (stat->normal_ut < spa_normal_vdev_busy) {
+			/*
+			 * move some of the work to the normal class,
+			 * unless it is already busy
+			 */
+			spa->spa_special_to_normal_ratio /= spa_special_factor;
+		}
+		break;
+	default:
+		break; /* do nothing */
+	}
+	/*
+	 * must stay within limits
+	 */
+	if (spa->spa_special_to_normal_ratio < spa_special_ratio_min)
+		spa->spa_special_to_normal_ratio = spa_special_ratio_min;
+	if (spa->spa_special_to_normal_ratio > spa_special_ratio_max)
+		spa->spa_special_to_normal_ratio = spa_special_ratio_max;
+
+	DTRACE_PROBE3(spa_special_stats_utl, char *, spa->spa_name,
+	    uint64_t, stat->normal_ut, uint64_t, stat->special_ut);
+	DTRACE_PROBE3(spa_special_stats_lt, char *, spa->spa_name,
+	    int64_t, stat->normal_lt, int64_t, stat->special_lt);
+	DTRACE_PROBE2(spa_special_stats_rt, char *, spa->spa_name,
+	    uint64_t, spa->spa_special_to_normal_ratio);
+
+	mutex_exit(&spa->spa_special_stat_lock);
+}
+
+
+static void
+spa_vdev_walk_stats(vdev_t *pvd, hrtime_t *lt, int *ut, int *nvdev)
+{
+	int i;
+	if (pvd->vdev_children == 0) {
+		vdev_stat_t *pvd_stat = &pvd->vdev_stat;
+		/* single vdev (itself) */
+		ASSERT(pvd->vdev_ops->vdev_op_leaf);
+		DTRACE_PROBE1(spa_vdev_walk_lf, vdev_t *, pvd);
+		mutex_enter(&pvd->vdev_stat_lock);
+		*lt += pvd_stat->vs_latency[ZIO_TYPE_WRITE];
+		*ut += pvd_stat->vs_busy;
+		mutex_exit(&pvd->vdev_stat_lock);
+		*nvdev = *nvdev+1;
+	} else {
+		/* not a leaf-level vdev, has children */
+		ASSERT(pvd->vdev_ops->vdev_op_leaf == B_FALSE);
+		for (i = 0; i < pvd->vdev_children; i++) {
+			vdev_t *vd = pvd->vdev_child[i];
+			vdev_stat_t *vd_stat = &vd->vdev_stat;
+			ASSERT(vd);
+
+			if (vd->vdev_islog || vd->vdev_ishole ||
+			    vd->vdev_isspare || vd->vdev_isl2cache)
+				continue;
+
+			if (vd->vdev_ops->vdev_op_leaf == B_FALSE) {
+				DTRACE_PROBE1(spa_vdev_walk_nl, vdev_t *, vd);
+				spa_vdev_walk_stats(vd, lt, ut, nvdev);
+			} else {
+				DTRACE_PROBE1(spa_vdev_walk_lf, vdev_t *, vd);
+				mutex_enter(&vd->vdev_stat_lock);
+				*lt += vd_stat->vs_latency[ZIO_TYPE_WRITE];
+				*ut += vd_stat->vs_busy;
+				mutex_exit(&vd->vdev_stat_lock);
+				*nvdev = *nvdev+1;
+			}
+		}
+	}
+}
+
+void
+spa_special_stats_update(spa_t *spa)
+{
+	int i;
+	spa_special_stat_t spa_stat;
+	/* is it time to update ? */
+	hrtime_t now = gethrtime();
+	vdev_t *rvd = spa->spa_root_vdev;
+
+	/* too early to update stats ? */
+	if ((now - spa->spa_special_stat_timestamp) <
+	    spa_special_stat_update_period) {
+		DTRACE_PROBE1(spa_special_stat_early, char *, spa->spa_name);
+		return;
+	}
+
+	spa->spa_special_stat_timestamp = now;
+	membar_producer();
+
+	/*
+	 * walk the top level vdevs and calculate average stats for
+	 * the normal and special classes
+	 */
+	DTRACE_PROBE1(spa_special_stat_update, spa_t *, spa);
+
+	bzero(&spa_stat, sizeof (spa_special_stat_t));
+
+	ASSERT(rvd);
+
+	for (i = 0; i < rvd->vdev_children; i++) {
+		vdev_t *vd = rvd->vdev_child[i];
+		vdev_stat_t *vd_stat = &vd->vdev_stat;
+		ASSERT(vd);
+
+		if (vd->vdev_islog || vd->vdev_ishole ||
+		    vd->vdev_isspare || vd->vdev_isl2cache)
+			continue;
+		if (vd->vdev_isspecial) {
+			spa_vdev_walk_stats(vd, &spa_stat.special_lt,
+			    &spa_stat.special_ut, &spa_stat.nspecial);
+		} else {
+			spa_vdev_walk_stats(vd, &spa_stat.normal_lt,
+			    &spa_stat.normal_ut, &spa_stat.nnormal);
+		}
+	}
+
+	/* adjust the ratio accordingly */
+	spa_special_ratio_adjust(spa, &spa_stat);
+}
+
+/*
+ * Distribute writes across special and normal vdevs in
+ * spa_special_to_normal-1:1 proportion
+ */
+boolean_t
+spa_choose_special_class(spa_t *spa)
+{
+	uint64_t val = atomic_inc_64_nv(&spa->spa_special_stat_rotor);
+	return (val % spa->spa_special_to_normal_ratio);
+}
 /*
  * ==========================================================================
  * SPA Scanning
@@ -5986,7 +6160,6 @@ spa_sync_props(void *arg1, void *arg2, dmu_tx_t *tx)
 			case ZPOOL_PROP_DEDUPDITTO:
 				spa->spa_dedup_ditto = intval;
 				break;
-#ifdef	NZA_CLOSED
 			case ZPOOL_PROP_SPECIALCLASS:
 				ASSERT(intval < SPA_NUM_SPECIALCLASSES);
 				spa_set_specialclass(spa,
@@ -5998,7 +6171,6 @@ spa_sync_props(void *arg1, void *arg2, dmu_tx_t *tx)
 			case ZPOOL_PROP_HIWATERMARK:
 				spa->spa_hiwat = intval;
 				break;
-#endif /* NZA_CLOSED */
 			default:
 				break;
 			}
@@ -6269,9 +6441,7 @@ spa_sync(spa_t *spa, uint64_t txg)
 
 	spa->spa_sync_pass = 0;
 
-#ifdef	NZA_CLOSED
 	spa_check_special(spa);
-#endif /* NZA_CLOSED */
 	spa_config_exit(spa, SCL_CONFIG, FTAG);
 
 	spa_handle_ignored_writes(spa);

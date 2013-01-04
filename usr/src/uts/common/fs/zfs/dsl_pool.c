@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/dsl_pool.h>
@@ -29,10 +29,12 @@
 #include <sys/dsl_prop.h>
 #include <sys/dsl_dir.h>
 #include <sys/dsl_synctask.h>
+#include <sys/dsl_dataset.h>
 #include <sys/dsl_scan.h>
 #include <sys/dnode.h>
 #include <sys/dmu_tx.h>
 #include <sys/dmu_objset.h>
+#include <sys/dmu_traverse.h>
 #include <sys/arc.h>
 #include <sys/zap.h>
 #include <sys/zio.h>
@@ -45,9 +47,10 @@
 #include <sys/zfeature.h>
 #include <sys/zil_impl.h>
 
-#ifdef	NZA_CLOSED
 #include <sys/wrcache.h>
-#endif /* NZA_CLOSED */
+#include <sys/time.h>
+
+extern int zfs_txg_timeout;
 
 int zfs_no_write_throttle = 0;
 int zfs_write_limit_shift = 3;			/* 1/8th of physical memory */
@@ -86,9 +89,7 @@ dsl_pool_open_impl(spa_t *spa, uint64_t txg)
 	dp = kmem_zalloc(sizeof (dsl_pool_t), KM_SLEEP);
 	dp->dp_spa = spa;
 	dp->dp_meta_rootbp = *bp;
-#ifdef	NZA_CLOSED
 	dp->dp_sync_history[0] = dp->dp_sync_history[1] = 0;
-#endif /* NZA_CLOSED */
 
 	rw_init(&dp->dp_config_rwlock, NULL, RW_DEFAULT, NULL);
 	dp->dp_write_limit = zfs_write_limit_min;
@@ -501,9 +502,7 @@ dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 	dmu_tx_commit(tx);
 
 	dp->dp_space_towrite[txg & TXG_MASK] = 0;
-#ifdef	NZA_CLOSED
 	dp->dp_wrcio_towrite[txg & TXG_MASK] = 0;
-#endif /* NZA_CLOSED */
 	ASSERT(dp->dp_tempreserved[txg & TXG_MASK] == 0);
 
 	/*
@@ -675,11 +674,9 @@ dsl_pool_willuse_space(dsl_pool_t *dp, int64_t space, dmu_tx_t *tx)
 	if (space > 0) {
 		mutex_enter(&dp->dp_lock);
 		dp->dp_space_towrite[tx->tx_txg & TXG_MASK] += space;
-#ifdef	NZA_CLOSED
 		if (dmu_tx_is_wrcio(tx)) {
 			dp->dp_wrcio_towrite[tx->tx_txg & TXG_MASK] += space;
 		}
-#endif /* NZA_CLOSED */
 		mutex_exit(&dp->dp_lock);
 	}
 }

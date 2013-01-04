@@ -20,15 +20,13 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/zio.h>
 #include <sys/spa.h>
-#ifdef	NZA_CLOSED
 #include <sys/special.h>
-#endif /* NZA_CLOSED */
 #include <sys/zfs_acl.h>
 #include <sys/zfs_ioctl.h>
 #include <sys/fs/zfs.h>
@@ -67,7 +65,6 @@ zpool_prop_init(void)
 		{ NULL }
 	};
 
-#ifdef	NZA_CLOSED
 	static zprop_index_t specialclass_table[] = {
 		{ "zil",	SPA_SPECIALCLASS_ZIL },
 		{ "meta",	SPA_SPECIALCLASS_META },
@@ -77,7 +74,6 @@ zpool_prop_init(void)
 #endif
 		{ NULL }
 	};
-#endif /* NZA_CLOSED */
 
 	/* string properties */
 	zprop_register_string(ZPOOL_PROP_ALTROOT, "altroot", NULL, PROP_DEFAULT,
@@ -135,12 +131,10 @@ zpool_prop_init(void)
 	    ZIO_FAILURE_MODE_WAIT, PROP_DEFAULT, ZFS_TYPE_POOL,
 	    "wait | continue | panic", "FAILMODE", failuremode_table);
 
-#ifdef	NZA_CLOSED
 	/* special device status (enabled/disabled) */
 	zprop_register_index(ZPOOL_PROP_ENABLESPECIAL, "enablespecial", 0,
 	    PROP_READONLY, ZFS_TYPE_POOL, "on | off", "ENABLESPECIAL",
 	    boolean_table);
-
 #if 0
 	/* temporarily disable wrcache */
 	/* special class */
@@ -163,7 +157,6 @@ zpool_prop_init(void)
 	zprop_register_number(ZPOOL_PROP_HIWATERMARK, "high-watermark",
 	    80, PROP_DEFAULT, ZFS_TYPE_POOL,
 	    "<watermark 0-100%>", "HIWATERMARK");
-#endif /* NZA_CLOSED */
 
 	/* hidden properties */
 	zprop_register_hidden(ZPOOL_PROP_NAME, "name", PROP_TYPE_STRING,

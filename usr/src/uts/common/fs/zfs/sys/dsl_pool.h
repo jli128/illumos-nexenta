@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifndef	_SYS_DSL_POOL_H
@@ -91,14 +91,12 @@ typedef struct dsl_pool {
 	uint64_t dp_bptree_obj;
 	uint64_t dp_empty_bpobj;
 
-#ifdef	NZA_CLOSED
 	/*
 	 * Used for "special" device only
 	 * dp_rtime: the time (in ms) when we moved the data
 	 */
 	hrtime_t dp_spec_rtime;
 	uint64_t dp_sync_history[2];
-#endif /* NZA_CLOSED */
 
 	struct dsl_scan *dp_scan;
 
@@ -110,9 +108,7 @@ typedef struct dsl_pool {
 	uint64_t dp_mos_compressed_delta;
 	uint64_t dp_mos_uncompressed_delta;
 
-#ifdef	NZA_CLOSED
 	uint64_t dp_wrcio_towrite[TXG_SIZE];
-#endif /* NZA_CLOSED */
 
 	/* Has its own locking */
 	tx_state_t dp_tx;
@@ -169,9 +165,7 @@ extern int dsl_pool_user_release(dsl_pool_t *dp, uint64_t dsobj,
 extern void dsl_pool_clean_tmp_userrefs(dsl_pool_t *dp);
 int dsl_pool_open_special_dir(dsl_pool_t *dp, const char *name, dsl_dir_t **);
 
-#ifdef	NZA_CLOSED
 boolean_t dsl_pool_wrcio_limit(dsl_pool_t *dp, uint64_t txg);
-#endif /* NZA_CLOSED */
 
 #ifdef	__cplusplus
 }

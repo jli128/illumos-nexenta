@@ -21,9 +21,9 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifndef	_LIBZFS_H
@@ -262,9 +262,7 @@ extern int zpool_label_disk(libzfs_handle_t *, zpool_handle_t *, char *);
 /*
  * Functions to manage pool properties
  */
-#ifdef	NZA_CLOSED
 extern int zpool_set_proplist(zpool_handle_t *, nvlist_t *);
-#endif /* NZA_CLOSED */
 extern int zpool_set_prop(zpool_handle_t *, const char *, const char *);
 extern int zpool_get_prop(zpool_handle_t *, zpool_prop_t, char *,
     size_t proplen, zprop_source_t *);
@@ -484,7 +482,6 @@ extern uint64_t zpool_prop_default_numeric(zpool_prop_t);
 extern const char *zpool_prop_column_name(zpool_prop_t);
 extern boolean_t zpool_prop_align_right(zpool_prop_t);
 
-#ifdef	NZA_CLOSED
 /*
  * Functions to manage vdev properties
  */
@@ -503,7 +500,6 @@ extern int cos_set_proplist(zpool_handle_t *, const char *, nvlist_t *);
 extern int cos_get_proplist(libzfs_handle_t *, char *, zprop_list_t **);
 extern int cos_get_prop(zpool_handle_t *,  const char *, cos_prop_t, char *,
     size_t, nvlist_t **);
-#endif /* NZA_CLOSED */
 
 /*
  * Functions shared by zfs and zpool property management.
@@ -542,12 +538,10 @@ typedef struct zprop_get_cbdata {
 void zprop_print_one_property(const char *, zprop_get_cbdata_t *,
     const char *, const char *, zprop_source_t, const char *,
     const char *);
-#ifdef	NZA_CLOSED
 void vdev_print_one_property(const char *, const char *,
     zprop_get_cbdata_t *, const char *, const char *);
 void cos_print_one_property(const char *, const char *,
     zprop_get_cbdata_t *, const char *, const char *);
-#endif /* NZA_CLOSED */
 
 /*
  * Iterator functions.

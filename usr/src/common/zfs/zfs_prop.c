@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 by Delphix. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 /* Portions Copyright 2010 Robert Milkowski */
@@ -69,6 +69,7 @@ zfs_prop_init(void)
 		{ "fletcher2",	ZIO_CHECKSUM_FLETCHER_2 },
 		{ "fletcher4",	ZIO_CHECKSUM_FLETCHER_4 },
 		{ "sha256",	ZIO_CHECKSUM_SHA256 },
+		{ "sha1crc32",	ZIO_CHECKSUM_SHA1CRC32 },
 		{ NULL }
 	};
 
@@ -79,6 +80,9 @@ zfs_prop_init(void)
 		{ "sha256",	ZIO_CHECKSUM_SHA256 },
 		{ "sha256,verify",
 				ZIO_CHECKSUM_SHA256 | ZIO_CHECKSUM_VERIFY },
+		{ "sha1crc32",	ZIO_CHECKSUM_SHA1CRC32 },
+		{ "sha1crc32,verify",
+				ZIO_CHECKSUM_SHA1CRC32 | ZIO_CHECKSUM_VERIFY },
 		{ NULL }
 	};
 
@@ -388,10 +392,8 @@ zfs_prop_init(void)
 	    PROP_READONLY, ZFS_TYPE_DATASET, "UNIQUE");
 	zprop_register_hidden(ZFS_PROP_OBJSETID, "objsetid", PROP_TYPE_NUMBER,
 	    PROP_READONLY, ZFS_TYPE_DATASET, "OBJSETID");
-#ifdef	NZA_CLOSED
 	zprop_register_hidden(ZFS_PROP_LSTXG, "lstxg", PROP_TYPE_NUMBER,
 	    PROP_READONLY, ZFS_TYPE_DATASET, "LSTXG");
-#endif /* NZA_CLOSED */
 
 
 	/* oddball properties */

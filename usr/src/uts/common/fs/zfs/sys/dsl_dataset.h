@@ -22,7 +22,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifndef	_SYS_DSL_DATASET_H
@@ -141,7 +141,6 @@ typedef struct dsl_dataset {
 	objset_t *ds_objset;
 	uint64_t ds_userrefs;
 
-#ifdef	NZA_CLOSED
 	/*
 	 * NOTE: for pool with special device only
 	 * Last transaction data was moved from special devices
@@ -156,7 +155,6 @@ typedef struct dsl_dataset {
 	 * later.
 	 */
 	zbookmark_t ds_lszb;
-#endif /* NZA_CLOSED */
 
 	/*
 	 * ds_owner is protected by the ds_rwlock and the ds_lock
@@ -177,10 +175,8 @@ typedef struct dsl_dataset {
 	kmutex_t ds_sendstream_lock;
 	list_t ds_sendstreams;
 
-#ifdef	NZA_CLOSED
 	/* writecache block header */
 	void	*ds_wrc_blkhdr;
-#endif /* NZA_CLOSED */
 
 	/* Protected by ds_lock; keep at end of struct for better locality */
 	char ds_snapname[MAXNAMELEN];
@@ -299,10 +295,8 @@ int dsl_dataset_set_reservation(const char *dsname, zprop_source_t source,
     uint64_t reservation);
 
 int dsl_destroy_inconsistent(const char *dsname, void *arg);
-#ifdef	NZA_CLOSED
 int dsl_dataset_clean_special(dsl_dataset_t *ds, dmu_tx_t *tx, uint64_t curtxg,
 		hrtime_t scan_start);
-#endif /* NZA_CLOSED */
 
 #ifdef ZFS_DEBUG
 #define	dprintf_ds(ds, fmt, ...) do { \

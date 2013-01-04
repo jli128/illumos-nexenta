@@ -22,8 +22,8 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /* Portions Copyright 2010 Robert Milkowski */
@@ -49,13 +49,9 @@ typedef enum {
 	ZFS_TYPE_FILESYSTEM	= 0x1,
 	ZFS_TYPE_SNAPSHOT	= 0x2,
 	ZFS_TYPE_VOLUME		= 0x4,
-#ifndef	NZA_CLOSED
-	ZFS_TYPE_POOL		= 0x8
-#else /* NZA_CLOSED */
 	ZFS_TYPE_POOL		= 0x8,
 	ZFS_TYPE_VDEV		= 0x10,
 	ZFS_TYPE_COS		= 0x20
-#endif /* NZA_CLOSED */
 } zfs_type_t;
 
 typedef enum dmu_objset_type {
@@ -144,9 +140,7 @@ typedef enum {
 	ZFS_PROP_REFRATIO,
 	ZFS_PROP_WRITTEN,
 	ZFS_PROP_CLONES,
-#ifdef	NZA_CLOSED
 	ZFS_PROP_LSTXG,
-#endif /* NZA_CLOSED */
 	ZFS_NUM_PROPS
 } zfs_prop_t;
 
@@ -189,16 +183,13 @@ typedef enum {
 	ZPOOL_PROP_COMMENT,
 	ZPOOL_PROP_EXPANDSZ,
 	ZPOOL_PROP_FREEING,
-#ifdef	NZA_CLOSED
 	ZPOOL_PROP_ENABLESPECIAL,
 	ZPOOL_PROP_SPECIALCLASS,
 	ZPOOL_PROP_LOWATERMARK,
 	ZPOOL_PROP_HIWATERMARK,
-#endif /* NZA_CLOSED */
 	ZPOOL_NUM_PROPS
 } zpool_prop_t;
 
-#ifdef	NZA_CLOSED
 typedef enum vdev_prop {
 	VDEV_PROP_PATH,
 	VDEV_PROP_FRU,
@@ -225,7 +216,6 @@ typedef enum cos_prop {
 #define	COS_PREFREAD	"cos_prefread"
 #define	COS_MINPEDNING	"cos_minpending"
 #define	COS_MAXPEDNING	"cos_maxpending"
-#endif /* NZA_CLOSED */
 
 /* Small enough to not hog a whole line of printout in zpool(1M). */
 #define	ZPROP_MAX_COMMENT	32
@@ -304,7 +294,6 @@ int zpool_prop_index_to_string(zpool_prop_t, uint64_t, const char **);
 int zpool_prop_string_to_index(zpool_prop_t, const char *, uint64_t *);
 uint64_t zpool_prop_random_value(zpool_prop_t, uint64_t seed);
 
-#ifdef	NZA_CLOSED
 /*
  * Vdev property functions shared between libzfs and kernel.
  */
@@ -328,7 +317,6 @@ boolean_t cos_prop_readonly(cos_prop_t);
 int cos_prop_index_to_string(cos_prop_t, uint64_t, const char **);
 int cos_prop_string_to_index(cos_prop_t, const char *, uint64_t *);
 uint64_t cos_prop_random_value(cos_prop_t, uint64_t seed);
-#endif /* NZA_CLOSED */
 
 /*
  * Definitions for the Delegation.
@@ -577,9 +565,7 @@ typedef struct zpool_rewind_policy {
 #define	ZPOOL_CONFIG_UNSPARE		"unspare"
 #define	ZPOOL_CONFIG_PHYS_PATH		"phys_path"
 #define	ZPOOL_CONFIG_IS_LOG		"is_log"
-#ifdef	NZA_CLOSED
 #define	ZPOOL_CONFIG_IS_SPECIAL		"is_special"
-#endif /* NZA_CLOSED */
 #define	ZPOOL_CONFIG_L2CACHE		"l2cache"
 #define	ZPOOL_CONFIG_HOLE_ARRAY		"hole_array"
 #define	ZPOOL_CONFIG_VDEV_CHILDREN	"vdev_children"
@@ -640,9 +626,7 @@ typedef struct zpool_rewind_policy {
 #define	VDEV_TYPE_SPARE			"spare"
 #define	VDEV_TYPE_LOG			"log"
 #define	VDEV_TYPE_L2CACHE		"l2cache"
-#ifdef	NZA_CLOSED
 #define	VDEV_TYPE_SPECIAL		"special"
-#endif /* NZA_CLOSED */
 
 /*
  * This is needed in userland to report the minimum necessary device size.
@@ -788,6 +772,13 @@ typedef struct vdev_stat {
 	uint64_t	vs_scan_processed;	/* scan processed bytes	*/
 	hrtime_t	vs_latency[ZIO_TYPES];	/* moving average of latency */
 	hrtime_t	vs_iotime[ZIO_TYPES];	/* time spent doing i/o */
+	/* utilization telemetry */
+	hrtime_t	vs_bzstart;		/* busy time start */
+	hrtime_t	vs_bztotal;		/* busy time total */
+	hrtime_t	vs_wcstart;		/* wall-clock time start */
+	hrtime_t	vs_wctotal;		/* wall-clock time total */
+	hrtime_t	vs_bztimestamp;		/* time of vs_busy update */
+	uint64_t	vs_busy;		/* vdev utilization */
 } vdev_stat_t;
 
 /*
@@ -903,7 +894,6 @@ typedef enum zfs_ioc {
 	ZFS_IOC_SEND_NEW,
 	ZFS_IOC_SEND_SPACE,
 	ZFS_IOC_CLONE,
-#ifdef	NZA_CLOSED
 	ZFS_IOC_VDEV_SET_PROPS,
 	ZFS_IOC_VDEV_GET_PROPS,
 	ZFS_IOC_COS_ALLOC,
@@ -911,7 +901,6 @@ typedef enum zfs_ioc {
 	ZFS_IOC_COS_LIST,
 	ZFS_IOC_COS_SET_PROPS,
 	ZFS_IOC_COS_GET_PROPS,
-#endif /* NZA_CLOSED */
 	ZFS_IOC_LAST
 } zfs_ioc_t;
 

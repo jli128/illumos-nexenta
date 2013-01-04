@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 
-# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2013 Nexenta Systems, Inc. All rights reserved.
 
 
 #
@@ -40,10 +40,15 @@
 # For the stmf_sbd mdb(1) modules, no extra includes are needed.
 NZA_STMFSBDBASE_FLAGS=
 NZA_ZFSPLUSBASE_FLAGS=
-NZA_ZFSPLUS_SHARED_OBJS=libzfs_closed_stubs.o
+NZA_ZFSPLUS_SHARED_OBJS=zfs_closed_stubs.o
 NZA_ZFSPLUS_SHARED_SRCS=
+
+NZA_ZFSPLUS_OBJS += $(NZA_ZFSPLUS_SHARED_OBJS)
 
 # Trick kernel Makefiles into ignoring AOE target
 NZA_KMODS=$(POUND_SIGN)
 NZA_OPEN_ONLY=
+
+ZFS_OBJS +=		\
+	$(NZA_ZFSPLUS_SHARED_OBJS)
 

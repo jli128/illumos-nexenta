@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1340,12 +1340,12 @@ zfs_acl_chmod(vtype_t vtype, uint64_t mode, boolean_t trim, zfs_acl_t *aclp)
 	uint64_t	who;
 	int		new_count, new_bytes;
 	int		ace_size;
-	int 		entry_type;
+	int		entry_type;
 	uint16_t	iflags, type;
 	uint32_t	access_mask;
 	zfs_acl_node_t	*newnode;
-	size_t 		abstract_size = aclp->z_ops.ace_abstract_size();
-	void 		*zacep;
+	size_t		abstract_size = aclp->z_ops.ace_abstract_size();
+	void		*zacep;
 	boolean_t	isdir;
 	trivial_acl_t	masks;
 

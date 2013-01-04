@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/dsl_scan.h>
@@ -1204,8 +1205,10 @@ dsl_scan_ddt(dsl_scan_t *scn, dmu_tx_t *tx)
 
 		/* There should be no pending changes to the dedup table */
 		ddt = scn->scn_dp->dp_spa->spa_ddt[ddb->ddb_checksum];
-		ASSERT(avl_first(&ddt->ddt_tree) == NULL);
-
+#ifdef ZFS_DEBUG
+		for (uint_t i = 0; i < DDT_HASHSZ; i++)
+			ASSERT(avl_first(&ddt->ddt_tree[i]) == NULL);
+#endif
 		dsl_scan_ddt_entry(scn, ddb->ddb_checksum, &dde, tx);
 		n++;
 

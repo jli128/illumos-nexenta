@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifndef	ZPOOL_UTIL_H
@@ -39,9 +39,7 @@ extern "C" {
 void *safe_malloc(size_t);
 void zpool_no_memory(void);
 uint_t num_logs(nvlist_t *nv);
-#ifdef	NZA_CLOSED
 uint_t num_special(nvlist_t *nv);
-#endif /* NZA_CLOSED */
 
 /*
  * Virtual device functions

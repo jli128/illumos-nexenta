@@ -21,11 +21,13 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 #include <sys/zfs_context.h>
 #include <sys/zio.h>
 #include <sys/sha2.h>
 
+#pragma	weak	zio_checksum_SHA1CRC32 = zio_checksum_SHA256
 void
 zio_checksum_SHA256(const void *buf, uint64_t size, zio_cksum_t *zcp)
 {

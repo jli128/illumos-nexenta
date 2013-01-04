@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/dmu.h>
@@ -1033,8 +1034,6 @@ dsl_dir_set_quota_check(void *arg1, void *arg2, dmu_tx_t *tx)
 	mutex_exit(&dd->dd_lock);
 	return (err);
 }
-
-extern dsl_syncfunc_t dsl_prop_set_sync;
 
 static void
 dsl_dir_set_quota_sync(void *arg1, void *arg2, dmu_tx_t *tx)

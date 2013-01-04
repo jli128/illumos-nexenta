@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SYS_SPA_H
@@ -310,11 +310,9 @@ typedef struct blkptr {
 #define	BP_IS_RAIDZ(bp)		(DVA_GET_ASIZE(&(bp)->blk_dva[0]) > \
 				BP_GET_PSIZE(bp))
 
-#ifdef	NZA_CLOSED
 /* Determines whether BP points to data or metadata blocks */
 #define	BP_IS_METADATA(bp)	(BP_GET_LEVEL(bp) > 0 || \
 				dmu_ot[BP_GET_TYPE(bp)].ot_metadata)
-#endif /* NZA_CLOSED */
 
 #define	BP_ZERO(bp)				\
 {						\
@@ -470,11 +468,9 @@ extern int spa_vdev_setpath(spa_t *spa, uint64_t guid, const char *newpath);
 extern int spa_vdev_setfru(spa_t *spa, uint64_t guid, const char *newfru);
 extern int spa_vdev_split_mirror(spa_t *spa, char *newname, nvlist_t *config,
     nvlist_t *props, boolean_t exp);
-#ifdef	NZA_CLOSED
 extern int spa_vdev_prop_validate(spa_t *spa, nvlist_t *nvp);
 extern int spa_vdev_prop_set(spa_t *spa, uint64_t vdev_guid, nvlist_t *nvp);
 extern int spa_vdev_prop_get(spa_t *spa, uint64_t vdev_guid, nvlist_t **nvp);
-#endif /* NZA_CLOSED */
 
 /* spare state (which is global across all pools) */
 extern void spa_spare_add(vdev_t *vd);
@@ -609,9 +605,7 @@ extern uint64_t spa_version(spa_t *spa);
 extern boolean_t spa_deflate(spa_t *spa);
 extern metaslab_class_t *spa_normal_class(spa_t *spa);
 extern metaslab_class_t *spa_log_class(spa_t *spa);
-#ifdef	NZA_CLOSED
 extern metaslab_class_t *spa_special_class(spa_t *spa);
-#endif /* NZA_CLOSED */
 extern int spa_max_replication(spa_t *spa);
 extern int spa_prev_software_version(spa_t *spa);
 extern int spa_busy(void);
@@ -645,12 +639,14 @@ extern uint64_t bp_get_dsize(spa_t *spa, const blkptr_t *bp);
 extern boolean_t spa_has_slogs(spa_t *spa);
 extern boolean_t spa_is_root(spa_t *spa);
 extern boolean_t spa_writeable(spa_t *spa);
-#ifdef	NZA_CLOSED
 extern boolean_t spa_has_special(spa_t *spa);
-#endif /* NZA_CLOSED */
 
 extern int spa_mode(spa_t *spa);
 extern uint64_t strtonum(const char *str, char **nptr);
+
+/* Latency stats calculation for dynamic I/O balancing */
+extern void spa_special_stats_update(spa_t *spa);
+extern boolean_t spa_choose_special_class(spa_t *spa);
 
 extern char *spa_his_ievent_table[];
 

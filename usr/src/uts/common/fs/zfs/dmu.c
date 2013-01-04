@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/dmu.h>
@@ -1370,6 +1370,12 @@ dmu_sync_late_arrival(zio_t *pio, objset_t *os, dmu_sync_cb_t *done, zgd_t *zgd,
  *		the error will be reported to the done callback and
  *		propagated to pio from zio_done().
  */
+
+/*
+ * Tunable: when syncing to disk, write to special class vdevs
+ */
+uint64_t write_direct_to_special = 1;
+
 int
 dmu_sync(zio_t *pio, uint64_t txg, dmu_sync_cb_t *done, zgd_t *zgd)
 {
@@ -1382,6 +1388,7 @@ dmu_sync(zio_t *pio, uint64_t txg, dmu_sync_cb_t *done, zgd_t *zgd)
 	zbookmark_t zb;
 	zio_prop_t zp;
 	dnode_t *dn;
+	int flags = 0;
 
 	ASSERT(pio != NULL);
 	ASSERT(BP_IS_HOLE(bp));
@@ -1390,9 +1397,12 @@ dmu_sync(zio_t *pio, uint64_t txg, dmu_sync_cb_t *done, zgd_t *zgd)
 	SET_BOOKMARK(&zb, ds->ds_object,
 	    db->db.db_object, db->db_level, db->db_blkid);
 
+	if (write_direct_to_special) {
+		WP_SET_SPECIALCLASS(flags, B_TRUE);
+	}
 	DB_DNODE_ENTER(db);
 	dn = DB_DNODE(db);
-	dmu_write_policy(os, dn, db->db_level, WP_DMU_SYNC, &zp);
+	dmu_write_policy(os, dn, db->db_level, flags | WP_DMU_SYNC, &zp);
 	DB_DNODE_EXIT(db);
 
 	/*
@@ -1526,6 +1536,7 @@ dmu_write_policy(objset_t *os, dnode_t *dn, int level, int wp, zio_prop_t *zp)
 	boolean_t dedup;
 	boolean_t dedup_verify = os->os_dedup_verify;
 	int copies = os->os_copies;
+	boolean_t usesc;
 
 	/*
 	 * Determine checksum setting.
@@ -1582,17 +1593,19 @@ dmu_write_policy(objset_t *os, dnode_t *dn, int level, int wp, zio_prop_t *zp)
 		dedup = B_FALSE;
 	}
 
-#ifdef	NZA_CLOSED
 	zp->zp_usesc = WP_GET_SPECIALCLASS(wp);
-	zp->zp_metadata = ismd;
-#endif /* NZA_CLOSED */
 	zp->zp_checksum = checksum;
+	zp->zp_os_checksum = os->os_checksum;
 	zp->zp_compress = compress;
 	zp->zp_type = (wp & WP_SPILL) ? dn->dn_bonustype : type;
 	zp->zp_level = level;
 	zp->zp_copies = MIN(copies + ismd, spa_max_replication(os->os_spa));
 	zp->zp_dedup = dedup;
 	zp->zp_dedup_verify = dedup && dedup_verify;
+	zp->zp_metadata = ismd;
+
+	DTRACE_PROBE2(dmu_wp, boolean_t, zp->zp_metadata,
+	    boolean_t, zp->zp_usesc);
 }
 
 int

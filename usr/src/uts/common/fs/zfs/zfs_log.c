@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -45,6 +46,7 @@
 #include <sys/zfs_fuid.h>
 #include <sys/ddi.h>
 #include <sys/dsl_dataset.h>
+#include <sys/special.h>
 
 /*
  * These zfs_log_* functions must be called within a dmu tx, in one
@@ -449,6 +451,7 @@ zfs_log_rename(zilog_t *zilog, dmu_tx_t *tx, uint64_t txtype,
  * zfs_log_write() handles TX_WRITE transactions.
  */
 ssize_t zfs_immediate_write_sz = 32768;
+uint64_t wrcache_vdev_write_once = 1;
 
 void
 zfs_log_write(zilog_t *zilog, dmu_tx_t *tx, int txtype,
@@ -462,17 +465,58 @@ zfs_log_write(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	if (zil_replaying(zilog, tx) || zp->z_unlinked)
 		return;
 
+	/*
+	 * Decide how to handle the write:
+	 * - WR_INDIRECT - write to the regular vdev as opposed to slog vdev
+	 * - WR_COPIED   - write to slog following the tx desctiptor as
+	 *			immediate data
+	 * - WR_NEED_COPY - copy out in the future (e.g. with next sync)
+	 *
+	 * This works well under assumption that if SLOGs are used, then they
+	 * are always faster than regular vdevs, so all sizes of data are copied
+	 * through the SLOGs.
+	 *
+	 * Special vdevs in WRCACHE mode are as fast as SLOGs
+	 * In fact, such devices usually also host ZIL (and
+	 * therefore, eliminate the need for a separate log device), so
+	 * the conventional strategy results in double writes to such vdevs.
+	 *
+	 * A (conservative) modification to the logic below allows for writing
+	 * to WRCACHE vdevs once:
+	 * - if the write would for sure go to a WRCACHE vdev (usage below
+	 *   lower watermark), and it is enabled, then use WR_INDIRECT
+	 *   for all writes that do not exceed max block size for the object
+	 *
+	 * If SLOGs are cofigured, they work according to the original logic.
+	 */
+
 	immediate_write_sz = (zilog->zl_logbias == ZFS_LOGBIAS_THROUGHPUT)
 	    ? 0 : zfs_immediate_write_sz;
 
 	slogging = spa_has_slogs(zilog->zl_spa) &&
 	    (zilog->zl_logbias == ZFS_LOGBIAS_LATENCY);
+	if (immediate_write_sz && !slogging) {
+		spa_t *spa = zilog->zl_spa;
+		boolean_t has_special = spa_has_special(spa);
+		if (has_special) {
+			boolean_t enabled = spa_special_enabled(spa);
+			spa_specialclass_id_t class = spa_specialclass_id(spa);
+			if ((enabled) && (class == SPA_SPECIALCLASS_WRCACHE) &&
+			    (spa_watermark_none(spa)) &&
+			    (wrcache_vdev_write_once))
+				immediate_write_sz = 0;
+		}
+	}
+
 	if (resid > immediate_write_sz && !slogging && resid <= zp->z_blksz)
 		write_state = WR_INDIRECT;
 	else if (ioflag & (FSYNC | FDSYNC))
 		write_state = WR_COPIED;
 	else
 		write_state = WR_NEED_COPY;
+
+	DTRACE_PROBE3(zfs_lwr, ssize_t, immediate_write_sz,
+	    itx_wr_state_t, write_state, uint_t, zp->z_blksz);
 
 	if ((fsync_cnt = (uintptr_t)tsd_get(zfs_fsyncer_key)) != 0) {
 		(void) tsd_set(zfs_fsyncer_key, (void *)(fsync_cnt - 1));

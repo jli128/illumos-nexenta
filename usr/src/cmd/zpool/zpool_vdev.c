@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -388,11 +388,7 @@ is_whole_disk(const char *arg)
  * 	xxx		Shorthand for /dev/dsk/xxx
  */
 static nvlist_t *
-#ifdef	NZA_CLOSED
-make_leaf_vdev(const char *arg, boolean_t is_log, boolean_t is_specl)
-#else /* !NZA_CLOSED */
-make_leaf_vdev(const char *arg, uint64_t is_log)
-#endif /* !NZA_CLOSED */
+make_leaf_vdev(const char *arg, boolean_t is_log, boolean_t is_special)
 {
 	char path[MAXPATHLEN];
 	struct stat64 statbuf;
@@ -476,9 +472,8 @@ make_leaf_vdev(const char *arg, uint64_t is_log)
 	verify(nvlist_add_string(vdev, ZPOOL_CONFIG_PATH, path) == 0);
 	verify(nvlist_add_string(vdev, ZPOOL_CONFIG_TYPE, type) == 0);
 	verify(nvlist_add_uint64(vdev, ZPOOL_CONFIG_IS_LOG, is_log) == 0);
-#ifdef	NZA_CLOSED
-	verify(nvlist_add_uint64(vdev, ZPOOL_CONFIG_IS_SPECIAL, is_specl) == 0);
-#endif /* NZA_CLOSED */
+	verify(nvlist_add_uint64(vdev, ZPOOL_CONFIG_IS_SPECIAL,
+	    is_special) == 0);
 	if (strcmp(type, VDEV_TYPE_DISK) == 0)
 		verify(nvlist_add_uint64(vdev, ZPOOL_CONFIG_WHOLE_DISK,
 		    (uint64_t)wholedisk) == 0);
@@ -567,9 +562,7 @@ get_replication(nvlist_t *nvroot, boolean_t fatal)
 	lastrep.zprl_type = NULL;
 	for (t = 0; t < toplevels; t++) {
 		uint64_t is_log = B_FALSE;
-#ifdef	NZA_CLOSED
 		uint64_t is_special = B_FALSE;
-#endif /* NZA_CLOSED */
 
 		nv = top[t];
 
@@ -581,12 +574,10 @@ get_replication(nvlist_t *nvroot, boolean_t fatal)
 		if (is_log)
 			continue;
 
-#ifdef	NZA_CLOSED
 		(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_IS_SPECIAL,
 		    &is_special);
 		if (is_special)
 			continue;
-#endif /* NZA_CLOSED */
 
 		verify(nvlist_lookup_string(nv, ZPOOL_CONFIG_TYPE,
 		    &type) == 0);
@@ -1165,13 +1156,11 @@ is_grouping(const char *type, int *mindev, int *maxdev)
 		return (VDEV_TYPE_L2CACHE);
 	}
 
-#ifdef	NZA_CLOSED
 	if (strcmp(type, "special") == 0) {
 		if (mindev != NULL)
 			*mindev = 1;
 		return (VDEV_TYPE_SPECIAL);
 	}
-#endif /* NZA_CLOSED */
 
 	return (NULL);
 }
@@ -1187,14 +1176,10 @@ construct_spec(int argc, char **argv)
 {
 	nvlist_t *nvroot, *nv, **top, **spares, **l2cache;
 	int t, toplevels, mindev, maxdev, nspares, nlogs, nl2cache;
-#ifdef	NZA_CLOSED
 	int nspecial = 0;
-#endif /* NZA_CLOSED */
 	const char *type;
 	boolean_t is_log, seen_logs;
-#ifdef	NZA_CLOSED
 	boolean_t is_special, seen_special;
-#endif /* NZA_CLOSED */
 
 	top = NULL;
 	toplevels = 0;
@@ -1205,10 +1190,8 @@ construct_spec(int argc, char **argv)
 	nl2cache = 0;
 	is_log = B_FALSE;
 	seen_logs = B_FALSE;
-#ifdef	NZA_CLOSED
 	is_special = B_FALSE;
 	seen_special = B_FALSE;
-#endif /* NZA_CLOSED */
 
 	while (argc > 0) {
 		nv = NULL;
@@ -1230,9 +1213,7 @@ construct_spec(int argc, char **argv)
 					return (NULL);
 				}
 				is_log = B_FALSE;
-#ifdef	NZA_CLOSED
 				is_special = B_FALSE;
-#endif /* NZA_CLOSED */
 			}
 
 			if (strcmp(type, VDEV_TYPE_LOG) == 0) {
@@ -1245,9 +1226,7 @@ construct_spec(int argc, char **argv)
 				}
 				seen_logs = B_TRUE;
 				is_log = B_TRUE;
-#ifdef	NZA_CLOSED
 				is_special = B_FALSE;
-#endif /* NZA_CLOSED */
 				argc--;
 				argv++;
 				/*
@@ -1266,7 +1245,6 @@ construct_spec(int argc, char **argv)
 					return (NULL);
 				}
 				is_log = B_FALSE;
-#ifdef	NZA_CLOSED
 				is_special = B_FALSE;
 			}
 
@@ -1288,7 +1266,6 @@ construct_spec(int argc, char **argv)
 				 * We just set is_special and continue.
 				 */
 				continue;
-#endif /* NZA_CLOSED */
 			}
 
 			if (is_log) {
@@ -1302,7 +1279,6 @@ construct_spec(int argc, char **argv)
 				nlogs++;
 			}
 
-#ifdef	NZA_CLOSED
 			if (is_special) {
 				if (strcmp(type, VDEV_TYPE_MIRROR) != 0) {
 					(void) fprintf(stderr,
@@ -1313,7 +1289,6 @@ construct_spec(int argc, char **argv)
 				}
 				nspecial++;
 			}
-#endif /* NZA_CLOSED */
 
 			for (c = 1; c < argc; c++) {
 				if (is_grouping(argv[c], NULL, NULL) != NULL)
@@ -1323,13 +1298,8 @@ construct_spec(int argc, char **argv)
 				    children * sizeof (nvlist_t *));
 				if (child == NULL)
 					zpool_no_memory();
-#ifdef	NZA_CLOSED
 				if ((nv = make_leaf_vdev(argv[c], B_FALSE,
 				    B_FALSE)) == NULL)
-#else /* !NZA_CLOSED */
-				if ((nv = make_leaf_vdev(argv[c], B_FALSE))
-				    == NULL)
-#endif /* NZA_CLOSED */
 					return (NULL);
 				child[children - 1] = nv;
 			}
@@ -1366,10 +1336,8 @@ construct_spec(int argc, char **argv)
 				    type) == 0);
 				verify(nvlist_add_uint64(nv,
 				    ZPOOL_CONFIG_IS_LOG, is_log) == 0);
-#ifdef	NZA_CLOSED
 				verify(nvlist_add_uint64(nv,
 				    ZPOOL_CONFIG_IS_SPECIAL, is_special) == 0);
-#endif /* NZA_CLOSED */
 				if (strcmp(type, VDEV_TYPE_RAIDZ) == 0) {
 					verify(nvlist_add_uint64(nv,
 					    ZPOOL_CONFIG_NPARITY,
@@ -1388,19 +1356,13 @@ construct_spec(int argc, char **argv)
 			 * We have a device.  Pass off to make_leaf_vdev() to
 			 * construct the appropriate nvlist describing the vdev.
 			 */
-#ifdef	NZA_CLOSED
 			if ((nv = make_leaf_vdev(argv[0], is_log, is_special))
 			    == NULL)
-#else /* !NZA_CLOSED */
-			if ((nv = make_leaf_vdev(argv[0], is_log)) == NULL)
-#endif /* NZA_CLOSED */
 				return (NULL);
 			if (is_log)
 				nlogs++;
-#ifdef	NZA_CLOSED
 			if (is_special)
 				nspecial++;
-#endif /* NZA_CLOSED */
 			argc--;
 			argv++;
 		}
@@ -1419,13 +1381,11 @@ construct_spec(int argc, char **argv)
 		return (NULL);
 	}
 
-#ifdef	NZA_CLOSED
 	if (seen_special && nspecial == 0) {
 		(void) fprintf(stderr, gettext("invalid vdev specification: "
 		    "special requires at least 1 device\n"));
 		return (NULL);
 	}
-#endif /* NZA_CLOSED */
 
 	if (seen_logs && nlogs == 0) {
 		(void) fprintf(stderr, gettext("invalid vdev specification: "

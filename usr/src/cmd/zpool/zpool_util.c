@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <errno.h>
@@ -86,7 +86,6 @@ num_logs(nvlist_t *nv)
 	return (nlogs);
 }
 
-#ifdef	NZA_CLOSED
 /*
  * Return the number of special vdevs in supplied nvlist
  */
@@ -111,4 +110,3 @@ num_special(nvlist_t *nv)
 	}
 	return (nspecial);
 }
-#endif /* NZA_CLOSED */

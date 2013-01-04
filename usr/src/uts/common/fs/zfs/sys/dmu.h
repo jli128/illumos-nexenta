@@ -22,8 +22,8 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 /* Portions Copyright 2010 Robert Milkowski */
@@ -200,10 +200,8 @@ typedef enum dmu_object_type {
 	 * of indexing into dmu_ot directly (this works for both DMU_OT_* types
 	 * and DMU_OTN_* types).
 	 */
-#ifdef	NZA_CLOSED
 	DMU_OT_COS_PROPS,		/* UINT64 */
 	DMU_OT_VDEV_PROPS,		/* UINT64 */
-#endif /* NZA_CLOSED */
 	DMU_OT_NUMTYPES,
 
 	/*
@@ -311,10 +309,8 @@ typedef void dmu_buf_evict_func_t(struct dmu_buf *db, void *user_ptr);
 #define	DMU_POOL_BPTREE_OBJ		"bptree_obj"
 #define	DMU_POOL_EMPTY_BPOBJ		"empty_bpobj"
 
-#ifdef	NZA_CLOSED
 #define	DMU_POOL_COS_PROPS		"cos_props"
 #define	DMU_POOL_VDEV_PROPS		"vdev_props"
-#endif /* NZA_CLOSED */
 
 /*
  * Allocate an object from this objset.  The range of object numbers
@@ -405,7 +401,6 @@ void dmu_object_set_compress(objset_t *os, uint64_t object, uint8_t compress,
 #define	WP_DMU_SYNC	0x2
 #define	WP_SPILL	0x4
 
-#ifdef	NZA_CLOSED
 #define	WP_SPECIALCLASS_SHIFT	(16)
 #define	WP_SPECIALCLASS_BITS	(1) /* 1 bits per storage class */
 #define	WP_SPECIALCLASS_MASK	(((1 << WP_SPECIALCLASS_BITS) - 1) \
@@ -417,7 +412,18 @@ void dmu_object_set_compress(objset_t *os, uint64_t object, uint8_t compress,
 
 #define	WP_GET_SPECIALCLASS(flags) \
 	((flags & WP_SPECIALCLASS_MASK)	>> WP_SPECIALCLASS_SHIFT)
-#endif /* NZA_CLOSED */
+
+#define	WP_SPECIALCLASS_SHIFT	(16)
+#define	WP_SPECIALCLASS_BITS	(1) /* 1 bits per storage class */
+#define	WP_SPECIALCLASS_MASK	(((1 << WP_SPECIALCLASS_BITS) - 1) \
+	<< WP_SPECIALCLASS_SHIFT)
+
+#define	WP_SET_SPECIALCLASS(flags, sclass)	{ \
+	flags |= ((sclass << WP_SPECIALCLASS_SHIFT) & WP_SPECIALCLASS_MASK); \
+}
+
+#define	WP_GET_SPECIALCLASS(flags) \
+	((flags & WP_SPECIALCLASS_MASK)	>> WP_SPECIALCLASS_SHIFT)
 
 void dmu_write_policy(objset_t *os, struct dnode *dn, int level, int wp,
     struct zio_prop *zp);
@@ -526,9 +532,7 @@ void *dmu_buf_get_user(dmu_buf_t *db);
  * (ie. you've called dmu_tx_hold_object(tx, db->db_object)).
  */
 void dmu_buf_will_dirty(dmu_buf_t *db, dmu_tx_t *tx);
-#ifdef	NZA_CLOSED
 void dmu_buf_will_dirty_sc(dmu_buf_t *db, dmu_tx_t *tx, int sc);
-#endif /* NZA_CLOSED */
 
 /*
  * Tells if the given dbuf is freeable.
@@ -557,9 +561,7 @@ boolean_t dmu_buf_freeable(dmu_buf_t *);
 #define	DMU_OBJECT_END	(-1ULL)
 
 dmu_tx_t *dmu_tx_create(objset_t *os);
-#ifdef	NZA_CLOSED
-dmu_tx_t *dmu_tx_create_wrc(objset_t *os);
-#endif /* NZA_CLOSED */
+dmu_tx_t *dmu_tx_create_wrc(objset_t *os, boolean_t wrc_io);
 void dmu_tx_hold_write(dmu_tx_t *tx, uint64_t object, uint64_t off, int len);
 void dmu_tx_hold_free(dmu_tx_t *tx, uint64_t object, uint64_t off,
     uint64_t len);
@@ -572,9 +574,7 @@ void dmu_tx_abort(dmu_tx_t *tx);
 int dmu_tx_assign(dmu_tx_t *tx, uint64_t txg_how);
 void dmu_tx_wait(dmu_tx_t *tx);
 void dmu_tx_commit(dmu_tx_t *tx);
-#ifdef	NZA_CLOSED
 boolean_t dmu_tx_is_wrcio(dmu_tx_t *tx);
-#endif	/* NZA_CLOSED */
 
 /*
  * To register a commit callback, dmu_tx_callback_register() must be called.

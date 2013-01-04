@@ -25,7 +25,7 @@
 
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -262,10 +262,11 @@ vdev_mirror_child_select(zio_t *zio)
 	 * vdev_readable() returning B_FALSE), don't even try.
 	 */
 #ifdef	NZA_CLOSED
-	for (i = 0; i < mm->mm_children; i++, c++) {
+	for (i = 0; i < mm->mm_children; i++, c++)
 #else /* !NZA_CLOSED */
-	for (i = 0, c = mm->mm_preferred; i < mm->mm_children; i++, c++) {
+	for (i = 0, c = mm->mm_preferred; i < mm->mm_children; i++, c++)
 #endif /* !NZA_CLOSED */
+	{
 		if (c >= mm->mm_children)
 			c = 0;
 		mc = &mm->mm_child[c];

@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -643,10 +643,8 @@ libzfs_init(void)
 	zfs_prop_init();
 	zpool_prop_init();
 	zpool_feature_init();
-#ifdef	NZA_CLOSED
 	vdev_prop_init();
 	cos_prop_init();
-#endif /* NZA_CLOSED */
 	libzfs_mnttab_init(hdl);
 
 	return (hdl);
@@ -826,7 +824,7 @@ zcmd_read_dst_nvlist(libzfs_handle_t *hdl, zfs_cmd_t *zc, nvlist_t **nvlp)
 	return (0);
 }
 
-#pragma weak libzfs_log_event=libzfs_log_event_stub
+#pragma weak libzfs_log_event = libzfs_log_event_stub
 void
 libzfs_log_event_stub(libzfs_handle_t *hdl, const char *zc)
 {
@@ -1192,7 +1190,6 @@ zprop_parse_value(libzfs_handle_t *hdl, nvpair_t *elem, int prop,
 		proptype = zpool_prop_get_type(prop);
 		propname = zpool_prop_to_name(prop);
 		break;
-#ifdef	NZA_CLOSED
 	case ZFS_TYPE_VDEV:
 		proptype = vdev_prop_get_type(prop);
 		propname = vdev_prop_to_name(prop);
@@ -1201,7 +1198,6 @@ zprop_parse_value(libzfs_handle_t *hdl, nvpair_t *elem, int prop,
 		proptype = cos_prop_get_type(prop);
 		propname = cos_prop_to_name(prop);
 		break;
-#endif /* NZA_CLOSED */
 	default:
 		proptype = zfs_prop_get_type(prop);
 		propname = zfs_prop_to_name(prop);

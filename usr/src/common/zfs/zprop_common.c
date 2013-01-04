@@ -26,7 +26,7 @@
  * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 /*
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -58,12 +58,10 @@ zprop_get_proptable(zfs_type_t type)
 	switch (type) {
 	case ZFS_TYPE_POOL:
 		return (zpool_prop_get_table());
-#ifdef	NZA_CLOSED
 	case ZFS_TYPE_VDEV:
 		return (vdev_prop_get_table());
 	case ZFS_TYPE_COS:
 		return (cos_prop_get_table());
-#endif /* NZA_CLOSED */
 	default:
 		return (zfs_prop_get_table());
 	}
@@ -75,12 +73,10 @@ zprop_get_numprops(zfs_type_t type)
 	switch (type) {
 	case ZFS_TYPE_POOL:
 		return (ZPOOL_NUM_PROPS);
-#ifdef	NZA_CLOSED
 	case ZFS_TYPE_VDEV:
 		return (VDEV_NUM_PROPS);
 	case ZFS_TYPE_COS:
 		return (COS_NUM_PROPS);
-#endif /* NZA_CLOSED */
 	default:
 		return (ZFS_NUM_PROPS);
 	}

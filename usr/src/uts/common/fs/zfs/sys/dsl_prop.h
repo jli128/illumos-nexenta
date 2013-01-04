@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifndef	_SYS_DSL_PROP_H
@@ -86,6 +87,7 @@ int dsl_prop_get_dd(struct dsl_dir *dd, const char *propname,
     int intsz, int numints, void *buf, char *setpoint,
     boolean_t snapshot);
 
+dsl_syncfunc_t dsl_prop_set_sync;
 dsl_syncfunc_t dsl_props_set_sync;
 int dsl_prop_set(const char *ddname, const char *propname,
     zprop_source_t source, int intsz, int numints, const void *buf);

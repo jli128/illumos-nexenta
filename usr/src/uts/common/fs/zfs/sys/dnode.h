@@ -20,8 +20,8 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifndef	_SYS_DNODE_H
@@ -268,10 +268,8 @@ int dnode_hold_impl(struct objset *dd, uint64_t object, int flag,
 boolean_t dnode_add_ref(dnode_t *dn, void *ref);
 void dnode_rele(dnode_t *dn, void *ref);
 void dnode_setdirty(dnode_t *dn, dmu_tx_t *tx);
-#ifdef	NZA_CLOSED
-void dnode_setdirty_impl(dnode_t *dn, dmu_tx_t *tx,
+void dnode_setdirty_sc(dnode_t *dn, dmu_tx_t *tx,
     boolean_t usesc);
-#endif /* NZA_CLOSED */
 void dnode_sync(dnode_t *dn, dmu_tx_t *tx);
 void dnode_allocate(dnode_t *dn, dmu_object_type_t ot, int blocksize, int ibs,
     dmu_object_type_t bonustype, int bonuslen, dmu_tx_t *tx);
@@ -287,12 +285,8 @@ void dnode_clear_range(dnode_t *dn, uint64_t blkid,
     uint64_t nblks, dmu_tx_t *tx);
 void dnode_diduse_space(dnode_t *dn, int64_t space);
 void dnode_willuse_space(dnode_t *dn, int64_t space, dmu_tx_t *tx);
-#ifdef	NZA_CLOSED
 void dnode_new_blkid(dnode_t *dn, uint64_t blkid, dmu_tx_t *tx,
     boolean_t usesc, boolean_t);
-#else /* !NZA_CLOSED */
-void dnode_new_blkid(dnode_t *dn, uint64_t blkid, dmu_tx_t *tx, boolean_t);
-#endif /* NZA_CLOSED */
 uint64_t dnode_block_freed(dnode_t *dn, uint64_t blkid);
 void dnode_init(void);
 void dnode_fini(void);

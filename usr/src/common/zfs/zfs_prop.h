@@ -21,7 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifndef	_ZFS_PROP_H
@@ -111,6 +111,20 @@ void cos_prop_init(void);
 zprop_type_t cos_prop_get_type(cos_prop_t);
 zprop_desc_t *cos_prop_get_table(void);
 #endif /* NZA_CLOSED */
+
+/*
+ * vdev property functions
+ */
+void vdev_prop_init(void);
+zprop_type_t vdev_prop_get_type(vdev_prop_t);
+zprop_desc_t *vdev_prop_get_table(void);
+
+/*
+ * cos property functions
+ */
+void cos_prop_init(void);
+zprop_type_t cos_prop_get_type(cos_prop_t);
+zprop_desc_t *cos_prop_get_table(void);
 
 /*
  * Common routines to initialize property tables
