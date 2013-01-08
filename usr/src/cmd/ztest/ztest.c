@@ -577,9 +577,9 @@ usage(boolean_t requested)
 	    "\t[-F freezeloops (default: %llu)] max loops in spa_freeze()\n"
 	    "\t[-P passtime (default: %llu sec)] time per pass\n"
 	    "\t[-B alt_ztest (default: <none>)] alternate ztest path\n"
-	    "\t[-N special vdevs per mirror (default: %llu)]\n"
+	    "\t[-N special vdevs per mirror (default: %d)]\n"
 	    "\t[-S special vdev size (default: %llu)]\n"
-	    "\t[-M special vdev mirrors (default: %llu)]\n"
+	    "\t[-M special vdev mirrors (default: %d)]\n"
 	    "\t[-h] (print help)\n"
 	    "",
 	    zo->zo_pool,

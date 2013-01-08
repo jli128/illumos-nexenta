@@ -825,6 +825,8 @@ zcmd_read_dst_nvlist(libzfs_handle_t *hdl, zfs_cmd_t *zc, nvlist_t **nvlp)
 }
 
 #pragma weak libzfs_log_event = libzfs_log_event_stub
+
+/* ARGSUSED hdl zc */
 void
 libzfs_log_event_stub(libzfs_handle_t *hdl, const char *zc)
 {

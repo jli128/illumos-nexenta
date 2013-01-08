@@ -574,7 +574,7 @@ vdev_raidz_generate_parity_p(raidz_map_t *rm)
 {
 	uint64_t *p, *src, pcount, ccount, i;
 	int c;
-	int parity_done, no_accel = 0;
+	int parity_done;
 	void *va[16];
 	void **array;
 	int j, nvects;
@@ -588,7 +588,8 @@ vdev_raidz_generate_parity_p(raidz_map_t *rm)
 			break;
 		}
 		/* check sizes and alignment */
-		if ((no_accel = UNALIGNED(rm->rm_col[VDEV_RAIDZ_P].rc_data))) {
+		no_accel = UNALIGNED(rm->rm_col[VDEV_RAIDZ_P].rc_data);
+		if (no_accel) {
 			DTRACE_PROBE1(raidz_unaligned_dst, unsigned long,
 			    no_accel);
 			break;
@@ -596,7 +597,8 @@ vdev_raidz_generate_parity_p(raidz_map_t *rm)
 		pcount = rm->rm_col[rm->rm_firstdatacol].rc_size;
 		nvects = 1; /* for the destination */
 		for (c = rm->rm_firstdatacol; c < rm->rm_cols; c++) {
-			if ((no_accel = UNALIGNED(rm->rm_col[c].rc_data))) {
+			no_accel = UNALIGNED(rm->rm_col[c].rc_data);
+			if (no_accel) {
 				DTRACE_PROBE1(raidz_unaligned_src,
 				    unsigned long, no_accel);
 				break;

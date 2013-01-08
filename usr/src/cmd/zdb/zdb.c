@@ -2352,8 +2352,10 @@ dump_block_stats(spa_t *spa)
 	    (u_longlong_t)zcb.zcb_dedup_asize,
 	    (u_longlong_t)zcb.zcb_dedup_blocks,
 	    (double)zcb.zcb_dedup_asize / tzb->zb_asize + 1.0);
-	if (spec_alloc != 0)
-		(void) printf("\tspecial allocated: %10llu\n", spec_alloc);
+	if (spec_alloc != 0) {
+		(void) printf("\tspecial allocated: %10llu\n",
+		    (u_longlong_t)spec_alloc);
+	}
 	(void) printf("\tSPA allocated: %10llu     used: %5.2f%%\n",
 	    (u_longlong_t)norm_alloc, 100.0 * norm_alloc / norm_space);
 

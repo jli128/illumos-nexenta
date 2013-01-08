@@ -3085,7 +3085,6 @@ spa_get_stats(const char *name, nvlist_t **config,
 {
 	int error;
 	spa_t *spa;
-	boolean_t wrcthr_stopped = B_FALSE;
 
 	*config = NULL;
 	error = spa_open_common(name, &spa, FTAG, NULL, config);
@@ -5618,7 +5617,6 @@ spa_special_stats_update(spa_t *spa)
 
 	for (i = 0; i < rvd->vdev_children; i++) {
 		vdev_t *vd = rvd->vdev_child[i];
-		vdev_stat_t *vd_stat = &vd->vdev_stat;
 		ASSERT(vd);
 
 		if (vd->vdev_islog || vd->vdev_ishole ||

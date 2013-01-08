@@ -2327,7 +2327,7 @@ print_one_latency_stat(uint64_t iotime, uint64_t ops)
 		value /= (double)(MICROSEC / MILLISEC);
 	}
 
-	sprintf(buf, "%.2f", value);
+	(void) sprintf(buf, "%.2f", value);
 	(void) printf("  %5s", buf);
 }
 

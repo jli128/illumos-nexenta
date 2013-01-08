@@ -1966,6 +1966,7 @@ zio_ddt_read_done(zio_t *zio)
 	return (ZIO_PIPELINE_CONTINUE);
 }
 
+/* ARGSUSED */
 static boolean_t
 zio_ddt_collision(zio_t *zio, ddt_t *ddt, ddt_entry_t *dde)
 {
@@ -2025,7 +2026,6 @@ static void
 zio_ddt_child_write_ready(zio_t *zio)
 {
 	int p = zio->io_prop.zp_copies;
-	ddt_t *ddt = ddt_select(zio->io_spa, zio->io_bp);
 	ddt_entry_t *dde = zio->io_private;
 	ddt_phys_t *ddp = &dde->dde_phys[p];
 	zio_t *pio;
@@ -2049,7 +2049,6 @@ static void
 zio_ddt_child_write_done(zio_t *zio)
 {
 	int p = zio->io_prop.zp_copies;
-	ddt_t *ddt = ddt_select(zio->io_spa, zio->io_bp);
 	ddt_entry_t *dde = zio->io_private;
 	ddt_phys_t *ddp = &dde->dde_phys[p];
 

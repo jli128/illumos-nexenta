@@ -410,7 +410,6 @@ static void
 ddt_stat_update(ddt_t *ddt, ddt_entry_t *dde, uint64_t neg)
 {
 	ddt_stat_t dds;
-	ddt_histogram_t *ddh;
 
 	ddt_stat_generate(ddt->ddt_spa, dde, &dds);
 
@@ -662,6 +661,7 @@ dde_exit(ddt_entry_t *dde)
 /* cache for ddt_entry_t structures */
 static kmem_cache_t *dde_cache;
 
+/* ARGSUSED */
 static int
 dde_cache_constr(void *buf, void *arg, int flags)
 {
@@ -671,6 +671,7 @@ dde_cache_constr(void *buf, void *arg, int flags)
 	return (0);
 }
 
+/* ARGSUSED */
 static void
 dde_cache_destr(void *buf, void *arg)
 {

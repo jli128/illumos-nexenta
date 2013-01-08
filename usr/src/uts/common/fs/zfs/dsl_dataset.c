@@ -1664,7 +1664,7 @@ dsl_dataset_destroy_sync(void *arg1, void *tag, dmu_tx_t *tx)
 {
 	struct dsl_ds_destroyarg *dsda = arg1;
 	dsl_dataset_t *ds = dsda->ds;
-	int err;
+	int err = 0;
 	int after_branch_point = FALSE;
 	dsl_pool_t *dp = ds->ds_dir->dd_pool;
 	objset_t *mos = dp->dp_meta_objset;

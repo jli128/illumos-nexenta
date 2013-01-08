@@ -1536,7 +1536,6 @@ dmu_write_policy(objset_t *os, dnode_t *dn, int level, int wp, zio_prop_t *zp)
 	boolean_t dedup;
 	boolean_t dedup_verify = os->os_dedup_verify;
 	int copies = os->os_copies;
-	boolean_t usesc;
 
 	/*
 	 * Determine checksum setting.
