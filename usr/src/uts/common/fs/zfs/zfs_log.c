@@ -451,7 +451,7 @@ zfs_log_rename(zilog_t *zilog, dmu_tx_t *tx, uint64_t txtype,
  * zfs_log_write() handles TX_WRITE transactions.
  */
 ssize_t zfs_immediate_write_sz = 32768;
-uint64_t wrcache_vdev_write_once = 1;
+boolean_t zfs_wrcache_write_once = 1;
 
 void
 zfs_log_write(zilog_t *zilog, dmu_tx_t *tx, int txtype,
@@ -495,18 +495,10 @@ zfs_log_write(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 
 	slogging = spa_has_slogs(zilog->zl_spa) &&
 	    (zilog->zl_logbias == ZFS_LOGBIAS_LATENCY);
-	if (immediate_write_sz && !slogging) {
-		spa_t *spa = zilog->zl_spa;
-		boolean_t has_special = spa_has_special(spa);
-		if (has_special) {
-			boolean_t enabled = spa_special_enabled(spa);
-			spa_specialclass_id_t class = spa_specialclass_id(spa);
-			if ((enabled) && (class == SPA_SPECIALCLASS_WRCACHE) &&
-			    (spa_watermark_none(spa)) &&
-			    (wrcache_vdev_write_once))
-				immediate_write_sz = 0;
-		}
-	}
+
+	if (immediate_write_sz && !slogging && zfs_wrcache_write_once &&
+	    spa_write_data_to_special(zilog->zl_spa))
+		immediate_write_sz = 0;
 
 	if (resid > immediate_write_sz && !slogging && resid <= zp->z_blksz)
 		write_state = WR_INDIRECT;

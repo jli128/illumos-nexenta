@@ -225,14 +225,7 @@ spa_load_cos_props(spa_t *dummy)
 
 /* ARGSUSED */
 boolean_t
-spa_watermark_none(spa_t *dummy)
-{
-	return (B_TRUE);
-}
-
-/* ARGSUSED */
-boolean_t
-spa_special_enabled(spa_t *dummy)
+spa_write_data_to_special(spa_t *dummy)
 {
 	return (B_FALSE);
 }

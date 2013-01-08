@@ -45,8 +45,7 @@ spa_specialclass_id_t spa_specialclass_id(spa_t *);
 spa_specialclass_t *spa_get_specialclass(spa_t *);
 uint64_t spa_specialclass_flags(spa_t *);
 void spa_check_special(spa_t *);
-boolean_t spa_special_enabled(spa_t *);
-boolean_t spa_watermark_none(spa_t *);
+boolean_t spa_write_data_to_special(spa_t *);
 
 /* currently there are 2 flags */
 enum specialflagbit {

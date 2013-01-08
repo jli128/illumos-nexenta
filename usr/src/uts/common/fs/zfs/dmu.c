@@ -46,6 +46,7 @@
 #include <sys/vmsystm.h>
 #include <sys/zfs_znode.h>
 #endif
+#include <sys/special.h>
 
 const dmu_object_type_info_t dmu_ot[DMU_OT_NUMTYPES] = {
 	{	DMU_BSWAP_UINT8,	TRUE,	"unallocated"		},
@@ -1372,9 +1373,9 @@ dmu_sync_late_arrival(zio_t *pio, objset_t *os, dmu_sync_cb_t *done, zgd_t *zgd,
  */
 
 /*
- * Tunable: when syncing to disk, write to special class vdevs
+ * Tunable: when syncing to disk in wrcache mode, write to special class vdevs
  */
-uint64_t write_direct_to_special = 1;
+boolean_t dmu_write_to_special = 1;
 
 int
 dmu_sync(zio_t *pio, uint64_t txg, dmu_sync_cb_t *done, zgd_t *zgd)
@@ -1397,7 +1398,8 @@ dmu_sync(zio_t *pio, uint64_t txg, dmu_sync_cb_t *done, zgd_t *zgd)
 	SET_BOOKMARK(&zb, ds->ds_object,
 	    db->db.db_object, db->db_level, db->db_blkid);
 
-	if (write_direct_to_special) {
+	/* write to special only if proper conditions hold */
+	if (dmu_write_to_special && spa_write_data_to_special(os->os_spa)) {
 		WP_SET_SPECIALCLASS(flags, B_TRUE);
 	}
 	DB_DNODE_ENTER(db);

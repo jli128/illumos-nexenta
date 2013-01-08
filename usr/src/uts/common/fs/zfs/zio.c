@@ -2594,11 +2594,12 @@ zio_vdev_io_done(zio_t *zio)
 		 */
 		mutex_enter(&zio->io_lock);
 		tid = zio->io_timeout_id;
-		ASSERT(tid != 0);
+		ASSERT(zio->io_error != 0 || tid != 0);
 		zio->io_timeout_id = 0;
 		mutex_exit(&zio->io_lock);
 
-		(void) untimeout(tid);
+		if (tid)
+			(void) untimeout(tid);
 
 		vdev_queue_io_done(zio);
 
