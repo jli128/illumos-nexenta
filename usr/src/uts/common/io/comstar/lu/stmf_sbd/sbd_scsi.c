@@ -18,10 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- *
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/conf.h>
@@ -2914,19 +2914,19 @@ sbd_handle_inquiry(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 		if (sl->sl_flags & SL_VID_VALID) {
 			bcopy(sl->sl_vendor_id, inq->inq_vid, 8);
 		} else {
-			bcopy(STMF_VENDOR_ID, inq->inq_vid, 8);
+			bcopy(sbd_vendor_id, inq->inq_vid, 8);
 		}
 
 		if (sl->sl_flags & SL_PID_VALID) {
 			bcopy(sl->sl_product_id, inq->inq_pid, 16);
 		} else {
-			bcopy(STMF_PRODUCT_ID, inq->inq_pid, 16);
+			bcopy(sbd_product_id, inq->inq_pid, 16);
 		}
 
 		if (sl->sl_flags & SL_REV_VALID) {
 			bcopy(sl->sl_revision, inq->inq_revision, 4);
 		} else {
-			bcopy(STMF_REVISION, inq->inq_revision, 4);
+			bcopy(sbd_revision, inq->inq_revision, 4);
 		}
 
 		/* Adding Version Descriptors */

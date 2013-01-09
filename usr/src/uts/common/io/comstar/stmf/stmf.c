@@ -18,11 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- */
-/*
- * Copyright 2012, Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/conf.h>
@@ -7051,9 +7050,9 @@ stmf_dlun0_new_task(scsi_task_t *task, stmf_data_buf_t *dbuf)
 		p[4] = inq_page_length;
 		p[6] = 0x80;
 
-		(void) strncpy((char *)p+8, STMF_VENDOR_ID, 8);
-		(void) strncpy((char *)p+16, STMF_PRODUCT_ID, 16);
-		(void) strncpy((char *)p+32, STMF_REVISION, 4);
+		(void) strncpy((char *)p+8, "NONE    ", 8);
+		(void) strncpy((char *)p+16, "NONE            ", 16);
+		(void) strncpy((char *)p+32, "NONE", 4);
 
 		dbuf->db_data_size = sz;
 		dbuf->db_relative_offset = 0;

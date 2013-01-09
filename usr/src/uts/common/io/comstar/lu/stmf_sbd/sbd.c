@@ -18,9 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/conf.h>
@@ -108,6 +109,9 @@ static dev_info_t	*sbd_dip;
 static uint32_t		sbd_lu_count = 0;
 
 /* Global property settings for the logical unit */
+char sbd_vendor_id[]	= "NEXENTA ";
+char sbd_product_id[]	= "COMSTAR         ";
+char sbd_revision[]	= "1.0 ";
 char *sbd_mgmt_url = NULL;
 uint16_t sbd_mgmt_url_alloc_size = 0;
 krwlock_t sbd_global_prop_lock;
@@ -266,6 +270,8 @@ sbd_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 static int
 sbd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
+	char	*prop;
+
 	switch (cmd) {
 	case DDI_ATTACH:
 		sbd_dip = dip;
@@ -275,6 +281,17 @@ sbd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			break;
 		}
 		ddi_report_dev(dip);
+
+		if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip,
+		    DDI_PROP_DONTPASS, "vendor-id", &prop) == DDI_SUCCESS)
+			(void) snprintf(sbd_vendor_id, 9, "%s%8s", prop, "");
+		if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip,
+		    DDI_PROP_DONTPASS, "product-id", &prop) == DDI_SUCCESS)
+			(void) snprintf(sbd_product_id, 17, "%s%16s", prop, "");
+		if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip,
+		    DDI_PROP_DONTPASS, "revision", &prop) == DDI_SUCCESS)
+			(void) snprintf(sbd_revision, 5, "%s%4s", prop, "");
+
 		return (DDI_SUCCESS);
 	}
 
@@ -3312,19 +3329,19 @@ sbd_get_lu_props(sbd_lu_props_t *islp, uint32_t islp_sz,
 		oslp->slp_lu_vid = 1;
 		bcopy(sl->sl_vendor_id, oslp->slp_vid, 8);
 	} else {
-		bcopy(STMF_VENDOR_ID, oslp->slp_vid, 8);
+		bcopy(sbd_vendor_id, oslp->slp_vid, 8);
 	}
 	if (sl->sl_flags & SL_PID_VALID) {
 		oslp->slp_lu_pid = 1;
 		bcopy(sl->sl_product_id, oslp->slp_pid, 16);
 	} else {
-		bcopy(STMF_PRODUCT_ID, oslp->slp_pid, 16);
+		bcopy(sbd_product_id, oslp->slp_pid, 16);
 	}
 	if (sl->sl_flags & SL_REV_VALID) {
 		oslp->slp_lu_rev = 1;
 		bcopy(sl->sl_revision, oslp->slp_rev, 4);
 	} else {
-		bcopy(STMF_REVISION, oslp->slp_rev, 4);
+		bcopy(sbd_revision, oslp->slp_rev, 4);
 	}
 	bcopy(sl->sl_device_id + 4, oslp->slp_guid, 16);
 
