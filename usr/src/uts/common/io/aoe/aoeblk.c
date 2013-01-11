@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/aoe.h>
@@ -63,8 +63,8 @@ static char *aoe_errlist[] =
 #define	OP_WRITE	1
 #define	OP_FLUSH	2
 
-static int aoe_maxwait = MAXWAIT;
-static int aoe_wc = 0;
+int aoeblk_maxwait = MAXWAIT;
+int aoeblk_wc = 1;
 
 /*
  * Driver's global variables
@@ -593,7 +593,7 @@ rexmit_timer(void *vp)
 		    tsince(f->frm_tag) > timeout_ticks) {
 			n = f->frm_waited += timeout_ticks;
 			n /= hz;
-			if (n > aoe_maxwait) {
+			if (n > aoeblk_maxwait) {
 				aoe_frame_t *af = PRIV2FRM(f);
 				/* Waited too long.  Device failure. */
 				aoeblk_downdisk(d, af->af_mac, 1);
@@ -714,7 +714,7 @@ aoeblk_atawc(aoedisk_t *d, void *mac)
 
 	/* Set up ata header. */
 	ah->aa_cmdstat = (unsigned char)ATA_SETFEATURES;
-	ah->aa_errfeat = aoe_wc ? ATA_SF_ENAB_WCACHE : ATA_SF_DIS_WCACHE;
+	ah->aa_errfeat = aoeblk_wc ? ATA_SF_ENAB_WCACHE : ATA_SF_DIS_WCACHE;
 	ah->aa_lba3 = 0xa0;
 
 	f->frm_req = NULL;
