@@ -62,7 +62,10 @@ static vdev_ops_t *vdev_ops_table[] = {
 /* maximum scrub/resilver I/O queue per leaf vdev */
 int zfs_scrub_limit = 10;
 
-/* alpha for exponential moving average of I/O latency (in 1/10th of a percent) */
+/*
+ * alpha for exponential moving average of I/O latency
+ * (in 1/10th of a percent)
+ */
 int zfs_vs_latency_alpha = 100;
 
 /*

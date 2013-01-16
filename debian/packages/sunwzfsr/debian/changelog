@@ -1,3 +1,9 @@
+sunwzfsr (5.11.134-31-9467-12648) nexenta; urgency=low
+
+  * Issue 12648: backout zfs++ changes
+
+ -- Nexenta Systems <support@nexenta.com>  Thu, 10 Jan 2013 19:42:16 +0400
+
 sunwzfsr (5.11.134-31-9466-12236) nexenta; urgency=low
 
   * Issue 12235: ZFS extensions for intelligent placement of data and metadata

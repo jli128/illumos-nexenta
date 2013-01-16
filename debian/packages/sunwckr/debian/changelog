@@ -1,3 +1,9 @@
+sunwckr (5.11.134-31-12265-12648) nexenta; urgency=low
+
+  * Issue 12648: backout zfs++ changes
+
+ -- Nexenta Systems <support@nexenta.com>  Thu, 10 Jan 2013 19:42:16 +0400
+
 sunwckr (5.11.134-31-12264-8622) nexenta; urgency=low
 
   * Issue 8622: SSD added to a zpool does not appear to be recognised with a 4KB native block size

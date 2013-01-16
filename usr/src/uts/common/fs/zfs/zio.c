@@ -197,13 +197,19 @@ zio_init(void)
 
 	zio_inject_init();
 
-      
 	/*
 	 * initialize the hardware compression.
-	 * */
-        if (use_gzip_hardware) {
-	    init_gzip_hardware_compress();
-        } 
+	 */
+	if (use_gzip_hardware) {
+		init_gzip_hardware_compress();
+	}
+
+	/*
+	 * Initialize minimum timeout if not set.
+	 */
+	if (zio_min_timeout_ms == -1) {
+		zio_min_timeout_ms = 2 * zfs_txg_synctime_ms;
+	}
 }
 
 void
@@ -336,13 +342,6 @@ zio_pop_transforms(zio_t *zio)
 		zio->io_transform_stack = zt->zt_next;
 
 		kmem_free(zt, sizeof (zio_transform_t));
-	}
-
-	/*
-	 * Initialize minimum timeout if not set.
-	 */
-	if (zio_min_timeout_ms == -1) {
-		zio_min_timeout_ms = 2 * zfs_txg_synctime_ms;
 	}
 }
 
@@ -2356,7 +2355,6 @@ zio_vdev_io_start(zio_t *zio)
 	vdev_t *vd = zio->io_vd;
 	uint64_t align;
 	spa_t *spa = zio->io_spa;
-	zio->io_vd_timestamp = gethrtime();
 	zio_type_t type = zio->io_type;
 
 	ASSERT(zio->io_error == 0);
@@ -2371,6 +2369,8 @@ zio_vdev_io_start(zio_t *zio)
 		 */
 		return (vdev_mirror_ops.vdev_op_io_start(zio));
 	}
+
+	zio->io_vd_timestamp = gethrtime();
 
 	/*
 	 * We keep track of time-sensitive I/Os so that the scan thread

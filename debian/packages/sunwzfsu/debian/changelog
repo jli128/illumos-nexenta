@@ -1,3 +1,9 @@
+sunwzfsu (5.11.134-31-12266-12648) nexenta; urgency=low
+
+  * Issue 12648: backout zfs++ changes
+
+ -- Nexenta Systems <support@nexenta.com>  Thu, 10 Jan 2013 19:42:16 +0400
+
 sunwzfsu (5.11.134-31-12265-11612) nexenta; urgency=high
 
   * Issue 11612: Failing vdev of a mirrored pool should not take zfs
