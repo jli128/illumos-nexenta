@@ -11,7 +11,7 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2013 Nexenta Systems, Inc. All rights reserved.
 #
 
 include		$(SRC)//Makefile.master
@@ -236,6 +236,7 @@ _MANFILES=	6to4relay.1m		\
  	 	intrstat.1m		\
  	 	iostat.1m		\
  	 	ipaddrsel.1m		\
+		ipadm.1m		\
  	 	ipf.1m			\
  	 	ipfs.1m			\
  	 	ipfstat.1m		\
