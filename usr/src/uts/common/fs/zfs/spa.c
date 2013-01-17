@@ -133,12 +133,6 @@ uint_t		zio_taskq_basedc = 80;		/* base duty cycle */
 boolean_t	spa_create_process = B_TRUE;	/* no process ==> no sysdc */
 
 /*
- * This (illegal) pool name is used when temporarily importing a spa_t in order
- * to get the vdev stats associated with the imported devices.
- */
-#define	TRYIMPORT_NAME	"$import"
-
-/*
  * ==========================================================================
  * SPA properties routines
  * ==========================================================================
@@ -2007,6 +2001,13 @@ spa_load(spa_t *spa, spa_load_state_t state, spa_import_type_t type,
 	spa->spa_load_state = error ? SPA_LOAD_ERROR : SPA_LOAD_NONE;
 	spa->spa_ena = 0;
 
+#ifdef _KERNEL
+	if (error == 0) {
+		/* start performance monitor thread */
+		spa_start_perfmon_thread(spa);
+	}
+#endif
+
 	return (error);
 }
 
@@ -3555,6 +3556,10 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 
 	mutex_exit(&spa_namespace_lock);
 
+#ifdef _KERNEL
+	/* start performance monitor thread */
+	spa_start_perfmon_thread(spa);
+#endif
 	return (0);
 }
 
@@ -4053,6 +4058,7 @@ spa_export_common(char *pool, int new_state, nvlist_t **oldconfig,
 {
 	spa_t *spa;
 	boolean_t wrcthr_stopped = B_FALSE;
+	boolean_t perfmon_stopped = B_FALSE;
 
 	if (oldconfig)
 		*oldconfig = NULL;
@@ -4074,6 +4080,7 @@ spa_export_common(char *pool, int new_state, nvlist_t **oldconfig,
 	spa_open_ref(spa, FTAG);
 	mutex_exit(&spa_namespace_lock);
 	wrcthr_stopped = stop_wrc_thread(spa); /* stop write cache thread */
+	perfmon_stopped = spa_stop_perfmon_thread(spa);
 	spa_async_suspend(spa);
 	mutex_enter(&spa_namespace_lock);
 	spa_close(spa, FTAG);
@@ -4101,6 +4108,8 @@ spa_export_common(char *pool, int new_state, nvlist_t **oldconfig,
 			mutex_exit(&spa_namespace_lock);
 			if (wrcthr_stopped)
 				start_wrc_thread(spa);
+			if (perfmon_stopped)
+				spa_start_perfmon_thread(spa);
 			return (EBUSY);
 		}
 
@@ -4116,6 +4125,8 @@ spa_export_common(char *pool, int new_state, nvlist_t **oldconfig,
 			mutex_exit(&spa_namespace_lock);
 			if (wrcthr_stopped)
 				start_wrc_thread(spa);
+			if (perfmon_stopped)
+				spa_start_perfmon_thread(spa);
 			return (EXDEV);
 		}
 
@@ -5443,209 +5454,6 @@ _spa_vdev_setfru(spa_t *spa, uint64_t guid, const char *newfru)
 }
 
 /*
- * Tunable: enable selection between special and normal classes
- * if true, enables distribution of I/O between special and normal
- * classes according to the spa->spa_special_to_normal_ratio
- * if false, the ratio is disregarded, special class is used when possible
- */
-uint64_t spa_special_selection_enable = 0;
-/* Tunable: nanosec period for updating stats (10 msec default) */
-hrtime_t spa_special_stat_update_period = 10*1000000;
-/*
- * Tunable: special selection goal
- * selects among special and normal vdevs in order to optimize specific
- * system parameter, e.g. latency or throughput
- */
-spa_special_selection_t spa_special_selection =
-    SPA_SPECIAL_SELECTION_LATENCY;
-/* Tunable: limits on the ratio of special to normal writes */
-uint64_t spa_special_ratio_max = SPA_SPECIAL_RATIO_MAX;
-uint64_t spa_special_ratio_min = SPA_SPECIAL_RATIO_MIN;
-/* Tunable: factor used to adjust the ratio up/down */
-uint64_t spa_special_factor = SPA_SPECIAL_ADJUSTMENT;
-/*
- * Tunable: vdev utilization threshold
- * once reached, start re-distributing I/O requests to other vdev classes
- */
-uint64_t spa_special_vdev_busy = SPA_SPECIAL_UTILIZATION;
-uint64_t spa_normal_vdev_busy = SPA_SPECIAL_UTILIZATION;
-
-static void
-spa_special_ratio_adjust(spa_t *spa, spa_special_stat_t *stat)
-{
-	/* calculate averages */
-	if (stat->nnormal) {
-		stat->normal_lt = stat->normal_lt/stat->nnormal;
-		stat->normal_ut = stat->normal_ut/stat->nnormal;
-	}
-	if (stat->nspecial) {
-		stat->special_lt = stat->special_lt/stat->nspecial;
-		stat->special_ut = stat->special_ut/stat->nspecial;
-	}
-
-	/* update */
-	mutex_enter(&spa->spa_special_stat_lock);
-	spa->spa_special_stat = *stat;
-
-	/*
-	 * write to special until utilization threshold is reached
-	 * then look at either patency or bandwidth and adjust
-	 * request distribution accordingly
-	 */
-	ASSERT(SPA_SPECIAL_SELECTION_VALID(spa_special_selection));
-	switch (spa_special_selection) {
-	case SPA_SPECIAL_SELECTION_LATENCY:
-		/*
-		 * bias selection toward class with smaller
-		 * average latency
-		 */
-		if (stat->normal_lt && stat->special_lt) {
-			if (stat->normal_lt > stat->special_lt)
-				spa->spa_special_to_normal_ratio *=
-				    spa_special_factor;
-			if (stat->normal_lt < stat->special_lt)
-				spa->spa_special_to_normal_ratio /=
-				    spa_special_factor;
-		}
-		break;
-	case SPA_SPECIAL_SELECTION_THROUGHPUT:
-		if (stat->special_ut < spa_special_vdev_busy) {
-			/*
-			 * keep using special class until
-			 * the threshold is reached
-			 */
-			spa->spa_special_to_normal_ratio *= spa_special_factor;
-		} else if (stat->normal_ut < spa_normal_vdev_busy) {
-			/*
-			 * move some of the work to the normal class,
-			 * unless it is already busy
-			 */
-			spa->spa_special_to_normal_ratio /= spa_special_factor;
-		}
-		break;
-	default:
-		break; /* do nothing */
-	}
-	/*
-	 * must stay within limits
-	 */
-	if (spa->spa_special_to_normal_ratio < spa_special_ratio_min)
-		spa->spa_special_to_normal_ratio = spa_special_ratio_min;
-	if (spa->spa_special_to_normal_ratio > spa_special_ratio_max)
-		spa->spa_special_to_normal_ratio = spa_special_ratio_max;
-
-	DTRACE_PROBE3(spa_special_stats_utl, char *, spa->spa_name,
-	    uint64_t, stat->normal_ut, uint64_t, stat->special_ut);
-	DTRACE_PROBE3(spa_special_stats_lt, char *, spa->spa_name,
-	    int64_t, stat->normal_lt, int64_t, stat->special_lt);
-	DTRACE_PROBE2(spa_special_stats_rt, char *, spa->spa_name,
-	    uint64_t, spa->spa_special_to_normal_ratio);
-
-	mutex_exit(&spa->spa_special_stat_lock);
-}
-
-
-static void
-spa_vdev_walk_stats(vdev_t *pvd, hrtime_t *lt, int *ut, int *nvdev)
-{
-	int i;
-	if (pvd->vdev_children == 0) {
-		vdev_stat_t *pvd_stat = &pvd->vdev_stat;
-		/* single vdev (itself) */
-		ASSERT(pvd->vdev_ops->vdev_op_leaf);
-		DTRACE_PROBE1(spa_vdev_walk_lf, vdev_t *, pvd);
-		mutex_enter(&pvd->vdev_stat_lock);
-		*lt += pvd_stat->vs_latency[ZIO_TYPE_WRITE];
-		*ut += pvd_stat->vs_busy;
-		mutex_exit(&pvd->vdev_stat_lock);
-		*nvdev = *nvdev+1;
-	} else {
-		/* not a leaf-level vdev, has children */
-		ASSERT(pvd->vdev_ops->vdev_op_leaf == B_FALSE);
-		for (i = 0; i < pvd->vdev_children; i++) {
-			vdev_t *vd = pvd->vdev_child[i];
-			vdev_stat_t *vd_stat = &vd->vdev_stat;
-			ASSERT(vd);
-
-			if (vd->vdev_islog || vd->vdev_ishole ||
-			    vd->vdev_isspare || vd->vdev_isl2cache)
-				continue;
-
-			if (vd->vdev_ops->vdev_op_leaf == B_FALSE) {
-				DTRACE_PROBE1(spa_vdev_walk_nl, vdev_t *, vd);
-				spa_vdev_walk_stats(vd, lt, ut, nvdev);
-			} else {
-				DTRACE_PROBE1(spa_vdev_walk_lf, vdev_t *, vd);
-				mutex_enter(&vd->vdev_stat_lock);
-				*lt += vd_stat->vs_latency[ZIO_TYPE_WRITE];
-				*ut += vd_stat->vs_busy;
-				mutex_exit(&vd->vdev_stat_lock);
-				*nvdev = *nvdev+1;
-			}
-		}
-	}
-}
-
-void
-spa_special_stats_update(spa_t *spa)
-{
-	int i;
-	spa_special_stat_t spa_stat;
-	/* is it time to update ? */
-	hrtime_t now = gethrtime();
-	vdev_t *rvd = spa->spa_root_vdev;
-
-	/* too early to update stats ? */
-	if ((now - spa->spa_special_stat_timestamp) <
-	    spa_special_stat_update_period) {
-		DTRACE_PROBE1(spa_special_stat_early, char *, spa->spa_name);
-		return;
-	}
-
-	spa->spa_special_stat_timestamp = now;
-	membar_producer();
-
-	/*
-	 * walk the top level vdevs and calculate average stats for
-	 * the normal and special classes
-	 */
-	DTRACE_PROBE1(spa_special_stat_update, spa_t *, spa);
-
-	bzero(&spa_stat, sizeof (spa_special_stat_t));
-
-	ASSERT(rvd);
-
-	for (i = 0; i < rvd->vdev_children; i++) {
-		vdev_t *vd = rvd->vdev_child[i];
-		ASSERT(vd);
-
-		if (vd->vdev_islog || vd->vdev_ishole ||
-		    vd->vdev_isspare || vd->vdev_isl2cache)
-			continue;
-		if (vd->vdev_isspecial) {
-			spa_vdev_walk_stats(vd, &spa_stat.special_lt,
-			    &spa_stat.special_ut, &spa_stat.nspecial);
-		} else {
-			spa_vdev_walk_stats(vd, &spa_stat.normal_lt,
-			    &spa_stat.normal_ut, &spa_stat.nnormal);
-		}
-	}
-
-	/* adjust the ratio accordingly */
-	spa_special_ratio_adjust(spa, &spa_stat);
-}
-
-/*
- * Distribute writes across special and normal vdevs in
- * spa_special_to_normal-1:1 proportion
- */
-boolean_t
-spa_choose_special_class(spa_t *spa)
-{
-	uint64_t val = atomic_inc_64_nv(&spa->spa_special_stat_rotor);
-	return (val % spa->spa_special_to_normal_ratio);
-}
-/*
  * ==========================================================================
  * SPA Scanning
  * ==========================================================================
@@ -6659,4 +6467,19 @@ done:
 		sysevent_free_attr(attr);
 	sysevent_free(ev);
 #endif
+}
+
+#pragma weak spa_start_perfmon_thread = _spa_start_perfmon_thread
+/* ARGSUSED */
+void
+_spa_start_perfmon_thread(spa_t *spa)
+{
+}
+
+#pragma weak spa_stop_perfmon_thread = _spa_stop_perfmon_thread
+/* ARGSUSED */
+boolean_t
+_spa_stop_perfmon_thread(spa_t *spa)
+{
+	return (B_FALSE);
 }

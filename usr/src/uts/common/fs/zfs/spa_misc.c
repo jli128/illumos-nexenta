@@ -450,13 +450,14 @@ spa_add(const char *name, nvlist_t *config, const char *altroot)
 	mutex_init(&spa->spa_vdev_top_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&spa->spa_wrc.wrc_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&spa->spa_wrc_route.route_lock, NULL, MUTEX_DEFAULT, NULL);
-	mutex_init(&spa->spa_special_stat_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&spa->spa_perfmon.perfmon_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	cv_init(&spa->spa_async_cv, NULL, CV_DEFAULT, NULL);
 	cv_init(&spa->spa_proc_cv, NULL, CV_DEFAULT, NULL);
 	cv_init(&spa->spa_scrub_io_cv, NULL, CV_DEFAULT, NULL);
 	cv_init(&spa->spa_suspend_cv, NULL, CV_DEFAULT, NULL);
 	cv_init(&spa->spa_wrc.wrc_cv, NULL, CV_DEFAULT, NULL);
+	cv_init(&spa->spa_perfmon.perfmon_cv, NULL, CV_DEFAULT, NULL);
 
 	for (int t = 0; t < TXG_SIZE; t++)
 		bplist_create(&spa->spa_free_bplist[t]);
@@ -522,19 +523,14 @@ spa_add(const char *name, nvlist_t *config, const char *altroot)
 	spa->spa_wrc_route.route_normal = 0;
 	spa->spa_wrc_route.route_perc = 0;
 
-	spa_cos_init(spa);
-
-	list_create(&spa->spa_wrc.wrc_blocks, sizeof (wrc_block_t),
-	    offsetof(wrc_block_t, node));
-	spa->spa_wrc.wrc_block_count = 0;
-	spa->spa_wrc.wrc_thread = NULL;
-	spa->spa_wrc_route.route_special = 0;
-	spa->spa_wrc_route.route_normal = 0;
-	spa->spa_wrc_route.route_perc = 0;
-
 	bzero(&(spa->spa_special_stat), sizeof (spa_special_stat_t));
-	spa->spa_special_stat_timestamp = 0;
+	spa->spa_special_stat_rotor = 0;
 	spa->spa_special_to_normal_ratio = SPA_SPECIAL_RATIO;
+	spa->spa_dedup_percentage = 100;
+	spa->spa_dedup_rotor = 0;
+
+	spa->spa_perfmon.perfmon_thread = NULL;
+	spa->spa_perfmon.perfmon_thr_exit = B_FALSE;
 
 	return (spa);
 }
@@ -588,6 +584,7 @@ spa_remove(spa_t *spa)
 	cv_destroy(&spa->spa_scrub_io_cv);
 	cv_destroy(&spa->spa_suspend_cv);
 	cv_destroy(&spa->spa_wrc.wrc_cv);
+	cv_destroy(&spa->spa_perfmon.perfmon_cv);
 
 	mutex_destroy(&spa->spa_async_lock);
 	mutex_destroy(&spa->spa_errlist_lock);
@@ -602,7 +599,7 @@ spa_remove(spa_t *spa)
 	mutex_destroy(&spa->spa_vdev_top_lock);
 	mutex_destroy(&spa->spa_wrc.wrc_lock);
 	mutex_destroy(&spa->spa_wrc_route.route_lock);
-	mutex_destroy(&spa->spa_special_stat_lock);
+	mutex_destroy(&spa->spa_perfmon.perfmon_lock);
 
 	kmem_free(spa, sizeof (spa_t));
 }

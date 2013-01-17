@@ -166,30 +166,21 @@ vdev_queue_agg_io_done(zio_t *aio)
 /*
  * Compute vdev utilization
  *
- * we use pending queue add/remove events to accummulate two things:
- *   busy time (when there are zios on the pending queue);
- *   wall clock time (total elapsed time)
- * we also keep track of the last utilization reading, sample
- * utilization telemetry every so often, and use EMA to smooth out
- * instantaneous changes
+ * we use pending queue add/remove events to accummulate vdev busy time
+ * (when there are zios on the pending queue)
  *
- * an important detail: this specific way of accummulating busy time
- * works correctly only if vdev_busy_update() is invoked in the following
- * order with respect to the add/remove events
- *
+ * the expected usage pattern is as follows:
  * ...
- * vdev_buzy_update(vd);
+ * vdev_busy_update(vd);
  * avl_add(pending_tree, zio);
  * ...
  * vdev_busy_update(vd);
  * avl_remove(pending_tree, zio);
  * ...
  */
-int64_t vdev_busy_alpha = 100;		/* 0.1 */
-hrtime_t vdev_busy_delay = 10*1000000;	/* 10 msec */
 
 static void
-vdev_util_update(vdev_t *vd)
+vdev_busy_update(vdev_t *vd)
 {
 	ulong_t pending;
 	vdev_queue_t *vq = &vd->vdev_queue;
@@ -204,33 +195,13 @@ vdev_util_update(vdev_t *vd)
 	    ulong_t, pending);
 
 	ts = gethrtime();
-
 	mutex_enter(&vd->vdev_stat_lock);
-	/* accumulate wall clock time */
-	if (vs->vs_wcstart) {
-		ASSERT(vs->vs_wcstart <= ts);
-		vs->vs_wctotal += ts - vs->vs_wcstart;
-	}
-	vs->vs_wcstart = ts;
-	/* accumulate busy time; see the comment above */
 	if (pending) {
 		ASSERT(vs->vs_bzstart);
 		ASSERT(vs->vs_bzstart <= ts);
 		vs->vs_bztotal += ts - vs->vs_bzstart;
 	}
 	vs->vs_bzstart = ts;
-	/* update utilization stats */
-	if (vs->vs_wctotal && (ts - vs->vs_bztimestamp) > vdev_busy_delay) {
-		int64_t busy = 100*vs->vs_bztotal/vs->vs_wctotal;
-		vs->vs_bztimestamp = ts;
-		vs->vs_busy += (int64_t)(busy - vs->vs_busy) *
-		    vdev_busy_alpha/1000;
-		/* reset the accumulators */
-		vs->vs_bztotal = vs->vs_wctotal = 0;
-
-		DTRACE_PROBE3(vdev_util_diff, uint64_t, vd->vdev_guid,
-		    uint64_t, busy, uint64_t, vs->vs_busy);
-	}
 	mutex_exit(&vd->vdev_stat_lock);
 }
 
@@ -386,7 +357,7 @@ again:
 		} while (dio != lio);
 
 		/* update vdev utilization statistics */
-		vdev_util_update(aio->io_vd);
+		vdev_busy_update(aio->io_vd);
 
 		avl_add(&vq->vq_pending_tree, aio);
 
@@ -411,7 +382,7 @@ again:
 	}
 
 	/* update vdev utilization statistics */
-	vdev_util_update(fio->io_vd);
+	vdev_busy_update(fio->io_vd);
 
 	avl_add(&vq->vq_pending_tree, fio);
 
@@ -488,7 +459,7 @@ vdev_queue_io_done(zio_t *zio)
 	mutex_enter(&vq->vq_lock);
 
 	/* update vdev utilization statistics */
-	vdev_util_update(zio->io_vd);
+	vdev_busy_update(zio->io_vd);
 
 	avl_remove(&vq->vq_pending_tree, zio);
 

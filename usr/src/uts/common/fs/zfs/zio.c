@@ -965,21 +965,11 @@ zio_read_bp_init(zio_t *zio)
 	return (ZIO_PIPELINE_CONTINUE);
 }
 
-/*
- * Tunable: best-effort dedup - only dedup this percentage
- */
-uint64_t zfs_dedup_percentage = 100;
-
-static void
-best_effort_dedup(zio_prop_t *zp)
+#pragma weak zio_best_effort_dedup = _zio_best_effort_dedup
+/* ARGSUSED */
+void
+_zio_best_effort_dedup(zio_t *zio)
 {
-	static uint64_t zfs_dedup_rotor;
-
-	uint64_t val = atomic_inc_64_nv(&zfs_dedup_rotor);
-	if ((val % 100) > zfs_dedup_percentage) {
-		zp->zp_dedup = 0;
-		zp->zp_checksum = zp->zp_os_checksum;
-	}
 }
 
 static int
@@ -1086,8 +1076,10 @@ zio_write_bp_init(zio_t *zio)
 	if (psize == 0) {
 		zio->io_pipeline = ZIO_INTERLOCK_PIPELINE;
 	} else {
-		if (zp->zp_dedup && (zfs_dedup_percentage < 100))
-			best_effort_dedup(zp);
+		if (zp->zp_dedup) {
+			/* check the best-effort dedup setting */
+			zio_best_effort_dedup(zio);
+		}
 		ASSERT(zp->zp_checksum != ZIO_CHECKSUM_GANG_HEADER);
 		BP_SET_LSIZE(bp, lsize);
 		BP_SET_PSIZE(bp, psize);
@@ -2989,10 +2981,6 @@ zio_done(zio_t *zio)
 	zio_pop_transforms(zio);	/* note: may set zio->io_error */
 
 	vdev_stat_update(zio, psize);
-
-	/* update spa latency stats as needed */
-	if (spa_special_selection_enable)
-		spa_special_stats_update(spa);
 
 	if (zio->io_error) {
 		/*

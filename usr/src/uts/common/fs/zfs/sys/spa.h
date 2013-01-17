@@ -644,9 +644,12 @@ extern boolean_t spa_has_special(spa_t *spa);
 extern int spa_mode(spa_t *spa);
 extern uint64_t strtonum(const char *str, char **nptr);
 
-/* Latency stats calculation for dynamic I/O balancing */
-extern void spa_special_stats_update(spa_t *spa);
-extern boolean_t spa_choose_special_class(spa_t *spa);
+/* Selector for dynamic I/O balancing between special and regular vdevs */
+extern boolean_t spa_use_special_class(spa_t *spa);
+
+/* Pool perfmon thread management */
+extern void spa_start_perfmon_thread(spa_t *spa);
+extern boolean_t spa_stop_perfmon_thread(spa_t *spa);
 
 extern char *spa_his_ievent_table[];
 

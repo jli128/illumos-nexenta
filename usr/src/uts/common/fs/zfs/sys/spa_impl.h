@@ -45,6 +45,12 @@
 extern "C" {
 #endif
 
+/*
+ * This (illegal) pool name is used when temporarily importing a spa_t in order
+ * to get the vdev stats associated with the imported devices.
+ */
+#define	TRYIMPORT_NAME	"$import"
+
 typedef struct spa_error_entry {
 	zbookmark_t	se_bookmark;
 	char		*se_name;
@@ -116,7 +122,7 @@ typedef enum spa_watermark {
 } spa_watermark_t;
 
 /* Tunables and default values for special/normal class selection */
-extern uint64_t spa_special_selection_enable;
+extern boolean_t spa_special_selection_enable;
 
 #define	SPA_SPECIAL_RATIO	1024
 #define	SPA_SPECIAL_RATIO_MIN	1
@@ -138,13 +144,18 @@ typedef enum {
 	    ((sel) < SPA_SPECIAL_SELECTION_MAX))
 
 typedef struct spa_special_stat {
-	int nspecial;
-	int nnormal;
 	int special_ut;
 	int normal_ut;
 	hrtime_t normal_lt;
 	hrtime_t special_lt;
 } spa_special_stat_t;
+
+typedef struct spa_perfmon_data {
+	kthread_t		*perfmon_thread;
+	boolean_t		perfmon_thr_exit;
+	kmutex_t		perfmon_lock;
+	kcondvar_t		perfmon_cv;
+} spa_perfmon_data_t;
 
 struct spa {
 	/*
@@ -294,10 +305,10 @@ struct spa {
 	 * latency stats per metaslab_class to aid dynamic balancing of io
 	 * across normal and special classes
 	 */
-	kmutex_t		spa_special_stat_lock;
-	hrtime_t		spa_special_stat_timestamp;
 	uint64_t		spa_special_stat_rotor;
 	spa_special_stat_t	spa_special_stat;
+
+	spa_perfmon_data_t	spa_perfmon;
 
 	/*
 	 * ratio of writes to special class vs writes to normal class;
@@ -307,6 +318,10 @@ struct spa {
 	 * special classes; the parameters are either latency or throughput
 	 */
 	uint64_t spa_special_to_normal_ratio;
+
+	/* target percentage of data to be considered for dedup */
+	int spa_dedup_percentage;
+	uint64_t spa_dedup_rotor;
 
 	/*
 	 * spa_refcnt & spa_config_lock must be the last elements

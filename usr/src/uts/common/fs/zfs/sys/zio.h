@@ -625,6 +625,9 @@ extern void spa_handle_ignored_writes(spa_t *spa);
 boolean_t zbookmark_is_before(const struct dnode_phys *dnp,
     const zbookmark_t *zb1, const zbookmark_t *zb2);
 
+/* best effort dedup */
+void zio_best_effort_dedup(zio_t *zio);
+
 #ifdef	__cplusplus
 }
 #endif

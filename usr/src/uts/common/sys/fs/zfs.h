@@ -776,8 +776,6 @@ typedef struct vdev_stat {
 	hrtime_t	vs_bzstart;		/* busy time start */
 	hrtime_t	vs_bztotal;		/* busy time total */
 	hrtime_t	vs_wcstart;		/* wall-clock time start */
-	hrtime_t	vs_wctotal;		/* wall-clock time total */
-	hrtime_t	vs_bztimestamp;		/* time of vs_busy update */
 	uint64_t	vs_busy;		/* vdev utilization */
 } vdev_stat_t;
 
