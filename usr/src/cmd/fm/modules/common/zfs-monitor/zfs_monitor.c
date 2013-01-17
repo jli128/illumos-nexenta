@@ -35,6 +35,48 @@ typedef struct zm {
 	boolean_t	exit;
 } zm_t;
 
+static boolean_t
+zm_read_disk(zm_t *zm, char *path)
+{
+	char *block;
+	char rpath[MAXPATHLEN];
+	const char *func;
+	struct dk_minfo_ext minfo_ext;
+	int fd;
+
+	(void) snprintf(rpath, sizeof (rpath), "/dev/rdsk/%s", path);
+
+	func = "open";
+	if ((fd = open(rpath, O_RDONLY | O_NDELAY)) < 0)
+		goto err_open;
+
+	func = "ioctl";
+	if (ioctl(fd, DKIOCGMEDIAINFOEXT, &minfo_ext) == -1)
+		goto err_ioctl;
+
+	func = "malloc";
+	if ((block = malloc(minfo_ext.dki_lbsize)) == NULL)
+		goto err_malloc;
+
+	func = "read";
+	if (read(fd, block, minfo_ext.dki_lbsize) != minfo_ext.dki_lbsize)
+		goto err_read;
+
+	(void) close(fd);
+	free(block);
+	return B_TRUE;
+
+err_read:
+	free(block);
+err_malloc:
+err_ioctl:
+	(void) close(fd);
+err_open:
+	fmd_hdl_debug(zm->fhdl, "device %s failed: %s\n", func,
+	    strerror(errno));
+	return B_FALSE;
+}
+
 static void
 zm_process_tree(zm_t *zm, zpool_handle_t *zph, nvlist_t *vd)
 {
@@ -50,8 +92,6 @@ zm_process_tree(zm_t *zm, zpool_handle_t *zph, nvlist_t *vd)
 	char		*class;
 	char		*path;
 	char		*vtype;
-	int		fd;
-	char		rpath[MAXPATHLEN];
 
 	/*
 	 * If we have children devices, then we're not a physical
@@ -122,25 +162,9 @@ zm_process_tree(zm_t *zm, zpool_handle_t *zph, nvlist_t *vd)
 		    vs->vs_state);
 		return;
 	}
-	(void) snprintf(rpath, sizeof (rpath), "/dev/rdsk/%s", path + 9);
 
-	fd = open(rpath, O_RDONLY | O_NDELAY);
-	if (fd >= 0) {
-		struct dk_minfo minfo;
-		char	block[DEV_BSIZE];
-
-		if (read(fd, block, DEV_BSIZE) == DEV_BSIZE) {
-			(void) close(fd);
-			return;
-		}
-		fmd_hdl_debug(zm->fhdl, "device read failed: %s\n",
-		    strerror(errno));
-		(void) close(fd);
-	}
-	if (fd < 0) {
-		fmd_hdl_debug(zm->fhdl, "can't open %s: %s\n", rpath,
-		    strerror(errno));
-	}
+	if (zm_read_disk(zm, path + 9))
+		return;
 
 	/*
 	 * From this point on, we know that the vdev is failed or

@@ -1,3 +1,9 @@
+sunwfmd (5.11.134-31-11341-11755) nexenta; urgency=high
+
+  * Issue 11755: Cert Bug 11518 I/O requests are not aligned with 4096 disk sector size
+
+ -- Nexenta Systems <support@nexenta.com>  Thu, 17 Jan 2013 01:04:44 +0100
+
 sunwfmd (5.11.134-31-11340-11612) nexenta; urgency=high
 
   * Issue 11612: Failing vdev of a mirrored pool should not take zfs
