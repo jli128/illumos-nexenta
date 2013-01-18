@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012, Josef 'Jeff' Sipek <jeffpc@31bits.net>. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989  AT&T.	*/
@@ -487,8 +487,8 @@ getsect(struct man_node *manp, char **pv)
 	char	*sections;
 	char	**sectp;
 
-	/* Just store all sections when doing makewhatis or whatis */
-	if (makewhatis || whatis) {
+	/* Just store all sections when doing makewhatis or apropos/whatis */
+	if (makewhatis || apropos) {
 		manp->defsrch = 1;
 		DPRINTF("-- Adding %s\n", manp->path);
 		manp->secv = NULL;
