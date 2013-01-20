@@ -1,3 +1,9 @@
+sunwckr (5.11.134-31-12266-8505) nexenta; urgency=low
+
+  * Issue 8505: all disks in ahci mode have illegal requests
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 16 Jan 2013 17:20:09 -0800
+
 sunwckr (5.11.134-31-12265-12648) nexenta; urgency=low
 
   * Issue 12648: backout zfs++ changes
