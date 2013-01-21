@@ -1,3 +1,9 @@
+sunwzfsr (5.11.134-31-9468-12379) nexenta; urgency=low
+
+  * Issue 12379: Backport request for Illumos changeset 13379 "zfs should handle imbalanced LUNs" to the 3.1.x branch
+
+ -- Nexenta Systems <support@nexenta.com>  Fri, 14 Dec 2012 14:29:43 +0100
+
 sunwzfsr (5.11.134-31-9467-12648) nexenta; urgency=low
 
   * Issue 12648: backout zfs++ changes
