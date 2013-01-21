@@ -18,10 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright (c) 2013 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -102,15 +103,16 @@ boolean_t	zio_requeue_io_start_cut_in_line = B_TRUE;
 
 #ifdef ZFS_DEBUG
 int zio_buf_debug_limit = 16384;
+#else
+int zio_buf_debug_limit = 0;
+#endif
+
 /*
  * Fault insertion for stress testing
  */
 int zio_faulty_vdev_enabled = 0;
 uint64_t zio_faulty_vdev_guid;
 uint64_t zio_faulty_vdev_delay_us = 1000000;	/* 1 second */
-#else
-int zio_buf_debug_limit = 0;
-#endif
 
 /*
  * ==========================================================================
@@ -2551,7 +2553,7 @@ zio_vdev_io_start(zio_t *zio)
 		ASSERT(zio->io_timeout_id == 0);
 		zio->io_timeout_id =
 		    timeout(zio_timeout_handler, zio, NSEC_TO_TICK(io_timeout));
-#ifdef ZFS_DEBUG
+
 		/*
 		 * Insert a fault simulation delay for a particular vdev.
 		 */
@@ -2560,7 +2562,6 @@ zio_vdev_io_start(zio_t *zio)
 			delay(NSEC_TO_TICK(zio_faulty_vdev_delay_us *
 			    (NANOSEC / MICROSEC)));
 		}
-#endif
 	}
 
 	return (vd->vdev_ops->vdev_op_io_start(zio));
