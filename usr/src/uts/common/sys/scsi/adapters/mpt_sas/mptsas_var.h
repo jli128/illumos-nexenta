@@ -55,6 +55,7 @@
 #define	_SYS_SCSI_ADAPTERS_MPTVAR_H
 
 #include <sys/byteorder.h>
+#include <sys/queue.h>
 #include <sys/isa_defs.h>
 #include <sys/sunmdi.h>
 #include <sys/mdi_impldefs.h>
@@ -184,6 +185,9 @@ typedef	struct NcrTableIndirect {	/* Table Indirect entries */
 #define	MPTSAS_RAID_WWID(wwid) \
 	((wwid & 0x0FFFFFFFFFFFFFFF) | 0x3000000000000000)
 
+TAILQ_HEAD(mptsas_active_cmdq, mptsas_cmd);
+typedef struct mptsas_active_cmdq mptsas_active_cmdq_t;
+
 typedef	struct mptsas_target {
 		uint64_t		m_sas_wwn;	/* hash key1 */
 		mptsas_phymask_t	m_phymask;	/* hash key2 */
@@ -196,8 +200,7 @@ typedef	struct mptsas_target {
 		uint32_t		m_deviceinfo;
 		uint8_t			m_phynum;
 		uint32_t		m_dups;
-		int32_t			m_timeout;
-		int32_t			m_timebase;
+		mptsas_active_cmdq_t	m_active_cmdq;
 		int32_t			m_t_throttle;
 		int32_t			m_t_ncmds;
 		int32_t			m_reset_delay;
@@ -259,8 +262,9 @@ typedef struct	mptsas_cmd {
 
 	int			cmd_pkt_flags;
 
-	/* timer for command in active slot */
-	int			cmd_active_timeout;
+	/* pending expiration time for command in active slot */
+	hrtime_t		cmd_active_expiration;
+	TAILQ_ENTRY(mptsas_cmd)	cmd_active_link;
 
 	struct scsi_pkt		*cmd_pkt;
 	struct scsi_arq_status	cmd_scb;
