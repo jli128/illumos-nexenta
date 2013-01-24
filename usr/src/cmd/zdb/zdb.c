@@ -725,7 +725,8 @@ dump_ddt(ddt_t *ddt, enum ddt_type type, enum ddt_class class)
 		return;
 	ASSERT(error == 0);
 
-	if ((count = ddt_object_count(ddt, type, class)) == 0)
+	(void) ddt_object_count(ddt, type, class, &count);
+	if (count == 0)
 		return;
 
 	dspace = doi.doi_physical_blocks_512 << 9;

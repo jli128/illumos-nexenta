@@ -85,11 +85,14 @@ ddt_object_destroy(ddt_t *ddt, enum ddt_type type, enum ddt_class class,
 	objset_t *os = ddt->ddt_os;
 	uint64_t *objectp = &ddt->ddt_object[type][class];
 	char name[DDT_NAMELEN];
-
+#if DEBUG
+	uint64_t count;
+#endif
 	ddt_object_name(ddt, type, class, name);
 
 	ASSERT(*objectp != 0);
-	ASSERT(ddt_object_count(ddt, type, class) == 0);
+	ASSERT((ddt_object_count(ddt, type, class, &count) == 0) &&
+	    (count == 0));
 	ASSERT(ddt_histogram_empty(&ddt->ddt_histogram[type][class]));
 	VERIFY(zap_remove(os, DMU_POOL_DIRECTORY_OBJECT, name, tx) == 0);
 	VERIFY(zap_remove(os, spa->spa_ddt_stat_object, name, tx) == 0);
@@ -111,24 +114,29 @@ ddt_object_load(ddt_t *ddt, enum ddt_type type, enum ddt_class class)
 
 	error = zap_lookup(ddt->ddt_os, DMU_POOL_DIRECTORY_OBJECT, name,
 	    sizeof (uint64_t), 1, &ddt->ddt_object[type][class]);
-
 	if (error)
 		return (error);
 
 	error = zap_lookup(ddt->ddt_os, ddt->ddt_spa->spa_ddt_stat_object, name,
 	    sizeof (uint64_t), sizeof (ddt_histogram_t) / sizeof (uint64_t),
 	    &ddt->ddt_histogram[type][class]);
+	if (error)
+		return (error);
 
 	/*
 	 * Seed the cached statistics.
 	 */
-	VERIFY(ddt_object_info(ddt, type, class, &doi) == 0);
-
-	ddo->ddo_count = ddt_object_count(ddt, type, class);
+	error = ddt_object_info(ddt, type, class, &doi);
+	/* Panic in debug mode */
+	ASSERT(error == 0);
+	if (error)
+		return (error);
+	error = ddt_object_count(ddt, type, class, &ddo->ddo_count);
+	if (error)
+		return (error);
 	ddo->ddo_dspace = doi.doi_physical_blocks_512 << 9;
 	ddo->ddo_mspace = doi.doi_fill_count * doi.doi_data_block_size;
 
-	ASSERT(error == 0);
 	return (error);
 }
 
@@ -151,7 +159,7 @@ ddt_object_sync(ddt_t *ddt, enum ddt_type type, enum ddt_class class,
 	 */
 	VERIFY(ddt_object_info(ddt, type, class, &doi) == 0);
 
-	ddo->ddo_count = ddt_object_count(ddt, type, class);
+	(void) ddt_object_count(ddt, type, class, &ddo->ddo_count);
 	ddo->ddo_dspace = doi.doi_physical_blocks_512 << 9;
 	ddo->ddo_mspace = doi.doi_fill_count * doi.doi_data_block_size;
 }
@@ -208,13 +216,14 @@ ddt_object_walk(ddt_t *ddt, enum ddt_type type, enum ddt_class class,
 	    ddt->ddt_object[type][class], dde, walk));
 }
 
-uint64_t
-ddt_object_count(ddt_t *ddt, enum ddt_type type, enum ddt_class class)
+int
+ddt_object_count(ddt_t *ddt, enum ddt_type type, enum ddt_class class,
+	uint64_t *count)
 {
 	ASSERT(ddt_object_exists(ddt, type, class));
 
 	return (ddt_ops[type]->ddt_op_count(ddt->ddt_os,
-	    ddt->ddt_object[type][class]));
+	    ddt->ddt_object[type][class], count));
 }
 
 int
@@ -1188,8 +1197,11 @@ ddt_sync_table(ddt_t *ddt, dmu_tx_t *tx, uint64_t txg)
 		uint64_t count = 0;
 		for (enum ddt_class class = 0; class < DDT_CLASSES; class++) {
 			if (ddt_object_exists(ddt, type, class)) {
+				uint64_t incr;
 				ddt_object_sync(ddt, type, class, tx);
-				count += ddt_object_count(ddt, type, class);
+				(void) ddt_object_count(ddt, type, class,
+				    &incr);
+				count += incr;
 			}
 		}
 		for (enum ddt_class class = 0; class < DDT_CLASSES; class++) {
