@@ -1,3 +1,10 @@
+sunwzfskr (5.11.134-31-12268-12770) nexenta; urgency=high
+
+  * Issue 12644: ASSERT() in zio.c in io error path
+  * Issue 12770: zio latency reports can produce false positives
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 23 Jan 2012 12:40:30 -0400
+
 sunwzfskr (5.11.134-31-12267-12379) nexenta; urgency=high
 
   * Issue 12379: Backport request for Illumos changeset 13379 "zfs should handle imbalanced LUNs" to the 3.1.x branch
