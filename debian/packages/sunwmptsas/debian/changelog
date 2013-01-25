@@ -1,3 +1,10 @@
+sunwmptsas (5.11.134-31-11658-9517) nexenta; urgency=high
+
+  * Issue 9517: After single disk fault patch installed single disk fault
+    still causes process hangs
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 23 Jan 2013 12:00:00 -0400
+
 sunwmptsas (5.11.134-31-11657-0) nexenta; urgency=high
 
   * Issue 11657: Add support for Supermicro onboard 2308 controller.
