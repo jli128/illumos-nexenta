@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/cpuvar.h>
@@ -328,7 +329,7 @@ pppt_msg_scsi_cmd(stmf_ic_msg_t *msg)
 	task = ptask->pt_stmf_task;
 	task->task_port_private = ptask;
 	task->task_flags = scmd->icsc_task_flags;
-	task->task_additional_flags = 0;
+	task->task_additional_flags = TASK_AF_PPPT_TASK;
 	task->task_priority = 0;
 
 	/*

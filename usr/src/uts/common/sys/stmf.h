@@ -207,6 +207,11 @@ typedef struct scsi_task {
 #define	TASK_AF_ACCEPT_LU_DBUF		0x08
 
 /*
+ * Indicating a PPPT task
+ */
+#define	TASK_AF_PPPT_TASK		0x10
+
+/*
  * scsi_task_t extension identifiers
  */
 #define	STMF_TASK_EXT_NONE		0
