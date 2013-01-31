@@ -7594,7 +7594,6 @@ mptsas_remove_cmd(mptsas_t *mpt, mptsas_cmd_t *cmd)
 {
 	int		slot;
 	mptsas_slots_t	*slots = mpt->m_active;
-	int		t;
 	mptsas_target_t	*ptgt = cmd->cmd_tgt_addr;
 
 	ASSERT(cmd != NULL);
@@ -7608,7 +7607,6 @@ mptsas_remove_cmd(mptsas_t *mpt, mptsas_cmd_t *cmd)
 		return;
 	}
 
-	t = Tgt(cmd);
 	slot = cmd->cmd_slot;
 
 	/*
@@ -7807,7 +7805,6 @@ mptsas_start_cmd(mptsas_t *mpt, mptsas_cmd_t *cmd)
 {
 	struct scsi_pkt		*pkt = CMD2PKT(cmd);
 	uint32_t		control = 0;
-	int			n;
 	caddr_t			mem;
 	pMpi2SCSIIORequest_t	io_request;
 	ddi_dma_handle_t	dma_hdl = mpt->m_dma_req_frame_hdl;
@@ -9401,8 +9398,8 @@ mptsas_watchsubr(mptsas_t *mpt)
 			 */
 			TAILQ_FOREACH(cmd, &ptgt->m_active_cmdq,
 			    cmd_active_link) {
-			    if (cmd->cmd_active_expiration <= timestamp)
-				ptgt->m_timeout_count++;
+				if (cmd->cmd_active_expiration <= timestamp)
+					ptgt->m_timeout_count++;
 			}
 			if (ptgt->m_timeout_count > mptsas_timeout_threshold) {
 				ptgt->m_timeout_count = 0;
