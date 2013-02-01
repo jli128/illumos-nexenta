@@ -1510,7 +1510,8 @@ spa_check_removed(vdev_t *vd)
 	for (int c = 0; c < vd->vdev_children; c++)
 		spa_check_removed(vd->vdev_child[c]);
 
-	if (vd->vdev_ops->vdev_op_leaf && vdev_is_dead(vd)) {
+	if (vd->vdev_ops->vdev_op_leaf && vdev_is_dead(vd) &&
+	    !vd->vdev_ishole) {
 		zfs_post_autoreplace(vd->vdev_spa, vd);
 		spa_event_notify(vd->vdev_spa, vd, ESC_ZFS_VDEV_CHECK);
 	}
