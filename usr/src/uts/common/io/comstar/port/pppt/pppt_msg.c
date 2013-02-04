@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
@@ -318,6 +319,7 @@ pppt_msg_scsi_cmd(stmf_ic_msg_t *msg)
 	    scmd->icsc_task_cdb_length, 0);
 	if (ptask->pt_stmf_task == NULL) {
 		(void) pppt_task_done(ptask);
+		ASSERT(ptask->pt_refcnt == 0);
 		pppt_task_free(ptask);
 		pppt_sess_rele(pppt_sess);
 		pppt_msg_tx_status(msg, STMF_ALLOC_FAILURE);
@@ -327,6 +329,8 @@ pppt_msg_scsi_cmd(stmf_ic_msg_t *msg)
 	}
 
 	task = ptask->pt_stmf_task;
+	/* task_port_private reference is a real reference. */
+	(void) pppt_task_hold(ptask);
 	task->task_port_private = ptask;
 	task->task_flags = scmd->icsc_task_flags;
 	task->task_additional_flags = TASK_AF_PPPT_TASK;
