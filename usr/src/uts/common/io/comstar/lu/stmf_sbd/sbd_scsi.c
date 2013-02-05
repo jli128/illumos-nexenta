@@ -1455,9 +1455,12 @@ sbd_handle_write_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd,
 		int commit;
 
 		commit = (scmd->len == 0 && scmd->nbufs == 0);
-		if (sbd_copy_rdwr(task, laddr, dbuf, SBD_CMD_SCSI_WRITE,
+		rw_enter(&sl->sl_access_state_lock, RW_READER);
+		if ((sl->sl_flags & SL_MEDIA_LOADED) == 0 ||
+		    sbd_copy_rdwr(task, laddr, dbuf, SBD_CMD_SCSI_WRITE,
 		    commit) != STMF_SUCCESS)
 			scmd->flags |= SBD_SCSI_CMD_XFER_FAIL;
+		rw_exit(&sl->sl_access_state_lock);
 		buflen = dbuf->db_data_size;
 	} else {
 		for (buflen = 0, ndx = 0; (buflen < dbuf->db_data_size) &&
