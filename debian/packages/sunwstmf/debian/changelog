@@ -1,3 +1,9 @@
+sunwstmf (5.11.134-31-13069-8564) nexenta; urgency=low
+
+  * Issue 8564: "mutex_enter: bad mutex" panic when under heavy load
+
+ -- Gate Keeper <support@nexenta.com>  Thu, 30 Aug 2012 12:10:55 -0700
+
 sunwstmf (5.11.134-31-9965-0) nexenta; urgency=low
 
   * Issue 9965: MPIO display Windows r2008 3.1.3
