@@ -1,3 +1,9 @@
+sunwstmf (5.11.134-31-13100-12981) nexenta; urgency=low
+
+  * Issue 12981: Panic due to possible race between LU coming to ready state and COMSTAR (stmf) sbd task
+
+ -- Nexenta Systems <steve.ma@nexenta.com>  Tue, 05 Feb 2013 11:13:55 -0700
+
 sunwstmf (5.11.134-31-13069-8564) nexenta; urgency=low
 
   * Issue 8564: "mutex_enter: bad mutex" panic when under heavy load
