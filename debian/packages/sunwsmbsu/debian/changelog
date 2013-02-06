@@ -1,3 +1,9 @@
+sunwsmbsu (5.11.134-31-13066-7126) nexenta; urgency=high
+
+  * Issue 7126: smbd panic with missing negotiate challenge
+
+ -- Gate Keeper <support@nexenta.com> Fri, 18 Jan 2013 02:23:00 +0000
+
 sunwsmbsu (5.11.134-31-12393-0) nexenta; urgency=high
 
   * Issue 12393: Kerberos and smbd disagree about who is our AD server

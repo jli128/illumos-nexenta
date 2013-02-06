@@ -1,3 +1,9 @@
+sunwsmbskr (5.11.134-31-13066-7126) nexenta; urgency=high
+
+  * Issue 7126: smbd panic with missing negotiate challenge
+
+ -- Gate Keeper <support@nexenta.com> Fri, 18 Jan 2013 02:23:00 +0000
+
 sunwsmbskr (5.11.134-31-10734-0) nexenta; urgency=high
 
   * Issue 10734: NT Trans. Notify returning too quickly
