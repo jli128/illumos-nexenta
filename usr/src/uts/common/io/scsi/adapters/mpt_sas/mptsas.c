@@ -3288,8 +3288,8 @@ alloc_tag:
 			/*
 			 * Initialize expiration time for passthrough commands,
 			 */
-			cmd->cmd_active_expiration =
-			    gethrtime() + cmd->cmd_pkt->pkt_time * NANOSEC;
+			cmd->cmd_active_expiration = gethrtime() +
+			    (hrtime_t)cmd->cmd_pkt->pkt_time * NANOSEC;
 		}
 		return (TRUE);
 	} else {
@@ -7947,7 +7947,8 @@ mptsas_start_cmd(mptsas_t *mpt, mptsas_cmd_t *cmd)
 	/*
 	 * Start timeout.
 	 */
-	cmd->cmd_active_expiration = gethrtime() + pkt->pkt_time * NANOSEC;
+	cmd->cmd_active_expiration =
+	    gethrtime() + (hrtime_t)pkt->pkt_time * NANOSEC;
 #ifdef MPTSAS_TEST
 	/*
 	 * Force timeouts to happen immediately.
@@ -9399,14 +9400,36 @@ mptsas_watchsubr(mptsas_t *mpt)
 
 		if (cmd->cmd_active_expiration <= timestamp) {
 			/*
-			 * Earliest command timeout expired. Check the rest
-			 * of the queue.
+			 * Earliest command timeout expired. Drain throttle.
 			 */
-			TAILQ_FOREACH(cmd, &ptgt->m_active_cmdq,
-			    cmd_active_link) {
-			    if (cmd->cmd_active_expiration <= timestamp)
-				ptgt->m_timeout_count++;
+			mptsas_set_throttle(mpt, ptgt, DRAIN_THROTTLE);
+
+			/*
+			 * Check for remaining commands.
+			 */
+			cmd = TAILQ_FIRST(&ptgt->m_active_cmdq);
+			if (cmd->cmd_active_expiration > timestamp) {
+				/*
+				 * Wait for remaining commands to complete or
+				 * time out.
+				 */
+				NDBG23(("command timed out, pending drain"));
+				continue;
 			}
+
+			/*
+			 * All command timeouts expired.
+			 */
+			mptsas_log(mpt, CE_NOTE, "Timeout of %d seconds "
+			    "expired with %d commands on target %d lun %d.",
+			    cmd->cmd_pkt->pkt_time, ptgt->m_t_ncmds,
+			    ptgt->m_devhdl, Lun(cmd));
+
+			do {
+				ptgt->m_timeout_count++;
+			} while ((cmd = TAILQ_NEXT(cmd, cmd_active_link))
+			    != NULL);
+
 			if (ptgt->m_timeout_count > mptsas_timeout_threshold) {
 				ptgt->m_timeout_count = 0;
 				mptsas_log(mpt, CE_WARN,
@@ -9415,9 +9438,10 @@ mptsas_watchsubr(mptsas_t *mpt)
 				mptsas_remove_target(mpt, ptgt);
 				continue;
 			}
+
 			mptsas_cmd_timeout(mpt, ptgt);
 		} else if (cmd->cmd_active_expiration <=
-		    timestamp + mptsas_scsi_watchdog_tick * NANOSEC) {
+		    timestamp + (hrtime_t)mptsas_scsi_watchdog_tick * NANOSEC) {
 			NDBG23(("pending timeout"));
 			mptsas_set_throttle(mpt, ptgt, DRAIN_THROTTLE);
 		}
