@@ -1,3 +1,9 @@
+sunwckr (5.11.134-31-12267-13144) nexenta; urgency=low
+
+  * Issue 12534: Race between log_sysevent_filename() and log_event_upcall() can cause panic
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 08 Feb 2013 10:31:53 +0100
+
 sunwckr (5.11.134-31-12266-8505) nexenta; urgency=low
 
   * Issue 8505: all disks in ahci mode have illegal requests
