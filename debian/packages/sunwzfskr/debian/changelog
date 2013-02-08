@@ -1,3 +1,9 @@
+sunwzfskr (5.11.134-31-12269-10054) nexenta; urgency=high
+
+  * Issue 10054: Long export time causes failover to fail
+
+ -- Nexenta Systems <support@nexenta.com>  Fri, 08 Feb 2013 21:00:00 +0400
+
 sunwzfskr (5.11.134-31-12268-12770) nexenta; urgency=high
 
   * Issue 12644: ASSERT() in zio.c in io error path
@@ -568,18 +574,4 @@ sunwzfskr (5.11.34-1) nexenta; urgency=low
   * Synchronized with OpenSolaris code (5.11 build 34)
 
  -- Mac <mac@gnusolaris.org>  Sun, 19 Feb 2006 00:05:34 -0800
-
-sunwzfskr (5.11.33-2) elatte; urgency=low
-
-  * conflicts with sunwzfsr (<< 5.11.33)
-
- -- Erast Benson <erast@gnusolaris.org>  Thu, 16 Feb 2006 10:49:13 -0800
-
-sunwzfskr (5.11.33-1) nexenta; urgency=low
-
-  * Converted from .pkg format to .deb
-    by alien version 8.53
-
- -- Mac <mac@gnusolaris.org>  Sun,  5 Feb 2006 11:49:00 -0800
-
 

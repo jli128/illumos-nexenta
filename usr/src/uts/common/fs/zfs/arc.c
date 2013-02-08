@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -1586,6 +1587,8 @@ arc_buf_size(arc_buf_t *buf)
 	return (buf->b_hdr->b_size);
 }
 
+int zfs_fastflush = 0;
+
 /*
  * Evict buffers from list until we've removed the specified number of
  * bytes.  Move the removed buffers to the appropriate evict state.
@@ -1910,6 +1913,31 @@ arc_do_user_evicts(void)
 	mutex_exit(&arc_eviction_mtx);
 }
 
+typedef struct arc_async_flush_data {
+	uint64_t	aaf_guid;
+} arc_async_flush_data_t;
+
+static taskq_t *arc_flush_taskq;
+
+static void
+_arc_flush(uint64_t guid)
+{
+	arc_evict_ghost(arc_mru_ghost, guid, -1);
+	arc_evict_ghost(arc_mfu_ghost, guid, -1);
+
+	mutex_enter(&arc_reclaim_thr_lock);
+	arc_do_user_evicts();
+	mutex_exit(&arc_reclaim_thr_lock);
+}
+
+static void
+arc_flush_task(void *arg)
+{
+	arc_async_flush_data_t *aaf = (arc_async_flush_data_t *)arg;
+	_arc_flush(aaf->aaf_guid);
+	kmem_free(aaf, sizeof (arc_async_flush_data_t));
+}
+
 /*
  * Flush all *evictable* data from the cache for the given spa.
  * NOTE: this will not touch "active" (i.e. referenced) data.
@@ -1918,9 +1946,17 @@ void
 arc_flush(spa_t *spa)
 {
 	uint64_t guid = 0;
+	boolean_t async_flush = (spa ? zfs_fastflush : FALSE);
+	arc_async_flush_data_t *aaf;
 
-	if (spa)
+	if (spa) {
 		guid = spa_guid(spa);
+		if (async_flush) {
+			aaf = kmem_alloc(sizeof (arc_async_flush_data_t),
+			    KM_SLEEP);
+			aaf->aaf_guid = guid;
+		}
+	}
 
 	while (list_head(&arc_mru->arcs_list[ARC_BUFC_DATA])) {
 		(void) arc_evict(arc_mru, guid, -1, FALSE, ARC_BUFC_DATA);
@@ -1943,13 +1979,24 @@ arc_flush(spa_t *spa)
 			break;
 	}
 
-	arc_evict_ghost(arc_mru_ghost, guid, -1);
-	arc_evict_ghost(arc_mfu_ghost, guid, -1);
-
-	mutex_enter(&arc_reclaim_thr_lock);
-	arc_do_user_evicts();
-	mutex_exit(&arc_reclaim_thr_lock);
-	ASSERT(spa || arc_eviction_list == NULL);
+	/*
+	 * Try to flush per-spa remaining ARC ghost buffers and buffers in
+	 * arc_eviction_list asynchronously while a pool is being closed.
+	 * An ARC buffer is bound to spa only by guid, so buffer can
+	 * exist even when pool has already gone. If asynchronous flushing
+	 * fails we fall back to regular (synchronous) one.
+	 * NOTE: If asynchronous flushing had not yet finished when the pool
+	 * was imported again it wouldn't be a problem, even when guids before
+	 * and after export/import are the same. We can evict only unreferenced
+	 * buffers, other are skipped.
+	 */
+	if (!async_flush || (taskq_dispatch(arc_flush_taskq, arc_flush_task,
+	    aaf, TQ_NOSLEEP) == NULL)) {
+		_arc_flush(guid);
+		ASSERT(spa || arc_eviction_list == NULL);
+		if (async_flush)
+			kmem_free(aaf, sizeof (arc_async_flush_data_t));
+	}
 }
 
 void
@@ -3550,6 +3597,8 @@ arc_init(void)
 	list_create(&arc_l2c_only->arcs_list[ARC_BUFC_DATA],
 	    sizeof (arc_buf_hdr_t), offsetof(arc_buf_hdr_t, b_arc_node));
 
+	arc_flush_taskq = taskq_create("arc_flush_tq",
+	    max_ncpus, minclsyspri, 1, 4, TASKQ_DYNAMIC);
 	buf_init();
 
 	arc_thread_exit = 0;
@@ -3618,6 +3667,7 @@ arc_fini(void)
 
 	mutex_destroy(&zfs_write_limit_lock);
 
+	taskq_destroy(arc_flush_taskq);
 	buf_fini();
 
 	ASSERT(arc_loaned_bytes == 0);
