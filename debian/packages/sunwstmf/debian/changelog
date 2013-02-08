@@ -1,3 +1,10 @@
+sunwstmf (5.11.134-31-13101-13056) nexenta; urgency=high
+
+  * Issue 12375: Create ALUA support on NexentaStor; Failover causes loss
+  of storage
+
+ -- Nexenta Systems <support@nexenta.com> Fri, 08 Fed 2013 16:37:49 -0000
+
 sunwstmf (5.11.134-31-13100-12981) nexenta; urgency=low
 
   * Issue 12981: Panic due to possible race between LU coming to ready state and COMSTAR (stmf) sbd task

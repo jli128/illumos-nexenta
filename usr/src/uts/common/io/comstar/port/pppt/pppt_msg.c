@@ -333,7 +333,7 @@ pppt_msg_scsi_cmd(stmf_ic_msg_t *msg)
 	(void) pppt_task_hold(ptask);
 	task->task_port_private = ptask;
 	task->task_flags = scmd->icsc_task_flags;
-	task->task_additional_flags = 0;
+	task->task_additional_flags = TASK_AF_PPPT_TASK;
 	task->task_priority = 0;
 
 	/*
