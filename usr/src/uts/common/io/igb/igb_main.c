@@ -26,6 +26,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013, Nexenta Systems, Inc. All rights reserved.
  */
 
 #include "igb_sw.h"
@@ -124,6 +125,7 @@ static void igb_fm_fini(igb_t *);
 static void igb_release_multicast(igb_t *);
 
 mac_priv_prop_t igb_priv_props[] = {
+	{"_eee_support", MAC_PROP_PERM_RW},
 	{"_tx_copy_thresh", MAC_PROP_PERM_RW},
 	{"_tx_recycle_thresh", MAC_PROP_PERM_RW},
 	{"_tx_overload_thresh", MAC_PROP_PERM_RW},

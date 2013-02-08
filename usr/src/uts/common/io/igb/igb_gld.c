@@ -25,6 +25,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013, Nexenta Systems, Inc. All rights reserved.
  */
 
 #include "igb_sw.h"
@@ -1420,6 +1421,31 @@ igb_set_priv_prop(igb_t *igb, const char *pr_name,
 	struct e1000_hw *hw = &igb->hw;
 	int i;
 
+	if (strcmp(pr_name, "_eee_support") == 0) {
+		if (pr_val == NULL)
+			return (EINVAL);
+		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		switch (result) {
+		case 0:
+		case 1:
+			if (hw->mac.type != e1000_i350) {
+				/*
+				 * For now, only supported on I350.
+				 * Add new mac.type values (or use < instead)
+				 * as new cards offer up EEE.
+				 */
+				return (ENXIO);
+			}
+			/* Must set this prior to the set call. */
+			hw->dev_spec._82575.eee_disable = !result;
+			if (e1000_set_eee_i350(hw) != E1000_SUCCESS)
+				err = EIO;
+		default:
+			err = EINVAL;
+			/* FALLTHRU */
+		}
+		return (err);
+	}
 	if (strcmp(pr_name, "_tx_copy_thresh") == 0) {
 		if (pr_val == NULL) {
 			err = EINVAL;
@@ -1542,6 +1568,13 @@ igb_get_priv_prop(igb_t *igb, const char *pr_name,
 
 	*perm = MAC_PROP_PERM_RW;
 
+	if (strcmp(pr_name, "_eee_support") == 0) {
+		*perm = MAC_PROP_PERM_READ;
+		value = (igb->hw.mac.type != e1000_i350) ? 0 :
+		    !(igb->hw.dev_spec._82575.eee_disable); 
+		err = 0;
+		goto done;
+	}
 	if (strcmp(pr_name, "_adv_pause_cap") == 0) {
 		*perm = MAC_PROP_PERM_READ;
 		value = (is_default ? 1 : igb->param_adv_pause_cap);
