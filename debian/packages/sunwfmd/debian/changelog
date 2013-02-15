@@ -1,3 +1,9 @@
+sunwfmd (5.11.134-31-11342-13165) nexenta; urgency=high
+
+  * Issue 13165: zfs-monitor should fallback to using DEV_BSIZE
+
+ -- Nexenta Systems <support@nexenta.com>  Thu, 14 Feb 2013 15:01:44 +0100
+
 sunwfmd (5.11.134-31-11341-11755) nexenta; urgency=high
 
   * Issue 11755: Cert Bug 11518 I/O requests are not aligned with 4096 disk sector size
