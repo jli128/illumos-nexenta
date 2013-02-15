@@ -207,7 +207,7 @@ ucode_free(processorid_t id, void* buf, size_t size)
  * An i86xpv guest domain or VM can't update the microcode.
  */
 
-#define	xpvdomu_or_hvm	\
+#define	XPVDOMU_OR_HVM	\
 	((hwenv == HW_XEN_PV && !is_controldom()) || (hwenv & HW_VIRTUAL) != 0)
 
 /*ARGSUSED*/
@@ -216,7 +216,7 @@ ucode_capable_amd(cpu_t *cp)
 {
 	int hwenv = get_hwenv();
 
-	if (xpvdomu_or_hvm)
+	if (XPVDOMU_OR_HVM)
 		return (0);
 
 	return (cpuid_getfamily(cp) >= 0x10);
@@ -227,7 +227,7 @@ ucode_capable_intel(cpu_t *cp)
 {
 	int hwenv = get_hwenv();
 
-	if (xpvdomu_or_hvm)
+	if (XPVDOMU_OR_HVM)
 		return (0);
 
 	return (cpuid_getfamily(cp) >= 6);

@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 by Delphix. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -635,32 +635,38 @@ determine_platform(void)
 		regs[1] = cp.cp_ecx;
 		regs[2] = cp.cp_edx;
 		regs[3] = 0;
-		if (strcmp(hvstr, HVSIG_XEN_HVM) == 0)
+		if (strcmp(hvstr, HVSIG_XEN_HVM) == 0) {
 			platform_type = HW_XEN_HVM;
-		else if (strcmp(hvstr, HVSIG_VMWARE) == 0)
+			return;
+		}
+		if (strcmp(hvstr, HVSIG_VMWARE) == 0) {
 			platform_type = HW_VMWARE;
-		else if (strcmp(hvstr, HVSIG_KVM) == 0)
+			return;
+		}
+		if (strcmp(hvstr, HVSIG_KVM) == 0) {
 			platform_type = HW_KVM;
-		else if (strcmp(hvstr, HVSIG_MICROSOFT) == 0)
+			return;
+		}
+		if (strcmp(hvstr, HVSIG_MICROSOFT) == 0)
 			platform_type = HW_MICROSOFT;
-		return;
+	} else {
+		/*
+		 * Check older VMware hardware versions. VMware hypervisor is
+		 * detected by performing an IN operation to VMware hypervisor
+		 * port and checking that value returned in %ebx is VMware
+		 * hypervisor magic value.
+		 *
+		 * References: http://kb.vmware.com/kb/1009458
+		 */
+		vmware_port(VMWARE_HVCMD_GETVERSION, regs);
+		if (regs[1] == VMWARE_HVMAGIC) {
+			platform_type = HW_VMWARE;
+			return;
+		}
 	}
 
 	/*
-	 * Check older VMware hardware versions. VMware hypervisor is detected
-	 * by performing an IN operation to VMware hypervisor port and checking
-	 * that value returned in EBX is VMware hypervisor magic value.
-	 *
-	 * References: http://kb.vmware.com/kb/1009458
-	 */
-	vmware_port(VMWARE_HVCMD_GETVERSION, regs);
-	if (regs[1] == VMWARE_HVMAGIC) {
-		platform_type = HW_VMWARE;
-		return;
-	}
-
-	/*
-	 * Check older Xen hypervisors. In a fully virtualized domain,
+	 * Check Xen hypervisor. In a fully virtualized domain,
 	 * Xen's pseudo-cpuid function returns a string representing the
 	 * Xen signature in %ebx, %ecx, and %edx. %eax contains the maximum
 	 * supported cpuid function. We need at least a (base + 2) leaf value
@@ -677,7 +683,8 @@ determine_platform(void)
 		regs[3] = 0;
 		if (strcmp(hvstr, HVSIG_XEN_HVM) == 0 &&
 		    cp.cp_eax >= (base + 2)) {
-			platform_type = HW_XEN_HVM;
+			platform_type &= ~HW_NATIVE;
+			platform_type |= HW_XEN_HVM;
 			return;
 		}
 	}
