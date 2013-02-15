@@ -356,6 +356,16 @@ struct spa {
 	refcount_t	spa_refcount;		/* number of opens */
 
 	uint64_t spa_ddt_meta_copies; /* amount of ddt-metadata copies */
+
+	/*
+	 * The following two fields are designed to restrict the distribution of the
+	 * deduplication entries. There are two possible states of these vars:
+	 * 1) min=DITTO, max=DUPLICATED - it provides the old behavior
+	 * 2) min=DUPLICATED, MAX=DUPLICATED - new behavior: all entries into
+	 * the single zap.
+	 */
+	enum ddt_class spa_ddt_class_min;
+	enum ddt_class spa_ddt_class_max;
 };
 
 extern const char *spa_config_path;

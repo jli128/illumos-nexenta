@@ -228,6 +228,9 @@ spa_prop_get_config(spa_t *spa, nvlist_t **nvp)
 		spa_prop_add_list(*nvp, ZPOOL_PROP_READONLY, NULL,
 		    (spa_mode(spa) == FREAD), src);
 
+		spa_prop_add_list(*nvp, ZPOOL_PROP_DDT_DESEGREGATION, NULL,
+		    (spa->spa_ddt_class_min == spa->spa_ddt_class_max), src);
+
 		cap = (size == 0) ? 0 : (alloc * 100 / size);
 		spa_prop_add_list(*nvp, ZPOOL_PROP_CAPACITY, NULL, cap, src);
 
@@ -457,6 +460,7 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 		case ZPOOL_PROP_AUTOREPLACE:
 		case ZPOOL_PROP_LISTSNAPS:
 		case ZPOOL_PROP_AUTOEXPAND:
+		case ZPOOL_PROP_DDT_DESEGREGATION:
 			error = nvpair_value_uint64(elem, &intval);
 			if (!error && intval > 1)
 				error = SET_ERROR(EINVAL);
@@ -1950,6 +1954,21 @@ spa_dir_prop(spa_t *spa, const char *name, uint64_t *val)
 	    name, sizeof (uint64_t), 1, val));
 }
 
+static void
+spa_set_ddt_classes(spa_t *spa, int desegregation)
+{
+	/*
+	 * if desegregation is turned on then set up ddt_class restrictions
+	 */
+	if (desegregation) {
+		spa->spa_ddt_class_min = DDT_CLASS_DUPLICATE;
+		spa->spa_ddt_class_max = DDT_CLASS_DUPLICATE;
+	} else {
+		spa->spa_ddt_class_min = DDT_CLASS_DITTO;
+		spa->spa_ddt_class_max = DDT_CLASS_UNIQUE;
+	}
+}
+
 static int
 spa_vdev_err(vdev_t *vdev, vdev_aux_t aux, int err)
 {
@@ -2566,6 +2585,8 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 		spa_prop_find(spa, ZPOOL_PROP_LOWATERMARK, &spa->spa_lowat);
 		spa_prop_find(spa, ZPOOL_PROP_DEDUPMETA_DITTO,
 		    &spa->spa_ddt_meta_copies);
+		spa_prop_find(spa, ZPOOL_PROP_DDT_DESEGREGATION, &val);
+		spa_set_ddt_classes(spa, val);
 
 		spa->spa_autoreplace = (autoreplace != 0);
 	}
@@ -3632,6 +3653,8 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	spa->spa_lowat = zpool_prop_default_numeric(ZPOOL_PROP_LOWATERMARK);
 	spa->spa_ddt_meta_copies = zpool_prop_default_numeric(
 	    ZPOOL_PROP_DEDUPMETA_DITTO);
+
+	spa_set_ddt_classes(spa, 0);
 
 	if (props != NULL) {
 		spa_configfile_set(spa, props, B_FALSE);
@@ -6107,6 +6130,9 @@ spa_sync_props(void *arg, dmu_tx_t *tx)
 			switch (prop) {
 			case ZPOOL_PROP_DELEGATION:
 				spa->spa_delegation = intval;
+				break;
+			case ZPOOL_PROP_DDT_DESEGREGATION:
+				spa_set_ddt_classes(spa, intval);
 				break;
 			case ZPOOL_PROP_BOOTFS:
 				spa->spa_bootfs = intval;

@@ -190,7 +190,7 @@ dsl_scan_setup_sync(void *arg, dmu_tx_t *tx)
 	scn->scn_phys.scn_state = DSS_SCANNING;
 	scn->scn_phys.scn_min_txg = 0;
 	scn->scn_phys.scn_max_txg = tx->tx_txg;
-	scn->scn_phys.scn_ddt_class_max = DDT_CLASSES - 1; /* the entire DDT */
+	scn->scn_phys.scn_ddt_class_max = spa->spa_ddt_class_max;/* the entire DDT */
 	scn->scn_phys.scn_start_time = gethrestime_sec();
 	scn->scn_phys.scn_errors = 0;
 	scn->scn_phys.scn_to_examine = spa->spa_root_vdev->vdev_stat.vs_alloc;
@@ -199,7 +199,8 @@ dsl_scan_setup_sync(void *arg, dmu_tx_t *tx)
 	spa_scan_stat_init(spa);
 
 	if (DSL_SCAN_IS_SCRUB_RESILVER(scn)) {
-		scn->scn_phys.scn_ddt_class_max = zfs_scrub_ddt_class_max;
+		scn->scn_phys.scn_ddt_class_max =
+			MIN(zfs_scrub_ddt_class_max, spa->spa_ddt_class_max);
 
 		/* rewrite all disk labels */
 		vdev_config_dirty(spa->spa_root_vdev);
@@ -218,7 +219,8 @@ dsl_scan_setup_sync(void *arg, dmu_tx_t *tx)
 		 * of the scrub should go faster using top-down pruning.
 		 */
 		if (scn->scn_phys.scn_min_txg > TXG_INITIAL)
-			scn->scn_phys.scn_ddt_class_max = DDT_CLASS_DITTO;
+			scn->scn_phys.scn_ddt_class_max =
+				MIN(DDT_CLASS_DITTO, spa->spa_ddt_class_max);
 
 	}
 
