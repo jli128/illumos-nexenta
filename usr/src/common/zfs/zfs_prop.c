@@ -189,10 +189,18 @@ zfs_prop_init(void)
 		{ NULL }
 	};
 
-	static zprop_index_t cache_table[] = {
+	static zprop_index_t primary_cache_table[] = {
 		{ "none",	ZFS_CACHE_NONE },
 		{ "metadata",	ZFS_CACHE_METADATA },
 		{ "all",	ZFS_CACHE_ALL },
+		{ NULL }
+	};
+
+	static zprop_index_t secondary_cache_table[] = {
+		{ "none",	ZFS_CACHE_NONE },
+		{ "metadata",	ZFS_CACHE_METADATA },
+		{ "all",	ZFS_CACHE_ALL },
+		{ "data",	ZFS_CACHE_DATA },
 		{ NULL }
 	};
 
@@ -239,11 +247,12 @@ zfs_prop_init(void)
 	zprop_register_index(ZFS_PROP_PRIMARYCACHE, "primarycache",
 	    ZFS_CACHE_ALL, PROP_INHERIT,
 	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT | ZFS_TYPE_VOLUME,
-	    "all | none | metadata", "PRIMARYCACHE", cache_table);
+	    "all | none | metadata", "PRIMARYCACHE", primary_cache_table);
 	zprop_register_index(ZFS_PROP_SECONDARYCACHE, "secondarycache",
 	    ZFS_CACHE_ALL, PROP_INHERIT,
 	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT | ZFS_TYPE_VOLUME,
-	    "all | none | metadata", "SECONDARYCACHE", cache_table);
+	    "all | none | metadata | data", "SECONDARYCACHE",
+	    secondary_cache_table);
 	zprop_register_index(ZFS_PROP_LOGBIAS, "logbias", ZFS_LOGBIAS_LATENCY,
 	    PROP_INHERIT, ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
 	    "latency | throughput", "LOGBIAS", logbias_table);

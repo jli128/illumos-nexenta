@@ -383,7 +383,8 @@ typedef enum zfs_smb_acl_op {
 typedef enum zfs_cache_type {
 	ZFS_CACHE_NONE = 0,
 	ZFS_CACHE_METADATA = 1,
-	ZFS_CACHE_ALL = 2
+	ZFS_CACHE_ALL = 2,
+	ZFS_CACHE_DATA = 3
 } zfs_cache_type_t;
 
 typedef enum {

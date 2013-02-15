@@ -207,7 +207,7 @@ secondary_cache_changed_cb(void *arg, uint64_t newval)
 	 * Inheritance and range checking should have been done by now.
 	 */
 	ASSERT(newval == ZFS_CACHE_ALL || newval == ZFS_CACHE_NONE ||
-	    newval == ZFS_CACHE_METADATA);
+	    newval == ZFS_CACHE_METADATA || newval == ZFS_CACHE_DATA);
 
 	os->os_secondary_cache = newval;
 }

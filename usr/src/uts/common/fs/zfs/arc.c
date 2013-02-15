@@ -589,6 +589,7 @@ typedef struct buf_hash_table {
 	struct ht_table *ht_table;
 } buf_hash_table_t;
 
+#pragma align 64 (buf_hash_table)
 static buf_hash_table_t buf_hash_table;
 
 #define	BUF_HASH_INDEX(spa, dva, birth) \

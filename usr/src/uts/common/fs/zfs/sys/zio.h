@@ -310,28 +310,6 @@ typedef struct zio_prop {
 	boolean_t		zp_usesc;
 } zio_prop_t;
 
-#define	ZIO_IS_DDT(io_prop)                        \
-	(((io_prop)->zp_type == DMU_OT_DDT_ZAP) || \
-	    ((io_prop)->zp_type == DMU_OT_DDT_STATS))
-
-#define	ZIO_IS_ZPL_META(io_prop)                                    \
-	(((io_prop)->zp_type == DMU_OT_ZNODE)			 || \
-	    ((io_prop)->zp_type == DMU_OT_OLDACL)		 || \
-	    ((io_prop)->zp_type == DMU_OT_DIRECTORY_CONTENTS)	 || \
-	    ((io_prop)->zp_type == DMU_OT_MASTER_NODE)		 || \
-	    ((io_prop)->zp_type == DMU_OT_UNLINKED_SET))
-
-#define	ZIO_IS_GENERAL_META(io_prop)                          \
-	(((io_prop)->zp_type == DMU_OT_DNODE)			 || \
-	    ((io_prop)->zp_type == DMU_OT_OBJSET)		 || \
-	    ((io_prop)->zp_type == DMU_OT_OBJECT_DIRECTORY)	 || \
-	    ((io_prop)->zp_type == DMU_OT_OBJECT_ARRAY)	 || \
-	    ((io_prop)->zp_type == DMU_OT_PACKED_NVLIST)	 || \
-	    ((io_prop)->zp_type == DMU_OT_PACKED_NVLIST_SIZE)	 || \
-	    ((io_prop)->zp_type == DMU_OT_OBJECT_ARRAY)	 || \
-	    ((io_prop)->zp_type == DMU_OT_BPOBJ)		 || \
-	    ((io_prop)->zp_type == DMU_OT_BPOBJ_HDR))
-
 typedef struct zio_cksum_report zio_cksum_report_t;
 
 typedef void zio_cksum_finish_f(zio_cksum_report_t *rep,
@@ -619,7 +597,6 @@ extern void zfs_ereport_finish_checksum(zio_cksum_report_t *report,
 
 extern void zfs_ereport_send_interim_checksum(zio_cksum_report_t *report);
 extern void zfs_ereport_free_checksum(zio_cksum_report_t *report);
-
 /* If we have the good data in hand, this function can be used */
 extern void zfs_ereport_post_checksum(spa_t *spa, vdev_t *vd,
     struct zio *zio, uint64_t offset, uint64_t length,

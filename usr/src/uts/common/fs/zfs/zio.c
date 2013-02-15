@@ -1487,37 +1487,6 @@ zio_resume_wait(spa_t *spa)
 }
 
 /*
- * Tunables: consider several types of metadata: ddt-related, 'general'
- * (e.g. object tree), zpl (e.g. inodes, directory contents), and 'other'
- * (none of the above); control which types go to special vdevs
- */
-uint64_t zfs_enable_meta_selection = 1;
-uint64_t zfs_ddt_to_special = 1;
-uint64_t zfs_general_meta_to_special = 1;
-uint64_t zfs_zpl_meta_to_special = 1;
-uint64_t zfs_other_meta_to_special = 0;
-
-static boolean_t
-zio_refine_meta_placement(zio_prop_t *io_prop)
-{
-	boolean_t isddt = ZIO_IS_DDT(io_prop),
-	    isgen = ZIO_IS_GENERAL_META(io_prop),
-	    iszpl = ZIO_IS_ZPL_META(io_prop);
-
-	if ((isddt) && (zfs_ddt_to_special == 0))
-		return (B_FALSE);
-	else if ((isgen) && (zfs_general_meta_to_special == 0))
-		return (B_FALSE);
-	else if ((iszpl) && (zfs_zpl_meta_to_special == 0))
-		return (B_FALSE);
-	else if ((isddt == 0) && (isgen == 0) && (iszpl == 0) &&
-	    (zfs_other_meta_to_special == 0))
-		return (B_FALSE);
-	else
-		return (B_TRUE);
-}
-
-/*
  * ==========================================================================
  * Gang blocks.
  *

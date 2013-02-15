@@ -237,12 +237,19 @@ typedef struct dmu_buf_impl {
 } dmu_buf_impl_t;
 
 /* Note: the dbuf hash table is exposed only for the mdb module */
-#define	DBUF_MUTEXES 256
-#define	DBUF_HASH_MUTEX(h, idx) (&(h)->hash_mutexes[(idx) & (DBUF_MUTEXES-1)])
+#define	DBUF_MUTEXES	256
+#define DBUF_LOCK_PAD	64
+typedef struct {
+	kmutex_t mtx;
+#ifdef _KERNEL
+	unsigned char pad[(DBUF_LOCK_PAD - sizeof (kmutex_t))];
+#endif
+} dbuf_mutex_t;
+#define	DBUF_HASH_MUTEX(h, idx) (&((h)->hash_mutexes[(idx) & (DBUF_MUTEXES-1)].mtx))
 typedef struct dbuf_hash_table {
 	uint64_t hash_table_mask;
 	dmu_buf_impl_t **hash_table;
-	kmutex_t hash_mutexes[DBUF_MUTEXES];
+	dbuf_mutex_t hash_mutexes[DBUF_MUTEXES];
 } dbuf_hash_table_t;
 
 
@@ -321,6 +328,7 @@ void dbuf_init(void);
 void dbuf_fini(void);
 
 boolean_t dbuf_is_metadata(dmu_buf_impl_t *db);
+boolean_t dbuf_meta_to_special(dmu_buf_impl_t *db);
 
 #define	DBUF_GET_BUFC_TYPE(_db)	\
 	(dbuf_is_metadata(_db) ? ARC_BUFC_METADATA : ARC_BUFC_DATA)
@@ -330,10 +338,20 @@ boolean_t dbuf_is_metadata(dmu_buf_impl_t *db);
 	(dbuf_is_metadata(_db) &&					\
 	((_db)->db_objset->os_primary_cache == ZFS_CACHE_METADATA)))
 
+/* returns B_TRUE if _db is metadata and it goes to special vdev */ 
+#define DBUF_META_TO_SPECIAL(_db)	\
+	(dbuf_meta_to_special(_db))
+
+/*
+ * note that ZFS_CACHE_DATA actually means: L2ARC gets data and metadata
+ * that is not placed on special devices
+ */
 #define	DBUF_IS_L2CACHEABLE(_db)					\
 	((_db)->db_objset->os_secondary_cache == ZFS_CACHE_ALL ||	\
 	(dbuf_is_metadata(_db) &&					\
-	((_db)->db_objset->os_secondary_cache == ZFS_CACHE_METADATA)))
+	((_db)->db_objset->os_secondary_cache == ZFS_CACHE_METADATA)) ||\
+	((DBUF_META_TO_SPECIAL(_db) == B_FALSE) &&			\
+	((_db)->db_objset->os_secondary_cache == ZFS_CACHE_DATA)))
 
 #define	DBUF_IS_L2COMPRESSIBLE(_db)					\
 	((_db)->db_objset->os_compress != ZIO_COMPRESS_OFF ||		\

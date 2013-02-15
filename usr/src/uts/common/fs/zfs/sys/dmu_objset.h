@@ -128,7 +128,8 @@ struct objset {
 
 #define	DMU_OS_IS_L2CACHEABLE(os)				\
 	((os)->os_secondary_cache == ZFS_CACHE_ALL ||		\
-	(os)->os_secondary_cache == ZFS_CACHE_METADATA)
+	(os)->os_secondary_cache == ZFS_CACHE_METADATA ||	\
+	(os)->os_secondary_cache == ZFS_CACHE_DATA)
 
 #define	DMU_OS_IS_L2COMPRESSIBLE(os)	(zfs_mdcomp_disable == B_FALSE)
 
