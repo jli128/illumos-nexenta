@@ -1,3 +1,9 @@
+sunwckr (5.11.134-31-12268-13247) nexenta; urgency=medium
+
+  * Issue 13247: Large, fixed command timeouts impair command drop recovery
+
+ -- Nexenta Systems <support@nexenta.com>  Mon, 25 Feb 2013 12:00:00 -0500
+
 sunwckr (5.11.134-31-12267-13144) nexenta; urgency=low
 
   * Issue 12534: Race between log_sysevent_filename() and log_event_upcall() can cause panic
