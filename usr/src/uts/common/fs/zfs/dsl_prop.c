@@ -237,16 +237,9 @@ dsl_prop_register(dsl_dataset_t *ds, const char *propname,
 	int err;
 	int need_rwlock;
 
-	need_rwlock = !RW_WRITE_HELD(&dp->dp_config_rwlock);
-	if (need_rwlock)
-		rw_enter(&dp->dp_config_rwlock, RW_READER);
-
 	err = dsl_prop_get_ds(ds, propname, 8, 1, &value, NULL);
-	if (err != 0) {
-		if (need_rwlock)
-			rw_exit(&dp->dp_config_rwlock);
+	if (err != 0)
 		return (err);
-	}
 
 	cbr = kmem_alloc(sizeof (dsl_prop_cb_record_t), KM_SLEEP);
 	cbr->cbr_ds = ds;
@@ -260,8 +253,6 @@ dsl_prop_register(dsl_dataset_t *ds, const char *propname,
 
 	cbr->cbr_func(cbr->cbr_arg, value);
 
-	if (need_rwlock)
-		rw_exit(&dp->dp_config_rwlock);
 	return (0);
 }
 
