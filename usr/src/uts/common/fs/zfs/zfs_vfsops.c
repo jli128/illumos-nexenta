@@ -42,6 +42,7 @@
 #include <sys/zil.h>
 #include <sys/fs/zfs.h>
 #include <sys/dmu.h>
+#include <sys/dsl_dir.h>
 #include <sys/dsl_prop.h>
 #include <sys/dsl_dataset.h>
 #include <sys/dsl_deleg.h>
@@ -506,6 +507,7 @@ zfs_register_callbacks(vfs_t *vfsp)
 	 * overboard...
 	 */
 	ds = dmu_objset_ds(os);
+	rw_enter(&ds->ds_dir->dd_pool->dp_config_rwlock, RW_READER);
 	error = dsl_prop_register(ds, "atime", atime_changed_cb, zfsvfs);
 	error = error ? error : dsl_prop_register(ds,
 	    "xattr", xattr_changed_cb, zfsvfs);
@@ -527,6 +529,7 @@ zfs_register_callbacks(vfs_t *vfsp)
 	    "aclinherit", acl_inherit_changed_cb, zfsvfs);
 	error = error ? error : dsl_prop_register(ds,
 	    "vscan", vscan_changed_cb, zfsvfs);
+	rw_exit(&ds->ds_dir->dd_pool->dp_config_rwlock);
 	if (error)
 		goto unregister;
 
@@ -2029,8 +2032,20 @@ zfs_suspend_fs(zfsvfs_t *zfsvfs)
 {
 	int error;
 
-	if ((error = zfsvfs_teardown(zfsvfs, B_FALSE)) != 0)
+	mutex_enter(&zfsvfs->z_lock);
+	if (zfsvfs->z_busy) {
+		mutex_exit(&zfsvfs->z_lock);
+		return (EBUSY);
+	}
+	zfsvfs->z_busy = B_TRUE;
+	mutex_exit(&zfsvfs->z_lock);
+
+	if ((error = zfsvfs_teardown(zfsvfs, B_FALSE)) != 0) {
+		mutex_enter(&zfsvfs->z_lock);
+		zfsvfs->z_busy = B_FALSE;
+		mutex_exit(&zfsvfs->z_lock);
 		return (error);
+	}
 	dmu_objset_disown(zfsvfs->z_os, zfsvfs);
 
 	return (0);
@@ -2110,6 +2125,10 @@ bail:
 		if (vn_vfswlock(zfsvfs->z_vfs->vfs_vnodecovered) == 0)
 			(void) dounmount(zfsvfs->z_vfs, MS_FORCE, CRED());
 	}
+	mutex_enter(&zfsvfs->z_lock);
+	zfsvfs->z_busy = B_FALSE;
+	mutex_exit(&zfsvfs->z_lock);
+
 	return (err);
 }
 

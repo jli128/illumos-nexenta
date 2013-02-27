@@ -231,8 +231,10 @@ dsl_pool_create(spa_t *spa, nvlist_t *zplprops, uint64_t txg)
 	uint64_t obj;
 
 	/* create and open the MOS (meta-objset) */
+	rw_enter(&dp->dp_config_rwlock, RW_READER);
 	dp->dp_meta_objset = dmu_objset_create_impl(spa,
 	    NULL, &dp->dp_meta_rootbp, DMU_OST_META, tx);
+	rw_exit(&dp->dp_config_rwlock);
 
 	/* create the pool directory */
 	err = zap_create_claim(dp->dp_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
@@ -275,8 +277,10 @@ dsl_pool_create(spa_t *spa, nvlist_t *zplprops, uint64_t txg)
 
 	/* create the root objset */
 	VERIFY(0 == dsl_dataset_hold_obj(dp, obj, FTAG, &ds));
+	rw_enter(&dp->dp_config_rwlock, RW_READER);
 	os = dmu_objset_create_impl(dp->dp_spa, ds,
 	    dsl_dataset_get_blkptr(ds), DMU_OST_ZFS, tx);
+	rw_exit(&dp->dp_config_rwlock);
 #ifdef _KERNEL
 	zfs_create_fs(os, kcred, zplprops, tx);
 #endif
