@@ -21,6 +21,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
 
 include ../../Makefile.cmd
@@ -36,7 +37,8 @@ common_DCNAMES = \
 	SCA500 \
 	SCA1000 \
 	SENSOR \
-	TEST
+	TEST \
+	DEV
 
 i386_DCNAMES = \
 	AMD \

@@ -9522,6 +9522,12 @@ mptsas_remove_target(mptsas_t *mpt, mptsas_target_t *ptgt)
 		    "for device removal failed. \n");
 		kmem_free(topo_node, sizeof (mptsas_topo_change_list_t));
 	}
+
+	/*
+	 * Generate an FMA ereport.
+	 */
+	mptsas_fm_ereport(mpt, DDI_FM_DEVICE_TARGET_REMOVE);
+	ddi_fm_service_impact(mpt->m_dip, DDI_SERVICE_UNAFFECTED);
 }
 
 /*

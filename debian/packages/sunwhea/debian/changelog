@@ -1,3 +1,10 @@
+sunwhea (5.11.134-31-12263-13272) nexenta; urgency=low
+
+  * Issue 13272: Stucked Inquiry commands put a pool to degraded state
+    with too many errors without displaying errors in zpool status
+
+ -- Nexenta Systems <support@nexenta.com>  Fri, 08 Mar 2013 11:37:00 -0400
+
 sunwhea (5.11.134-31-12262-0) nexenta; urgency=low
 
   * Issue 11462: Backport Illumos 1618

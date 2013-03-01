@@ -22,5 +22,6 @@
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
 
-subscribe ereport.io.device.target_remove
-dictionary DEV
+FMDICT: name=DEV version=1 maxkey=1 dictid=0x534f
+
+ereport.io.device.target_remove=1

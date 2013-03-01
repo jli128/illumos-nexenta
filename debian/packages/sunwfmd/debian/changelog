@@ -1,3 +1,10 @@
+sunwfmd (5.11.134-31-11343-13272) nexenta; urgency=high
+
+  * Issue 13272: Stucked Inquiry commands put a pool to degraded state
+    with too many errors without displaying errors in zpool status
+
+ -- Nexenta Systems <support@nexenta.com>  Fri, 08 Mar 2013 11:37:00 -0400
+
 sunwfmd (5.11.134-31-11342-13165) nexenta; urgency=high
 
   * Issue 13165: zfs-monitor should fallback to using DEV_BSIZE
