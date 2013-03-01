@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -29,6 +29,16 @@
  * that predate this metadata.  See mdb_v8_cfg.c for details.
  */
 
+/*
+ * We hard-code our MDB_API_VERSION to be 3 to allow this module to be
+ * compiled on systems with higher version numbers, but still allow the
+ * resulting binary object to be used on older systems.  (We do not make use
+ * of functionality present in versions later than 3.)  This is particularly
+ * important for mdb_v8 because (1) it's used in particular to debug
+ * application-level software and (2) it has a history of rapid evolution.
+ */
+#define	MDB_API_VERSION		3
+
 #include <sys/mdb_modapi.h>
 #include <assert.h>
 #include <ctype.h>
@@ -37,6 +47,7 @@
 #include <string.h>
 #include <libproc.h>
 #include <sys/avl.h>
+#include <alloca.h>
 
 #include "v8dbg.h"
 #include "v8cfg.h"
@@ -61,6 +72,7 @@ typedef struct v8_field {
 	ssize_t		v8f_offset;	/* field offset */
 	char 		v8f_name[64];	/* field name */
 	boolean_t	v8f_isbyte;	/* 1-byte int field */
+	boolean_t	v8f_isstr;	/* NUL-terminated string */
 } v8_field_t;
 
 /*
@@ -120,11 +132,25 @@ static intptr_t	V8_SmiTagMask;
 static intptr_t	V8_SmiValueShift;
 static intptr_t	V8_PointerSizeLog2;
 
+static intptr_t	V8_ISSHARED_SHIFT;
+static intptr_t	V8_DICT_SHIFT;
+static intptr_t	V8_DICT_PREFIX_SIZE;
+static intptr_t	V8_DICT_ENTRY_SIZE;
+static intptr_t	V8_DICT_START_INDEX;
 static intptr_t	V8_PROP_IDX_CONTENT;
 static intptr_t	V8_PROP_IDX_FIRST;
 static intptr_t	V8_PROP_TYPE_FIELD;
 static intptr_t	V8_PROP_FIRST_PHANTOM;
 static intptr_t	V8_PROP_TYPE_MASK;
+static intptr_t	V8_PROP_DESC_KEY;
+static intptr_t	V8_PROP_DESC_DETAILS;
+static intptr_t	V8_PROP_DESC_VALUE;
+static intptr_t	V8_PROP_DESC_SIZE;
+static intptr_t	V8_TRANSITIONS_IDX_DESC;
+
+static intptr_t V8_TYPE_JSOBJECT = -1;
+static intptr_t V8_TYPE_JSARRAY = -1;
+static intptr_t V8_TYPE_FIXEDARRAY = -1;
 
 /*
  * Although we have this information in v8_classes, the following offsets are
@@ -139,6 +165,8 @@ static ssize_t V8_OFF_FIXEDARRAY_DATA;
 static ssize_t V8_OFF_FIXEDARRAY_LENGTH;
 static ssize_t V8_OFF_HEAPNUMBER_VALUE;
 static ssize_t V8_OFF_HEAPOBJECT_MAP;
+static ssize_t V8_OFF_JSARRAY_LENGTH;
+static ssize_t V8_OFF_JSDATE_VALUE;
 static ssize_t V8_OFF_JSFUNCTION_SHARED;
 static ssize_t V8_OFF_JSOBJECT_ELEMENTS;
 static ssize_t V8_OFF_JSOBJECT_PROPERTIES;
@@ -147,10 +175,13 @@ static ssize_t V8_OFF_MAP_INOBJECT_PROPERTIES;
 static ssize_t V8_OFF_MAP_INSTANCE_ATTRIBUTES;
 static ssize_t V8_OFF_MAP_INSTANCE_DESCRIPTORS;
 static ssize_t V8_OFF_MAP_INSTANCE_SIZE;
+static ssize_t V8_OFF_MAP_BIT_FIELD3;
+static ssize_t V8_OFF_MAP_TRANSITIONS;
 static ssize_t V8_OFF_ODDBALL_TO_STRING;
 static ssize_t V8_OFF_SCRIPT_LINE_ENDS;
 static ssize_t V8_OFF_SCRIPT_NAME;
 static ssize_t V8_OFF_SEQASCIISTR_CHARS;
+static ssize_t V8_OFF_SEQONEBYTESTR_CHARS;
 static ssize_t V8_OFF_SHAREDFUNCTIONINFO_CODE;
 static ssize_t V8_OFF_SHAREDFUNCTIONINFO_FUNCTION_TOKEN_POSITION;
 static ssize_t V8_OFF_SHAREDFUNCTIONINFO_INFERRED_NAME;
@@ -161,12 +192,31 @@ static ssize_t V8_OFF_STRING_LENGTH;
 
 #define	NODE_OFF_EXTSTR_DATA		0x4	/* see node_string.h */
 
+#define	V8_CONSTANT_OPTIONAL		1
+#define	V8_CONSTANT_HASFALLBACK		2
+
+#define	V8_CONSTANT_MAJORSHIFT		3
+#define	V8_CONSTANT_MAJORMASK		((1 << 4) - 1)
+#define	V8_CONSTANT_MAJOR(flags)	\
+	(((flags) >> V8_CONSTANT_MAJORSHIFT) & V8_CONSTANT_MAJORMASK)
+
+#define	V8_CONSTANT_MINORSHIFT		7
+#define	V8_CONSTANT_MINORMASK		((1 << 9) - 1)
+#define	V8_CONSTANT_MINOR(flags)	\
+	(((flags) >> V8_CONSTANT_MINORSHIFT) & V8_CONSTANT_MINORMASK)
+
+#define	V8_CONSTANT_FALLBACK(maj, min) \
+	(V8_CONSTANT_OPTIONAL | V8_CONSTANT_HASFALLBACK | \
+	((maj) << V8_CONSTANT_MAJORSHIFT) | ((min) << V8_CONSTANT_MINORSHIFT))
+
 /*
  * Table of constants used directly by this file.
  */
 typedef struct v8_constant {
 	intptr_t	*v8c_valp;
 	const char	*v8c_symbol;
+	uint32_t	v8c_flags;
+	intptr_t	v8c_fallback;
 } v8_constant_t;
 
 static v8_constant_t v8_constants[] = {
@@ -195,11 +245,32 @@ static v8_constant_t v8_constants[] = {
 	{ &V8_SmiValueShift,		"v8dbg_SmiValueShift"		},
 	{ &V8_PointerSizeLog2,		"v8dbg_PointerSizeLog2"		},
 
-	{ &V8_PROP_IDX_CONTENT,		"v8dbg_prop_idx_content"	},
+	{ &V8_DICT_SHIFT,		"v8dbg_dict_shift",
+	    V8_CONSTANT_FALLBACK(3, 13), 24 },
+	{ &V8_DICT_PREFIX_SIZE,		"v8dbg_dict_prefix_size",
+	    V8_CONSTANT_FALLBACK(3, 11), 2 },
+	{ &V8_DICT_ENTRY_SIZE,		"v8dbg_dict_entry_size",
+	    V8_CONSTANT_FALLBACK(3, 11), 3 },
+	{ &V8_DICT_START_INDEX,		"v8dbg_dict_start_index",
+	    V8_CONSTANT_FALLBACK(3, 11), 3 },
+	{ &V8_ISSHARED_SHIFT,		"v8dbg_isshared_shift",
+	    V8_CONSTANT_FALLBACK(3, 11), 0 },
 	{ &V8_PROP_IDX_FIRST,		"v8dbg_prop_idx_first"		},
 	{ &V8_PROP_TYPE_FIELD,		"v8dbg_prop_type_field"		},
 	{ &V8_PROP_FIRST_PHANTOM,	"v8dbg_prop_type_first_phantom"	},
 	{ &V8_PROP_TYPE_MASK,		"v8dbg_prop_type_mask"		},
+	{ &V8_PROP_IDX_CONTENT,		"v8dbg_prop_idx_content",
+	    V8_CONSTANT_OPTIONAL },
+	{ &V8_PROP_DESC_KEY,		"v8dbg_prop_desc_key",
+	    V8_CONSTANT_FALLBACK(0, 0), 0 },
+	{ &V8_PROP_DESC_DETAILS,	"v8dbg_prop_desc_details",
+	    V8_CONSTANT_FALLBACK(0, 0), 1 },
+	{ &V8_PROP_DESC_VALUE,		"v8dbg_prop_desc_value",
+	    V8_CONSTANT_FALLBACK(0, 0), 2 },
+	{ &V8_PROP_DESC_SIZE,		"v8dbg_prop_desc_size",
+	    V8_CONSTANT_FALLBACK(0, 0), 3 },
+	{ &V8_TRANSITIONS_IDX_DESC,	"v8dbg_transitions_idx_descriptors",
+	    V8_CONSTANT_OPTIONAL },
 };
 
 static int v8_nconstants = sizeof (v8_constants) / sizeof (v8_constants[0]);
@@ -208,30 +279,62 @@ typedef struct v8_offset {
 	ssize_t		*v8o_valp;
 	const char	*v8o_class;
 	const char	*v8o_member;
+	boolean_t	v8o_optional;
 } v8_offset_t;
 
 static v8_offset_t v8_offsets[] = {
-	{ &V8_OFF_CODE_INSTRUCTION_SIZE,	"Code", "instruction_size" },
-	{ &V8_OFF_CODE_INSTRUCTION_START,	"Code", "instruction_start" },
-	{ &V8_OFF_CONSSTRING_FIRST,		"ConsString", "first" },
-	{ &V8_OFF_CONSSTRING_SECOND,		"ConsString", "second" },
-	{ &V8_OFF_EXTERNALSTRING_RESOURCE,	"ExternalString", "resource" },
-	{ &V8_OFF_FIXEDARRAY_DATA,		"FixedArray", "data" },
-	{ &V8_OFF_FIXEDARRAY_LENGTH,		"FixedArray", "length" },
-	{ &V8_OFF_HEAPNUMBER_VALUE,		"HeapNumber", "value" },
-	{ &V8_OFF_HEAPOBJECT_MAP,		"HeapObject", "map" },
-	{ &V8_OFF_JSFUNCTION_SHARED,		"JSFunction", "shared" },
-	{ &V8_OFF_JSOBJECT_ELEMENTS,		"JSObject", "elements" },
-	{ &V8_OFF_JSOBJECT_PROPERTIES,		"JSObject", "properties" },
-	{ &V8_OFF_MAP_CONSTRUCTOR,		"Map", "constructor" },
-	{ &V8_OFF_MAP_INOBJECT_PROPERTIES,	"Map", "inobject_properties" },
-	{ &V8_OFF_MAP_INSTANCE_ATTRIBUTES,	"Map", "instance_attributes" },
-	{ &V8_OFF_MAP_INSTANCE_DESCRIPTORS,	"Map", "instance_descriptors" },
-	{ &V8_OFF_MAP_INSTANCE_SIZE,		"Map", "instance_size" },
-	{ &V8_OFF_ODDBALL_TO_STRING,		"Oddball", "to_string" },
-	{ &V8_OFF_SCRIPT_LINE_ENDS,		"Script", "line_ends" },
-	{ &V8_OFF_SCRIPT_NAME,			"Script", "name" },
-	{ &V8_OFF_SEQASCIISTR_CHARS,		"SeqAsciiString", "chars" },
+	{ &V8_OFF_CODE_INSTRUCTION_SIZE,
+	    "Code", "instruction_size" },
+	{ &V8_OFF_CODE_INSTRUCTION_START,
+	    "Code", "instruction_start" },
+	{ &V8_OFF_CONSSTRING_FIRST,
+	    "ConsString", "first" },
+	{ &V8_OFF_CONSSTRING_SECOND,
+	    "ConsString", "second" },
+	{ &V8_OFF_EXTERNALSTRING_RESOURCE,
+	    "ExternalString", "resource" },
+	{ &V8_OFF_FIXEDARRAY_DATA,
+	    "FixedArray", "data" },
+	{ &V8_OFF_FIXEDARRAY_LENGTH,
+	    "FixedArray", "length" },
+	{ &V8_OFF_HEAPNUMBER_VALUE,
+	    "HeapNumber", "value" },
+	{ &V8_OFF_HEAPOBJECT_MAP,
+	    "HeapObject", "map" },
+	{ &V8_OFF_JSARRAY_LENGTH,
+	    "JSArray", "length" },
+	{ &V8_OFF_JSDATE_VALUE,
+	    "JSDate", "value", B_TRUE },
+	{ &V8_OFF_JSFUNCTION_SHARED,
+	    "JSFunction", "shared" },
+	{ &V8_OFF_JSOBJECT_ELEMENTS,
+	    "JSObject", "elements" },
+	{ &V8_OFF_JSOBJECT_PROPERTIES,
+	    "JSObject", "properties" },
+	{ &V8_OFF_MAP_CONSTRUCTOR,
+	    "Map", "constructor" },
+	{ &V8_OFF_MAP_INOBJECT_PROPERTIES,
+	    "Map", "inobject_properties" },
+	{ &V8_OFF_MAP_INSTANCE_ATTRIBUTES,
+	    "Map", "instance_attributes" },
+	{ &V8_OFF_MAP_INSTANCE_DESCRIPTORS,
+	    "Map", "instance_descriptors", B_TRUE },
+	{ &V8_OFF_MAP_TRANSITIONS,
+	    "Map", "transitions", B_TRUE },
+	{ &V8_OFF_MAP_INSTANCE_SIZE,
+	    "Map", "instance_size" },
+	{ &V8_OFF_MAP_BIT_FIELD3,
+	    "Map", "bit_field3", B_TRUE },
+	{ &V8_OFF_ODDBALL_TO_STRING,
+	    "Oddball", "to_string" },
+	{ &V8_OFF_SCRIPT_LINE_ENDS,
+	    "Script", "line_ends" },
+	{ &V8_OFF_SCRIPT_NAME,
+	    "Script", "name" },
+	{ &V8_OFF_SEQASCIISTR_CHARS,
+	    "SeqAsciiString", "chars", B_TRUE },
+	{ &V8_OFF_SEQONEBYTESTR_CHARS,
+	    "SeqOneByteString", "chars", B_TRUE },
 	{ &V8_OFF_SHAREDFUNCTIONINFO_CODE,
 	    "SharedFunctionInfo", "code" },
 	{ &V8_OFF_SHAREDFUNCTIONINFO_FUNCTION_TOKEN_POSITION,
@@ -244,10 +347,16 @@ static v8_offset_t v8_offsets[] = {
 	    "SharedFunctionInfo", "name" },
 	{ &V8_OFF_SHAREDFUNCTIONINFO_SCRIPT,
 	    "SharedFunctionInfo", "script" },
-	{ &V8_OFF_STRING_LENGTH,	"String", "length" },
+	{ &V8_OFF_STRING_LENGTH,
+	    "String", "length" },
 };
 
 static int v8_noffsets = sizeof (v8_offsets) / sizeof (v8_offsets[0]);
+
+static uintptr_t v8_major;
+static uintptr_t v8_minor;
+static uintptr_t v8_build;
+static uintptr_t v8_patch;
 
 static int autoconf_iter_symbol(mdb_symbol_t *, void *);
 static v8_class_t *conf_class_findcreate(const char *);
@@ -261,6 +370,7 @@ static int conf_update_type(v8_cfg_t *, const char *);
 static int conf_update_frametype(v8_cfg_t *, const char *);
 static void conf_class_compute_offsets(v8_class_t *);
 
+static int read_typebyte(uint8_t *, uintptr_t);
 static int heap_offset(const char *, const char *, ssize_t *);
 
 /*
@@ -271,8 +381,10 @@ static int
 autoconfigure(v8_cfg_t *cfgp)
 {
 	v8_class_t *clp;
+	v8_enum_t *ep;
 	struct v8_constant *cnp;
 	int ii;
+	int failed = 0;
 
 	assert(v8_classes == NULL);
 
@@ -302,11 +414,59 @@ autoconfigure(v8_cfg_t *cfgp)
 	for (ii = 0; ii < v8_nconstants; ii++) {
 		cnp = &v8_constants[ii];
 
-		if (cfgp->v8cfg_readsym(cfgp, cnp->v8c_symbol,
-		    cnp->v8c_valp) == -1) {
-			mdb_warn("failed to read \"%s\"", cnp->v8c_symbol);
-			return (-1);
+		if (cfgp->v8cfg_readsym(cfgp,
+		    cnp->v8c_symbol, cnp->v8c_valp) != -1) {
+			continue;
 		}
+
+		if (!(cnp->v8c_flags & V8_CONSTANT_OPTIONAL)) {
+			mdb_warn("failed to read \"%s\"", cnp->v8c_symbol);
+			failed++;
+			continue;
+		}
+
+		if (!(cnp->v8c_flags & V8_CONSTANT_HASFALLBACK) ||
+		    v8_major < V8_CONSTANT_MAJOR(cnp->v8c_flags) ||
+		    (v8_major == V8_CONSTANT_MAJOR(cnp->v8c_flags) &&
+		    v8_minor < V8_CONSTANT_MINOR(cnp->v8c_flags))) {
+			*cnp->v8c_valp = -1;
+			continue;
+		}
+
+		/*
+		 * We have a fallback -- and we know that the version satisfies
+		 * the fallback's version constraints; use the fallback value.
+		 */
+		*cnp->v8c_valp = cnp->v8c_fallback;
+	}
+
+	/*
+	 * Load type values for well-known classes that we use a lot.
+	 */
+	for (ep = v8_types; ep->v8e_name[0] != '\0'; ep++) {
+		if (strcmp(ep->v8e_name, "JSObject") == 0)
+			V8_TYPE_JSOBJECT = ep->v8e_value;
+
+		if (strcmp(ep->v8e_name, "JSArray") == 0)
+			V8_TYPE_JSARRAY = ep->v8e_value;
+
+		if (strcmp(ep->v8e_name, "FixedArray") == 0)
+			V8_TYPE_FIXEDARRAY = ep->v8e_value;
+	}
+
+	if (V8_TYPE_JSOBJECT == -1) {
+		mdb_warn("couldn't find JSObject type\n");
+		failed++;
+	}
+
+	if (V8_TYPE_JSARRAY == -1) {
+		mdb_warn("couldn't find JSArray type\n");
+		failed++;
+	}
+
+	if (V8_TYPE_FIXEDARRAY == -1) {
+		mdb_warn("couldn't find FixedArray type\n");
+		failed++;
 	}
 
 	/*
@@ -332,12 +492,27 @@ again:
 			goto again;
 		}
 
+		if (offp->v8o_optional) {
+			*offp->v8o_valp = -1;
+			continue;
+		}
+
 		mdb_warn("couldn't find class \"%s\", field \"%s\"\n",
 		    offp->v8o_class, offp->v8o_member);
-		return (-1);
+		failed++;
 	}
 
-	return (0);
+	if (!((V8_OFF_SEQASCIISTR_CHARS != -1) ^
+	    (V8_OFF_SEQONEBYTESTR_CHARS != -1))) {
+		mdb_warn("expected exactly one of SeqAsciiString and "
+		    "SeqOneByteString to be defined\n");
+		failed++;
+	}
+
+	if (V8_OFF_SEQONEBYTESTR_CHARS != -1)
+		V8_OFF_SEQASCIISTR_CHARS = V8_OFF_SEQONEBYTESTR_CHARS;
+
+	return (failed ? -1 : 0);
 }
 
 /* ARGSUSED */
@@ -386,24 +561,17 @@ conf_next_part(char *buf, char *start)
 static v8_class_t *
 conf_class_findcreate(const char *name)
 {
-	v8_class_t *clp, *iclp, **ptr;
+	v8_class_t *clp, *iclp, *prev = NULL;
 	int cmp;
 
-	if (v8_classes == NULL || strcmp(v8_classes->v8c_name, name) > 0) {
-		ptr = &v8_classes;
-	} else {
-		for (iclp = v8_classes; iclp->v8c_next != NULL;
-		    iclp = iclp->v8c_next) {
-			cmp = strcmp(iclp->v8c_next->v8c_name, name);
+	for (iclp = v8_classes; iclp != NULL; iclp = iclp->v8c_next) {
+		if ((cmp = strcmp(iclp->v8c_name, name)) == 0)
+			return (iclp);
 
-			if (cmp == 0)
-				return (iclp->v8c_next);
+		if (cmp > 0)
+			break;
 
-			if (cmp > 0)
-				break;
-		}
-
-		ptr = &iclp->v8c_next;
+		prev = iclp;
 	}
 
 	if ((clp = mdb_zalloc(sizeof (*clp), UM_NOSLEEP)) == NULL)
@@ -411,9 +579,14 @@ conf_class_findcreate(const char *name)
 
 	(void) strlcpy(clp->v8c_name, name, sizeof (clp->v8c_name));
 	clp->v8c_end = (size_t)-1;
+	clp->v8c_next = iclp;
 
-	clp->v8c_next = *ptr;
-	*ptr = clp;
+	if (prev != NULL) {
+		prev->v8c_next = clp;
+	} else {
+		v8_classes = clp;
+	}
+
 	return (clp);
 }
 
@@ -508,6 +681,9 @@ conf_update_field(v8_cfg_t *cfgp, const char *symbol)
 
 	if (strcmp(tt, "int") == 0)
 		flp->v8f_isbyte = B_TRUE;
+
+	if (strcmp(tt, "char") == 0)
+		flp->v8f_isstr = B_TRUE;
 
 	return (0);
 }
@@ -611,7 +787,13 @@ conf_class_compute_offsets(v8_class_t *clp)
 /*
  * Utility functions
  */
-static int jsstr_print(uintptr_t, boolean_t, char **, size_t *);
+#define	JSSTR_NONE		0
+#define	JSSTR_NUDE		JSSTR_NONE
+#define	JSSTR_VERBOSE		0x1
+#define	JSSTR_QUOTED		0x2
+
+static int jsstr_print(uintptr_t, uint_t, char **, size_t *);
+static boolean_t jsobj_is_undefined(uintptr_t addr);
 
 static const char *
 enum_lookup_str(v8_enum_t *enums, int val, const char *dflt)
@@ -780,7 +962,17 @@ read_heap_double(double *valp, uintptr_t addr, ssize_t off)
 static int
 read_heap_array(uintptr_t addr, uintptr_t **retp, size_t *lenp, int flags)
 {
+	uint8_t type;
 	uintptr_t len;
+
+	if (!V8_IS_HEAPOBJECT(addr))
+		return (-1);
+
+	if (read_typebyte(&type, addr) != 0)
+		return (-1);
+
+	if (type != V8_TYPE_FIXEDARRAY)
+		return (-1);
 
 	if (read_heap_smi(&len, addr, V8_OFF_FIXEDARRAY_LENGTH) != 0)
 		return (-1);
@@ -797,7 +989,7 @@ read_heap_array(uintptr_t addr, uintptr_t **retp, size_t *lenp, int flags)
 
 	if (mdb_vread(*retp, len * sizeof (uintptr_t),
 	    addr + V8_OFF_FIXEDARRAY_DATA) == -1) {
-		if (flags != UM_GC)
+		if (!(flags & UM_GC))
 			mdb_free(*retp, len * sizeof (uintptr_t));
 
 		return (-1);
@@ -870,6 +1062,75 @@ read_size(size_t *valp, uintptr_t addr)
 }
 
 /*
+ * Assuming "addr" refers to a FixedArray that is implementing a
+ * StringDictionary, iterate over its contents calling the specified function
+ * with key and value.
+ */
+static int
+read_heap_dict(uintptr_t addr,
+    int (*func)(const char *, uintptr_t, void *), void *arg)
+{
+	uint8_t type;
+	uintptr_t len;
+	char buf[512];
+	char *bufp;
+	int rval = -1;
+	uintptr_t *dict, ndict, i;
+	const char *typename;
+
+	if (read_heap_array(addr, &dict, &ndict, UM_SLEEP) != 0)
+		return (-1);
+
+	if (V8_DICT_ENTRY_SIZE < 2) {
+		v8_warn("dictionary entry size (%d) is too small for a "
+		    "key and value\n", V8_DICT_ENTRY_SIZE);
+		goto out;
+	}
+
+	for (i = V8_DICT_START_INDEX + V8_DICT_PREFIX_SIZE; i < ndict;
+	    i += V8_DICT_ENTRY_SIZE) {
+		/*
+		 * The layout here is key, value, details. (This is hardcoded
+		 * in Dictionary<Shape, Key>::SetEntry().)
+		 */
+		if (jsobj_is_undefined(dict[i]))
+			continue;
+
+		if (read_typebyte(&type, dict[i]) != 0)
+			goto out;
+
+		typename = enum_lookup_str(v8_types, type, NULL);
+
+		if (typename != NULL && strcmp(typename, "Oddball") == 0) {
+			/*
+			 * In some cases, the key can (apparently) be a hole;
+			 * assume that any Oddball in the key field falls into
+			 * this case and skip over it.
+			 */
+			continue;
+		}
+
+		if (!V8_TYPE_STRING(type))
+			goto out;
+
+		bufp = buf;
+		len = sizeof (buf);
+
+		if (jsstr_print(dict[i], JSSTR_NUDE, &bufp, &len) != 0)
+			goto out;
+
+		if (func(buf, dict[i + 1], arg) == -1)
+			goto out;
+	}
+
+	rval = 0;
+out:
+	mdb_free(dict, ndict * sizeof (uintptr_t));
+
+	return (rval);
+}
+
+/*
  * Returns in "buf" a description of the type of "addr" suitable for printing.
  */
 static int
@@ -907,7 +1168,7 @@ obj_jstype(uintptr_t addr, char **bufp, size_t *lenp, uint8_t *typep)
 		if (read_heap_ptr(&strptr, addr,
 		    V8_OFF_ODDBALL_TO_STRING) != -1) {
 			(void) bsnprintf(bufp, lenp, ": \"");
-			(void) jsstr_print(strptr, B_FALSE, bufp, lenp);
+			(void) jsstr_print(strptr, JSSTR_NUDE, bufp, lenp);
 			(void) bsnprintf(bufp, lenp, "\"");
 		}
 	}
@@ -935,6 +1196,18 @@ obj_print_fields(uintptr_t baddr, v8_class_t *clp)
 
 		addr = baddr + V8_OFF_HEAP(flp->v8f_offset);
 
+		if (flp->v8f_isstr) {
+			if (mdb_readstr(buf, sizeof (buf), addr) == -1) {
+				mdb_printf("%p %s (unreadable)\n",
+				    addr, flp->v8f_name);
+				continue;
+			}
+
+			mdb_printf("%p %s = \"%s\"\n",
+			    addr, flp->v8f_name, buf);
+			continue;
+		}
+
 		if (flp->v8f_isbyte) {
 			uint8_t sv;
 			if (mdb_vread(&sv, sizeof (sv), addr) == -1) {
@@ -956,9 +1229,8 @@ obj_print_fields(uintptr_t baddr, v8_class_t *clp)
 		}
 
 		if (type != 0 && V8_TYPE_STRING(type)) {
-			(void) bsnprintf(&bufp, &len, ": \"");
-			(void) jsstr_print(value, B_FALSE, &bufp, &len);
-			(void) bsnprintf(&bufp, &len, "\"");
+			(void) bsnprintf(&bufp, &len, ": ");
+			(void) jsstr_print(value, JSSTR_QUOTED, &bufp, &len);
 		}
 
 		mdb_printf("%p %s = %p (%s)\n", addr, flp->v8f_name, value,
@@ -1017,18 +1289,19 @@ obj_print_class(uintptr_t addr, v8_class_t *clp)
  * Print the ASCII string for the given ASCII JS string, expanding ConsStrings
  * and ExternalStrings as needed.
  */
-static int jsstr_print_seq(uintptr_t, boolean_t, char **, size_t *);
-static int jsstr_print_cons(uintptr_t, boolean_t, char **, size_t *);
-static int jsstr_print_external(uintptr_t, boolean_t, char **, size_t *);
+static int jsstr_print_seq(uintptr_t, uint_t, char **, size_t *);
+static int jsstr_print_cons(uintptr_t, uint_t, char **, size_t *);
+static int jsstr_print_external(uintptr_t, uint_t, char **, size_t *);
 
 static int
-jsstr_print(uintptr_t addr, boolean_t verbose, char **bufp, size_t *lenp)
+jsstr_print(uintptr_t addr, uint_t flags, char **bufp, size_t *lenp)
 {
 	uint8_t typebyte;
 	int err = 0;
 	char *lbufp;
 	size_t llen;
 	char buf[64];
+	boolean_t verbose = flags & JSSTR_VERBOSE ? B_TRUE : B_FALSE;
 
 	if (read_typebyte(&typebyte, addr) != 0)
 		return (0);
@@ -1052,11 +1325,11 @@ jsstr_print(uintptr_t addr, boolean_t verbose, char **bufp, size_t *lenp)
 	}
 
 	if (V8_STRREP_SEQ(typebyte))
-		err = jsstr_print_seq(addr, verbose, bufp, lenp);
+		err = jsstr_print_seq(addr, flags, bufp, lenp);
 	else if (V8_STRREP_CONS(typebyte))
-		err = jsstr_print_cons(addr, verbose, bufp, lenp);
+		err = jsstr_print_cons(addr, flags, bufp, lenp);
 	else if (V8_STRREP_EXT(typebyte))
-		err = jsstr_print_external(addr, verbose, bufp, lenp);
+		err = jsstr_print_external(addr, flags, bufp, lenp);
 	else {
 		(void) bsnprintf(bufp, lenp, "<unknown string type>");
 		err = -1;
@@ -1069,15 +1342,22 @@ jsstr_print(uintptr_t addr, boolean_t verbose, char **bufp, size_t *lenp)
 }
 
 static int
-jsstr_print_seq(uintptr_t addr, boolean_t verbose, char **bufp, size_t *lenp)
+jsstr_print_seq(uintptr_t addr, uint_t flags, char **bufp, size_t *lenp)
 {
-	uintptr_t len, rlen;
-	char buf[256];
+	/*
+	 * To allow the caller to allocate a very large buffer for strings,
+	 * we'll allocate a buffer sized based on our input, making it at
+	 * least enough space for our ellipsis and at most 256K.
+	 */
+	uintptr_t len, rlen, blen = *lenp + sizeof ("[...]") + 1;
+	char *buf = alloca(MIN(blen, 256 * 1024));
+	boolean_t verbose = flags & JSSTR_VERBOSE ? B_TRUE : B_FALSE;
+	boolean_t quoted = flags & JSSTR_QUOTED ? B_TRUE : B_FALSE;
 
 	if (read_heap_smi(&len, addr, V8_OFF_STRING_LENGTH) != 0)
 		return (-1);
 
-	rlen = len <= sizeof (buf) - 1 ? len : sizeof (buf) - sizeof ("[...]");
+	rlen = len <= blen - 1 ? len : blen - sizeof ("[...]");
 
 	if (verbose)
 		mdb_printf("length: %d, will read: %d\n", len, rlen);
@@ -1091,18 +1371,22 @@ jsstr_print_seq(uintptr_t addr, boolean_t verbose, char **bufp, size_t *lenp)
 	}
 
 	if (rlen != len)
-		(void) strlcat(buf, "[...]", sizeof (buf));
+		(void) strlcat(buf, "[...]", blen);
 
 	if (verbose)
 		mdb_printf("value: \"%s\"\n", buf);
 
-	(void) bsnprintf(bufp, lenp, "%s", buf);
+	(void) bsnprintf(bufp, lenp, "%s%s%s",
+	    quoted ? "\"" : "", buf, quoted ? "\"" : "");
+
 	return (0);
 }
 
 static int
-jsstr_print_cons(uintptr_t addr, boolean_t verbose, char **bufp, size_t *lenp)
+jsstr_print_cons(uintptr_t addr, uint_t flags, char **bufp, size_t *lenp)
 {
+	boolean_t verbose = flags & JSSTR_VERBOSE ? B_TRUE : B_FALSE;
+	boolean_t quoted = flags & JSSTR_QUOTED ? B_TRUE : B_FALSE;
 	uintptr_t ptr1, ptr2;
 
 	if (read_heap_ptr(&ptr1, addr, V8_OFF_CONSSTRING_FIRST) != 0 ||
@@ -1114,20 +1398,31 @@ jsstr_print_cons(uintptr_t addr, boolean_t verbose, char **bufp, size_t *lenp)
 		mdb_printf("ptr2: %p\n", ptr2);
 	}
 
+	if (quoted)
+		(void) bsnprintf(bufp, lenp, "\"");
+
 	if (jsstr_print(ptr1, verbose, bufp, lenp) != 0)
 		return (-1);
 
-	return (jsstr_print(ptr2, verbose, bufp, lenp));
+	if (jsstr_print(ptr2, verbose, bufp, lenp) != 0)
+		return (-1);
+
+	if (quoted)
+		(void) bsnprintf(bufp, lenp, "\"");
+
+	return (0);
 }
 
 static int
-jsstr_print_external(uintptr_t addr, boolean_t verbose, char **bufp,
+jsstr_print_external(uintptr_t addr, uint_t flags, char **bufp,
     size_t *lenp)
 {
 	uintptr_t ptr1, ptr2;
-	char buf[256];
+	size_t blen = *lenp + 1;
+	char *buf = alloca(blen);
+	boolean_t quoted = flags & JSSTR_QUOTED ? B_TRUE : B_FALSE;
 
-	if (verbose)
+	if (flags & JSSTR_VERBOSE)
 		mdb_printf("assuming Node.js string\n");
 
 	if (read_heap_ptr(&ptr1, addr, V8_OFF_EXTERNALSTRING_RESOURCE) != 0)
@@ -1140,7 +1435,7 @@ jsstr_print_external(uintptr_t addr, boolean_t verbose, char **bufp,
 		return (-1);
 	}
 
-	if (mdb_readstr(buf, sizeof (buf), ptr2) == -1) {
+	if (mdb_readstr(buf, blen, ptr2) == -1) {
 		v8_warn("failed to read ExternalString data");
 		return (-1);
 	}
@@ -1150,7 +1445,9 @@ jsstr_print_external(uintptr_t addr, boolean_t verbose, char **bufp,
 		return (-1);
 	}
 
-	(void) bsnprintf(bufp, lenp, "%s", buf);
+	(void) bsnprintf(bufp, lenp, "%s%s%s",
+	    quoted ? "\"" : "", buf, quoted ? "\"" : "");
+
 	return (0);
 }
 
@@ -1184,7 +1481,7 @@ jsobj_is_undefined(uintptr_t addr)
 	if (read_heap_ptr(&strptr, addr, V8_OFF_ODDBALL_TO_STRING) == -1)
 		return (B_FALSE);
 
-	if (jsstr_print(strptr, B_FALSE, &bufp, &len) != 0)
+	if (jsstr_print(strptr, JSSTR_NUDE, &bufp, &len) != 0)
 		return (B_FALSE);
 
 	return (strcmp(buf, "undefined") == 0);
@@ -1195,16 +1492,17 @@ jsobj_properties(uintptr_t addr,
     int (*func)(const char *, uintptr_t, void *), void *arg)
 {
 	uintptr_t ptr, map;
-	uintptr_t *props = NULL, *descs = NULL, *content = NULL;
-	size_t ii, size, nprops, rndescs, ndescs, ncontent;
+	uintptr_t *props = NULL, *descs = NULL, *content = NULL, *trans;
+	size_t size, nprops, ndescs, ncontent, ntrans;
+	ssize_t ii, rndescs;
 	uint8_t type, ninprops;
 	int rval = -1;
 	size_t ps = sizeof (uintptr_t);
+	ssize_t off;
 
 	/*
 	 * Objects have either "fast" properties represented with a FixedArray
-	 * or slow properties represented with a Dictionary.  We only support
-	 * the former, so we check that up front.
+	 * or slow properties represented with a Dictionary.
 	 */
 	if (mdb_vread(&ptr, ps, addr + V8_OFF_JSOBJECT_PROPERTIES) == -1)
 		return (-1);
@@ -1212,21 +1510,88 @@ jsobj_properties(uintptr_t addr,
 	if (read_typebyte(&type, ptr) != 0)
 		return (-1);
 
-	if (strcmp(enum_lookup_str(v8_types, type, ""), "FixedArray") != 0)
-		return (func(NULL, 0, arg));
+	if (type != V8_TYPE_FIXEDARRAY) {
+		/*
+		 * If our properties aren't a fixed array, we'll emit a member
+		 * that contains the type name, but with a NULL value.
+		 */
+		char buf[256];
 
-	if (read_heap_array(ptr, &props, &nprops, UM_SLEEP) != 0)
-		return (-1);
+		(void) mdb_snprintf(buf, sizeof (buf), "<%s>",
+		    enum_lookup_str(v8_types, type, "unknown"));
+
+		return (func(buf, NULL, arg));
+	}
 
 	/*
 	 * To iterate the properties, we need to examine the instance
-	 * descriptors of the associated Map object.  Some properties may be
-	 * stored inside the object itself, in which case we need to know how
-	 * big the object is and how many such properties there are.
+	 * descriptors of the associated Map object.  Depending on the version
+	 * of V8, this might be found directly from the map -- or indirectly
+	 * via the transitions array.
 	 */
-	if (mdb_vread(&map, ps, addr + V8_OFF_HEAPOBJECT_MAP) == -1 ||
-	    mdb_vread(&ptr, ps, map + V8_OFF_MAP_INSTANCE_DESCRIPTORS) == -1 ||
-	    read_heap_array(ptr, &descs, &ndescs, UM_SLEEP) != 0)
+	if (mdb_vread(&map, ps, addr + V8_OFF_HEAPOBJECT_MAP) == -1)
+		goto err;
+
+	if (V8_DICT_SHIFT != -1) {
+		uintptr_t bit_field3;
+
+		if (mdb_vread(&bit_field3, sizeof (bit_field3),
+		    map + V8_OFF_MAP_BIT_FIELD3) == -1)
+			goto err;
+
+		if (V8_SMI_VALUE(bit_field3) & (1 << V8_DICT_SHIFT))
+			return (read_heap_dict(ptr, func, arg));
+	} else if (V8_OFF_MAP_INSTANCE_DESCRIPTORS != -1) {
+		uintptr_t bit_field3;
+
+		if (mdb_vread(&bit_field3, sizeof (bit_field3),
+		    map + V8_OFF_MAP_INSTANCE_DESCRIPTORS) == -1)
+			goto err;
+
+		if (V8_SMI_VALUE(bit_field3) == (1 << V8_ISSHARED_SHIFT)) {
+			/*
+			 * On versions of V8 prior to that used in 0.10,
+			 * the instance descriptors were overloaded to also
+			 * be bit_field3 -- and there was no way from that
+			 * field to infer a dictionary type.  Because we
+			 * can't determine if the map is actually the
+			 * hash_table_map, we assume that if it's an object
+			 * that has kIsShared set, that it is in fact a
+			 * dictionary -- an assumption that is assuredly in
+			 * error in some cases.
+			 */
+			return (read_heap_dict(ptr, func, arg));
+		}
+	}
+
+	if (read_heap_array(ptr, &props, &nprops, UM_SLEEP) != 0)
+		goto err;
+
+	if ((off = V8_OFF_MAP_INSTANCE_DESCRIPTORS) == -1) {
+		if (V8_OFF_MAP_TRANSITIONS == -1 ||
+		    V8_TRANSITIONS_IDX_DESC == -1 ||
+		    V8_PROP_IDX_CONTENT != -1) {
+			mdb_warn("missing instance_descriptors, but did "
+			    "not find expected transitions array metadata; "
+			    "cannot read properties\n");
+			goto err;
+		}
+
+		off = V8_OFF_MAP_TRANSITIONS;
+	}
+
+	if (mdb_vread(&ptr, ps, map + off) == -1)
+		goto err;
+
+	if (V8_OFF_MAP_TRANSITIONS != -1) {
+		if (read_heap_array(ptr, &trans, &ntrans, UM_SLEEP) != 0)
+			goto err;
+
+		ptr = trans[V8_TRANSITIONS_IDX_DESC];
+		mdb_free(trans, ntrans * sizeof (uintptr_t));
+	}
+
+	if (read_heap_array(ptr, &descs, &ndescs, UM_SLEEP) != 0)
 		goto err;
 
 	if (read_size(&size, addr) != 0)
@@ -1235,26 +1600,46 @@ jsobj_properties(uintptr_t addr,
 	if (mdb_vread(&ninprops, 1, map + V8_OFF_MAP_INOBJECT_PROPERTIES) == -1)
 		goto err;
 
-	if (V8_PROP_IDX_CONTENT < ndescs &&
+	if (V8_PROP_IDX_CONTENT != -1 && V8_PROP_IDX_CONTENT < ndescs &&
 	    read_heap_array(descs[V8_PROP_IDX_CONTENT], &content,
 	    &ncontent, UM_SLEEP) != 0)
-		return (-1);
+		goto err;
 
-	/*
-	 * The first FIRST (2) entries in the descriptors array are special.
-	 */
-	rndescs = ndescs <= V8_PROP_IDX_FIRST ? 0 : ndescs - V8_PROP_IDX_FIRST;
+	if (V8_PROP_IDX_CONTENT == -1) {
+		/*
+		 * On node v0.8 and later, the content is not stored in an
+		 * orthogonal FixedArray, but rather with the descriptors.
+		 */
+		content = descs;
+		ncontent = ndescs;
+		rndescs = ndescs > V8_PROP_IDX_FIRST ?
+		    (ndescs - V8_PROP_IDX_FIRST) / V8_PROP_DESC_SIZE : 0;
+	} else {
+		rndescs = ndescs - V8_PROP_IDX_FIRST;
+	}
 
 	for (ii = 0; ii < rndescs; ii++) {
-		uintptr_t keyidx, validx, detidx;
+		uintptr_t keyidx, validx, detidx, baseidx;
 		char buf[1024];
 		intptr_t val;
 		uint_t len = sizeof (buf);
 		char *c = buf;
 
-		keyidx = V8_DESC_KEYIDX(ii);
-		validx = V8_DESC_VALIDX(ii);
-		detidx = V8_DESC_DETIDX(ii);
+		if (V8_PROP_IDX_CONTENT != -1) {
+			/*
+			 * In node versions prior to v0.8, this was hardcoded
+			 * in the V8 implementation, so we hardcode it here
+			 * as well.
+			 */
+			keyidx = ii + V8_PROP_IDX_FIRST;
+			validx = ii << 1;
+			detidx = (ii << 1) + 1;
+		} else {
+			baseidx = V8_PROP_IDX_FIRST + (ii * V8_PROP_DESC_SIZE);
+			keyidx = baseidx + V8_PROP_DESC_KEY;
+			validx = baseidx + V8_PROP_DESC_VALUE;
+			detidx = baseidx + V8_PROP_DESC_DETAILS;
+		}
 
 		if (detidx >= ncontent) {
 			v8_warn("property descriptor %d: detidx (%d) "
@@ -1273,14 +1658,14 @@ jsobj_properties(uintptr_t addr,
 			continue;
 		}
 
-		if (jsstr_print(descs[keyidx], B_FALSE, &c, &len) != 0)
+		if (jsstr_print(descs[keyidx], JSSTR_NUDE, &c, &len) != 0)
 			continue;
 
 		val = (intptr_t)content[validx];
 
 		if (!V8_IS_SMI(val)) {
-			v8_warn("property descriptor %d: value index value "
-			    "is not an SMI: %p\n", ii, val);
+			v8_warn("object %p: property descriptor %d: value "
+			    "index value is not an SMI: %p\n", addr, ii, val);
 			continue;
 		}
 
@@ -1319,7 +1704,7 @@ err:
 	if (descs != NULL)
 		mdb_free(descs, ndescs * sizeof (uintptr_t));
 
-	if (content != NULL)
+	if (content != NULL && V8_PROP_IDX_CONTENT != -1)
 		mdb_free(content, ncontent * sizeof (uintptr_t));
 
 	return (rval);
@@ -1337,7 +1722,13 @@ jsfunc_lineno(uintptr_t lendsp, uintptr_t tokpos, char *buf, size_t buflen)
 	uintptr_t *data;
 
 	if (jsobj_is_undefined(lendsp)) {
-		mdb_snprintf(buf, buflen, "position %d", tokpos);
+		/*
+		 * The token position is an SMI, but it comes in as its raw
+		 * value so we can more easily compare it to values in the line
+		 * endings table.  If we're just printing the position directly,
+		 * we must convert it here.
+		 */
+		mdb_snprintf(buf, buflen, "position %d", V8_SMI_VALUE(tokpos));
 		return (0);
 	}
 
@@ -1400,7 +1791,7 @@ jsfunc_name(uintptr_t funcinfop, char **bufp, size_t *lenp)
 
 	if (read_heap_ptr(&ptrp, funcinfop,
 	    V8_OFF_SHAREDFUNCTIONINFO_NAME) != 0 ||
-	    jsstr_print(ptrp, B_FALSE, bufp, lenp) != 0)
+	    jsstr_print(ptrp, JSSTR_NUDE, bufp, lenp) != 0)
 		return (-1);
 
 	if (*bufp != bufs)
@@ -1415,7 +1806,7 @@ jsfunc_name(uintptr_t funcinfop, char **bufp, size_t *lenp)
 	(void) bsnprintf(bufp, lenp, "<anonymous> (as ");
 	bufs = *bufp;
 
-	if (jsstr_print(ptrp, B_FALSE, bufp, lenp) != 0)
+	if (jsstr_print(ptrp, JSSTR_NUDE, bufp, lenp) != 0)
 		return (-1);
 
 	if (*bufp == bufs)
@@ -1435,7 +1826,10 @@ typedef struct jsobj_print {
 	int jsop_indent;
 	uint64_t jsop_depth;
 	boolean_t jsop_printaddr;
+	uintptr_t jsop_baseaddr;
 	int jsop_nprops;
+	const char *jsop_member;
+	boolean_t jsop_found;
 } jsobj_print_t;
 
 static int jsobj_print_number(uintptr_t, jsobj_print_t *);
@@ -1443,6 +1837,7 @@ static int jsobj_print_oddball(uintptr_t, jsobj_print_t *);
 static int jsobj_print_jsobject(uintptr_t, jsobj_print_t *);
 static int jsobj_print_jsarray(uintptr_t, jsobj_print_t *);
 static int jsobj_print_jsfunction(uintptr_t, jsobj_print_t *);
+static int jsobj_print_jsdate(uintptr_t, jsobj_print_t *);
 
 static int
 jsobj_print(uintptr_t addr, jsobj_print_t *jsop)
@@ -1461,10 +1856,14 @@ jsobj_print(uintptr_t addr, jsobj_print_t *jsop)
 		{ "JSObject", jsobj_print_jsobject },
 		{ "JSArray", jsobj_print_jsarray },
 		{ "JSFunction", jsobj_print_jsfunction },
+		{ "JSDate", jsobj_print_jsdate },
 		{ NULL }
 	}, *ent;
 
-	if (jsop->jsop_printaddr)
+	if (jsop->jsop_baseaddr != NULL && jsop->jsop_member == NULL)
+		(void) bsnprintf(bufp, lenp, "%p: ", jsop->jsop_baseaddr);
+
+	if (jsop->jsop_printaddr && jsop->jsop_member == NULL)
 		(void) bsnprintf(bufp, lenp, "%p: ", addr);
 
 	if (V8_IS_SMI(addr)) {
@@ -1480,8 +1879,12 @@ jsobj_print(uintptr_t addr, jsobj_print_t *jsop)
 	if (read_typebyte(&type, addr) != 0)
 		return (-1);
 
-	if (V8_TYPE_STRING(type))
-		return (jsstr_print(addr, B_FALSE, bufp, lenp));
+	if (V8_TYPE_STRING(type)) {
+		if (jsstr_print(addr, JSSTR_QUOTED, bufp, lenp) == -1)
+			return (-1);
+
+		return (0);
+	}
 
 	klass = enum_lookup_str(v8_types, type, "<unknown>");
 
@@ -1490,7 +1893,7 @@ jsobj_print(uintptr_t addr, jsobj_print_t *jsop)
 			return (ent->func(addr, jsop));
 	}
 
-	v8_warn("unknown JavaScript object type \"%s\"\n", klass);
+	v8_warn("%p: unknown JavaScript object type \"%s\"\n", addr, klass);
 	return (-1);
 }
 
@@ -1522,7 +1925,7 @@ jsobj_print_oddball(uintptr_t addr, jsobj_print_t *jsop)
 	if (read_heap_ptr(&strptr, addr, V8_OFF_ODDBALL_TO_STRING) != 0)
 		return (-1);
 
-	return (jsstr_print(strptr, B_FALSE, bufp, lenp));
+	return (jsstr_print(strptr, JSSTR_NUDE, bufp, lenp));
 }
 
 static int
@@ -1531,11 +1934,6 @@ jsobj_print_prop(const char *desc, uintptr_t val, void *arg)
 	jsobj_print_t *jsop = arg, descend;
 	char **bufp = jsop->jsop_bufp;
 	size_t *lenp = jsop->jsop_lenp;
-
-	if (desc == NULL) {
-		jsop->jsop_nprops = -1;
-		return (0);
-	}
 
 	(void) bsnprintf(bufp, lenp, "%s\n%*s%s: ", jsop->jsop_nprops == 0 ?
 	    "{" : "", jsop->jsop_indent + 4, "", desc);
@@ -1553,10 +1951,52 @@ jsobj_print_prop(const char *desc, uintptr_t val, void *arg)
 }
 
 static int
+jsobj_print_prop_member(const char *desc, uintptr_t val, void *arg)
+{
+	jsobj_print_t *jsop = arg, descend;
+	const char *member = jsop->jsop_member, *next = member;
+	int rv;
+
+	for (; *next != '\0' && *next != '.' && *next != '['; next++)
+		continue;
+
+	if (*member == '[') {
+		mdb_warn("cannot use array indexing on an object\n");
+		return (-1);
+	}
+
+	if (strncmp(member, desc, next - member) != 0)
+		return (0);
+
+	if (desc[next - member] != '\0')
+		return (0);
+
+	/*
+	 * This property matches the desired member; descend.
+	 */
+	descend = *jsop;
+
+	if (*next == '\0') {
+		descend.jsop_member = NULL;
+		descend.jsop_found = B_TRUE;
+	} else {
+		descend.jsop_member = *next == '.' ? next + 1 : next;
+	}
+
+	rv = jsobj_print(val, &descend);
+	jsop->jsop_found = descend.jsop_found;
+
+	return (rv);
+}
+
+static int
 jsobj_print_jsobject(uintptr_t addr, jsobj_print_t *jsop)
 {
 	char **bufp = jsop->jsop_bufp;
 	size_t *lenp = jsop->jsop_lenp;
+
+	if (jsop->jsop_member != NULL)
+		return (jsobj_properties(addr, jsobj_print_prop_member, jsop));
 
 	if (jsop->jsop_depth == 0) {
 		(void) bsnprintf(bufp, lenp, "[...]");
@@ -1582,6 +2022,82 @@ jsobj_print_jsobject(uintptr_t addr, jsobj_print_t *jsop)
 }
 
 static int
+jsobj_print_jsarray_member(uintptr_t addr, jsobj_print_t *jsop)
+{
+	uintptr_t *elts;
+	jsobj_print_t descend;
+	uintptr_t ptr;
+	const char *member = jsop->jsop_member, *end, *p;
+	size_t elt = 0, place = 1, len, rv;
+
+	if (read_heap_ptr(&ptr, addr, V8_OFF_JSOBJECT_ELEMENTS) != 0 ||
+	    read_heap_array(ptr, &elts, &len, UM_SLEEP | UM_GC) != 0)
+		return (-1);
+
+	if (*member != '[') {
+		mdb_warn("expected bracketed array index; "
+		    "found '%s'\n", member);
+		return (-1);
+	}
+
+	if ((end = strchr(member, ']')) == NULL) {
+		mdb_warn("missing array index terminator\n");
+		return (-1);
+	}
+
+	/*
+	 * We know where our array index ends; convert it to an integer
+	 * by stepping through it from least significant digit to most.
+	 */
+	for (p = end - 1; p > member; p--) {
+		if (*p < '0' || *p > '9') {
+			mdb_warn("illegal array index at '%c'\n", *p);
+			return (-1);
+		}
+
+		elt += (*p - '0') * place;
+		place *= 10;
+	}
+
+	if (place == 1) {
+		mdb_warn("missing array index\n");
+		return (-1);
+	}
+
+	if (elt >= len) {
+		mdb_warn("array index %d exceeds size of %d\n", elt, len);
+		return (-1);
+	}
+
+	descend = *jsop;
+
+	switch (*(++end)) {
+	case '\0':
+		descend.jsop_member = NULL;
+		descend.jsop_found = B_TRUE;
+		break;
+
+	case '.':
+		descend.jsop_member = end + 1;
+		break;
+
+	case '[':
+		descend.jsop_member = end;
+		break;
+
+	default:
+		mdb_warn("illegal character '%c' following "
+		    "array index terminator\n", *end);
+		return (-1);
+	}
+
+	rv = jsobj_print(elts[elt], &descend);
+	jsop->jsop_found = descend.jsop_found;
+
+	return (rv);
+}
+
+static int
 jsobj_print_jsarray(uintptr_t addr, jsobj_print_t *jsop)
 {
 	char **bufp = jsop->jsop_bufp;
@@ -1592,13 +2108,16 @@ jsobj_print_jsarray(uintptr_t addr, jsobj_print_t *jsop)
 	uintptr_t *elts;
 	size_t ii, len;
 
+	if (jsop->jsop_member != NULL)
+		return (jsobj_print_jsarray_member(addr, jsop));
+
 	if (jsop->jsop_depth == 0) {
 		(void) bsnprintf(bufp, lenp, "[...]");
 		return (0);
 	}
 
 	if (read_heap_ptr(&ptr, addr, V8_OFF_JSOBJECT_ELEMENTS) != 0 ||
-	    read_heap_array(ptr, &elts, &len, UM_GC) != 0)
+	    read_heap_array(ptr, &elts, &len, UM_SLEEP | UM_GC) != 0)
 		return (-1);
 
 	if (len == 0) {
@@ -1643,6 +2162,40 @@ jsobj_print_jsfunction(uintptr_t addr, jsobj_print_t *jsop)
 
 	(void) bsnprintf(bufp, lenp, "function ");
 	return (jsfunc_name(shared, bufp, lenp) != 0);
+}
+
+static int
+jsobj_print_jsdate(uintptr_t addr, jsobj_print_t *jsop)
+{
+	char **bufp = jsop->jsop_bufp;
+	size_t *lenp = jsop->jsop_lenp;
+	char buf[128];
+	uintptr_t value;
+	uint8_t type;
+	double numval;
+
+	if (V8_OFF_JSDATE_VALUE == -1) {
+		(void) bsnprintf(bufp, lenp, "<JSDate>", buf);
+		return (0);
+	}
+
+	if (read_heap_ptr(&value, addr, V8_OFF_JSDATE_VALUE) != 0)
+		return (-1);
+
+	if (read_typebyte(&type, value) != 0)
+		return (-1);
+
+	if (strcmp(enum_lookup_str(v8_types, type, ""), "HeapNumber") != 0)
+		return (-1);
+
+	if (read_heap_double(&numval, value, V8_OFF_HEAPNUMBER_VALUE) == -1)
+		return (-1);
+
+	mdb_snprintf(buf, sizeof (buf), "%Y",
+	    (time_t)((long long)numval / MILLISEC));
+	(void) bsnprintf(bufp, lenp, "%lld (%s)", (long long)numval, buf);
+
+	return (0);
 }
 
 /*
@@ -1759,7 +2312,7 @@ dcmd_v8function(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	len = sizeof (buf);
 	mdb_printf("defined at ");
 
-	if (jsstr_print(namep, B_FALSE, &bufp, &len) == 0)
+	if (jsstr_print(namep, JSSTR_NUDE, &bufp, &len) == 0)
 		mdb_printf("%s ", buf);
 
 	if (jsfunc_lineno(lendsp, tokpos, buf, sizeof (buf)) == 0)
@@ -1887,10 +2440,24 @@ load_current_context(uintptr_t *fpp, uintptr_t *raddrp)
 }
 
 static int
-do_jsframe_special(uintptr_t fptr, uintptr_t raddr)
+do_jsframe_special(uintptr_t fptr, uintptr_t raddr, char *prop)
 {
 	uintptr_t ftype;
 	const char *ftypename;
+
+	/*
+	 * First see if this looks like a native frame rather than a JavaScript
+	 * frame.  We check this by asking MDB to print the return address
+	 * symbolically.  If that works, we assume this was NOT a V8 frame,
+	 * since those are never in the symbol table.
+	 */
+	if (mdb_snprintf(NULL, 0, "%A", raddr) > 1) {
+		if (prop != NULL)
+			return (0);
+
+		mdb_printf("%p %a\n", fptr, raddr);
+		return (0);
+	}
 
 	/*
 	 * Figure out what kind of frame this is using the same algorithm as
@@ -1900,6 +2467,9 @@ do_jsframe_special(uintptr_t fptr, uintptr_t raddr)
 	    V8_IS_SMI(ftype) &&
 	    (ftypename = enum_lookup_str(v8_frametypes, V8_SMI_VALUE(ftype),
 	    NULL)) != NULL && strstr(ftypename, "ArgumentsAdaptor") != NULL) {
+		if (prop != NULL)
+			return (0);
+
 		mdb_printf("%p %a <%s>\n", fptr, raddr, ftypename);
 		return (0);
 	}
@@ -1909,6 +2479,9 @@ do_jsframe_special(uintptr_t fptr, uintptr_t raddr)
 	 */
 	if (mdb_vread(&ftype, sizeof (ftype), fptr + V8_OFF_FP_MARKER) != -1 &&
 	    V8_IS_SMI(ftype)) {
+		if (prop != NULL)
+			return (0);
+
 		ftypename = enum_lookup_str(v8_frametypes, V8_SMI_VALUE(ftype),
 		    NULL);
 
@@ -1924,7 +2497,8 @@ do_jsframe_special(uintptr_t fptr, uintptr_t raddr)
 }
 
 static int
-do_jsframe(uintptr_t fptr, uintptr_t raddr, boolean_t verbose)
+do_jsframe(uintptr_t fptr, uintptr_t raddr, boolean_t verbose,
+    char *func, char *prop)
 {
 	uintptr_t funcp, funcinfop, tokpos, scriptp, lendsp, ptrp;
 	uintptr_t ii, nargs;
@@ -1937,7 +2511,7 @@ do_jsframe(uintptr_t fptr, uintptr_t raddr, boolean_t verbose)
 	/*
 	 * Check for non-JavaScript frames first.
 	 */
-	if (do_jsframe_special(fptr, raddr) == 0)
+	if (func == NULL && do_jsframe_special(fptr, raddr, prop) == 0)
 		return (DCMD_OK);
 
 	/*
@@ -1960,6 +2534,10 @@ do_jsframe(uintptr_t fptr, uintptr_t raddr, boolean_t verbose)
 	if (read_typebyte(&type, funcp) != 0 ||
 	    (typename = enum_lookup_str(v8_types, type, NULL)) == NULL) {
 		v8_silent--;
+
+		if (func != NULL || prop != NULL)
+			return (DCMD_OK);
+
 		mdb_printf("%p %a\n", fptr, raddr);
 		return (DCMD_OK);
 	}
@@ -1967,11 +2545,17 @@ do_jsframe(uintptr_t fptr, uintptr_t raddr, boolean_t verbose)
 	v8_silent--;
 
 	if (strcmp("Code", typename) == 0) {
+		if (func != NULL || prop != NULL)
+			return (DCMD_OK);
+
 		mdb_printf("%p %a internal (Code: %p)\n", fptr, raddr, funcp);
 		return (DCMD_OK);
 	}
 
 	if (strcmp("JSFunction", typename) != 0) {
+		if (func != NULL || prop != NULL)
+			return (DCMD_OK);
+
 		mdb_printf("%p %a unknown (%s: %p)", fptr, raddr, typename,
 		    funcp);
 		return (DCMD_OK);
@@ -1985,9 +2569,13 @@ do_jsframe(uintptr_t fptr, uintptr_t raddr, boolean_t verbose)
 	if (jsfunc_name(funcinfop, &bufp, &len) != 0)
 		return (DCMD_ERR);
 
-	mdb_printf("%p %a %s (%p)\n", fptr, raddr, buf, funcp);
+	if (func != NULL && strcmp(buf, func) != 0)
+		return (DCMD_OK);
 
-	if (!verbose)
+	if (prop == NULL)
+		mdb_printf("%p %a %s (%p)\n", fptr, raddr, buf, funcp);
+
+	if (!verbose && prop == NULL)
 		return (DCMD_OK);
 
 	/*
@@ -2007,27 +2595,51 @@ do_jsframe(uintptr_t fptr, uintptr_t raddr, boolean_t verbose)
 
 	bufp = buf;
 	len = sizeof (buf);
-	(void) jsstr_print(ptrp, B_FALSE, &bufp, &len);
+	(void) jsstr_print(ptrp, JSSTR_NUDE, &bufp, &len);
 
-	(void) mdb_inc_indent(4);
-	mdb_printf("file: %s\n", buf);
+	if (prop != NULL && strcmp(prop, "file") == 0) {
+		mdb_printf("%s\n", buf);
+		return (DCMD_OK);
+	}
+
+	if (prop == NULL) {
+		(void) mdb_inc_indent(4);
+		mdb_printf("file: %s\n", buf);
+	}
 
 	if (read_heap_ptr(&lendsp, scriptp, V8_OFF_SCRIPT_LINE_ENDS) != 0)
 		return (DCMD_ERR);
 
 	(void) jsfunc_lineno(lendsp, tokpos, buf, sizeof (buf));
 
-	mdb_printf("posn: %s\n", buf);
+	if (prop != NULL && strcmp(prop, "posn") == 0) {
+		mdb_printf("%s\n", buf);
+		return (DCMD_OK);
+	}
+
+	if (prop == NULL)
+		mdb_printf("posn: %s\n", buf);
 
 	if (read_heap_smi(&nargs, funcinfop,
 	    V8_OFF_SHAREDFUNCTIONINFO_LENGTH) == 0) {
 		for (ii = 0; ii < nargs; ii++) {
 			uintptr_t argptr;
+			char arg[10];
 
 			if (mdb_vread(&argptr, sizeof (argptr),
 			    fptr + V8_OFF_FP_ARGS + (nargs - ii - 1) *
 			    sizeof (uintptr_t)) == -1)
 				continue;
+
+			(void) snprintf(arg, sizeof (arg), "arg%d", ii + 1);
+
+			if (prop != NULL) {
+				if (strcmp(arg, prop) != 0)
+					continue;
+
+				mdb_printf("%p\n", argptr);
+				return (DCMD_OK);
+			}
 
 			bufp = buf;
 			len = sizeof (buf);
@@ -2035,6 +2647,11 @@ do_jsframe(uintptr_t fptr, uintptr_t raddr, boolean_t verbose)
 
 			mdb_printf("arg%d: %p (%s)\n", (ii + 1), argptr, buf);
 		}
+	}
+
+	if (prop != NULL) {
+		mdb_warn("unknown frame property '%s'\n", prop);
+		return (DCMD_ERR);
 	}
 
 	(void) mdb_dec_indent(4);
@@ -2055,29 +2672,53 @@ typedef struct findjsobjects_instance {
 typedef struct findjsobjects_obj {
 	findjsobjects_prop_t *fjso_props;
 	findjsobjects_prop_t *fjso_last;
-	int fjso_nprops;
+	size_t fjso_nprops;
 	findjsobjects_instance_t fjso_instances;
 	int fjso_ninstances;
 	avl_node_t fjso_node;
 	struct findjsobjects_obj *fjso_next;
+	boolean_t fjso_malformed;
+	char fjso_constructor[80];
 } findjsobjects_obj_t;
 
 typedef struct findjsobjects_stats {
 	int fjss_heapobjs;
+	int fjss_cached;
+	int fjss_typereads;
 	int fjss_jsobjs;
 	int fjss_objects;
+	int fjss_arrays;
 	int fjss_uniques;
 } findjsobjects_stats_t;
+
+typedef struct findjsobjects_reference {
+	uintptr_t fjsrf_addr;
+	char *fjsrf_desc;
+	size_t fjsrf_index;
+	struct findjsobjects_reference *fjsrf_next;
+} findjsobjects_reference_t;
+
+typedef struct findjsobjects_referent {
+	avl_node_t fjsr_node;
+	uintptr_t fjsr_addr;
+	findjsobjects_reference_t *fjsr_head;
+	findjsobjects_reference_t *fjsr_tail;
+	struct findjsobjects_referent *fjsr_next;
+} findjsobjects_referent_t;
 
 typedef struct findjsobjects_state {
 	uintptr_t fjs_addr;
 	uintptr_t fjs_size;
 	boolean_t fjs_verbose;
 	boolean_t fjs_brk;
+	boolean_t fjs_allobjs;
 	boolean_t fjs_initialized;
-	uintptr_t fjs_referent;
+	boolean_t fjs_marking;
 	boolean_t fjs_referred;
 	avl_tree_t fjs_tree;
+	avl_tree_t fjs_referents;
+	findjsobjects_referent_t *fjs_head;
+	findjsobjects_referent_t *fjs_tail;
 	findjsobjects_obj_t *fjs_current;
 	findjsobjects_obj_t *fjs_objects;
 	findjsobjects_stats_t fjs_stats;
@@ -2118,16 +2759,42 @@ findjsobjects_cmp(findjsobjects_obj_t *lhs, findjsobjects_obj_t *rhs)
 	lprop = lhs->fjso_props;
 	rprop = rhs->fjso_props;
 
-	for (;;) {
-		if (lprop == NULL || rprop == NULL)
-			return (lprop != NULL ? 1 : rprop != NULL ? -1 : 0);
-
+	while (lprop != NULL && rprop != NULL) {
 		if ((rv = strcmp(lprop->fjsp_desc, rprop->fjsp_desc)) != 0)
 			return (rv > 0 ? 1 : -1);
 
 		lprop = lprop->fjsp_next;
 		rprop = rprop->fjsp_next;
 	}
+
+	if (lprop != NULL)
+		return (1);
+
+	if (rprop != NULL)
+		return (-1);
+
+	if (lhs->fjso_nprops > rhs->fjso_nprops)
+		return (1);
+
+	if (lhs->fjso_nprops < rhs->fjso_nprops)
+		return (-1);
+
+	rv = strcmp(lhs->fjso_constructor, rhs->fjso_constructor);
+
+	return (rv < 0 ? -1 : rv > 0 ? 1 : 0);
+}
+
+int
+findjsobjects_cmp_referents(findjsobjects_referent_t *lhs,
+    findjsobjects_referent_t *rhs)
+{
+	if (lhs->fjsr_addr < rhs->fjsr_addr)
+		return (-1);
+
+	if (lhs->fjsr_addr > rhs->fjsr_addr)
+		return (1);
+
+	return (0);
 }
 
 int
@@ -2135,6 +2802,14 @@ findjsobjects_cmp_ninstances(const void *l, const void *r)
 {
 	findjsobjects_obj_t *lhs = *((findjsobjects_obj_t **)l);
 	findjsobjects_obj_t *rhs = *((findjsobjects_obj_t **)r);
+	size_t lprod = lhs->fjso_ninstances * lhs->fjso_nprops;
+	size_t rprod = rhs->fjso_ninstances * rhs->fjso_nprops;
+
+	if (lprod < rprod)
+		return (-1);
+
+	if (lprod > rprod)
+		return (1);
 
 	if (lhs->fjso_ninstances < rhs->fjso_ninstances)
 		return (-1);
@@ -2175,155 +2850,17 @@ findjsobjects_prop(const char *desc, uintptr_t val, void *arg)
 
 	current->fjso_last = prop;
 	current->fjso_nprops++;
-
-	return (0);
-}
-
-int
-findjsobjects_range(findjsobjects_state_t *fjs, uintptr_t addr, uintptr_t size)
-{
-	uintptr_t limit;
-	findjsobjects_stats_t *stats = &fjs->fjs_stats;
-	uint8_t type;
-	int jsobject = -1, fixedarray = -1;
-	v8_enum_t *ep;
-
-	for (ep = v8_types; ep->v8e_name[0] != '\0'; ep++) {
-		if (strcmp(ep->v8e_name, "JSObject") == 0)
-			jsobject = ep->v8e_value;
-
-		if (strcmp(ep->v8e_name, "FixedArray") == 0)
-			fixedarray = ep->v8e_value;
-	}
-
-	if (jsobject == -1 || fixedarray == -1) {
-		v8_warn("couldn't find %s type\n",
-		    jsobject == -1 ? "JSObject" : "FixedArray");
-		return (-1);
-	}
-
-	for (limit = addr + size; addr < limit; addr++) {
-		findjsobjects_instance_t *inst;
-		findjsobjects_obj_t *obj;
-		avl_index_t where;
-
-		if (V8_IS_SMI(addr))
-			continue;
-
-		if (!V8_IS_HEAPOBJECT(addr))
-			continue;
-
-		stats->fjss_heapobjs++;
-
-		if (read_typebyte(&type, addr) == -1)
-			continue;
-
-		if (type != jsobject)
-			continue;
-
-		stats->fjss_jsobjs++;
-
-		fjs->fjs_current = findjsobjects_alloc(addr);
-
-		if (jsobj_properties(addr, findjsobjects_prop, fjs) != 0) {
-			findjsobjects_free(fjs->fjs_current);
-			fjs->fjs_current = NULL;
-			continue;
-		}
-
-		/*
-		 * Now determine if we already have an object matching our
-		 * properties.  If we don't, we'll add our new object; if we
-		 * do we'll merely enqeuue our instance.
-		 */
-		obj = avl_find(&fjs->fjs_tree, fjs->fjs_current, &where);
-		stats->fjss_objects++;
-
-		if (obj == NULL) {
-			avl_add(&fjs->fjs_tree, fjs->fjs_current);
-			fjs->fjs_current->fjso_next = fjs->fjs_objects;
-			fjs->fjs_objects = fjs->fjs_current;
-			fjs->fjs_current = NULL;
-			stats->fjss_uniques++;
-			continue;
-		}
-
-		findjsobjects_free(fjs->fjs_current);
-		fjs->fjs_current = NULL;
-
-		inst = mdb_alloc(sizeof (findjsobjects_instance_t), UM_SLEEP);
-		inst->fjsi_addr = addr;
-		inst->fjsi_next = obj->fjso_instances.fjsi_next;
-		obj->fjso_instances.fjsi_next = inst;
-		obj->fjso_ninstances++;
-	}
-
-	return (0);
-}
-
-static int
-findjsobjects_mapping(findjsobjects_state_t *fjs, const prmap_t *pmp,
-    const char *name)
-{
-	if (name != NULL && !(fjs->fjs_brk && (pmp->pr_mflags & MA_BREAK)))
-		return (0);
-
-	if (fjs->fjs_addr != NULL && (fjs->fjs_addr < pmp->pr_vaddr ||
-	    fjs->fjs_addr >= pmp->pr_vaddr + pmp->pr_size))
-		return (0);
-
-	return (findjsobjects_range(fjs, pmp->pr_vaddr, pmp->pr_size));
-}
-
-static int
-findjsobjects_references_prop(const char *desc, uintptr_t val, void *arg)
-{
-	findjsobjects_state_t *fjs = arg;
-
-	if (val == fjs->fjs_referent) {
-		mdb_printf("%p referred to by %p.%s\n", fjs->fjs_referent,
-		    fjs->fjs_addr, desc);
-		fjs->fjs_referred = B_TRUE;
-		return (0);
-	}
+	current->fjso_malformed =
+	    val == NULL && current->fjso_nprops == 1 && desc[0] == '<';
 
 	return (0);
 }
 
 static void
-findjsobjects_references(findjsobjects_state_t *fjs, uintptr_t addr)
-{
-	findjsobjects_instance_t *inst;
-	findjsobjects_obj_t *obj;
-
-	fjs->fjs_referent = addr;
-	fjs->fjs_referred = B_FALSE;
-
-	v8_silent++;
-
-	for (obj = fjs->fjs_objects; obj != NULL; obj = obj->fjso_next) {
-		for (inst = &obj->fjso_instances;
-		    inst != NULL; inst = inst->fjsi_next) {
-			fjs->fjs_addr = inst->fjsi_addr;
-			(void) jsobj_properties(inst->fjsi_addr,
-			    findjsobjects_references_prop, fjs);
-		}
-	}
-
-	v8_silent--;
-
-	if (!fjs->fjs_referred)
-		mdb_printf("%p is not referred to by a known object.\n", addr);
-
-	fjs->fjs_addr = NULL;
-}
-
-static char *
 findjsobjects_constructor(findjsobjects_obj_t *obj)
 {
-	static char buf[80];
-	char *bufp = buf, *rval = NULL;
-	unsigned int len = sizeof (buf);
+	char *bufp = obj->fjso_constructor;
+	unsigned int len = sizeof (obj->fjso_constructor);
 	uintptr_t map, funcinfop;
 	uintptr_t addr = obj->fjso_instances.fjsi_addr;
 	uint8_t type;
@@ -2345,28 +2882,420 @@ findjsobjects_constructor(findjsobjects_obj_t *obj)
 
 	if (jsfunc_name(funcinfop, &bufp, &len) != 0)
 		goto out;
-
-	rval = buf;
 out:
 	v8_silent--;
+}
 
-	return (rval);
+int
+findjsobjects_range(findjsobjects_state_t *fjs, uintptr_t addr, uintptr_t size)
+{
+	uintptr_t limit;
+	findjsobjects_stats_t *stats = &fjs->fjs_stats;
+	uint8_t type;
+	int jsobject = V8_TYPE_JSOBJECT, jsarray = V8_TYPE_JSARRAY;
+	caddr_t range = mdb_alloc(size, UM_SLEEP);
+	uintptr_t base = addr, mapaddr;
+
+	if (mdb_vread(range, size, addr) == -1)
+		return (0);
+
+	for (limit = addr + size; addr < limit; addr++) {
+		findjsobjects_instance_t *inst;
+		findjsobjects_obj_t *obj;
+		avl_index_t where;
+
+		if (V8_IS_SMI(addr))
+			continue;
+
+		if (!V8_IS_HEAPOBJECT(addr))
+			continue;
+
+		stats->fjss_heapobjs++;
+
+		mapaddr = *((uintptr_t *)((uintptr_t)range +
+		    (addr - base) + V8_OFF_HEAPOBJECT_MAP));
+
+		if (!V8_IS_HEAPOBJECT(mapaddr))
+			continue;
+
+		mapaddr += V8_OFF_MAP_INSTANCE_ATTRIBUTES;
+		stats->fjss_typereads++;
+
+		if (mapaddr >= base && mapaddr < base + size) {
+			stats->fjss_cached++;
+
+			type = *((uint8_t *)((uintptr_t)range +
+			    (mapaddr - base)));
+		} else {
+			if (mdb_vread(&type, sizeof (uint8_t), mapaddr) == -1)
+				continue;
+		}
+
+		if (type != jsobject && type != jsarray)
+			continue;
+
+		stats->fjss_jsobjs++;
+
+		fjs->fjs_current = findjsobjects_alloc(addr);
+
+		if (type == jsobject) {
+			if (jsobj_properties(addr,
+			    findjsobjects_prop, fjs) != 0) {
+				findjsobjects_free(fjs->fjs_current);
+				fjs->fjs_current = NULL;
+				continue;
+			}
+
+			findjsobjects_constructor(fjs->fjs_current);
+			stats->fjss_objects++;
+		} else {
+			uintptr_t ptr;
+			size_t *nprops = &fjs->fjs_current->fjso_nprops;
+			ssize_t len = V8_OFF_JSARRAY_LENGTH;
+			ssize_t elems = V8_OFF_JSOBJECT_ELEMENTS;
+			ssize_t flen = V8_OFF_FIXEDARRAY_LENGTH;
+			uintptr_t nelems;
+			uint8_t t;
+
+			if (read_heap_smi(nprops, addr, len) != 0 ||
+			    read_heap_ptr(&ptr, addr, elems) != 0 ||
+			    !V8_IS_HEAPOBJECT(ptr) ||
+			    read_typebyte(&t, ptr) != 0 ||
+			    t != V8_TYPE_FIXEDARRAY ||
+			    read_heap_smi(&nelems, ptr, flen) != 0 ||
+			    nelems < *nprops) {
+				findjsobjects_free(fjs->fjs_current);
+				fjs->fjs_current = NULL;
+				continue;
+			}
+
+			strcpy(fjs->fjs_current->fjso_constructor, "Array");
+			stats->fjss_arrays++;
+		}
+
+		/*
+		 * Now determine if we already have an object matching our
+		 * properties.  If we don't, we'll add our new object; if we
+		 * do we'll merely enqueue our instance.
+		 */
+		obj = avl_find(&fjs->fjs_tree, fjs->fjs_current, &where);
+
+		if (obj == NULL) {
+			avl_add(&fjs->fjs_tree, fjs->fjs_current);
+			fjs->fjs_current->fjso_next = fjs->fjs_objects;
+			fjs->fjs_objects = fjs->fjs_current;
+			fjs->fjs_current = NULL;
+			stats->fjss_uniques++;
+			continue;
+		}
+
+		findjsobjects_free(fjs->fjs_current);
+		fjs->fjs_current = NULL;
+
+		inst = mdb_alloc(sizeof (findjsobjects_instance_t), UM_SLEEP);
+		inst->fjsi_addr = addr;
+		inst->fjsi_next = obj->fjso_instances.fjsi_next;
+		obj->fjso_instances.fjsi_next = inst;
+		obj->fjso_ninstances++;
+	}
+
+	mdb_free(range, size);
+
+	return (0);
+}
+
+static int
+findjsobjects_mapping(findjsobjects_state_t *fjs, const prmap_t *pmp,
+    const char *name)
+{
+	if (name != NULL && !(fjs->fjs_brk && (pmp->pr_mflags & MA_BREAK)))
+		return (0);
+
+	if (fjs->fjs_addr != NULL && (fjs->fjs_addr < pmp->pr_vaddr ||
+	    fjs->fjs_addr >= pmp->pr_vaddr + pmp->pr_size))
+		return (0);
+
+	return (findjsobjects_range(fjs, pmp->pr_vaddr, pmp->pr_size));
+}
+
+static void
+findjsobjects_references_add(findjsobjects_state_t *fjs, uintptr_t val,
+    const char *desc, size_t index)
+{
+	findjsobjects_referent_t search, *referent;
+	findjsobjects_reference_t *reference;
+
+	search.fjsr_addr = val;
+
+	if ((referent = avl_find(&fjs->fjs_referents, &search, NULL)) == NULL)
+		return;
+
+	reference = mdb_zalloc(sizeof (*reference), UM_SLEEP | UM_GC);
+	reference->fjsrf_addr = fjs->fjs_addr;
+
+	if (desc != NULL) {
+		reference->fjsrf_desc =
+		    mdb_alloc(strlen(desc) + 1, UM_SLEEP | UM_GC);
+		(void) strcpy(reference->fjsrf_desc, desc);
+	} else {
+		reference->fjsrf_index = index;
+	}
+
+	if (referent->fjsr_head == NULL) {
+		referent->fjsr_head = reference;
+	} else {
+		referent->fjsr_tail->fjsrf_next = reference;
+	}
+
+	referent->fjsr_tail = reference;
+}
+
+static int
+findjsobjects_references_prop(const char *desc, uintptr_t val, void *arg)
+{
+	findjsobjects_references_add(arg, val, desc, -1);
+
+	return (0);
+}
+
+static void
+findjsobjects_references_array(findjsobjects_state_t *fjs,
+    findjsobjects_obj_t *obj)
+{
+	findjsobjects_instance_t *inst = &obj->fjso_instances;
+	uintptr_t *elts;
+	size_t i, len;
+
+	for (; inst != NULL; inst = inst->fjsi_next) {
+		uintptr_t addr = inst->fjsi_addr, ptr;
+
+		if (read_heap_ptr(&ptr, addr, V8_OFF_JSOBJECT_ELEMENTS) != 0 ||
+		    read_heap_array(ptr, &elts, &len, UM_SLEEP) != 0)
+			continue;
+
+		fjs->fjs_addr = addr;
+
+		for (i = 0; i < len; i++)
+			findjsobjects_references_add(fjs, elts[i], NULL, i);
+
+		mdb_free(elts, len * sizeof (uintptr_t));
+	}
+}
+
+static void
+findjsobjects_referent(findjsobjects_state_t *fjs, uintptr_t addr)
+{
+	findjsobjects_referent_t search, *referent;
+
+	search.fjsr_addr = addr;
+
+	if (avl_find(&fjs->fjs_referents, &search, NULL) != NULL) {
+		assert(fjs->fjs_marking);
+		mdb_warn("%p is already marked; ignoring\n", addr);
+		return;
+	}
+
+	referent = mdb_zalloc(sizeof (findjsobjects_referent_t), UM_SLEEP);
+	referent->fjsr_addr = addr;
+
+	avl_add(&fjs->fjs_referents, referent);
+
+	if (fjs->fjs_tail != NULL) {
+		fjs->fjs_tail->fjsr_next = referent;
+	} else {
+		fjs->fjs_head = referent;
+	}
+
+	fjs->fjs_tail = referent;
+
+	if (fjs->fjs_marking)
+		mdb_printf("findjsobjects: marked %p\n", addr);
+}
+
+static void
+findjsobjects_references(findjsobjects_state_t *fjs)
+{
+	findjsobjects_reference_t *reference;
+	findjsobjects_referent_t *referent;
+	avl_tree_t *referents = &fjs->fjs_referents;
+	findjsobjects_obj_t *obj;
+	void *cookie = NULL;
+	uintptr_t addr;
+
+	fjs->fjs_referred = B_FALSE;
+
+	v8_silent++;
+
+	/*
+	 * First traverse over all objects and arrays, looking for references
+	 * to our designated referent(s).
+	 */
+	for (obj = fjs->fjs_objects; obj != NULL; obj = obj->fjso_next) {
+		findjsobjects_instance_t *head = &obj->fjso_instances, *inst;
+
+		if (obj->fjso_nprops != 0 && obj->fjso_props == NULL) {
+			findjsobjects_references_array(fjs, obj);
+			continue;
+		}
+
+		for (inst = head; inst != NULL; inst = inst->fjsi_next) {
+			fjs->fjs_addr = inst->fjsi_addr;
+
+			(void) jsobj_properties(inst->fjsi_addr,
+			    findjsobjects_references_prop, fjs);
+		}
+	}
+
+	v8_silent--;
+	fjs->fjs_addr = NULL;
+
+	/*
+	 * Now go over our referent(s), reporting any references that we have
+	 * accumulated.
+	 */
+	for (referent = fjs->fjs_head; referent != NULL;
+	    referent = referent->fjsr_next) {
+		addr = referent->fjsr_addr;
+
+		if ((reference = referent->fjsr_head) == NULL) {
+			mdb_printf("%p is not referred to by a "
+			    "known object.\n", addr);
+			continue;
+		}
+
+		for (; reference != NULL; reference = reference->fjsrf_next) {
+			mdb_printf("%p referred to by %p",
+			    addr, reference->fjsrf_addr);
+
+			if (reference->fjsrf_desc == NULL) {
+				mdb_printf("[%d]\n", reference->fjsrf_index);
+			} else {
+				mdb_printf(".%s\n", reference->fjsrf_desc);
+			}
+		}
+	}
+
+	/*
+	 * Finally, destroy our referent nodes.
+	 */
+	while ((referent = avl_destroy_nodes(referents, &cookie)) != NULL)
+		mdb_free(referent, sizeof (findjsobjects_referent_t));
+
+	fjs->fjs_head = NULL;
+	fjs->fjs_tail = NULL;
+}
+
+static findjsobjects_instance_t *
+findjsobjects_instance(findjsobjects_state_t *fjs, uintptr_t addr,
+    findjsobjects_instance_t **headp)
+{
+	findjsobjects_obj_t *obj;
+
+	for (obj = fjs->fjs_objects; obj != NULL; obj = obj->fjso_next) {
+		findjsobjects_instance_t *head = &obj->fjso_instances, *inst;
+
+		for (inst = head; inst != NULL; inst = inst->fjsi_next) {
+			if (inst->fjsi_addr == addr) {
+				*headp = head;
+				return (inst);
+			}
+		}
+	}
+
+	return (NULL);
+}
+
+/*ARGSUSED*/
+static void
+findjsobjects_match_all(findjsobjects_obj_t *obj, const char *ignored)
+{
+	mdb_printf("%p\n", obj->fjso_instances.fjsi_addr);
+}
+
+static void
+findjsobjects_match_propname(findjsobjects_obj_t *obj, const char *propname)
+{
+	findjsobjects_prop_t *prop;
+
+	for (prop = obj->fjso_props; prop != NULL; prop = prop->fjsp_next) {
+		if (strcmp(prop->fjsp_desc, propname) == 0) {
+			mdb_printf("%p\n", obj->fjso_instances.fjsi_addr);
+			return;
+		}
+	}
+}
+
+static void
+findjsobjects_match_constructor(findjsobjects_obj_t *obj,
+    const char *constructor)
+{
+	if (strcmp(constructor, obj->fjso_constructor) == 0)
+		mdb_printf("%p\n", obj->fjso_instances.fjsi_addr);
+}
+
+static int
+findjsobjects_match(findjsobjects_state_t *fjs, uintptr_t addr,
+    uint_t flags, void (*func)(findjsobjects_obj_t *, const char *),
+    const char *match)
+{
+	findjsobjects_obj_t *obj;
+
+	if (!(flags & DCMD_ADDRSPEC)) {
+		for (obj = fjs->fjs_objects; obj != NULL;
+		    obj = obj->fjso_next) {
+			if (obj->fjso_malformed && !fjs->fjs_allobjs)
+				continue;
+
+			func(obj, match);
+		}
+
+		return (DCMD_OK);
+	}
+
+	/*
+	 * First, look for the specified address among the representative
+	 * objects.
+	 */
+	for (obj = fjs->fjs_objects; obj != NULL; obj = obj->fjso_next) {
+		if (obj->fjso_instances.fjsi_addr == addr) {
+			func(obj, match);
+			return (DCMD_OK);
+		}
+	}
+
+	/*
+	 * We didn't find it among the representative objects; iterate over
+	 * all objects.
+	 */
+	for (obj = fjs->fjs_objects; obj != NULL; obj = obj->fjso_next) {
+		findjsobjects_instance_t *head = &obj->fjso_instances, *inst;
+
+		for (inst = head; inst != NULL; inst = inst->fjsi_next) {
+			if (inst->fjsi_addr == addr) {
+				func(obj, match);
+				return (DCMD_OK);
+			}
+		}
+	}
+
+	mdb_warn("%p does not correspond to a known object\n", addr);
+	return (DCMD_ERR);
 }
 
 static void
 findjsobjects_print(findjsobjects_obj_t *obj)
 {
-	int col = 17 + (sizeof (uintptr_t) * 2) + strlen("..."), len;
+	int col = 19 + (sizeof (uintptr_t) * 2) + strlen("..."), len;
 	uintptr_t addr = obj->fjso_instances.fjsi_addr;
-	char *buf = findjsobjects_constructor(obj);
 	findjsobjects_prop_t *prop;
 
-	mdb_printf("%?p %8d %6d ",
+	mdb_printf("%?p %8d %8d ",
 	    addr, obj->fjso_ninstances, obj->fjso_nprops);
 
-	if (buf != NULL) {
-		mdb_printf("%s: ", buf);
-		col += strlen(buf) + 2;
+	if (obj->fjso_constructor[0] != '\0') {
+		mdb_printf("%s%s", obj->fjso_constructor,
+		    obj->fjso_props != NULL ? ": " : "");
+		col += strlen(obj->fjso_constructor) + 2;
 	}
 
 	for (prop = obj->fjso_props; prop != NULL; prop = prop->fjsp_next) {
@@ -2394,7 +3323,7 @@ dcmd_findjsobjects_help(void)
 "followed by the constructor and first few properties of the objects.  Once\n"
 "run, subsequent calls to ::findjsobjects use cached data.  If provided an\n"
 "address (and in the absence of -r, described below), ::findjsobjects treats\n"
-"the address as that of a representative object, and emits all instances of\n"
+"the address as that of a representative object, and lists all instances of\n"
 "that object (that is, all objects that have a matching property signature).");
 
 	mdb_dec_indent(2);
@@ -2405,7 +3334,9 @@ dcmd_findjsobjects_help(void)
 "  -b       Include the heap denoted by the brk(2) (normally excluded)\n"
 "  -c cons  Display representative objects with the specified constructor\n"
 "  -p prop  Display representative objects that have the specified property\n"
-"  -r       Find references to the specified object\n"
+"  -l       List all objects that match the representative object\n"
+"  -m       Mark specified object for later reference determination via -r\n"
+"  -r       Find references to the specified and/or marked object(s)\n"
 "  -v       Provide verbose statistics\n");
 }
 
@@ -2416,18 +3347,22 @@ dcmd_findjsobjects(uintptr_t addr,
 	static findjsobjects_state_t fjs;
 	static findjsobjects_stats_t *stats = &fjs.fjs_stats;
 	findjsobjects_obj_t *obj;
-	findjsobjects_prop_t *prop;
 	struct ps_prochandle *Pr;
-	boolean_t references = B_FALSE;
+	boolean_t references = B_FALSE, listlike = B_FALSE;
 	const char *propname = NULL;
 	const char *constructor = NULL;
 
 	fjs.fjs_verbose = B_FALSE;
 	fjs.fjs_brk = B_FALSE;
+	fjs.fjs_marking = B_FALSE;
+	fjs.fjs_allobjs = B_FALSE;
 
 	if (mdb_getopts(argc, argv,
+	    'a', MDB_OPT_SETBITS, B_TRUE, &fjs.fjs_allobjs,
 	    'b', MDB_OPT_SETBITS, B_TRUE, &fjs.fjs_brk,
 	    'c', MDB_OPT_STR, &constructor,
+	    'l', MDB_OPT_SETBITS, B_TRUE, &listlike,
+	    'm', MDB_OPT_SETBITS, B_TRUE, &fjs.fjs_marking,
 	    'p', MDB_OPT_STR, &propname,
 	    'r', MDB_OPT_SETBITS, B_TRUE, &references,
 	    'v', MDB_OPT_SETBITS, B_TRUE, &fjs.fjs_verbose,
@@ -2439,6 +3374,13 @@ dcmd_findjsobjects(uintptr_t addr,
 		    (int(*)(const void *, const void *))findjsobjects_cmp,
 		    sizeof (findjsobjects_obj_t),
 		    offsetof(findjsobjects_obj_t, fjso_node));
+
+		avl_create(&fjs.fjs_referents,
+		    (int(*)(const void *, const void *))
+		    findjsobjects_cmp_referents,
+		    sizeof (findjsobjects_referent_t),
+		    offsetof(findjsobjects_referent_t, fjsr_node));
+
 		fjs.fjs_initialized = B_TRUE;
 	}
 
@@ -2460,25 +3402,26 @@ dcmd_findjsobjects(uintptr_t addr,
 			return (DCMD_ERR);
 		}
 
-		nobjs = avl_numnodes(&fjs.fjs_tree);
+		if ((nobjs = avl_numnodes(&fjs.fjs_tree)) != 0) {
+			/*
+			 * We have the objects -- now sort them.
+			 */
+			sorted = mdb_alloc(nobjs * sizeof (void *),
+			    UM_SLEEP | UM_GC);
 
-		/*
-		 * We have the objects -- now sort them.
-		 */
-		sorted = mdb_alloc(nobjs * sizeof (void *), UM_GC);
+			for (obj = fjs.fjs_objects, i = 0; obj != NULL;
+			    obj = obj->fjso_next, i++) {
+				sorted[i] = obj;
+			}
 
-		for (obj = fjs.fjs_objects, i = 0; obj != NULL;
-		    obj = obj->fjso_next, i++) {
-			sorted[i] = obj;
+			qsort(sorted, avl_numnodes(&fjs.fjs_tree),
+			    sizeof (void *), findjsobjects_cmp_ninstances);
+
+			for (i = 1, fjs.fjs_objects = sorted[0]; i < nobjs; i++)
+				sorted[i - 1]->fjso_next = sorted[i];
+
+			sorted[nobjs - 1]->fjso_next = NULL;
 		}
-
-		qsort(sorted, avl_numnodes(&fjs.fjs_tree), sizeof (void *),
-		    findjsobjects_cmp_ninstances);
-
-		for (i = 1, fjs.fjs_objects = sorted[0]; i < nobjs; i++)
-			sorted[i - 1]->fjso_next = sorted[i];
-
-		sorted[nobjs - 1]->fjso_next = NULL;
 
 		v8_silent--;
 
@@ -2488,103 +3431,107 @@ dcmd_findjsobjects(uintptr_t addr,
 
 			mdb_printf(f, "elapsed time (seconds)", elapsed);
 			mdb_printf(f, "heap objects", stats->fjss_heapobjs);
+			mdb_printf(f, "type reads", stats->fjss_typereads);
+			mdb_printf(f, "cached reads", stats->fjss_cached);
 			mdb_printf(f, "JavaScript objects", stats->fjss_jsobjs);
 			mdb_printf(f, "processed objects", stats->fjss_objects);
+			mdb_printf(f, "processed arrays", stats->fjss_arrays);
 			mdb_printf(f, "unique objects", stats->fjss_uniques);
 		}
 	}
 
-	if (propname != NULL) {
-		if (flags & DCMD_ADDRSPEC) {
-			mdb_warn("cannot specify an object when "
-			    "specifying a property name\n");
+	if (listlike && !(flags & DCMD_ADDRSPEC)) {
+		if (propname != NULL || constructor != NULL) {
+			char opt = propname != NULL ? 'p' : 'c';
+
+			mdb_warn("cannot specify -l with -%c; instead, pipe "
+			    "output of ::findjsobjects -%c to "
+			    "::findjsobjects -l\n", opt, opt);
 			return (DCMD_ERR);
 		}
 
+		return (findjsobjects_match(&fjs, addr, flags,
+		    findjsobjects_match_all, NULL));
+	}
+
+	if (propname != NULL) {
 		if (constructor != NULL) {
 			mdb_warn("cannot specify both a property name "
 			    "and a constructor\n");
 			return (DCMD_ERR);
 		}
 
-		for (obj = fjs.fjs_objects; obj != NULL; obj = obj->fjso_next) {
-			for (prop = obj->fjso_props; prop != NULL;
-			    prop = prop->fjsp_next) {
-				if (strcmp(prop->fjsp_desc, propname) == 0)
-					break;
-			}
-
-			if (prop == NULL)
-				continue;
-
-			mdb_printf("%p\n", obj->fjso_instances.fjsi_addr);
-		}
-
-		return (DCMD_OK);
+		return (findjsobjects_match(&fjs, addr, flags,
+		    findjsobjects_match_propname, propname));
 	}
 
 	if (constructor != NULL) {
-		if (flags & DCMD_ADDRSPEC) {
-			mdb_warn("cannot specify an object when "
-			    "specifying a constructor\n");
-			return (DCMD_ERR);
-		}
-
-		for (obj = fjs.fjs_objects; obj != NULL; obj = obj->fjso_next) {
-			char *cons = findjsobjects_constructor(obj);
-
-			if (cons == NULL || strcmp(constructor, cons) != 0)
-				continue;
-
-			mdb_printf("%p\n", obj->fjso_instances.fjsi_addr);
-		}
-
-		return (DCMD_OK);
+		return (findjsobjects_match(&fjs, addr, flags,
+		    findjsobjects_match_constructor, constructor));
 	}
 
-	if (references && !(flags & DCMD_ADDRSPEC)) {
-		mdb_warn("must specify an object to find references\n");
+	if (references && !(flags & DCMD_ADDRSPEC) &&
+	    avl_is_empty(&fjs.fjs_referents)) {
+		mdb_warn("must specify or mark an object to find references\n");
+		return (DCMD_ERR);
+	}
+
+	if (fjs.fjs_marking && !(flags & DCMD_ADDRSPEC)) {
+		mdb_warn("must specify an object to mark\n");
+		return (DCMD_ERR);
+	}
+
+	if (references && fjs.fjs_marking) {
+		mdb_warn("can't both mark an object and find its references\n");
 		return (DCMD_ERR);
 	}
 
 	if (flags & DCMD_ADDRSPEC) {
+		findjsobjects_instance_t *inst, *head;
+
 		/*
-		 * If we've been passed an address, we're either looking for
-		 * similar objects or for references (if -r has been set).
+		 * If we've been passed an address, it's to either list like
+		 * objects (-l), mark an object (-m) or find references to the
+		 * specified/marked objects (-r).  (Note that the absence of
+		 * any of these options implies -l.)
 		 */
-		if (references) {
-			findjsobjects_references(&fjs, addr);
-			return (DCMD_OK);
+		inst = findjsobjects_instance(&fjs, addr, &head);
+
+		if (inst == NULL) {
+			mdb_warn("%p is not a valid object\n", addr);
+			return (DCMD_ERR);
 		}
 
-		for (obj = fjs.fjs_objects; obj != NULL; obj = obj->fjso_next) {
-			findjsobjects_instance_t *inst, *h;
-
-			h = &obj->fjso_instances;
-
-			for (inst = h; inst != NULL; inst = inst->fjsi_next) {
-				if (inst->fjsi_addr == addr)
-					break;
-			}
-
-			if (inst == NULL)
-				continue;
-
-			for (inst = h; inst != NULL; inst = inst->fjsi_next)
+		if (!references && !fjs.fjs_marking) {
+			for (inst = head; inst != NULL; inst = inst->fjsi_next)
 				mdb_printf("%p\n", inst->fjsi_addr);
 
 			return (DCMD_OK);
 		}
 
-		mdb_warn("%p is not a valid object\n", addr);
-		return (DCMD_ERR);
+		if (!listlike) {
+			findjsobjects_referent(&fjs, inst->fjsi_addr);
+		} else {
+			for (inst = head; inst != NULL; inst = inst->fjsi_next)
+				findjsobjects_referent(&fjs, inst->fjsi_addr);
+		}
 	}
 
-	mdb_printf("%-?s %8s %6s %s\n", "OBJECT",
+	if (references)
+		findjsobjects_references(&fjs);
+
+	if (references || fjs.fjs_marking)
+		return (DCMD_OK);
+
+	mdb_printf("%-?s %8s %8s %s\n", "OBJECT",
 	    "#OBJECTS", "#PROPS", "CONSTRUCTOR: PROPS");
 
-	for (obj = fjs.fjs_objects; obj != NULL; obj = obj->fjso_next)
+	for (obj = fjs.fjs_objects; obj != NULL; obj = obj->fjso_next) {
+		if (obj->fjso_malformed && !fjs.fjs_allobjs)
+			continue;
+
 		findjsobjects_print(obj);
+	}
 
 	return (DCMD_OK);
 }
@@ -2595,9 +3542,13 @@ dcmd_jsframe(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	uintptr_t fptr, raddr;
 	boolean_t opt_v = B_FALSE, opt_i = B_FALSE;
+	char *opt_f = NULL, *opt_p = NULL;
 
-	if (mdb_getopts(argc, argv, 'v', MDB_OPT_SETBITS, B_TRUE, &opt_v,
-	    'i', MDB_OPT_SETBITS, B_TRUE, &opt_i, NULL) != argc)
+	if (mdb_getopts(argc, argv,
+	    'v', MDB_OPT_SETBITS, B_TRUE, &opt_v,
+	    'i', MDB_OPT_SETBITS, B_TRUE, &opt_i,
+	    'f', MDB_OPT_STR, &opt_f,
+	    'p', MDB_OPT_STR, &opt_p, NULL) != argc)
 		return (DCMD_USAGE);
 
 	/*
@@ -2608,7 +3559,7 @@ dcmd_jsframe(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	 * overridden with the "-i" option (for "immediate").
 	 */
 	if (opt_i)
-		return (do_jsframe(addr, 0, opt_v));
+		return (do_jsframe(addr, 0, opt_v, opt_f, opt_p));
 
 	if (mdb_vread(&raddr, sizeof (raddr),
 	    addr + sizeof (uintptr_t)) == -1) {
@@ -2625,7 +3576,7 @@ dcmd_jsframe(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (fptr == NULL)
 		return (DCMD_OK);
 
-	return (do_jsframe(fptr, raddr, opt_v));
+	return (do_jsframe(fptr, raddr, opt_v, opt_f, opt_p));
 }
 
 /* ARGSUSED */
@@ -2635,27 +3586,71 @@ dcmd_jsprint(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	char *buf, *bufp;
 	size_t bufsz = 262144, len = bufsz;
 	jsobj_print_t jsop;
-	int rv;
+	boolean_t opt_b = B_FALSE;
+	int rv, i;
 
 	bzero(&jsop, sizeof (jsop));
 	jsop.jsop_depth = 2;
 	jsop.jsop_printaddr = B_FALSE;
 
-	if (mdb_getopts(argc, argv,
+	i = mdb_getopts(argc, argv,
 	    'a', MDB_OPT_SETBITS, B_TRUE, &jsop.jsop_printaddr,
-	    'd', MDB_OPT_UINT64, &jsop.jsop_depth, NULL) != argc)
-		return (DCMD_USAGE);
+	    'b', MDB_OPT_SETBITS, B_TRUE, &opt_b,
+	    'd', MDB_OPT_UINT64, &jsop.jsop_depth, NULL);
 
-	if ((buf = bufp = mdb_zalloc(bufsz, UM_NOSLEEP)) == NULL)
-		return (DCMD_ERR);
+	if (opt_b)
+		jsop.jsop_baseaddr = addr;
 
-	jsop.jsop_bufp = &bufp;
-	jsop.jsop_lenp = &len;
+	do {
+		if (i != argc) {
+			const mdb_arg_t *member = &argv[i++];
 
-	rv = jsobj_print(addr, &jsop);
-	(void) mdb_printf("%s\n", buf);
-	mdb_free(buf, bufsz);
-	return (rv == 0 ? DCMD_OK : DCMD_ERR);
+			if (member->a_type != MDB_TYPE_STRING)
+				return (DCMD_USAGE);
+
+			jsop.jsop_member = member->a_un.a_str;
+		}
+
+		for (;;) {
+			if ((buf = bufp =
+			    mdb_zalloc(bufsz, UM_NOSLEEP)) == NULL)
+				return (DCMD_ERR);
+
+			jsop.jsop_bufp = &bufp;
+			jsop.jsop_lenp = &len;
+
+			rv = jsobj_print(addr, &jsop);
+
+			if (len > 0)
+				break;
+
+			mdb_free(buf, bufsz);
+			bufsz <<= 1;
+			len = bufsz;
+		}
+
+		if (jsop.jsop_member == NULL && rv != 0)
+			return (DCMD_ERR);
+
+		if (jsop.jsop_member && !jsop.jsop_found) {
+			if (jsop.jsop_baseaddr)
+				(void) mdb_printf("%p: ", jsop.jsop_baseaddr);
+
+			(void) mdb_printf("undefined%s",
+			    i < argc ? " " : "");
+		} else {
+			(void) mdb_printf("%s%s", buf, i < argc &&
+			    !isspace(buf[strlen(buf) - 1]) ? " " : "");
+		}
+
+		mdb_free(buf, bufsz);
+		jsop.jsop_found = B_FALSE;
+		jsop.jsop_baseaddr = NULL;
+	} while (i < argc);
+
+	mdb_printf("\n");
+
+	return (DCMD_OK);
 }
 
 /* ARGSUSED */
@@ -2732,12 +3727,12 @@ dcmd_v8array(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (read_typebyte(&type, addr) != 0)
 		return (DCMD_ERR);
 
-	if (strcmp(enum_lookup_str(v8_types, type, ""), "FixedArray") != 0) {
+	if (type != V8_TYPE_FIXEDARRAY) {
 		mdb_warn("%p is not an instance of FixedArray\n", addr);
 		return (DCMD_ERR);
 	}
 
-	if (read_heap_array(addr, &array, &len, UM_GC) != 0)
+	if (read_heap_array(addr, &array, &len, UM_SLEEP | UM_GC) != 0)
 		return (DCMD_ERR);
 
 	for (ii = 0; ii < len; ii++)
@@ -2752,8 +3747,12 @@ dcmd_jsstack(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	uintptr_t raddr;
 	boolean_t opt_v;
+	char *opt_f = NULL, *opt_p = NULL;
 
-	if (mdb_getopts(argc, argv, 'v', MDB_OPT_SETBITS, B_TRUE, &opt_v,
+	if (mdb_getopts(argc, argv,
+	    'v', MDB_OPT_SETBITS, B_TRUE, &opt_v,
+	    'f', MDB_OPT_STR, &opt_f,
+	    'p', MDB_OPT_STR, &opt_p,
 	    NULL) != argc)
 		return (DCMD_USAGE);
 
@@ -2764,7 +3763,7 @@ dcmd_jsstack(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	 */
 	if (!(flags & DCMD_ADDRSPEC)) {
 		if (load_current_context(&addr, &raddr) != 0 ||
-		    do_jsframe(addr, raddr, opt_v) != 0)
+		    do_jsframe(addr, raddr, opt_v, opt_f, opt_p) != 0)
 			return (DCMD_ERR);
 	}
 
@@ -2779,7 +3778,7 @@ static int
 dcmd_v8str(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	boolean_t opt_v = B_FALSE;
-	char buf[256];
+	char buf[512 * 1024];
 	char *bufp;
 	size_t len;
 
@@ -2789,7 +3788,8 @@ dcmd_v8str(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	bufp = buf;
 	len = sizeof (buf);
-	if (jsstr_print(addr, opt_v, &bufp, &len) != 0)
+	if (jsstr_print(addr, (opt_v ? JSSTR_VERBOSE : JSSTR_NONE) |
+	    JSSTR_QUOTED, &bufp, &len) != 0)
 		return (DCMD_ERR);
 
 	mdb_printf("%s\n", buf);
@@ -2870,7 +3870,7 @@ walk_jsframes_init(mdb_walk_state_t *wsp)
 static int
 walk_jsframes_step(mdb_walk_state_t *wsp)
 {
-	uintptr_t ftype, addr, next;
+	uintptr_t addr, next;
 	int rv;
 
 	addr = wsp->walk_addr;
@@ -2878,15 +3878,6 @@ walk_jsframes_step(mdb_walk_state_t *wsp)
 
 	if (rv != WALK_NEXT)
 		return (rv);
-
-	/*
-	 * Figure out the type of this frame.
-	 */
-	if (mdb_vread(&ftype, sizeof (ftype), addr + V8_OFF_FP_MARKER) == -1)
-		return (WALK_ERR);
-
-	if (V8_IS_SMI(ftype) && V8_SMI_VALUE(ftype) == 0)
-		return (WALK_DONE);
 
 	if (mdb_vread(&next, sizeof (next), addr) == -1)
 		return (WALK_ERR);
@@ -2898,6 +3889,87 @@ walk_jsframes_step(mdb_walk_state_t *wsp)
 	return (WALK_NEXT);
 }
 
+typedef struct jsprop_walk_data {
+	int jspw_nprops;
+	int jspw_current;
+	uintptr_t *jspw_props;
+} jsprop_walk_data_t;
+
+/*ARGSUSED*/
+static int
+walk_jsprop_nprops(const char *desc, uintptr_t val, void *arg)
+{
+	jsprop_walk_data_t *jspw = arg;
+	jspw->jspw_nprops++;
+
+	return (0);
+}
+
+/*ARGSUSED*/
+static int
+walk_jsprop_props(const char *desc, uintptr_t val, void *arg)
+{
+	jsprop_walk_data_t *jspw = arg;
+	jspw->jspw_props[jspw->jspw_current++] = val;
+
+	return (0);
+}
+
+static int
+walk_jsprop_init(mdb_walk_state_t *wsp)
+{
+	jsprop_walk_data_t *jspw;
+	uintptr_t addr;
+	uint8_t type;
+
+	if ((addr = wsp->walk_addr) == NULL) {
+		mdb_warn("'jsprop' does not support global walks\n");
+		return (WALK_ERR);
+	}
+
+	if (!V8_IS_HEAPOBJECT(addr) || read_typebyte(&type, addr) != 0 ||
+	    type != V8_TYPE_JSOBJECT) {
+		mdb_warn("%p is not a JSObject\n", addr);
+		return (WALK_ERR);
+	}
+
+	jspw = mdb_zalloc(sizeof (jsprop_walk_data_t), UM_SLEEP | UM_GC);
+
+	if (jsobj_properties(addr, walk_jsprop_nprops, jspw) == -1) {
+		mdb_warn("couldn't iterate over properties for %p\n", addr);
+		return (WALK_ERR);
+	}
+
+	jspw->jspw_props = mdb_zalloc(jspw->jspw_nprops *
+	    sizeof (uintptr_t), UM_SLEEP | UM_GC);
+
+	if (jsobj_properties(addr, walk_jsprop_props, jspw) == -1) {
+		mdb_warn("couldn't iterate over properties for %p\n", addr);
+		return (WALK_ERR);
+	}
+
+	jspw->jspw_current = 0;
+	wsp->walk_data = jspw;
+
+	return (WALK_NEXT);
+}
+
+static int
+walk_jsprop_step(mdb_walk_state_t *wsp)
+{
+	jsprop_walk_data_t *jspw = wsp->walk_data;
+	int rv;
+
+	if (jspw->jspw_current >= jspw->jspw_nprops)
+		return (WALK_DONE);
+
+	if ((rv = wsp->walk_callback(jspw->jspw_props[jspw->jspw_current++],
+	    NULL, wsp->walk_cbdata)) != WALK_NEXT)
+		return (rv);
+
+	return (WALK_NEXT);
+}
+
 /*
  * MDB linkage
  */
@@ -2906,12 +3978,12 @@ static const mdb_dcmd_t v8_mdb_dcmds[] = {
 	/*
 	 * Commands to inspect JavaScript-level state
 	 */
-	{ "jsframe", ":[-v]", "summarize a JavaScript stack frame",
-		dcmd_jsframe },
-	{ "jsprint", ":[-a] [-d depth]", "print a JavaScript object",
+	{ "jsframe", ":[-iv] [-f function] [-p property]",
+		"summarize a JavaScript stack frame", dcmd_jsframe },
+	{ "jsprint", ":[-ab] [-d depth] [member]", "print a JavaScript object",
 		dcmd_jsprint },
-	{ "jsstack", "[-v]", "print a JavaScript stacktrace",
-		dcmd_jsstack },
+	{ "jsstack", "[-v] [-f function] [-p property]",
+		"print a JavaScript stacktrace", dcmd_jsstack },
 	{ "findjsobjects", "?[-vb] [-r | -c cons | -p prop]", "find JavaScript "
 		"objects", dcmd_findjsobjects, dcmd_findjsobjects_help },
 
@@ -2947,59 +4019,86 @@ static const mdb_dcmd_t v8_mdb_dcmds[] = {
 static const mdb_walker_t v8_mdb_walkers[] = {
 	{ "jsframe", "walk V8 JavaScript stack frames",
 		walk_jsframes_init, walk_jsframes_step },
+	{ "jsprop", "walk property values for an object",
+		walk_jsprop_init, walk_jsprop_step },
 	{ NULL }
 };
 
 static mdb_modinfo_t v8_mdb = { MDB_API_VERSION, v8_mdb_dcmds, v8_mdb_walkers };
 
-const mdb_modinfo_t *
-_mdb_init(void)
+static void
+configure(void)
 {
-	uintptr_t v8major, v8minor, v8build, v8patch;
+	char *success;
+	v8_cfg_t *cfgp = NULL;
 	GElf_Sym sym;
 
-	if (mdb_readsym(&v8major, sizeof (v8major),
+	if (mdb_readsym(&v8_major, sizeof (v8_major),
 	    "_ZN2v88internal7Version6major_E") == -1 ||
-	    mdb_readsym(&v8minor, sizeof (v8minor),
+	    mdb_readsym(&v8_minor, sizeof (v8_minor),
 	    "_ZN2v88internal7Version6minor_E") == -1 ||
-	    mdb_readsym(&v8build, sizeof (v8build),
+	    mdb_readsym(&v8_build, sizeof (v8_build),
 	    "_ZN2v88internal7Version6build_E") == -1 ||
-	    mdb_readsym(&v8patch, sizeof (v8patch),
+	    mdb_readsym(&v8_patch, sizeof (v8_patch),
 	    "_ZN2v88internal7Version6patch_E") == -1) {
 		mdb_warn("failed to determine V8 version");
-		return (&v8_mdb);
+		return;
 	}
 
-	mdb_printf("V8 version: %d.%d.%d.%d\n", v8major, v8minor, v8build,
-	    v8patch);
+	mdb_printf("V8 version: %d.%d.%d.%d\n",
+	    v8_major, v8_minor, v8_build, v8_patch);
 
 	/*
 	 * First look for debug metadata embedded within the binary, which may
 	 * be present in recent V8 versions built with postmortem metadata.
 	 */
 	if (mdb_lookup_by_name("v8dbg_SmiTag", &sym) == 0) {
-		if (autoconfigure(&v8_cfg_target) != 0)
-			mdb_warn("failed to autoconfigure from target\n");
-
-		else
-			mdb_printf("Autoconfigured V8 support from target.\n");
-
-		return (&v8_mdb);
+		cfgp = &v8_cfg_target;
+		success = "Autoconfigured V8 support from target";
+	} else if (v8_major == 3 && v8_minor == 1 && v8_build == 8) {
+		cfgp = &v8_cfg_04;
+		success = "Configured V8 support based on node v0.4";
+	} else if (v8_major == 3 && v8_minor == 6 && v8_build == 6) {
+		cfgp = &v8_cfg_06;
+		success = "Configured V8 support based on node v0.6";
+	} else {
+		mdb_printf("mdb_v8: target has no debug metadata and "
+		    "no existing config found\n");
+		return;
 	}
 
-	if (v8major == 3 && v8minor == 1 && v8build == 8 &&
-	    autoconfigure(&v8_cfg_04) == 0) {
-		mdb_printf("Configured V8 support based on node v0.4");
-		return (&v8_mdb);
+	if (autoconfigure(cfgp) != 0) {
+		mdb_warn("failed to autoconfigure from target; "
+		    "commands may have incorrect results!\n");
+		return;
 	}
 
-	if (v8major == 3 && v8minor == 6 && v8build == 6 &&
-	    autoconfigure(&v8_cfg_06) == 0) {
-		mdb_printf("Configured V8 support based on node v0.6");
-		return (&v8_mdb);
-	}
+	mdb_printf("%s\n", success);
+}
 
-	mdb_printf("mdb_v8: target has no debug metadata and no existing "
-	    "config found");
+static void
+enable_demangling(void)
+{
+	const char *symname = "_ZN2v88internal7Version6major_E";
+	GElf_Sym sym;
+	char buf[64];
+
+	/*
+	 * Try to determine whether C++ symbol demangling has been enabled.  If
+	 * not, enable it.
+	 */
+	if (mdb_lookup_by_name("_ZN2v88internal7Version6major_E", &sym) != 0)
+		return;
+
+	(void) mdb_snprintf(buf, sizeof (buf), "%a", sym.st_value);
+	if (strstr(buf, symname) != NULL)
+		(void) mdb_eval("$G");
+}
+
+const mdb_modinfo_t *
+_mdb_init(void)
+{
+	configure();
+	enable_demangling();
 	return (&v8_mdb);
 }
