@@ -1,3 +1,11 @@
+sunwfmd (5.11.134-31-11344-13272) nexenta; urgency=high
+
+  * Issue 13272: Stucked Inquiry commands put a pool to degraded state
+    with too many errors without displaying errors in zpool status (fix
+    Makefile)
+
+ -- Nexenta Systems <support@nexenta.com>  Sun, 10 Mar 2013 13:15:00 -0400
+
 sunwfmd (5.11.134-31-11343-13272) nexenta; urgency=high
 
   * Issue 13272: Stucked Inquiry commands put a pool to degraded state
