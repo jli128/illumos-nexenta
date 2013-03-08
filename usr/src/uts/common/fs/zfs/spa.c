@@ -6236,7 +6236,6 @@ spa_sync(spa_t *spa, uint64_t txg)
 		vdev_sync_done(vd, txg);
 
 	spa_update_dspace(spa);
-	spa_update_iotime(spa);
 	spa_update_latency(spa);
 	/*
 	 * It had better be the case that we didn't dirty anything
