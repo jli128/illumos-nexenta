@@ -1,3 +1,9 @@
+sunwzfskr (5.11.134-31-12271-13333) nexenta; urgency=high
+
+  * Issue 13333: zpool iostat doubles metrics for pool operations and bandwidth
+
+ -- Ilya Usvyatsky <ilya.usvyatsky@nexenta.com>  Sat, 09 Mar 2013 18:22:58 -0500
+
 sunwzfskr (5.11.134-31-12270-12619) nexenta; urgency=high
 
   * Issue 12619: Deadlocked zfs txg processing in dsl_sync_task_group_sync()
