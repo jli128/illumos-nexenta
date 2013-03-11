@@ -318,9 +318,8 @@ pppt_msg_scsi_cmd(stmf_ic_msg_t *msg)
 	    scmd->icsc_task_lun_no,
 	    scmd->icsc_task_cdb_length, 0);
 	if (ptask->pt_stmf_task == NULL) {
+		/* NOTE: pppt_task_done() will free ptask. */
 		(void) pppt_task_done(ptask);
-		ASSERT(ptask->pt_refcnt == 0);
-		pppt_task_free(ptask);
 		pppt_sess_rele(pppt_sess);
 		pppt_msg_tx_status(msg, STMF_ALLOC_FAILURE);
 		stmf_ic_msg_free(msg);

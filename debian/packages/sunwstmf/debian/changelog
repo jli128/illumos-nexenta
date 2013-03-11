@@ -1,3 +1,9 @@
+sunwstmf (5.11.134-31-13102-13365) nexenta; urgency=high
+
+  * Issue 13365: pppt "mutex_enter: bad mutex" panic (son of 8564)
+
+ -- Nexenta Systems <support@nexenta.com> Mon, 11 Mar 2013 16:37:49 -0000
+
 sunwstmf (5.11.134-31-13101-13056) nexenta; urgency=high
 
   * Issue 12375: Create ALUA support on NexentaStor; Failover causes loss
