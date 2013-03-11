@@ -1,3 +1,9 @@
+sunwzfskr (5.11.134-31-12272-13318) nexenta; urgency=high
+
+  * Issue 13318: kernel panic during failover with autosync running on the active node
+
+ -- Nexenta Systems <support@nexenta.com>  Mon, 11 Mar 2013 21:18:25 -0500
+
 sunwzfskr (5.11.134-31-12271-13333) nexenta; urgency=high
 
   * Issue 13333: zpool iostat doubles metrics for pool operations and bandwidth
