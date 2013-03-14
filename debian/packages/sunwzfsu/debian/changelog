@@ -1,3 +1,9 @@
+sunwzfsu (5.11.134-31-12268-10054) nexenta; urgency=low
+
+  * Issue 10054: Parallel unmount of datasets for zpool export
+
+ -- Ilys Usvyatsky <ilya.usvyatsky@nexenta.com>  Wed, 13 Mar 2013 21:26:18 -0400
+
 sunwzfsu (5.11.134-31-12267-12379) nexenta; urgency=low
 
   * Issue 12379: Backport request for Illumos changeset 13379 "zfs should handle imbalanced LUNs" to the 3.1.x branch

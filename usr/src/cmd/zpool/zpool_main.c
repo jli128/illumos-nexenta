@@ -863,7 +863,7 @@ zpool_do_destroy(int argc, char **argv)
 		return (1);
 	}
 
-	if (zpool_disable_datasets(zhp, force) != 0) {
+	if (zpool_disable_datasets(zhp, force, 0) != 0) {
 		(void) fprintf(stderr, gettext("could not destroy '%s': "
 		    "could not unmount datasets\n"), zpool_get_name(zhp));
 		return (1);
@@ -891,12 +891,13 @@ zpool_do_export(int argc, char **argv)
 	boolean_t force = B_FALSE;
 	boolean_t hardforce = B_FALSE;
 	int c;
+	int n_threads = sysconf(_SC_NPROCESSORS_ONLN) * 2;
 	zpool_handle_t *zhp;
 	int ret;
 	int i;
 
 	/* check options */
-	while ((c = getopt(argc, argv, "fF")) != -1) {
+	while ((c = getopt(argc, argv, ":fFt:")) != -1) {
 		switch (c) {
 		case 'f':
 			force = B_TRUE;
@@ -904,9 +905,17 @@ zpool_do_export(int argc, char **argv)
 		case 'F':
 			hardforce = B_TRUE;
 			break;
+		case 't':
+			n_threads = atoi(optarg);
+			break;
 		case '?':
 			(void) fprintf(stderr, gettext("invalid option '%c'\n"),
 			    optopt);
+			usage(B_FALSE);
+		case ':':
+			(void) fprintf(stderr, gettext("missing argument "
+						       "for option '%c'\n"),
+				       optopt);
 			usage(B_FALSE);
 		}
 	}
@@ -927,7 +936,7 @@ zpool_do_export(int argc, char **argv)
 			continue;
 		}
 
-		if (zpool_disable_datasets(zhp, force) != 0) {
+		if (zpool_disable_datasets(zhp, force, n_threads) != 0) {
 			ret = 1;
 			zpool_close(zhp);
 			continue;
