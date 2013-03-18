@@ -1,3 +1,9 @@
+sunwzfsu (5.11.134-31-12269-10054) nexenta; urgency=low
+
+  * Issue 10054: Parallel unmount of datasets for zpool export - minor fix
+
+ -- Ilys Usvyatsky <ilya.usvyatsky@nexenta.com>  Sat, 16 Mar 2013 17:14:23 -0400
+
 sunwzfsu (5.11.134-31-12268-10054) nexenta; urgency=low
 
   * Issue 10054: Parallel unmount of datasets for zpool export

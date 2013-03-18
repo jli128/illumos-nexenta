@@ -1154,6 +1154,7 @@ typedef struct umount_task_q {
 	pthread_mutex_t	q_lock;
 	libzfs_handle_t	*hdl;
 	int		error;
+	const char	*error_mp;
 	int		q_length;
 	int		n_tasks;
 	int		flags;
@@ -1192,6 +1193,7 @@ umount_task_q_init(int argc, const char **argv, int flags,
 		return (error);
 	task_q->hdl = hdl;
 	task_q->error = 0;
+	task_q->error_mp = NULL;
 	task_q->q_length = argc;
 	task_q->n_tasks = argc;
 	task_q->flags = flags;
@@ -1378,17 +1380,12 @@ unmounter(void *arg)
 			 * children - we have checked above, so it is fatal
 			 */
 			assert(child_umount_pending(t, task_q) == B_FALSE);
-			/*
-			 * Tell ZFS!
-			 */
-			zfs_error_aux(task_q->hdl, strerror(q_error));
-			task_q->task[t].error = task_q->error =
-				zfs_error_fmt(task_q->hdl, EZFS_UMOUNTFAILED,
-					      dgettext(TEXT_DOMAIN,
-						       "cannot unmount '%s'"),
-					      task_q->task[t].mp);
+			task->error = q_error;
+			if (!task_q->error) {
+				task_q->error = task->error;
+				task_q->error_mp = task->mp;
+			}
 			done = 1;
-			break;
 		}
 
 		if (error = pthread_mutex_unlock(&task_q->q_lock))
@@ -1398,7 +1395,7 @@ unmounter(void *arg)
 	return ((void *)error);
 }
 
-#define THREADS_HARD_LIMIT	32
+#define THREADS_HARD_LIMIT	128
 int parallel_unmount(libzfs_handle_t *hdl, int argc, const char **argv,
 		     int flags, int n_threads)
 {
@@ -1428,14 +1425,15 @@ int parallel_unmount(libzfs_handle_t *hdl, int argc, const char **argv,
 	thread_pool_fini(thread_pool);
 
 	if (task_queue->error) {
-		for (i = 0; i < task_queue->q_length; i++) {
-			umount_task_t *task = &task_queue->task[i];
-			if (task->error) {
-				fprintf(stderr, "Thread %d: umount2(%s)"
-					"[%d] failed: %d\n", pthread_self(),
-					task->mp, i, task->error);
-			}
-		}
+		error = task_queue->error;
+		/*
+		 * Tell ZFS!
+		 */
+		zfs_error_aux(hdl, strerror(task_queue->error));
+		error = zfs_error_fmt(hdl, EZFS_UMOUNTFAILED,
+				      dgettext(TEXT_DOMAIN,
+					       "cannot unmount '%s'"),
+				      task_queue->error_mp);
 	}
 
 	umount_task_q_fini(task_queue);
