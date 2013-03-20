@@ -19,10 +19,12 @@
 # CDDL HEADER END
 #
 
+#
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2011 Joyent, Inc.  All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+#
 
 include ../Makefile.master
 include $(NZA_MAKEDEFS)
@@ -57,6 +59,7 @@ COMMON_SUBDIRS=		\
 	adbgen		\
 	acct		\
 	acctadm		\
+	acpitools	\
 	aoeadm		\
 	aoesvc		\
 	arch		\
