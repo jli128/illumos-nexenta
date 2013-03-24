@@ -1086,17 +1086,16 @@ typedef struct smb_tree {
 	smb_tree_has_feature((sr)->tid_tree, SMB_TREE_SHORTNAMES) : 0)
 
 /*
- * SMB_TREE_CONTAINS_NODE is used to check if a node is on the same filesystem
- * as the tree's root filesystem or if it's on a compatible child filesystem
- * provided mount point traversal is enabled.  This is apparently called in
- * some cases with sr=NULL, and is expected to return TRUE.
+ * SMB_TREE_CONTAINS_NODE is used to check if a node is on the same
+ * file system as the tree's root filesystem, or if mount point traversal
+ * should be allowed.  Note that this is also called in some cases with
+ * sr=NULL, where it is expected to evaluate to TRUE.
  */
 
 #define	SMB_TREE_CONTAINS_NODE(sr, node)                                \
 	((sr) == NULL || (sr)->tid_tree == NULL ||                      \
 	SMB_TREE_VFS((sr)->tid_tree) == SMB_NODE_VFS(node) ||           \
-	smb_tree_has_feature((sr)->tid_tree, SMB_TREE_TRAVERSE_MOUNTS) && \
-	smb_vfs_is_compat(SMB_TREE_VFS((sr)->tid_tree), SMB_NODE_VFS(node)))
+	smb_tree_has_feature((sr)->tid_tree, SMB_TREE_TRAVERSE_MOUNTS))
 
 /*
  * SMB_OFILE_IS_READONLY reflects whether an ofile is readonly or not.

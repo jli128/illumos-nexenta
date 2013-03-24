@@ -774,7 +774,7 @@ smb_node_share_check(smb_node_t *node)
 }
 
 /*
- * SMB Chage Notification
+ * SMB Change Notification
  */
 
 void

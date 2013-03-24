@@ -271,9 +271,8 @@ smb_pathname_reduce(
 	kmem_free(usepath, MAXPATHLEN);
 
 	/*
-	 * Prevent traversal to another file system if the target file
-	 * system is incompatible with the share root filesystem and if
-	 * mount point traversal is disabled.
+	 * Prevent traversal to another file system if mount point
+	 * traversal is disabled.
 	 *
 	 * Note that we disregard whether the traversal of the path went
 	 * outside of the file system and then came back (say via a link).
@@ -289,10 +288,7 @@ smb_pathname_reduce(
 			err = EACCES;
 			if ((sr) && (sr)->tid_tree &&
 			    smb_tree_has_feature((sr)->tid_tree,
-			    SMB_TREE_TRAVERSE_MOUNTS) &&
-			    smb_vfs_is_compat(
-			    share_root_node->vp->v_vfsp,
-			    (*dir_node)->vp->v_vfsp))
+			    SMB_TREE_TRAVERSE_MOUNTS))
 				err = 0;
 		}
 	}

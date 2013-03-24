@@ -475,7 +475,6 @@ int smb_pathname(smb_request_t *, char *, int, smb_node_t *,
 int smb_vfs_hold(smb_export_t *, vfs_t *);
 void smb_vfs_rele(smb_export_t *, vfs_t *);
 void smb_vfs_rele_all(smb_export_t *);
-int smb_vfs_is_compat(vfs_t *, vfs_t *);
 
 /* NOTIFY CHANGE */
 
