@@ -1,3 +1,9 @@
+sunwzfskr (5.11.134-31-12273-10054) nexenta; urgency=high
+
+  * Issue 10054: asynchronous ARC/L2ARC eviction to reduce zpool export time
+
+ -- Boris Protopopov <boris.protopopov@nexenta.com>  Mon, 25 Mar 2013 11:19:25 -0500
+
 sunwzfskr (5.11.134-31-12272-13318) nexenta; urgency=high
 
   * Issue 13318: kernel panic during failover with autosync running on the active node

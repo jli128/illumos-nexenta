@@ -1922,6 +1922,27 @@ static taskq_t *arc_flush_taskq;
 static void
 _arc_flush(uint64_t guid)
 {
+	while (list_head(&arc_mru->arcs_list[ARC_BUFC_DATA])) {
+		(void) arc_evict(arc_mru, guid, -1, FALSE, ARC_BUFC_DATA);
+		if (guid)
+			break;
+	}
+	while (list_head(&arc_mru->arcs_list[ARC_BUFC_METADATA])) {
+		(void) arc_evict(arc_mru, guid, -1, FALSE, ARC_BUFC_METADATA);
+		if (guid)
+			break;
+	}
+	while (list_head(&arc_mfu->arcs_list[ARC_BUFC_DATA])) {
+		(void) arc_evict(arc_mfu, guid, -1, FALSE, ARC_BUFC_DATA);
+		if (guid)
+			break;
+	}
+	while (list_head(&arc_mfu->arcs_list[ARC_BUFC_METADATA])) {
+		(void) arc_evict(arc_mfu, guid, -1, FALSE, ARC_BUFC_METADATA);
+		if (guid)
+			break;
+	}
+
 	arc_evict_ghost(arc_mru_ghost, guid, -1);
 	arc_evict_ghost(arc_mfu_ghost, guid, -1);
 
@@ -1956,27 +1977,6 @@ arc_flush(spa_t *spa)
 			    KM_SLEEP);
 			aaf->aaf_guid = guid;
 		}
-	}
-
-	while (list_head(&arc_mru->arcs_list[ARC_BUFC_DATA])) {
-		(void) arc_evict(arc_mru, guid, -1, FALSE, ARC_BUFC_DATA);
-		if (spa)
-			break;
-	}
-	while (list_head(&arc_mru->arcs_list[ARC_BUFC_METADATA])) {
-		(void) arc_evict(arc_mru, guid, -1, FALSE, ARC_BUFC_METADATA);
-		if (spa)
-			break;
-	}
-	while (list_head(&arc_mfu->arcs_list[ARC_BUFC_DATA])) {
-		(void) arc_evict(arc_mfu, guid, -1, FALSE, ARC_BUFC_DATA);
-		if (spa)
-			break;
-	}
-	while (list_head(&arc_mfu->arcs_list[ARC_BUFC_METADATA])) {
-		(void) arc_evict(arc_mfu, guid, -1, FALSE, ARC_BUFC_METADATA);
-		if (spa)
-			break;
 	}
 
 	/*
@@ -4156,7 +4156,8 @@ l2arc_list_locked(int list_num, kmutex_t **lock)
  * If the 'all' boolean is set, every buffer is evicted.
  */
 static void
-l2arc_evict(l2arc_dev_t *dev, uint64_t distance, boolean_t all)
+_l2arc_evict(l2arc_dev_t *dev, uint64_t distance, boolean_t all,
+	     boolean_t space_update)
 {
 	list_t *buflist;
 	l2arc_buf_hdr_t *abl2;
@@ -4276,8 +4277,96 @@ top:
 	}
 	mutex_exit(&l2arc_buflist_mtx);
 
-	vdev_space_update(dev->l2ad_vdev, -(taddr - dev->l2ad_evict), 0, 0);
-	dev->l2ad_evict = taddr;
+	if (space_update) {
+		vdev_space_update(dev->l2ad_vdev, -(taddr - dev->l2ad_evict), 0, 0);
+		dev->l2ad_evict = taddr;
+	}
+}
+
+/*
+ * Asynchronous task for eviction of all the buffers for this L2ARC device
+ * The task is dispatched in l2arc_evict()
+ */
+typedef struct {
+	l2arc_dev_t *dev;
+} l2arc_evict_data_t;
+
+static void
+l2arc_evict_task(void *arg)
+{
+	l2arc_evict_data_t *d = (l2arc_evict_data_t*)arg;
+	ASSERT(d && d->dev);
+
+	/*
+	 * Evict l2arc buffers asynchronously; we need to keep the device
+	 * around until we are sure there aren't any buffers referencing it.
+	 * We do not need to hold any config locks, etc. because at this point,
+	 * we are the only ones who knows about this device (the in-core
+	 * structure), so no new buffers can be created (e.g. if the pool is
+	 * re-imported while the asynchronous eviction is in progress) that
+	 * reference this same in-core structure
+	 */
+	_l2arc_evict(d->dev, 0LL, B_TRUE, B_FALSE);
+
+	/* Same cleanup as in the synchronous path */
+	list_destroy(d->dev->l2ad_buflist);
+	kmem_free(d->dev->l2ad_buflist, sizeof (list_t));
+	kmem_free(d->dev, sizeof (l2arc_dev_t));
+	/* Task argument cleanup */
+	kmem_free(arg, sizeof (l2arc_evict_data_t));
+}
+
+boolean_t zfs_l2arc_async_evict = B_TRUE;
+
+/*
+ * Perform l2arc eviction for buffers associated with this device
+ * If evicting all buffers (done at pool export time), try to evict
+ * asynchronously, and fall back to synchronous eviction in case of error
+ * Tell the caller whether to cleanup the device:
+ *  - B_TRUE means "asynchronous eviction, do not cleanup"
+ *  - B_FALSE means "synchronous eviction, done, please cleanup"
+ */
+static boolean_t
+l2arc_evict(l2arc_dev_t *dev, uint64_t distance, boolean_t all)
+{
+	/*
+	 *  If we are evicting all the buffers for this device, which happens
+	 *  at pool export time, schedule asynchronous task
+	 */
+	if (all && zfs_l2arc_async_evict) {
+		l2arc_evict_data_t *arg =
+		    kmem_alloc(sizeof (l2arc_evict_data_t), KM_SLEEP);
+		arg->dev = dev;
+
+		/*
+		 * Preemptively adjust the space stats for vdev
+		 * and metaslab class
+		 */
+		vdev_space_update(dev->l2ad_vdev,
+		    -(dev->l2ad_end - dev->l2ad_evict), 0, 0);
+		dev->l2ad_evict = dev->l2ad_end;
+
+		if ((taskq_dispatch(arc_flush_taskq, l2arc_evict_task,
+		    arg, TQ_NOSLEEP) == NULL)) {
+			/*
+			 * Failed to dispatch asynchronous task
+			 * cleanup, evict synchronously, avoid adjusting
+			 * vdev space second time
+			 */
+			kmem_free(arg, sizeof (l2arc_evict_data_t));
+			_l2arc_evict(dev, distance, all, B_FALSE);
+		} else {
+			/*
+			 * Successfull dispatch, vdev space updated
+			 */
+			return B_TRUE;
+		}
+	} else {
+		/* Evict synchronously */
+		_l2arc_evict(dev, distance, all, B_TRUE);
+	}
+
+	return B_FALSE;
 }
 
 /*
@@ -4533,8 +4622,9 @@ l2arc_feed_thread(void)
 
 		/*
 		 * Evict L2ARC buffers that will be overwritten.
+		 * B_FALSE guarantees synchronous eviction.
 		 */
-		l2arc_evict(dev, size, B_FALSE);
+		(void) l2arc_evict(dev, size, B_FALSE);
 
 		/*
 		 * Write ARC buffers.
@@ -4648,10 +4738,15 @@ l2arc_remove_vdev(vdev_t *vd)
 	/*
 	 * Clear all buflists and ARC references.  L2ARC device flush.
 	 */
-	l2arc_evict(remdev, 0, B_TRUE);
-	list_destroy(remdev->l2ad_buflist);
-	kmem_free(remdev->l2ad_buflist, sizeof (list_t));
-	kmem_free(remdev, sizeof (l2arc_dev_t));
+	if (l2arc_evict(remdev, 0, B_TRUE) == B_FALSE) {
+		/*
+		 * The eviction was done synchronously, cleanup here
+		 * Otherwise, the asynchronous task will cleanup
+		 */
+		list_destroy(remdev->l2ad_buflist);
+		kmem_free(remdev->l2ad_buflist, sizeof (list_t));
+		kmem_free(remdev, sizeof (l2arc_dev_t));
+	}
 }
 
 void
