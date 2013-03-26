@@ -435,13 +435,17 @@ int
 dmu_objset_hold(const char *name, void *tag, objset_t **osp)
 {
 	dsl_dataset_t *ds;
+	dsl_pool_t *dp;
 	int err;
 
 	err = dsl_dataset_hold(name, tag, &ds);
 	if (err)
 		return (err);
 
+	dp = ds->ds_dir->dd_pool;
+	rw_enter(&dp->dp_config_rwlock, RW_READER);
 	err = dmu_objset_from_ds(ds, osp);
+	rw_exit(&dp->dp_config_rwlock);
 	if (err)
 		dsl_dataset_rele(ds, tag);
 
@@ -454,13 +458,17 @@ dmu_objset_own(const char *name, dmu_objset_type_t type,
     boolean_t readonly, void *tag, objset_t **osp)
 {
 	dsl_dataset_t *ds;
+	dsl_pool_t *dp;
 	int err;
 
 	err = dsl_dataset_own(name, B_FALSE, tag, &ds);
 	if (err)
 		return (err);
 
+	dp = ds->ds_dir->dd_pool;
+	rw_enter(&dp->dp_config_rwlock, RW_READER);
 	err = dmu_objset_from_ds(ds, osp);
+	rw_exit(&dp->dp_config_rwlock);
 	if (err) {
 		dsl_dataset_disown(ds, tag);
 	} else if (type != DMU_OST_ANY && type != (*osp)->os_phys->os_type) {
