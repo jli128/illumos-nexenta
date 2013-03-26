@@ -378,8 +378,11 @@ traverse_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *rootbp,
 	/* See comment on ZIL traversal in dsl_scan_visitds. */
 	if (ds != NULL && !dsl_dataset_is_snapshot(ds)) {
 		objset_t *os;
+		dsl_pool_t *dp = ds->ds_dir->dd_pool;
 
+		rw_enter(&dp->dp_config_rwlock, RW_READER);
 		err = dmu_objset_from_ds(ds, &os);
+		rw_exit(&dp->dp_config_rwlock);
 		if (err)
 			return (err);
 

@@ -233,11 +233,9 @@ dsl_prop_register(dsl_dataset_t *ds, const char *propname,
     dsl_prop_changed_cb_t *callback, void *cbarg)
 {
 	dsl_dir_t *dd = ds->ds_dir;
-	dsl_pool_t *dp = dd->dd_pool;
 	uint64_t value;
 	dsl_prop_cb_record_t *cbr;
 	int err;
-	int need_rwlock;
 
 	err = dsl_prop_get_ds(ds, propname, 8, 1, &value, NULL);
 	if (err != 0)

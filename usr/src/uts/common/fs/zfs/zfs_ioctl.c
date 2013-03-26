@@ -1112,8 +1112,12 @@ getzfsvfs_from_ds(dsl_dataset_t *ds, zfsvfs_t **zfvp)
 {
 	objset_t *os;
 	int error;
+	dsl_pool_t *dp;
 
+	dp = ds->ds_dir->dd_pool;
+	rw_enter(&dp->dp_config_rwlock, RW_READER);
 	error = dmu_objset_from_ds(ds, &os);
+	rw_exit(&dp->dp_config_rwlock);
 	if (error)
 		return (error);
 
@@ -2081,7 +2085,9 @@ top:
 		} else {
 			objset_t *ossnap;
 
+			rw_enter(&dp->dp_config_rwlock, RW_READER);
 			error = dmu_objset_from_ds(ds, &ossnap);
+			rw_exit(&dp->dp_config_rwlock);
 			if (error == 0)
 				error = zfs_ioc_objset_stats_impl(zc, ossnap);
 			dsl_dataset_rele(ds, FTAG);
@@ -3880,7 +3886,9 @@ zfs_ioc_send(zfs_cmd_t *zc)
 		return (error);
 	}
 
+	rw_enter(&dp->dp_config_rwlock, RW_READER);
 	error = dmu_objset_from_ds(ds, &tosnap);
+	rw_exit(&dp->dp_config_rwlock);
 	if (error) {
 		dsl_dataset_rele(ds, FTAG);
 		spa_close(spa, FTAG);
@@ -3896,7 +3904,9 @@ zfs_ioc_send(zfs_cmd_t *zc)
 			dsl_dataset_rele(ds, FTAG);
 			return (error);
 		}
+		rw_enter(&dp->dp_config_rwlock, RW_READER);
 		error = dmu_objset_from_ds(dsfrom, &fromsnap);
+		rw_exit(&dp->dp_config_rwlock);
 		if (error) {
 			dsl_dataset_rele(dsfrom, FTAG);
 			dsl_dataset_rele(ds, FTAG);

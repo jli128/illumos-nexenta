@@ -1155,12 +1155,17 @@ restore_write_byref(struct restorearg *ra, objset_t *os,
 	 * GUID of the target dataset, find the referenced dataset.
 	 */
 	if (drrwbr->drr_toguid != drrwbr->drr_refguid) {
+		dsl_pool_t *dp;
 		gmesrch.guid = drrwbr->drr_refguid;
 		if ((gmep = avl_find(ra->guid_to_ds_map, &gmesrch,
 		    &where)) == NULL) {
 			return (EINVAL);
 		}
-		if (dmu_objset_from_ds(gmep->gme_ds, &ref_os))
+		dp = gmep->gme_ds->ds_dir->dd_pool;
+		rw_enter(&dp->dp_config_rwlock, RW_READER);
+		err = dmu_objset_from_ds(gmep->gme_ds, &ref_os);
+		rw_exit(&dp->dp_config_rwlock);
+		if (err)
 			return (EINVAL);
 	} else {
 		ref_os = os;
@@ -1267,6 +1272,7 @@ dmu_recv_stream(dmu_recv_cookie_t *drc, vnode_t *vp, offset_t *voffp,
 	objset_t *os;
 	zio_cksum_t pcksum;
 	int featureflags;
+	dsl_pool_t *dp;
 
 	if (drc->drc_drrb->drr_magic == BSWAP_64(DMU_BACKUP_MAGIC))
 		ra.byteswap = TRUE;
@@ -1311,7 +1317,10 @@ dmu_recv_stream(dmu_recv_cookie_t *drc, vnode_t *vp, offset_t *voffp,
 	/*
 	 * Open the objset we are modifying.
 	 */
+	dp = drc->drc_real_ds->ds_dir->dd_pool;
+	rw_enter(&dp->dp_config_rwlock, RW_READER);
 	VERIFY(dmu_objset_from_ds(drc->drc_real_ds, &os) == 0);
+	rw_exit(&dp->dp_config_rwlock);
 
 	ASSERT(drc->drc_real_ds->ds_phys->ds_flags & DS_FLAG_INCONSISTENT);
 
