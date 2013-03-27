@@ -863,7 +863,7 @@ zpool_do_destroy(int argc, char **argv)
 		return (1);
 	}
 
-	if (zpool_disable_datasets(zhp, force, 0) != 0) {
+	if (zpool_disable_datasets(zhp, force) != 0) {
 		(void) fprintf(stderr, gettext("could not destroy '%s': "
 		    "could not unmount datasets\n"), zpool_get_name(zhp));
 		return (1);
@@ -936,7 +936,7 @@ zpool_do_export(int argc, char **argv)
 			continue;
 		}
 
-		if (zpool_disable_datasets(zhp, force, n_threads) != 0) {
+		if (zpool_disable_datasets_ex(zhp, force, n_threads) != 0) {
 			ret = 1;
 			zpool_close(zhp);
 			continue;

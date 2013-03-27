@@ -33,6 +33,11 @@
 # MAPFILE HEADER END
 #
 
+SUNWprivate_1.2 {
+    global:
+	zpool_disable_datasets_ex;
+};
+	
 SUNWprivate_1.1 {
     global:
 	fletcher_2_native;

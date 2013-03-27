@@ -1179,7 +1179,9 @@ umount_task_q_init(int argc, const char **argv, int flags,
 
 	*task = NULL;
 	/* nothing to do ? should not be here */
-	if (argc <= 0)
+	if (argc == 0)
+		return (0);
+	if (argc < 0)
 		return (EINVAL);
 
 	/* allocate and init task_q */
@@ -1212,9 +1214,10 @@ umount_task_q_init(int argc, const char **argv, int flags,
 static void
 umount_task_q_fini(umount_task_q_t *task_q)
 {
-	assert(task_q != NULL);
-	pthread_mutex_destroy(&task_q->q_lock);
-	free(task_q);
+	if (task_q != NULL) {
+		pthread_mutex_destroy(&task_q->q_lock);
+		free(task_q);
+	}
 }
 
 static int
@@ -1225,7 +1228,9 @@ thread_pool_init(int n_threads, thread_pool_t **pool)
 
 	*pool = NULL;
 	/* nothing to do ? should not be here */
-	if (n_threads <= 0)
+	if (n_threads == 0)
+		return 0;
+	if (n_threads < 0)
 		return (EINVAL);
 
 	/* allocate and init task_q*/
@@ -1244,8 +1249,8 @@ thread_pool_init(int n_threads, thread_pool_t **pool)
 static void
 thread_pool_fini(thread_pool_t *pool)
 {
-	assert(pool != NULL);
-	free(pool);
+	if (pool != NULL)
+		free(pool);
 }
 
 static int
@@ -1404,7 +1409,10 @@ int parallel_unmount(libzfs_handle_t *hdl, int argc, const char **argv,
 	int		i, error;
 
 	if (error = umount_task_q_init(argc, argv, flags, hdl, &task_queue))
-		return error;
+		return (error);
+
+	if (task_queue == NULL)
+		return (0);
 
 	if (n_threads > argc)
 		n_threads = argc;
@@ -1413,7 +1421,7 @@ int parallel_unmount(libzfs_handle_t *hdl, int argc, const char **argv,
 		n_threads = THREADS_HARD_LIMIT;
 
 	if (error = thread_pool_init(n_threads, &thread_pool))
-		return error;
+		return (error);
 
 	for (i = 0; i < n_threads; ++i)
 		pthread_create(&thread_pool->thread[i].tid, NULL,
@@ -1424,7 +1432,7 @@ int parallel_unmount(libzfs_handle_t *hdl, int argc, const char **argv,
 
 	thread_pool_fini(thread_pool);
 
-	if (task_queue->error) {
+	if (task_queue && task_queue->error) {
 		error = task_queue->error;
 		/*
 		 * Tell ZFS!
@@ -1450,7 +1458,13 @@ int parallel_unmount(libzfs_handle_t *hdl, int argc, const char **argv,
  * gather all the filesystems that are currently mounted.
  */
 int
-zpool_disable_datasets(zpool_handle_t *zhp, boolean_t force, int n_threads)
+zpool_disable_datasets(zpool_handle_t *zhp, boolean_t force)
+{
+	return zpool_disable_datasets_ex(zhp, force, 1);
+}
+
+int
+zpool_disable_datasets_ex(zpool_handle_t *zhp, boolean_t force, int n_threads)
 {
 	int used, alloc;
 	struct mnttab entry;
