@@ -1,3 +1,9 @@
+sunwzfsr (5.11.134-31-9473-10054) nexenta; urgency=high
+
+  * Issue 10054: turn on zfs_fastflush by default
+
+ -- Boris Protopopov <boris.protopopov@nexenta.com>  Wed, 27 Mar 2013 16:21:29 -0700
+
 sunwzfsr (5.11.134-31-9472-13409) nexenta; urgency=low
 
   * Issue 13409: Parallel unmount of datasets for zpool export - another fix

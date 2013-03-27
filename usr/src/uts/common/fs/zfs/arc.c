@@ -1587,7 +1587,7 @@ arc_buf_size(arc_buf_t *buf)
 	return (buf->b_hdr->b_size);
 }
 
-int zfs_fastflush = 0;
+int zfs_fastflush = 1;
 
 /*
  * Evict buffers from list until we've removed the specified number of
