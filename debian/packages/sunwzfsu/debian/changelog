@@ -1,3 +1,9 @@
+sunwzfsr (5.11.134-31-12271-13409) nexenta; urgency=low
+
+  * Issue 13409: Fixed section definition in libzfs mapfile-vers file
+
+ -- Ilys Usvyatsky <ilya.usvyatsky@nexenta.com>  Wed, 27 Mar 2013 18:02:44 -0700
+
 sunwzfsr (5.11.134-31-12270-13409) nexenta; urgency=low
 
   * Issue 13409: Parallel unmount of datasets for zpool export - another fix

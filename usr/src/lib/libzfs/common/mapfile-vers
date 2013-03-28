@@ -33,11 +33,6 @@
 # MAPFILE HEADER END
 #
 
-SUNWprivate_1.2 {
-    global:
-	zpool_disable_datasets_ex;
-};
-	
 SUNWprivate_1.1 {
     global:
 	fletcher_2_native;
@@ -156,6 +151,7 @@ SUNWprivate_1.1 {
 	zpool_create;
 	zpool_destroy;
 	zpool_disable_datasets;
+	zpool_disable_datasets_ex;
 	zpool_dump_ddt;
 	zpool_enable_datasets;
 	zpool_expand_proplist;
