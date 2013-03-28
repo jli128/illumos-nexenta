@@ -1076,14 +1076,10 @@ dsl_scan_visitds(dsl_scan_t *scn, uint64_t dsobj, dmu_tx_t *tx)
 	dsl_pool_t *dp = scn->scn_dp;
 	dsl_dataset_t *ds;
 	objset_t *os;
-	int error;
 
 	VERIFY3U(0, ==, dsl_dataset_hold_obj(dp, dsobj, FTAG, &ds));
 
-	rw_enter(&dp->dp_config_rwlock, RW_READER);
-	error = dmu_objset_from_ds(ds, &os);
-	rw_exit(&dp->dp_config_rwlock);
-	if (error)
+	if (dmu_objset_from_ds(ds, &os))
 		goto out;
 
 	/*

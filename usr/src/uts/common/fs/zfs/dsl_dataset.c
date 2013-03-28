@@ -1050,7 +1050,6 @@ dsl_dataset_destroy(dsl_dataset_t *ds, void *tag, boolean_t defer)
 	dsl_sync_task_group_t *dstg;
 	objset_t *os;
 	dsl_dir_t *dd;
-	dsl_pool_t *dp;
 	uint64_t obj;
 	struct dsl_ds_destroyarg dsda = { 0 };
 	dsl_dataset_t dummy_ds = { 0 };
@@ -1073,7 +1072,6 @@ dsl_dataset_destroy(dsl_dataset_t *ds, void *tag, boolean_t defer)
 	}
 
 	dd = ds->ds_dir;
-	dp = dd->dd_pool;
 	dummy_ds.ds_dir = dd;
 	dummy_ds.ds_object = ds->ds_object;
 
@@ -1086,9 +1084,7 @@ dsl_dataset_destroy(dsl_dataset_t *ds, void *tag, boolean_t defer)
 	if (err)
 		goto out;
 
-	rw_enter(&dp->dp_config_rwlock, RW_READER);
 	err = dmu_objset_from_ds(ds, &os);
-	rw_exit(&dp->dp_config_rwlock);
 	if (err)
 		goto out;
 

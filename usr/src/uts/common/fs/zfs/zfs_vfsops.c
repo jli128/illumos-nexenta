@@ -42,7 +42,6 @@
 #include <sys/zil.h>
 #include <sys/fs/zfs.h>
 #include <sys/dmu.h>
-#include <sys/dsl_dir.h>
 #include <sys/dsl_prop.h>
 #include <sys/dsl_dataset.h>
 #include <sys/dsl_deleg.h>
@@ -507,7 +506,6 @@ zfs_register_callbacks(vfs_t *vfsp)
 	 * overboard...
 	 */
 	ds = dmu_objset_ds(os);
-	rw_enter(&ds->ds_dir->dd_pool->dp_config_rwlock, RW_READER);
 	error = dsl_prop_register(ds, "atime", atime_changed_cb, zfsvfs);
 	error = error ? error : dsl_prop_register(ds,
 	    "xattr", xattr_changed_cb, zfsvfs);
@@ -529,7 +527,6 @@ zfs_register_callbacks(vfs_t *vfsp)
 	    "aclinherit", acl_inherit_changed_cb, zfsvfs);
 	error = error ? error : dsl_prop_register(ds,
 	    "vscan", vscan_changed_cb, zfsvfs);
-	rw_exit(&ds->ds_dir->dd_pool->dp_config_rwlock);
 	if (error)
 		goto unregister;
 
