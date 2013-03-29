@@ -1,3 +1,9 @@
+sunwsmbskr (5.11.134-31-13067-7815) nexenta; urgency=low
+
+  * Issue 7815: SMB server delivers old modification time...
+
+ -- Nexenta Systems <support@nexenta.com> Fri, 29 Mar 2013 11:39:17 -0400
+
 sunwsmbskr (5.11.134-31-13066-7126) nexenta; urgency=high
 
   * Issue 7126: smbd panic with missing negotiate challenge
