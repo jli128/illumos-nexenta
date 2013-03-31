@@ -46,7 +46,7 @@ DEBUG_DEFS	+= $(DEBUG_FLGS)
 #
 # lint pass one non-enforcement
 #
-CFLAGS += $(CCVERBOSE) -DACPI_USE_LOCAL_CACHE -DACPI_DEBUG_OUTPUT
+CFLAGS +=	$(CCVERBOSE) -DACPI_USE_LOCAL_CACHE
 
 #
 # 3rd party code is not lint clean
