@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2013 Nexenta Systems, Inc. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
@@ -220,13 +220,19 @@ CLOBBERFILES= $(PDIR) proto_list_$(PKGMACH)
 # build environment and then reference (implicitly or explicitly) the all
 # or install targets.
 #
-$(NZA_OPEN_ONLY)MANIFESTS:sh= \
-	(cd manifests; rm -f network-aoe-target.mf; print *.mf)
+$(NZA_OPEN_ONLY)MANIFESTS:sh= (		\
+	cd manifests;			\
+	rm -f driver-isal.mf;		\
+	rm -f network-aoe-target.mf;	\
+	print *.mf			\
+	)
 
-$(NZA_KMODS)MANIFESTS:sh= \
-	(cd manifests; \
-	 cp ../../../nza-closed/pkg/manifests/network-aoe-target.mf .; \
-	 print *.mf)
+$(NZA_KMODS)MANIFESTS:sh= (						\
+	cd manifests;							\
+	cp ../../../nza-closed/pkg/manifests/driver-isal.mf .;		\
+	cp ../../../nza-closed/pkg/manifests/network-aoe-target.mf .;	\
+	print *.mf							\
+	)
 
 PKGS= $(MANIFESTS:%.mf=%)
 DEP_PKGS= $(PKGS:%=$(PDIR)/%.dep)
