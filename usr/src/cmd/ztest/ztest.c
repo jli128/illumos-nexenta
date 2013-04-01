@@ -1049,7 +1049,8 @@ ztest_random_vdev_top(spa_t *spa, boolean_t log_ok)
 	do {
 		top = ztest_random(rvd->vdev_children);
 		tvd = rvd->vdev_child[top];
-	} while (tvd->vdev_ishole || (tvd->vdev_islog && !log_ok) ||
+	} while (tvd->vdev_ishole || tvd->vdev_isspecial ||
+	    (tvd->vdev_islog && !log_ok) ||
 	    tvd->vdev_mg == NULL || tvd->vdev_mg->mg_class == NULL);
 
 	return (top);
