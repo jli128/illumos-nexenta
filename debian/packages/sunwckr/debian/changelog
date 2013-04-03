@@ -1,3 +1,9 @@
+sunwckr (5.11.134-31-12269-10173) nexenta; urgency=medium
+
+  * Issue 10173: VLAN fanout stuck to one CPU
+
+ -- Nexenta Systems <support@nexenta.com>  Mon, 25 Mar 2013 12:00:00 -0500
+
 sunwckr (5.11.134-31-12268-13247) nexenta; urgency=medium
 
   * Issue 13247: Large, fixed command timeouts impair command drop recovery
