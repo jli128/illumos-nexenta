@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -57,6 +58,7 @@
  *
  * 	zpool_enable_datasets()
  * 	zpool_disable_datasets()
+ * 	zpool_disable_datasets_ex()
  */
 
 #include <dirent.h>
@@ -72,6 +74,7 @@
 #include <sys/mntent.h>
 #include <sys/mount.h>
 #include <sys/stat.h>
+#include <thread_pool.h>
 
 #include <libzfs.h>
 
@@ -1127,6 +1130,272 @@ mountpoint_compare(const void *a, const void *b)
 	return (strcmp(mountb, mounta));
 }
 
+typedef enum {
+	TASK_TO_PROCESS,
+	TASK_IN_PROCESSING,
+	TASK_DONE,
+	TASK_MAX
+} task_state_t;
+
+typedef struct umount_task {
+	const char	*mp;
+	task_state_t	state;
+	int		error;
+} umount_task_t;
+
+typedef struct umount_task_q {
+	pthread_mutex_t	q_lock;
+	libzfs_handle_t	*hdl;
+	const char	*error_mp;
+	int		error;
+	int		q_length;
+	int		n_tasks;
+	int		flags;
+	umount_task_t	task[1];
+} umount_task_q_t;
+
+static int
+umount_task_q_init(int argc, const char **argv, int flags,
+    libzfs_handle_t *hdl, umount_task_q_t **task)
+{
+	umount_task_q_t *task_q;
+	int i, error;
+	size_t task_q_size;
+
+	*task = NULL;
+	/* nothing to do ? should not be here */
+	if (argc <= 0)
+		return (EINVAL);
+
+	/* allocate and init task_q */
+	task_q_size = sizeof (umount_task_q_t) +
+	    (argc-1) * sizeof (umount_task_t);
+	task_q = malloc(task_q_size);
+	if (task_q == NULL)
+		return (ENOMEM);
+
+	if (error = pthread_mutex_init(&task_q->q_lock, NULL)) {
+		free(task_q);
+		return (error);
+	}
+	task_q->hdl = hdl;
+	task_q->error_mp = NULL;
+	task_q->error = 0;
+	task_q->q_length = argc;
+	task_q->n_tasks = argc;
+	task_q->flags = flags;
+
+	/* we are not going to change the strings, so no need to strdup */
+	for (i = 0; i < argc; ++i) {
+		task_q->task[i].mp = argv[i];
+		task_q->task[i].state = TASK_TO_PROCESS;
+		task_q->error = 0;
+	}
+
+	*task = task_q;
+	return (0);
+}
+
+static void
+umount_task_q_fini(umount_task_q_t *task_q)
+{
+	assert(task_q != NULL);
+	pthread_mutex_destroy(&task_q->q_lock);
+	free(task_q);
+}
+
+static int
+is_child_of(const char *s1, const char *s2)
+{
+	for (; *s1 && *s2 && (*s1 == *s2); ++s1, ++s2)
+		;
+	return (!*s2 && (*s1 == '/'));
+}
+
+static boolean_t
+task_completed(int ind, umount_task_q_t *task_q)
+{
+	return (task_q->task[ind].state == TASK_DONE);
+}
+
+static boolean_t
+task_to_process(int ind, umount_task_q_t *task_q)
+{
+	return (task_q->task[ind].state == TASK_TO_PROCESS);
+}
+
+static boolean_t
+task_in_processing(int ind, umount_task_q_t *task_q)
+{
+	return (task_q->task[ind].state == TASK_IN_PROCESSING);
+}
+
+static void
+task_next_stage(int ind, umount_task_q_t *task_q)
+{
+	/* our state machine is a pipeline */
+	task_q->task[ind].state++;
+	assert(task_q->task[ind].state < TASK_MAX);
+}
+
+static boolean_t
+task_state_valid(int ind, umount_task_q_t *task_q)
+{
+	/* our state machine is a pipeline */
+	return (task_q->task[ind].state < TASK_MAX);
+}
+
+static boolean_t
+child_umount_pending(int ind, umount_task_q_t *task_q)
+{
+	int i;
+	for (i = ind-1; i >= 0; --i) {
+		assert(task_state_valid(i, task_q));
+		if ((task_q->task[i].state != TASK_DONE) &&
+		    is_child_of(task_q->task[i].mp, task_q->task[ind].mp))
+			return (B_TRUE);
+	}
+
+	return (B_FALSE);
+}
+
+static void
+unmounter(void *arg)
+{
+	umount_task_q_t *task_q = (umount_task_q_t *)arg;
+	int error = 0, done = 0;
+
+	assert(task_q != NULL);
+	if (task_q == NULL)
+		return;
+
+	while (!error && !done) {
+		umount_task_t *task;
+		int i, t, umount_err, flags, q_error;
+
+		if (error = pthread_mutex_lock(&task_q->q_lock))
+			break; /* Out of while() loop */
+
+		if (task_q->error || task_q->n_tasks == 0) {
+			(void) pthread_mutex_unlock(&task_q->q_lock);
+			break; /* Out of while() loop */
+		}
+
+		/* Find task ready for processing */
+		for (i = 0, task = NULL, t = -1; i < task_q->q_length; ++i) {
+			if (task_q->error) {
+				/* Fatal error, stop processing */
+				done = 1;
+				break; /* Out of for() loop */
+			}
+
+			if (task_completed(i, task_q))
+				continue; /* for() loop */
+
+			if (task_to_process(i, task_q)) {
+				/*
+				 * Cannot umount if some children are still
+				 * mounted; come back later
+				 */
+				if ((child_umount_pending(i, task_q)))
+					continue; /* for() loop */
+				/* Should be OK to unmount now */
+				task_next_stage(i, task_q);
+				task = &task_q->task[i];
+				t = i;
+				break; /* Out of for() loop */
+			}
+
+			/* Otherwise, the task is already in processing */
+			assert(task_in_processing(i, task_q));
+		}
+
+		flags = task_q->flags;
+
+		error = pthread_mutex_unlock(&task_q->q_lock);
+
+		if (done || (task == NULL) || error || task_q->error)
+			break; /* Out of while() loop */
+
+		umount_err = umount2(task->mp, flags);
+		q_error = errno;
+
+		if (error = pthread_mutex_lock(&task_q->q_lock))
+			break; /* Out of while() loop */
+
+		/* done processing */
+		assert(t >= 0 && t < task_q->q_length);
+		task_next_stage(t, task_q);
+		assert(task_completed(t, task_q));
+		task_q->n_tasks--;
+
+		if (umount_err) {
+			/*
+			 * umount2() failed, cannot be busy because of mounted
+			 * children - we have checked above, so it is fatal
+			 */
+			assert(child_umount_pending(t, task_q) == B_FALSE);
+			task->error = q_error;
+			if (!task_q->error) {
+				task_q->error = task->error;
+				task_q->error_mp = task->mp;
+			}
+			done = 1;
+		}
+
+		if (error = pthread_mutex_unlock(&task_q->q_lock))
+			break; /* Out of while() loop */
+	}
+}
+
+#define	THREADS_HARD_LIMIT	128
+int parallel_unmount(libzfs_handle_t *hdl, int argc, const char **argv,
+    int flags, int n_threads)
+{
+	umount_task_q_t *task_queue = NULL;
+	int		i, error;
+	tpool_t		*t;
+
+	if (argc == 0)
+		return (0);
+
+	if (error = umount_task_q_init(argc, argv, flags, hdl, &task_queue)) {
+		assert(task_queue == NULL);
+		task_queue = NULL; /* just in case */
+		goto out;
+	}
+
+	if (n_threads > argc)
+		n_threads = argc;
+
+	if (n_threads > THREADS_HARD_LIMIT)
+		n_threads = THREADS_HARD_LIMIT;
+
+	t = tpool_create(1, n_threads, 0, NULL);
+
+	for (i = 0; i < n_threads; ++i)
+		(void) tpool_dispatch(t, unmounter, task_queue);
+
+	tpool_wait(t);
+	tpool_destroy(t);
+
+out:
+	if (error || task_queue->error) {
+		/*
+		 * Tell ZFS!
+		 */
+		zfs_error_aux(hdl,
+		    strerror(error ? error : task_queue->error));
+		error = zfs_error_fmt(hdl, EZFS_UMOUNTFAILED,
+		    dgettext(TEXT_DOMAIN, "cannot unmount '%s'"),
+		    error ? "datasets" : task_queue->error_mp);
+	}
+	if (task_queue)
+		umount_task_q_fini(task_queue);
+
+	return (error);
+}
+
 /* alias for 2002/240 */
 #pragma weak zpool_unmount_datasets = zpool_disable_datasets
 /*
@@ -1138,6 +1407,12 @@ mountpoint_compare(const void *a, const void *b)
  */
 int
 zpool_disable_datasets(zpool_handle_t *zhp, boolean_t force)
+{
+	return (zpool_disable_datasets_ex(zhp, force, 1));
+}
+
+int
+zpool_disable_datasets_ex(zpool_handle_t *zhp, boolean_t force, int n_threads)
 {
 	int used, alloc;
 	struct mnttab entry;
@@ -1242,8 +1517,14 @@ zpool_disable_datasets(zpool_handle_t *zhp, boolean_t force)
 	 * Now unmount everything, removing the underlying directories as
 	 * appropriate.
 	 */
-	for (i = 0; i < used; i++) {
-		if (unmount_one(hdl, mountpoints[i], flags) != 0)
+	if (n_threads < 2) {
+		for (i = 0; i < used; i++) {
+			if (unmount_one(hdl, mountpoints[i], flags) != 0)
+				goto out;
+		}
+	} else {
+		if (parallel_unmount(hdl, used, (const char **)mountpoints,
+		    flags, n_threads) != 0)
 			goto out;
 	}
 

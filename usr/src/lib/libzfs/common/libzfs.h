@@ -765,6 +765,7 @@ int zfs_smb_acl_rename(libzfs_handle_t *, char *, char *, char *, char *);
  */
 extern int zpool_enable_datasets(zpool_handle_t *, const char *, int);
 extern int zpool_disable_datasets(zpool_handle_t *, boolean_t);
+extern int zpool_disable_datasets_ex(zpool_handle_t *, boolean_t, int);
 
 /*
  * Mappings between vdev and FRU.
