@@ -1118,10 +1118,12 @@ zpool_do_export(int argc, char **argv)
 			(void) fprintf(stderr, gettext("invalid option '%c'\n"),
 			    optopt);
 			usage(B_FALSE);
+			break;
 		case ':':
 			(void) fprintf(stderr, gettext("missing argument "
 			    "for option '%c'\n"), optopt);
 			usage(B_FALSE);
+			break;
 		}
 	}
 

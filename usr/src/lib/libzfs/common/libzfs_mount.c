@@ -1200,7 +1200,7 @@ static void
 umount_task_q_fini(umount_task_q_t *task_q)
 {
 	assert(task_q != NULL);
-	pthread_mutex_destroy(&task_q->q_lock);
+	(void) pthread_mutex_destroy(&task_q->q_lock);
 	free(task_q);
 }
 
