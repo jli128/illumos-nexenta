@@ -103,6 +103,10 @@ zpool_prop_init(void)
 	    PROP_DEFAULT, ZFS_TYPE_POOL, "<threshold (min 100)>", "DEDUPDITTO");
 	zprop_register_number(ZPOOL_PROP_DEDUPMETA_DITTO, "dedup_meta_ditto", 0,
 	    PROP_DEFAULT, ZFS_TYPE_POOL, "<number of copies>", "DEDUP_META_DITTO");
+	zprop_register_number(ZPOOL_PROP_DEDUP_LO_BEST_EFFORT, "dedup_lo_best_effort", 60,
+	    PROP_DEFAULT, ZFS_TYPE_POOL, "0-100", "DEDUP_LO_BEST_EFFORT");
+	zprop_register_number(ZPOOL_PROP_DEDUP_HI_BEST_EFFORT, "dedup_hi_best_effort", 80,
+	    PROP_DEFAULT, ZFS_TYPE_POOL, "0-100", "DEDUP_HI_BEST_EFFORT");
 
 	/* default index (boolean) properties */
 	zprop_register_index(ZPOOL_PROP_DELEGATION, "delegation", 1,
@@ -119,6 +123,8 @@ zpool_prop_init(void)
 	    PROP_DEFAULT, ZFS_TYPE_POOL, "on | off", "RDONLY", boolean_table);
 	zprop_register_index(ZPOOL_PROP_DDT_DESEGREGATION, "ddt_desegregation", 0,
 	    PROP_DEFAULT, ZFS_TYPE_POOL, "on | off", "DDT_DESEG", boolean_table);
+	zprop_register_index(ZPOOL_PROP_DEDUP_BEST_EFFORT, "dedup_best_effort", 0,
+	    PROP_DEFAULT, ZFS_TYPE_POOL, "on | off", "DEDUP_BEST_EFFORT", boolean_table);
 
 	zprop_register_index(ZPOOL_PROP_META_PLACEMENT, "meta_placement", 1,
 	    PROP_DEFAULT, ZFS_TYPE_POOL, "on | off", "META_PLCMNT", boolean_table);

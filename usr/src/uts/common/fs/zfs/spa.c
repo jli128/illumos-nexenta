@@ -242,6 +242,15 @@ spa_prop_get_config(spa_t *spa, nvlist_t **nvp)
 		cap = (size == 0) ? 0 : (alloc * 100 / size);
 		spa_prop_add_list(*nvp, ZPOOL_PROP_CAPACITY, NULL, cap, src);
 
+		spa_prop_add_list(*nvp, ZPOOL_PROP_DEDUP_BEST_EFFORT, NULL,
+		    spa->spa_dedup_best_effort, src);
+
+		spa_prop_add_list(*nvp, ZPOOL_PROP_DEDUP_LO_BEST_EFFORT, NULL,
+		    spa->spa_dedup_lo_best_effort, src);
+
+		spa_prop_add_list(*nvp, ZPOOL_PROP_DEDUP_HI_BEST_EFFORT, NULL,
+		    spa->spa_dedup_hi_best_effort, src);
+
 		spa_prop_add_list(*nvp, ZPOOL_PROP_DEDUPRATIO, NULL,
 		    ddt_get_pool_dedup_ratio(spa), src);
 
@@ -468,6 +477,7 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 		case ZPOOL_PROP_AUTOREPLACE:
 		case ZPOOL_PROP_LISTSNAPS:
 		case ZPOOL_PROP_AUTOEXPAND:
+		case ZPOOL_PROP_DEDUP_BEST_EFFORT:
 		case ZPOOL_PROP_DDT_DESEGREGATION:
 		case ZPOOL_PROP_META_PLACEMENT:
 		case ZPOOL_PROP_DDT_TO_METADEV:
@@ -529,6 +539,20 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 				}
 				dmu_objset_rele(os, FTAG);
 			}
+			break;
+
+		case ZPOOL_PROP_DEDUP_LO_BEST_EFFORT:
+			error = nvpair_value_uint64(elem, &intval);
+			if ((intval < 0) || (intval > 100) ||
+			    (intval >= spa->spa_dedup_hi_best_effort))
+				error = EINVAL;
+			break;
+
+		case ZPOOL_PROP_DEDUP_HI_BEST_EFFORT:
+			error = nvpair_value_uint64(elem, &intval);
+			if ((intval < 0) || (intval > 100) ||
+			    (intval <= spa->spa_dedup_lo_best_effort))
+				error = EINVAL;
 			break;
 
 		case ZPOOL_PROP_FAILUREMODE:
@@ -2594,6 +2618,10 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 		spa_prop_find(spa, ZPOOL_PROP_DDT_DESEGREGATION, &val);
 		spa_set_ddt_classes(spa, val);
 
+		spa_prop_find(spa, ZPOOL_PROP_DEDUP_BEST_EFFORT, &spa->spa_dedup_best_effort);
+		spa_prop_find(spa, ZPOOL_PROP_DEDUP_LO_BEST_EFFORT, &spa->spa_dedup_lo_best_effort);
+		spa_prop_find(spa, ZPOOL_PROP_DEDUP_HI_BEST_EFFORT, &spa->spa_dedup_hi_best_effort);
+
 		spa_prop_find(spa, ZPOOL_PROP_META_PLACEMENT, &mp->spa_enable_meta_placement_selection);
 		spa_prop_find(spa, ZPOOL_PROP_DDT_TO_METADEV, &mp->spa_ddt_to_special);
 		spa_prop_find(spa, ZPOOL_PROP_GENERAL_META_TO_METADEV, &mp->spa_general_meta_to_special);
@@ -3665,6 +3693,9 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	spa->spa_lowat = zpool_prop_default_numeric(ZPOOL_PROP_LOWATERMARK);
 	spa->spa_ddt_meta_copies = zpool_prop_default_numeric(
 	    ZPOOL_PROP_DEDUPMETA_DITTO);
+	spa->spa_dedup_best_effort = zpool_prop_default_numeric(ZPOOL_PROP_DEDUP_BEST_EFFORT);
+	spa->spa_dedup_lo_best_effort = zpool_prop_default_numeric(ZPOOL_PROP_DEDUP_LO_BEST_EFFORT);
+	spa->spa_dedup_hi_best_effort = zpool_prop_default_numeric(ZPOOL_PROP_DEDUP_HI_BEST_EFFORT);
 
 	mp->spa_enable_meta_placement_selection = zpool_prop_default_numeric(ZPOOL_PROP_META_PLACEMENT);
 	mp->spa_ddt_to_special = zpool_prop_default_numeric(ZPOOL_PROP_DDT_TO_METADEV);
@@ -6187,6 +6218,15 @@ spa_sync_props(void *arg, dmu_tx_t *tx)
 				break;
 			case ZPOOL_PROP_DDT_DESEGREGATION:
 				spa_set_ddt_classes(spa, intval);
+				break;
+			case ZPOOL_PROP_DEDUP_BEST_EFFORT:
+				spa->spa_dedup_best_effort = intval;
+				break;
+			case ZPOOL_PROP_DEDUP_LO_BEST_EFFORT:
+				spa->spa_dedup_lo_best_effort = intval;
+				break;
+			case ZPOOL_PROP_DEDUP_HI_BEST_EFFORT:
+				spa->spa_dedup_hi_best_effort = intval;
 				break;
 			case ZPOOL_PROP_BOOTFS:
 				spa->spa_bootfs = intval;

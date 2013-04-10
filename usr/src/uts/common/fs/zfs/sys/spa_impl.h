@@ -375,6 +375,10 @@ struct spa {
 	enum ddt_class spa_ddt_class_max;
 
 	spa_meta_placement_t spa_meta_policy;
+
+	uint64_t spa_dedup_best_effort;
+	uint64_t spa_dedup_lo_best_effort;
+	uint64_t spa_dedup_hi_best_effort;
 };
 
 extern const char *spa_config_path;
