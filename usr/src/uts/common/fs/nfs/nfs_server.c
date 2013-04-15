@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -1352,7 +1352,7 @@ static struct rpc_disptable rfs_disptable[] = {
  * is it transport-dependent, it's laughably easy to spoof.  If you're
  * really interested in security, you must start with secure RPC instead.
  */
-static int nfs_portmon = 0;
+volatile int nfs_portmon = 0;
 
 #ifdef DEBUG
 static int cred_hits = 0;

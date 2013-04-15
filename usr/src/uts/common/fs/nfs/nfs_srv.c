@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -1243,7 +1243,7 @@ struct rfs_async_write_list {
 
 static struct rfs_async_write_list *rfs_async_write_head = NULL;
 static kmutex_t rfs_async_write_lock;
-static int rfs_write_async = 1;	/* enables write clustering if == 1 */
+volatile int rfs_write_async = 1;	/* enables write clustering if == 1 */
 
 #define	MAXCLIOVECS	42
 #define	RFSWRITE_INITVAL (enum nfsstat) -1

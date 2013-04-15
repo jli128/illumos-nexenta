@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  *
  *	Copyright (c) 1983,1984,1985,1986,1987,1988,1989 AT&T.
  *	All rights reserved.
@@ -1449,7 +1450,7 @@ nfs_access(vnode_t *vp, int mode, int flags, cred_t *cr, caller_context_t *ct)
 	    va.va_mode << shift, mode));
 }
 
-static int nfs_do_symlink_cache = 1;
+volatile int nfs_do_symlink_cache = 1;
 
 /* ARGSUSED */
 static int
@@ -1752,7 +1753,7 @@ out:
 	return (error);
 }
 
-static int nfs_lookup_neg_cache = 1;
+volatile int nfs_lookup_neg_cache = 1;
 
 #ifdef DEBUG
 static int nfs_lookup_dnlc_hits = 0;
@@ -2939,7 +2940,7 @@ static int nfs_readdir_cache_misses = 0;
 static int nfs_readdir_readahead = 0;
 #endif
 
-static int nfs_shrinkreaddir = 0;
+volatile int nfs_shrinkreaddir = 0;
 
 /*
  * Read directory entries.
@@ -3599,7 +3600,7 @@ nfs_seek(vnode_t *vp, offset_t ooff, offset_t *noffp, caller_context_t *ct)
  * number of NFS_MAXDATA blocks to read ahead
  * optimized for 100 base-T.
  */
-static int nfs_nra = 4;
+volatile int nfs_nra = 4;
 
 #ifdef DEBUG
 static int nfs_lostpage = 0;	/* number of times we lost original page */

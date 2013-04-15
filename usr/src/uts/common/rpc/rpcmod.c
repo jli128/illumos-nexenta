@@ -21,7 +21,10 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ */
+/*
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -1103,8 +1106,8 @@ extern void	(*mir_rele)(queue_t *, mblk_t *);
 extern void	(*mir_start)(queue_t *);
 extern void	(*clnt_stop_idle)(queue_t *);
 
-clock_t	clnt_idle_timeout = MIR_CLNT_IDLE_TIMEOUT;
-clock_t	svc_idle_timeout = MIR_SVC_IDLE_TIMEOUT;
+volatile clock_t	clnt_idle_timeout = MIR_CLNT_IDLE_TIMEOUT;
+volatile clock_t	svc_idle_timeout = MIR_SVC_IDLE_TIMEOUT;
 
 /*
  * Timeout for subsequent notifications of idle connection.  This is

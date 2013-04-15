@@ -20,6 +20,7 @@
  */
 /*
  *  Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -756,7 +757,7 @@ svc_clts_kfreeres(SVCXPRT *clone_xprt)
 #define	REQTOXID(req)	((req)->rq_xprt->xp_xid)
 
 static int	ndupreqs = 0;
-int	maxdupreqs = MAXDUPREQS;
+volatile int	maxdupreqs = MAXDUPREQS;
 static kmutex_t dupreq_lock;
 static struct dupreq *drhashtbl[DRHASHSZ];
 static int	drhashstat[DRHASHSZ];

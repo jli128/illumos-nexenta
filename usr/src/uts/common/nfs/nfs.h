@@ -20,8 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
- *
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -242,7 +241,7 @@ enum nfsftype {
  */
 #ifdef _KERNEL
 
-extern bool_t		nfs_allow_preepoch_time;
+extern volatile bool_t	nfs_allow_preepoch_time;
 
 #ifdef _LP64
 
@@ -2291,7 +2290,7 @@ extern const struct fs_operation_def nfs3_vnodeops_template[];
  * with these broken servers, the nfs_disable_rddir_cache
  * parameter can be used to disable readdir response caching.
  */
-extern int		nfs_disable_rddir_cache;
+extern volatile int	nfs_disable_rddir_cache;
 
 /*
  * External functions called by the v2/v3 code into the v4 code

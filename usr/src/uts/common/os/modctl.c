@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -132,7 +133,7 @@ int		modunload_disable_count;
 
 int	isminiroot;		/* set if running as miniroot */
 int	modrootloaded;		/* set after root driver and fs are loaded */
-int	moddebug = 0x0;		/* debug flags for module writers */
+volatile int moddebug = 0x0;	/* debug flags for module writers */
 int	swaploaded;		/* set after swap driver and fs are loaded */
 int	bop_io_quiesced = 0;	/* set when BOP I/O can no longer be used */
 int	last_module_id;
