@@ -6,16 +6,20 @@
 # Use v4 compatability mode, so ldconfig gets added to maint scripts.
 export DH_COMPAT=4
 
+# Normally nexenta-on-source
 PACKAGE=$(shell dh_listpackages)
 
-# Location is used as ON work space
-GATESUBDIR=onnv-gate
-export GATEROOT=$(CURDIR)/$(GATESUBDIR)
+# Location of closed patches
+# You are expected to make a symlink for this when you
+# create a new workspace, i.e. patches -> ../nxp3xxx/closed
+PATCHDIR=$(CURDIR)/patches
+
+# Location where ON work space is found
+export GATEROOT=$(CURDIR)
 
 CLOSEDBIN_NAME=on-closed-bins-nd.i386.tar.bz2 
 CLOSEDBIN_URL=http://dlc.sun.com/osol/on/downloads/b134/$(CLOSEDBIN_NAME)
-GATEREV=onnv_134
-GATEPARENT_URL=ssh://anonhg@hg.illumos.org/illumos-gate
+
 CRYPTO_DIR=on-crypto-nd.i386.tar.bz2
 CRYPTO_URL=http://dlc.sun.com/osol/on/downloads/b134/$(CRYPTO_DIR)
 
@@ -32,29 +36,17 @@ PKGDIR=/var/tmp/packages
 patch: patch-stamp
 patch-stamp:
 	dh_testdir
-	if test ! -d $(GATEROOT); then \
-		hg clone -r $(GATEREV) $(GATEPARENT_URL) $(GATESUBDIR); \
-	else \
-		cd $(GATEROOT); \
-		hg pull; \
-		hg up -r $(GATEREV); \
+	if [ ! -d $(PATCHDIR)/. ]; then \
+		echo "You need the closed patches"; \
+		exit 1; \
 	fi
+	for p in $(shell cat debian/series); \
+	do \
+		patch -p1 < $(PATCHDIR)/$$p; \
+	done
 	cp $(GATEROOT)/usr/src/tools/env/opensolaris.sh $(GATEROOT)
 	cd $(GATEROOT) && cat $(CURDIR)/debian/opensolaris.patch | patch -p1
 	cd $(GATEROOT) && sed -i -e "s#__GATEROOT__#$(GATEROOT)#" opensolaris.sh
-	if test -L $(GATEROOT)/.hg/patches; then \
-		rm $(GATEROOT)/.hg/patches; \
-	fi
-	if test ! -d $(GATEROOT)/.hg/patches; then \
-		mkdir $(GATEROOT)/.hg/patches; \
-	fi;
-	if test -d $(GATEROOT)/../patches; then \
-		cd $(GATEROOT)/.hg/patches && ln -sf ../../../patches/* . ; \
-	fi
-	if test -d $(GATEROOT)/../closed; then \
-		cd $(GATEROOT)/.hg/patches && ln -sf ../../../closed/* . ; \
-	fi
-	cd $(GATEROOT) && hg qpush -a
 	touch $@
 
 setup-closed: setup-closed-stamp
@@ -130,10 +122,6 @@ clean: clobber_on rm_log_proto
 	dh_testdir
 	dh_testroot
 	dh_clean -d
-	if test -d $(GATEROOT) ;then \
-		cd $(GATEROOT) ; \
-		hg qpop -a ;  \
-	fi
 	rm -f opensolaris.sh patch-stamp
 	rm -f build-on-stamp build-stamp upload-packages-stamp build-packages-stamp debian/files
 
@@ -148,8 +136,8 @@ binary-arch: build
 	dh_installdocs
 	dh_installchangelogs
 	dh_installdirs  usr/src/$(PACKAGE) usr/src/$(PACKAGE)/debian usr/src/$(PACKAGE)/patches
-	cp -ar .hg debian/$(PACKAGE)/usr/src/$(PACKAGE)
-	cd debian/$(PACKAGE)/usr/src/$(PACKAGE) && hg up -C
+	#XXX cp -ar .hg debian/$(PACKAGE)/usr/src/$(PACKAGE)
+	#XXX cd debian/$(PACKAGE)/usr/src/$(PACKAGE) && hg up -C
 	dh_compress
 	dh_installdeb
 	dh_gencontrol
