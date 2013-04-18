@@ -22,18 +22,25 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
 PROG=query
 SHARED=	common.ksh query uninstall.ksh
-CLOBBERFILES= query
+TEMPLATES= SUNWdefault.xml SUNWblank.xml
+CLOBBERFILES= $(ROOTPROGS) $(ROOTSHARED) $(ROOTTEMPLATES)
 
 include $(SRC)/cmd/Makefile.cmd
 include ../../Makefile.brand
 
+.KEEP_STATE:
+
+all: $(PROG)
+
+install: $(ROOTPROGS) $(ROOTSHARED) $(ROOTTEMPLATES)
+
 $(ROOTSHAREDDIR)/common.ksh := FILEMODE = 0444
 $(ROOTSHAREDDIR)/uninstall.ksh := FILEMODE = 0444
-
-CLOBBERFILES=	$(ROOTSHARED) $(PROG)
 
 POFILES=	common.po query.po uninstall.po
 POFILE=		shared.po
@@ -41,10 +48,6 @@ POFILE=		shared.po
 $(POFILE): $(POFILES)
 	$(RM) $@
 	$(CAT) $(POFILES) > $@
-
-all: $(PROG)
-
-install: $(ROOTSHARED)
 
 clean:
 	-$(RM) $(PROG) $(POFILES)

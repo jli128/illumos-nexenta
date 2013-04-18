@@ -1,3 +1,4 @@
+#!/usr/bin/python2.6
 #
 # CDDL HEADER START
 #
@@ -19,35 +20,40 @@
 # CDDL HEADER END
 #
 #
-# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
-# lib/brand/Makefile
-#
-# include global definitions
-include ../../Makefile.master
 
-#
-# Build everything in parallel; use .WAIT for dependencies
-.PARALLEL:
+import pkg.fmri
+import sys
 
-SUBDIRS= shared .WAIT sn1 solaris10 ipkg labeled $($(MACH)_SUBDIRS)
-MSGSUBDIRS= solaris10 ipkg shared $($(MACH)_MSGSUBDIRS)
+def usage():
+        print >> sys.stderr, "usage: %s <fmri1> <fmri2>" % sys.argv[0]
+        sys.exit(2)
 
-all :=		TARGET= all
-install :=	TARGET= install
-clean :=	TARGET= clean
-clobber :=	TARGET= clobber
-lint :=		TARGET= lint
-_msg :=		TARGET= _msg
+if len(sys.argv) != 3:
+        usage()
 
-.KEEP_STATE:
+try:
+        x = pkg.fmri.PkgFmri(sys.argv[1])
+        y = pkg.fmri.PkgFmri(sys.argv[2])
+except pkg.fmri.FmriError, e:
+        print >> sys.stderr, "error: %s" % str(e)
+        sys.exit(1)
 
-all install clean clobber lint: $(SUBDIRS)
+if not x.is_same_pkg(y):
+        print >> sys.stderr, \
+            "error: can only compare two versions of the same package."
+        sys.exit(1)
 
-_msg: $(MSGSUBDIRS)
+if x < y:
+        print "<"
+elif x > y:
+        print ">"
+elif x == y:
+        print "="
+else:
+        print >> sys.stderr, "panic"
+        sys.exit(1)
 
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
+sys.exit(0)

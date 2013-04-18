@@ -159,7 +159,6 @@ SUBDIRS += \
 	libunistat	\
 	libdscfg	\
 	librdc		\
-	libinstzones	\
 	libpkg
 
 SUBDIRS += \
@@ -208,6 +207,7 @@ SUBDIRS += \
 	libxcurses2	\
 	libbrand	.WAIT   \
 	libzonecfg	\
+	libinstzones	\
 	libzoneinfo	\
 	libzonestat	\
 	libtsnet	\
@@ -650,7 +650,7 @@ libzfs_core:	libnvpair
 libzfs_jni:	libdiskmgt libnvpair libzfs
 libzpool:	libavl libumem libnvpair libcmdutils
 libsec:		libavl libidmap
-brand:		libc libsocket
+brand:		libzonecfg libmapmalloc
 libshare:	libscf libzfs libuuid libfsmgt libsecdb libumem libsmbfs
 libexacct/demo:	libexacct libproject libsocket libnsl
 libtsalarm:	libpcp
