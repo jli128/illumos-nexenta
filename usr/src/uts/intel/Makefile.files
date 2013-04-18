@@ -22,6 +22,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright (c) 2012, Joyent, Inc. All rights reserved.
 #
 
 #
@@ -255,6 +256,11 @@ CORE_PCBE_OBJS = core_pcbe.o
 #	AMR module
 #
 AMR_OBJS = amr.o
+
+#
+#	IPMI module
+#
+IPMI_OBJS +=  ipmi_main.o ipmi.o ipmi_kcs.o
 
 #
 #	IOMMULIB module

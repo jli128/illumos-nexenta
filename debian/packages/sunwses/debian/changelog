@@ -1,3 +1,9 @@
+sunwses (5.11.134-31-11215-0) nexenta; urgency=low
+
+  * Issue #11215 - sesctl to SGI JBOD hangs in biowait() with a command stuck in mptsas driver
+
+ -- Gate Keeper <support@nexenta.com>  Fri, 14 Sep 2012 09:45:00 -0700
+
 sunwses (5.11.134-31-0-100) nexenta; urgency=low
 
   * Renumber packages in preparation for 3.1 release

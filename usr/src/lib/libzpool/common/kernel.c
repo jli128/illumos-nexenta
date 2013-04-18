@@ -20,6 +20,8 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <assert.h>
@@ -45,6 +47,7 @@ int aok;
 uint64_t physmem;
 vnode_t *rootdir = (vnode_t *)0xabcd1234;
 char hw_serial[HW_HOSTID_LEN];
+vmem_t *zio_arena = NULL;
 
 struct utsname utsname = {
 	"userland", "libzpool", "1", "1", "na"
@@ -783,6 +786,20 @@ ddi_strtoull(const char *str, char **nptr, int base, u_longlong_t *result)
 	*result = strtoull(str, &end, base);
 	if (*result == 0)
 		return (errno);
+	return (0);
+}
+
+/* ARGSUSED */
+timeout_id_t
+timeout(void (*func)(void *), void *arg, clock_t delta)
+{
+	return ((timeout_id_t)1);
+}
+
+/* ARGSUSED */
+clock_t
+untimeout(timeout_id_t id_arg)
+{
 	return (0);
 }
 

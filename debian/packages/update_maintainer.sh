@@ -41,7 +41,7 @@ function update_control
 	return 0
 }
 
-for f in `find . -maxdepth 1 -mindepth 1 -type d -name "sunw*" -o -type d -name "brcmbnx" -o -type d -name "libsunw-perl" -o -type d -name "nexenta-lu" -o -type d -name "nexenta-sunw" -o -type d -name "brcmbnxe" -o -type d -name cpqary3`; do
+for f in `find . -maxdepth 1 -mindepth 1 -type d -name "sunw*" -o -type d -name "brcmbnx" -o -type d -name "libsunw-perl" -o -type d -name "nexenta-lu" -o -type d -name "nexenta-sunw" -o -type d -name "brcmbnxe" -o -type d -name "cpqary3" -o -type d -name "openipmi"`; do
 	pkg_name=`basename $f`
 
 	if update_control $f; then

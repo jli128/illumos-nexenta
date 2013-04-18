@@ -1,4 +1,10 @@
-sunwigb (5.11.134-31-0-105) nexenta; urgency=low
+sunwigb (5.11.134-31-13137-13117) nexenta; urgency=low
+
+  * Issue 13117: EEE Setting for I350 on by default
+
+ -- Nexenta Systems <support@nexenta.com>  Thu, 07 Feb 2013 12:08:55 -0700
+
+sunwigb (5.11.134-31-8234-1) nexenta; urgency=low
 
   * Issue 8115:  Support for I350 and ET2 into the "igb" driver
 

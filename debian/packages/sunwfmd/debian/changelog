@@ -1,3 +1,49 @@
+sunwfmd (5.11.134-31-11344-13272) nexenta; urgency=high
+
+  * Issue 13272: Stucked Inquiry commands put a pool to degraded state
+    with too many errors without displaying errors in zpool status (fix
+    Makefile)
+
+ -- Nexenta Systems <support@nexenta.com>  Sun, 10 Mar 2013 13:15:00 -0400
+
+sunwfmd (5.11.134-31-11343-13272) nexenta; urgency=high
+
+  * Issue 13272: Stucked Inquiry commands put a pool to degraded state
+    with too many errors without displaying errors in zpool status
+
+ -- Nexenta Systems <support@nexenta.com>  Fri, 08 Mar 2013 11:37:00 -0400
+
+sunwfmd (5.11.134-31-11342-13165) nexenta; urgency=high
+
+  * Issue 13165: zfs-monitor should fallback to using DEV_BSIZE
+
+ -- Nexenta Systems <support@nexenta.com>  Thu, 14 Feb 2013 15:01:44 +0100
+
+sunwfmd (5.11.134-31-11341-11755) nexenta; urgency=high
+
+  * Issue 11755: Cert Bug 11518 I/O requests are not aligned with 4096 disk sector size
+
+ -- Nexenta Systems <support@nexenta.com>  Thu, 17 Jan 2013 01:04:44 +0100
+
+sunwfmd (5.11.134-31-11340-11612) nexenta; urgency=high
+
+  * Issue 11612: Failing vdev of a mirrored pool should not take zfs
+    operations out of action for extended periods of time.
+
+ -- Nexenta Systems <support@nexenta.com>  Tue, 04 Dec 2012 10:00:00 -0400
+
+sunwfmd (5.11.134-31-11339-0) nexenta; urgency=low
+
+  * Issue 11339: Enhancments for OpenIPMI driver
+
+ -- Nexenta Systems <support@nexenta.com>  Tue, 18 Sep 2012 12:32:07 -0700
+
+sunwfmd (5.11.134-31-11126-0) nexenta; urgency=low
+
+  * Issue 11126: update libipmi and fma to use /dev/ipmi instead of /dev/bmc
+
+ -- Nexenta Systems <support@nexenta.com>  Tue, 21 Aug 2012 12:51:30 -0700
+
 sunwfmd (5.11.134-31-6490-0) nexenta; urgency=low
 
   * Issue 5639: FMD Service Segmentation Fault (core dumped)

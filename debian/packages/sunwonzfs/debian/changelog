@@ -1,3 +1,15 @@
+sunwonzfs (5.11.134-31-8937-12379) nexenta; urgency=low
+
+  * Issue 12379: Backport request for Illumos changeset 13379 "zfs should handle imbalanced LUNs" to the 3.1.x branch
+
+ -- Nexenta Systems <support@nexenta.com>  Fri, 14 Dec 2012 14:32:06 +0100
+
+sunwonzfs (5.11.134-31-8936-0) nexenta; urgency=low
+
+  * Issue 8923: ZFS should track latency, use latency-aware hybrid allocator
+
+ -- Nexenta Systems <support@nexenta.com>  Fri, 11 May 2012 22:38:43 +0400
+
 sunwonzfs (5.11.134-31-0-100a) nexenta; urgency=low
 
   * Issue 5389: possible pool corruption with SLOG

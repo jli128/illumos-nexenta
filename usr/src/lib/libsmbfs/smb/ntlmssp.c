@@ -20,8 +20,8 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -65,9 +65,13 @@
 #include "ntlm.h"
 #include "ntlmssp.h"
 
+/* A shorter alias for a crazy long name from [MS-NLMP] */
+#define	NTLMSSP_NEGOTIATE_NTLM2 \
+	NTLMSSP_NEGOTIATE_EXTENDED_SESSIONSECURITY
+
 typedef struct ntlmssp_state {
 	uint32_t ss_flags;
-	char *ss_target_name;
+	char *ss_target_name;	/* Primary domain or server name */
 	struct mbuf *ss_target_info;
 } ntlmssp_state_t;
 
@@ -147,10 +151,12 @@ mb_put_sb_hdr(struct mbdata *mbp, struct sec_buf *sb)
 static int
 mb_put_sb_data(struct mbdata *mbp, struct sec_buf *sb, struct mbuf *m)
 {
-	int cnt0, err;
+	int cnt0;
+	int err = 0;
 
 	sb->sb_offset = cnt0 = mbp->mb_count;
-	err = mb_put_mbuf(mbp, m);
+	if (m != NULL)
+		err = mb_put_mbuf(mbp, m);
 	sb->sb_maxlen = sb->sb_length = mbp->mb_count - cnt0;
 
 	return (err);
@@ -164,31 +170,35 @@ mb_put_sb_data(struct mbdata *mbp, struct sec_buf *sb, struct mbuf *m)
  */
 static int
 mb_put_sb_string(struct mbdata *mbp, struct sec_buf *sb,
-	const char *s, int unicode)
+	const char *str, int unicode)
 {
 	int err, trim;
 	struct mbdata tmp_mb;
 
-	/*
-	 * Put the string into a temp. mbuf,
-	 * then chop off the null terminator
-	 * before appending to caller's mbp.
-	 */
-	err = mb_init(&tmp_mb);
-	if (err)
-		return (err);
-	err = mb_put_string(&tmp_mb, s, unicode);
-	if (err)
-		return (err);
+	bzero(&tmp_mb, sizeof (tmp_mb));
 
-	trim = (unicode) ? 2 : 1;
-	if (tmp_mb.mb_cur->m_len < trim)
-		return (EFAULT);
-	tmp_mb.mb_cur->m_len -= trim;
+	if (str != NULL && *str != '\0') {
+		/*
+		 * Put the string into a temp. mbuf,
+		 * then chop off the null terminator
+		 * before appending to caller's mbp.
+		 */
+		err = mb_init(&tmp_mb);
+		if (err)
+			return (err);
+		err = mb_put_string(&tmp_mb, str, unicode);
+		if (err)
+			return (err);
+
+		trim = (unicode) ? 2 : 1;
+		if (tmp_mb.mb_cur->m_len < trim)
+			trim = 0;
+		tmp_mb.mb_cur->m_len -= trim;
+	}
 
 	err = mb_put_sb_data(mbp, sb, tmp_mb.mb_top);
 	/*
-	 * Note: tmp_mb.mb_top is consumed,
+	 * Note: tmp_mb.mb_top (if any) is consumed,
 	 * so do NOT free it (no mb_done)
 	 */
 	return (err);
@@ -215,60 +225,62 @@ ntlmssp_put_type1(struct ssp_ctx *sp, struct mbdata *out_mb)
 	int err;
 	struct smb_ctx *ctx = sp->smb_ctx;
 	ntlmssp_state_t *ssp_st = sp->sp_private;
-	char *ucdom = NULL;
-	char *ucwks = NULL;
 
 	if ((err = mb_init(&mb2)) != 0)
 		return (err);
 	mb2.mb_count = sizeof (hdr);
 
 	/*
-	 * Initialize the negotiation flags, and
-	 * save what we sent.  For reference:
-	 * [MS-NLMP] spec. (also ntlmssp.h)
+	 * The initial negotiation flags represent the union of all
+	 * options we support.  The server selects from these.
+	 * See: [MS-NLMP 2.2.2.5 NEGOTIATE]
+	 *
+	 * Careful about these two flags:
+	 *	NTLMSSP_NEGOTIATE_SIGN
+	 *	NTLMSSP_NEGOTIATE_SEAL
+	 * If we set them when using NTLM(v1) all our requests fail.
+	 * Win2k3 does not set them with NTLM, but does for NTLMv2.
+	 * Apparently these affect the signing algorithm somehow.
+	 * Using just NTLMSSP_NEGOTIATE_ALWAYS_SIGN appears to be
+	 * sufficient to indicate the signing we use.
 	 */
 	ssp_st->ss_flags =
+	    NTLMSSP_NEGOTIATE_UNICODE |
+	    NTLMSSP_NEGOTIATE_OEM |
 	    NTLMSSP_REQUEST_TARGET |
+	    /* NTLMSSP_NEGOTIATE_LM_KEY (never) */
 	    NTLMSSP_NEGOTIATE_NTLM |
-	    NTLMSSP_NEGOTIATE_TARGET_INFO |
+	    /* NTLMSSP_NEGOTIATE_ALWAYS_SIGN (set below) */
+	    /* NTLMSSP_NEGOTIATE_NTLM2 (set below) */
 	    NTLMSSP_NEGOTIATE_128 |
+	    /* NTLMSSP_NEGOTIATE_KEY_EXCH (not yet) */
 	    NTLMSSP_NEGOTIATE_56;
-
-	if (ctx->ct_hflags2 & SMB_FLAGS2_UNICODE)
-		ssp_st->ss_flags |= NTLMSSP_NEGOTIATE_UNICODE;
-	else
-		ssp_st->ss_flags |= NTLMSSP_NEGOTIATE_OEM;
 
 	if (ctx->ct_vcflags & SMBV_WILL_SIGN) {
 		ssp_st->ss_flags |= NTLMSSP_NEGOTIATE_ALWAYS_SIGN;
 		ctx->ct_hflags2 |= SMB_FLAGS2_SECURITY_SIGNATURE;
 	}
 
+	/*
+	 * Win2k3r2 always sets this, but if we do, then our
+	 * authentication via NTLM(v1) fails, so only set it
+	 * when doing NTLMv2.
+	 */
 	if (ctx->ct_authflags & SMB_AT_NTLM2)
-		ssp_st->ss_flags |= NTLMSSP_NEGOTIATE_EXTENDED_SESSIONSECURITY;
-	if (ctx->ct_authflags & SMB_AT_NTLM1)
-		ssp_st->ss_flags |= NTLMSSP_NEGOTIATE_LM_KEY;
+		ssp_st->ss_flags |= NTLMSSP_NEGOTIATE_NTLM2;
 
 	bcopy(ntlmssp_id, &hdr.h_id, ID_SZ);
 	hdr.h_type = 1; /* Type 1 */
 	hdr.h_flags = ssp_st->ss_flags;
 
 	/*
-	 * Put the client domain, client name strings.
-	 * These are always in OEM format, upper-case.
+	 * We could put the client domain, client name strings
+	 * here, (always in OEM format, upper-case), and set
+	 * NTLMSSP_NEGOTIATE_OEM_..._SUPPLIED, but Windows
+	 * leaves these NULL so let's do the same.
 	 */
-	ucdom  = utf8_str_toupper(ctx->ct_domain);
-	ucwks  = utf8_str_toupper(ctx->ct_locname);
-	if (ucdom == NULL || ucwks == NULL) {
-		err = ENOMEM;
-		goto out;
-	}
-	err = mb_put_sb_string(&mb2, &hdr.h_cldom, ucdom, 0);
-	if (err)
-		goto out;
-	err = mb_put_sb_string(&mb2, &hdr.h_wksta, ucwks, 0);
-	if (err)
-		goto out;
+	(void) mb_put_sb_string(&mb2, &hdr.h_cldom, NULL, 0);
+	(void) mb_put_sb_string(&mb2, &hdr.h_wksta, NULL, 0);
 
 	/*
 	 * Marshal the header (in LE order)
@@ -281,10 +293,6 @@ ntlmssp_put_type1(struct ssp_ctx *sp, struct mbdata *out_mb)
 	(void) mb_put_sb_hdr(out_mb, &hdr.h_wksta);
 
 	err = mb_put_mbuf(out_mb, mb2.mb_top);
-
-out:
-	free(ucdom);
-	free(ucwks);
 
 	return (err);
 }
@@ -355,8 +363,9 @@ ntlmssp_get_type2(struct ssp_ctx *sp, struct mbdata *in_mb)
 	}
 
 	/*
-	 * Get the target name string.  First get a copy of
-	 * the data from the offset/length indicated in the
+	 * Get the target name string.  (Server name or
+	 * Primary domain name.)  First get a copy of the
+	 * data from the offset/length indicated in the
 	 * security buffer header; then parse the string.
 	 */
 	err = md_get_sb_data(&top_mb, &hdr.h_target_name, &m);
@@ -429,8 +438,8 @@ ntlmssp_put_type3(struct ssp_ctx *sp, struct mbdata *out_mb)
 	hdr.h_flags = ssp_st->ss_flags;
 
 	/*
-	 * Put the LMv2,NTLMv2 responses, or
-	 * possibly LM, NTLM (v1) responses.
+	 * Put the NTLMv2/LMv2 or NTLM/LM (v1) responses.
+	 * See also NTLMSSP_NEGOTIATE_NTLM2 above.
 	 */
 	if (ctx->ct_authflags & SMB_AT_NTLM2) {
 		/* Build the NTLMv2 "target info" blob. */
@@ -440,9 +449,12 @@ ntlmssp_put_type3(struct ssp_ctx *sp, struct mbdata *out_mb)
 			goto out;
 		err = ntlm_put_v2_responses(ctx, &ti_mbc,
 		    &lm_mbc, &nt_mbc);
-	} else {
+	} else if (ctx->ct_authflags & SMB_AT_NTLM1) {
 		err = ntlm_put_v1_responses(ctx,
 		    &lm_mbc, &nt_mbc);
+	} else {
+		/* lm_mbc, nt_mbc remain empty for SMB_AT_ANON */
+		err = 0;
 	}
 	if (err)
 		goto out;
@@ -623,9 +635,9 @@ ntlmssp_init_client(struct ssp_ctx *sp)
 	ntlmssp_state_t *ssp_st;
 
 	if ((sp->smb_ctx->ct_authflags &
-	    (SMB_AT_NTLM2 | SMB_AT_NTLM1)) == 0) {
+	    (SMB_AT_NTLM2 | SMB_AT_NTLM1 | SMB_AT_ANON)) == 0) {
 		DPRINT("No NTLM authflags");
-		return (ENOTSUP);
+		return (EINVAL);
 	}
 
 	ssp_st = calloc(1, sizeof (*ssp_st));

@@ -18,10 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- *
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/conf.h>
@@ -1408,9 +1408,12 @@ sbd_handle_write_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd,
 		int commit;
 
 		commit = (scmd->len == 0 && scmd->nbufs == 0);
-		if (sbd_copy_rdwr(task, laddr, dbuf, SBD_CMD_SCSI_WRITE,
+		rw_enter(&sl->sl_access_state_lock, RW_READER);
+		if ((sl->sl_flags & SL_MEDIA_LOADED) == 0 ||
+		    sbd_copy_rdwr(task, laddr, dbuf, SBD_CMD_SCSI_WRITE,
 		    commit) != STMF_SUCCESS)
 			scmd->flags |= SBD_SCSI_CMD_XFER_FAIL;
+		rw_exit(&sl->sl_access_state_lock);
 		buflen = dbuf->db_data_size;
 	} else {
 		for (buflen = 0, ndx = 0; (buflen < dbuf->db_data_size) &&
@@ -3239,18 +3242,63 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	if (sl->sl_access_state == SBD_LU_TRANSITION_TO_STANDBY ||
 	    sl->sl_access_state == SBD_LU_TRANSITION_TO_ACTIVE) {
 		stmf_scsilib_send_status(task, STATUS_CHECK,
-		    STMF_SAA_LU_NO_ACCESS_UNAVAIL);
+		    STMF_SAA_LU_NO_ACCESS_TRANSITION);
 		return;
 	}
 
-	/* Checking ua conditions as per SAM3R14 5.3.2 specified order */
-	if ((it->sbd_it_ua_conditions) && (task->task_cdb[0] != SCMD_INQUIRY)) {
+	cdb0 = task->task_cdb[0];
+	cdb1 = task->task_cdb[1];
+
+	/*
+	 * Don't go further if cmd is unsupported in standby mode
+	 */
+	if (sl->sl_access_state == SBD_LU_STANDBY) {
+		if (cdb0 != SCMD_INQUIRY &&
+		    cdb0 != SCMD_MODE_SENSE &&
+		    cdb0 != SCMD_MODE_SENSE_G1 &&
+		    cdb0 != SCMD_MODE_SELECT &&
+		    cdb0 != SCMD_MODE_SELECT_G1 &&
+		    cdb0 != SCMD_RESERVE &&
+		    cdb0 != SCMD_RELEASE &&
+		    cdb0 != SCMD_PERSISTENT_RESERVE_OUT &&
+		    cdb0 != SCMD_PERSISTENT_RESERVE_IN &&
+		    cdb0 != SCMD_REQUEST_SENSE &&
+		    cdb0 != SCMD_READ_CAPACITY &&
+		    cdb0 != SCMD_TEST_UNIT_READY &&
+		    cdb0 != SCMD_START_STOP &&
+		    !(cdb0 == SCMD_SVC_ACTION_IN_G4 &&
+		    cdb1 == SSVC_ACTION_READ_CAPACITY_G4) &&
+		    !(cdb0 == SCMD_MAINTENANCE_IN &&
+		    (cdb1 & 0x1F) == 0x05) &&
+		    !(cdb0 == SCMD_MAINTENANCE_IN &&
+		    (cdb1 & 0x1F) == 0x0A)) {
+			stmf_scsilib_send_status(task, STATUS_CHECK,
+			    STMF_SAA_LU_NO_ACCESS_STANDBY);
+			return;
+		}
+	}
+
+	/*
+	 * Checking ua conditions as per SAM3R14 5.3.2 specified order. During
+	 * MPIO/ALUA failover, cmds come in through local ports and proxy port
+	 * port provider (i.e. pppt), we want to report unit attention to
+	 * only local cmds since initiators (Windows MPIO/DSM) would continue
+	 * sending I/O to the target that reported unit attention.
+	 */
+	if ((it->sbd_it_ua_conditions) &&
+	    !(task->task_additional_flags & TASK_AF_PPPT_TASK) &&
+	    (task->task_cdb[0] != SCMD_INQUIRY)) {
 		uint32_t saa = 0;
 
 		mutex_enter(&sl->sl_lock);
 		if (it->sbd_it_ua_conditions & SBD_UA_POR) {
 			it->sbd_it_ua_conditions &= ~SBD_UA_POR;
 			saa = STMF_SAA_POR;
+		} else if (it->sbd_it_ua_conditions &
+		    SBD_UA_ASYMMETRIC_ACCESS_CHANGED) {
+			it->sbd_it_ua_conditions &=
+			    ~SBD_UA_ASYMMETRIC_ACCESS_CHANGED;
+			saa = STMF_SAA_ASYMMETRIC_ACCESS_CHANGED;
 		}
 		mutex_exit(&sl->sl_lock);
 		if (saa) {
@@ -3288,9 +3336,9 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 			saa = STMF_SAA_MODE_PARAMETERS_CHANGED;
 		} else if (it->sbd_it_ua_conditions &
 		    SBD_UA_ASYMMETRIC_ACCESS_CHANGED) {
-			it->sbd_it_ua_conditions &=
-			    ~SBD_UA_ASYMMETRIC_ACCESS_CHANGED;
-			saa = STMF_SAA_ASYMMETRIC_ACCESS_CHANGED;
+			saa = 0;
+		} else if (it->sbd_it_ua_conditions & SBD_UA_POR) {
+			saa = 0;
 		} else if (it->sbd_it_ua_conditions &
 		    SBD_UA_ACCESS_STATE_TRANSITION) {
 			it->sbd_it_ua_conditions &=
@@ -3307,38 +3355,7 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 		}
 	}
 
-	cdb0 = task->task_cdb[0];
-	cdb1 = task->task_cdb[1];
-
 	if (sl->sl_access_state == SBD_LU_STANDBY) {
-		if (cdb0 != SCMD_INQUIRY &&
-		    cdb0 != SCMD_MODE_SENSE &&
-		    cdb0 != SCMD_MODE_SENSE_G1 &&
-		    cdb0 != SCMD_MODE_SELECT &&
-		    cdb0 != SCMD_MODE_SELECT_G1 &&
-		    cdb0 != SCMD_RESERVE &&
-		    cdb0 != SCMD_RELEASE &&
-		    cdb0 != SCMD_PERSISTENT_RESERVE_OUT &&
-		    cdb0 != SCMD_PERSISTENT_RESERVE_IN &&
-		    cdb0 != SCMD_REQUEST_SENSE &&
-		    cdb0 != SCMD_READ_CAPACITY &&
-		    cdb0 != SCMD_TEST_UNIT_READY &&
-		    cdb0 != SCMD_START_STOP &&
-		    cdb0 != SCMD_READ &&
-		    cdb0 != SCMD_READ_G1 &&
-		    cdb0 != SCMD_READ_G4 &&
-		    cdb0 != SCMD_READ_G5 &&
-		    !(cdb0 == SCMD_SVC_ACTION_IN_G4 &&
-		    cdb1 == SSVC_ACTION_READ_CAPACITY_G4) &&
-		    !(cdb0 == SCMD_MAINTENANCE_IN &&
-		    (cdb1 & 0x1F) == 0x05) &&
-		    !(cdb0 == SCMD_MAINTENANCE_IN &&
-		    (cdb1 & 0x1F) == 0x0A)) {
-			stmf_scsilib_send_status(task, STATUS_CHECK,
-			    STMF_SAA_LU_NO_ACCESS_STANDBY);
-			return;
-		}
-
 		/*
 		 * is this a short write?
 		 * if so, we'll need to wait until we have the buffer

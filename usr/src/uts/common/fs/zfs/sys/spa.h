@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011 by Delphix. All rights reserved.
  */
 
 #ifndef _SYS_SPA_H
@@ -587,7 +588,6 @@ extern uint64_t spa_freeze_txg(spa_t *spa);
 extern uint64_t spa_get_asize(spa_t *spa, uint64_t lsize);
 extern uint64_t spa_get_dspace(spa_t *spa);
 extern void spa_update_dspace(spa_t *spa);
-extern void spa_update_iotime(spa_t *spa);
 extern void spa_update_latency(spa_t *spa);
 extern uint64_t spa_version(spa_t *spa);
 extern boolean_t spa_deflate(spa_t *spa);
@@ -698,6 +698,13 @@ _NOTE(CONSTCOND) } while (0)
 #else
 #define	dprintf_bp(bp, fmt, ...)
 #endif
+
+extern boolean_t spa_debug_enabled(spa_t *spa);
+#define	spa_dbgmsg(spa, ...)			\
+{						\
+	if (spa_debug_enabled(spa))		\
+		zfs_dbgmsg(__VA_ARGS__);	\
+}
 
 extern int spa_mode_global;			/* mode, e.g. FREAD | FWRITE */
 

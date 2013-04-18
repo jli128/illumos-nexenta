@@ -1,3 +1,35 @@
+sunwmptsas (5.11.134-31-11660-13272) nexenta; urgency=high
+
+  * Issue 13272: Stucked Inquiry commands put a pool to degraded state
+    with too many errors without displaying errors in zpool status
+
+ -- Nexenta Systems <support@nexenta.com>  Fri, 08 Mar 2013 11:37:00 -0400
+
+sunwmptsas (5.11.134-31-11659-12927) nexenta; urgency=high
+
+  * Issue 12927: LSI 2008 mpt_sas
+
+ -- Nexenta Systems <support@nexenta.com>  Thu, 31 Jan 2013 16:55:23 -0400
+
+sunwmptsas (5.11.134-31-11658-9517) nexenta; urgency=high
+
+  * Issue 9517: After single disk fault patch installed single disk fault
+    still causes process hangs
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 23 Jan 2013 12:00:00 -0400
+
+sunwmptsas (5.11.134-31-11657-0) nexenta; urgency=high
+
+  * Issue 11657: Add support for Supermicro onboard 2308 controller.
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 10 Oct 2012 16:35:00 -0400
+
+sunwmptsas (5.11.134-31-11076-0) nexenta; urgency=high
+
+  * Issue 10443: 3.1.3 crash: BAD TRAP: type=e (#pf Page fault)
+
+ -- Nexenta Systems <support@nexenta.com>  Thu, 30 Aug 2012 16:35:00 -0400
+
 sunwmptsas (5.11.134-31-9636-0) nexenta; urgency=high
 
   * Issue 9636: mpt_sas should attempt an MUR reset at attach time.

@@ -19,7 +19,7 @@
 #
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
 #
 
 #
@@ -86,6 +86,7 @@ SUNWprivate {
 	smb_acl_sort;
 	smb_acl_to_zfs;
 	smb_auth_DES;
+	smb_auth_RC4;
 	smb_auth_gen_session_key;
 	smb_auth_hmac_md5;
 	smb_auth_ntlm_hash;
@@ -188,6 +189,7 @@ SUNWprivate {
 	smb_fsacl_free;
 	smb_fssd_init;
 	smb_fssd_term;
+	smb_gen_random_passwd;
 	smb_get_dcinfo;
 	smb_get_nameservers;
 	smb_get_txid;
@@ -281,7 +283,6 @@ SUNWprivate {
 	smb_mac_init;
 	smb_mac_sign;
 	smb_match;
-	smb_match_ci;
 	smb_match_netlogon_seqnum;
 	smb_mbstos;
 	smb_mbstowcs;

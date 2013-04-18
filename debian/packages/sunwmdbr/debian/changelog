@@ -1,4 +1,4 @@
-sunwmdbr (5.11.134-31-3-0) nexenta; urgency=low
+sunwmdbr (5.11.134-31-8544-0) nexenta; urgency=low
 
   * Issue 6231: should allow domain groups as member of local groups
 

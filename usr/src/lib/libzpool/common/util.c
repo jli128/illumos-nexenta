@@ -68,19 +68,22 @@ show_vdev_stats(const char *desc, const char *ctype, nvlist_t *nv, int indent)
 {
 	vdev_stat_t *vs;
 	vdev_stat_t v0 = { 0 };
-	uint64_t sec;
+	uint64_t sec, ops_rd, ops_wr;
 	uint64_t is_log = 0;
 	nvlist_t **child;
 	uint_t c, children;
 	char used[6], avail[6];
-	char rops[6], wops[6], rbytes[6], wbytes[6], riotime[6], wiotime[6], rerr[6], werr[6], cerr[6];
+	char rops[6], wops[6], rbytes[6], wbytes[6], rerr[6], werr[6], cerr[6];
+	char riotime[8], wiotime[8];
 	char *prefix = "";
 
 	if (indent == 0 && desc != NULL) {
 		(void) printf("                           "
-		    " capacity   operations   bandwidth  ---- errors ----\n");
+		    " capacity   operations   bandwidth   --- latency ---  "
+		    "---- errors ----\n");
 		(void) printf("description                "
-		    "used avail  read write  read write  read write cksum\n");
+		    "used avail  read write  read write     read    write  "
+		    "read write cksum\n");
 	}
 
 	if (desc != NULL) {
@@ -94,6 +97,8 @@ show_vdev_stats(const char *desc, const char *ctype, nvlist_t *nv, int indent)
 			vs = &v0;
 
 		sec = MAX(1, vs->vs_timestamp / NANOSEC);
+		ops_rd = MAX(1, vs->vs_ops[ZIO_TYPE_READ]);
+		ops_wr = MAX(1, vs->vs_ops[ZIO_TYPE_WRITE]);
 
 		nicenum(vs->vs_alloc, used);
 		nicenum(vs->vs_space - vs->vs_alloc, avail);
@@ -101,13 +106,14 @@ show_vdev_stats(const char *desc, const char *ctype, nvlist_t *nv, int indent)
 		nicenum(vs->vs_ops[ZIO_TYPE_WRITE] / sec, wops);
 		nicenum(vs->vs_bytes[ZIO_TYPE_READ] / sec, rbytes);
 		nicenum(vs->vs_bytes[ZIO_TYPE_WRITE] / sec, wbytes);
-		nicenum(vs->vs_iotime[ZIO_TYPE_READ] / vs->vs_ops[ZIO_TYPE_READ], riotime);
-		nicenum(vs->vs_iotime[ZIO_TYPE_WRITE] / vs->vs_ops[ZIO_TYPE_WRITE], wiotime);
+		nicenum(vs->vs_iotime[ZIO_TYPE_READ] / ops_rd, riotime);
+		nicenum(vs->vs_iotime[ZIO_TYPE_WRITE] / ops_wr, wiotime);
 		nicenum(vs->vs_read_errors, rerr);
 		nicenum(vs->vs_write_errors, werr);
 		nicenum(vs->vs_checksum_errors, cerr);
 
-		(void) printf("%*s%s%*s%*s%*s %5s %5s %5s %5s %10s %10s %5s %5s %5s\n",
+		(void) printf(
+		    "%*s%s%*s%*s%*s %5s %5s %5s %5s %8s %8s %5s %5s %5s\n",
 		    indent, "",
 		    prefix,
 		    indent + strlen(prefix) - 25 - (vs->vs_space ? 0 : 12),

@@ -1,3 +1,34 @@
+sunwhea (5.11.134-31-12263-13272) nexenta; urgency=low
+
+  * Issue 13272: Stucked Inquiry commands put a pool to degraded state
+    with too many errors without displaying errors in zpool status
+
+ -- Nexenta Systems <support@nexenta.com>  Fri, 08 Mar 2013 11:37:00 -0400
+
+sunwhea (5.11.134-31-12262-0) nexenta; urgency=low
+
+  * Issue 11462: Backport Illumos 1618
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 10 Oct 2012 16:43:02 +0400
+
+sunwhea (5.11.134-31-11339-1) nexenta; urgency=low
+
+  * Issue 7246: uuid.h is missing in 3.1.1
+
+ -- Nexenta Systems <support@nexenta.com>  Fri, 19 Oct 2012 17:05:10 +0400
+
+sunwhea (5.11.134-31-11339-0) nexenta; urgency=low
+
+  * Issue 11339: Enhancments for OpenIPMI driver
+
+ -- Nexenta Systems <support@nexenta.com>  Tue, 18 Sep 2012 12:32:07 -0700
+
+sunwhea (5.11.134-31-11126-0) nexenta; urgency=low
+
+  * Issue 11126: updated libipmi and fma to use /dev/ipmi instead of /dev/bmc
+
+ -- Nexenta Systems <support@nexenta.com>  Tue, 21 Aug 2012 12:51:30 -0700
+
 sunwhea (5.11.134-31-8936-0) nexenta; urgency=low
 
   * Issue 8923: ZFS should track latency, use latency-aware hybrid allocator

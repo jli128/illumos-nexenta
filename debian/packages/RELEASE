@@ -28,4 +28,5 @@ GPGKEY=Nexenta
 CORE_PKGS_LIST=core_pkgs.list
 BROKEN_PKGS_LIST=broken_pkgs.list
 NON_ON_PKGS_LIST=non_on_pkgs.list
+KEEP_CONTROL_PKGS_LIST=keep_control_pkg.list
 NEXENTALU=nexenta-lu

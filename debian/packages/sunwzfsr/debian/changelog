@@ -1,3 +1,63 @@
+sunwzfsr (5.11.134-31-9474-13409) nexenta; urgency=low
+
+  * Issue 13409: Fixed section definition in libzfs mapfile-vers file
+
+ -- Ilys Usvyatsky <ilya.usvyatsky@nexenta.com>  Wed, 27 Mar 2013 18:02:44 -0700
+
+sunwzfsr (5.11.134-31-9473-10054) nexenta; urgency=high
+
+  * Issue 10054: turn on zfs_fastflush by default
+
+ -- Boris Protopopov <boris.protopopov@nexenta.com>  Wed, 27 Mar 2013 16:21:29 -0700
+
+sunwzfsr (5.11.134-31-9472-13409) nexenta; urgency=low
+
+  * Issue 13409: Parallel unmount of datasets for zpool export - another fix
+
+ -- Ilys Usvyatsky <ilya.usvyatsky@nexenta.com>  Wed, 27 Mar 2013 14:53:56 -0700
+
+sunwzfsr (5.11.134-31-9471-10054) nexenta; urgency=high
+
+  * Issue 10054: asynchronous ARC/L2ARC eviction to reduce zpool export time
+
+ -- Boris Protopopov <boris.protopopov@nexenta.com>  Mon, 25 Mar 2013 11:19:25 -0500
+
+sunwzfsr (5.11.134-31-9470-10054) nexenta; urgency=low
+
+  * Issue 10054: Parallel unmount of datasets for zpool export - minor fix
+
+ -- Ilys Usvyatsky <ilya.usvyatsky@nexenta.com>  Sat, 16 Mar 2013 17:14:23 -0400
+
+sunwzfsr (5.11.134-31-9469-10054) nexenta; urgency=low
+
+  * Issue 10054: Parallel unmount of datasets for zpool export
+
+ -- Ilys Usvyatsky <ilya.usvyatsky@nexenta.com>  Wed, 13 Mar 2013 21:26:18 -0400
+
+sunwzfsr (5.11.134-31-9468-12379) nexenta; urgency=low
+
+  * Issue 12379: Backport request for Illumos changeset 13379 "zfs should handle imbalanced LUNs" to the 3.1.x branch
+
+ -- Nexenta Systems <support@nexenta.com>  Fri, 14 Dec 2012 14:29:43 +0100
+
+sunwzfsr (5.11.134-31-9467-12648) nexenta; urgency=low
+
+  * Issue 12648: backout zfs++ changes
+
+ -- Nexenta Systems <support@nexenta.com>  Thu, 10 Jan 2013 19:42:16 +0400
+
+sunwzfsr (5.11.134-31-9466-12236) nexenta; urgency=low
+
+  * Issue 12235: ZFS extensions for intelligent placement of data and metadata
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 28 Nov 2012 20:54:09 +0400
+
+sunwzfsr (5.11.134-31-9465-0) nexenta; urgency=low
+
+  * Issue 8853: sharenfs property must accept more than 1024 bytes
+
+ -- Nexenta Systems <support@nexenta.com>  Thu, 29 Mar 2012 14:40:47 +0400
+
 sunwzfsr (5.11.134-31-8936-0) nexenta; urgency=low
 
   * Issue 8923: ZFS should track latency, use latency-aware hybrid allocator

@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_SYS_FM_IO_DDI_H
@@ -45,6 +46,7 @@ extern "C" {
 #define	DDI_FM_DEVICE_INTERN_UNCORR	"intern_uncorr"
 #define	DDI_FM_DEVICE_FW_CORRUPT	"fw_corrupt"
 #define	DDI_FM_DEVICE_FW_MISMATCH	"fw_mismatch"
+#define	DDI_FM_DEVICE_TARGET_REMOVE	"target_remove"
 
 /* service impact ereport definitions */
 #define	DDI_FM_SERVICE_IMPACT		"service"

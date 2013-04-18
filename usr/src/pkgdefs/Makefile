@@ -95,6 +95,7 @@ sparc_SUBDIRS= \
 	SUNWust2.v
 
 i386_SUBDIRS= \
+	openipmi \
 	SUNWad810 \
 	SUNWadixp \
 	SUNWagp \
@@ -382,6 +383,7 @@ COMMON_SUBDIRS= \
 	SUNWpapi \
 	SUNWpcan \
 	SUNWpcmci  \
+	SUNWpcr \
 	SUNWpcser \
 	SUNWpcu	\
 	SUNWpcwl \

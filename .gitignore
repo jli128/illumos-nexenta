@@ -1,0 +1,19 @@
+# .gitignore for ncp3git checkouts.
+# Note: this does not try to ignore all files in a fully built workspace.
+# Rather, you are expected to "clean" before running: git status 
+#
+# These are created by closed patches, and should NEVER be
+# committed into the (open) ncp3git repository.
+patches
+usr/src/uts/common/io/comstar/lu/stmf_sbd/ats_copy_mgr.?
+*.orig
+# files generated during build (and not removed by clean)
+/*-stamp
+/opensolaris.sh
+.make.state
+# our debian build stuff
+debian/files
+debian/nexenta-on-source.substvars
+debian/nexenta-on-source/DEBIAN/*
+debian/nexenta-on-source/DEBIAN/md5sums
+debian/nexenta-on-source/usr/*

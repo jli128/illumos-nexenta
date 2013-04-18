@@ -126,11 +126,11 @@ check_add_drv()
 
 ARCH=`uname -p`
 if [ ${ARCH} = "i386" ]; then
-    DRVALIAS='"pciex1000,78" "pciex1000,79"'
+    DRVALIAS='"pciex1000,78" "pciex1000,79" "pciex1000,5b" "pciex1000,5d"'
 fi
 
 if [ ${ARCH} = "sparc" ]; then
-   DRVALIAS='"pci1000,78" "pci1000,79" "pciex1000,78" "pciex1000,79"'
+   DRVALIAS='"pci1000,78" "pci1000,79" "pciex1000,78" "pciex1000,79" "pciex1000,5b" "pciex1000,5d"'
 fi
 
 check_add_drv -i "$DRVALIAS" -c scsi-self-identifying mr_sas

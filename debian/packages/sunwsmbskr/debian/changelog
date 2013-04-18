@@ -1,18 +1,39 @@
-sunwsmbskr (5.11.134-31-3-2) nexenta; urgency=low
+sunwsmbskr (5.11.134-31-13066-7126) nexenta; urgency=high
 
-  * Issue 6628: Enabling CIFS causes appliance reboot
+  * Issue 7126: smbd panic with missing negotiate challenge
+
+ -- Gate Keeper <support@nexenta.com> Fri, 18 Jan 2013 02:23:00 +0000
+
+sunwsmbskr (5.11.134-31-10734-0) nexenta; urgency=high
+
+  * Issue 10734: NT Trans. Notify returning too quickly
+  * Issue 10733: Windows 7 directory listing keeps restarting
+  * Issue 6854:  FindFirstFile,FindFirstFileEx,... are not working correctly on Nexenta CIFS-shares
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 10 Oct 2012 17:26:00 -0700
+
+sunwsmbskr (5.11.134-31-10364-0) nexenta; urgency=low
+
+ * Issue 10364: Fixes panic caused by a race between an smb share request
+ and sever shutdown. Backport of #9812
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 10 Aug 2012 13:30:15 -0700
+
+sunwsmbskr (5.11.134-31-8546-0) nexenta; urgency=high
+
+  * Issue 7225: Codenomicon findings in smbsrv
+  * Issue 7258: Connections to CIFS service via DNS alias kills other sessions
+
+ -- Gate Keeper <support@nexenta.com>  Mon, 14 Nov 2011 16:24:17 -0500
+
+sunwsmbskr (5.11.134-31-7623-0) nexenta; urgency=high
+
   * Issue 7427: Nexenta panics when CIFS access attempted from Windows XP with Simplified Chinese characterset
+  * Issue 6628: Enabling CIFS causes appliance reboot
 
  -- Gate Keeper <support@nexenta.com>  Mon, 02 Dec 2011 16:13:33 -0500
 
-sunwsmbskr (5.11.134-31-3-1) nexenta; urgency=low
-
-  * Issue 7258: Connections to CIFS service via DNS alias kills other sessions
-  * Issue 7225: Codenomicon findings in smbsrv
-
- -- Gate Keeper <support@nexenta.com>  Mon, 14 Nov 2011 16:24:17 -0400
-
-sunwsmbskr (5.11.134-31-3-0) nexenta; urgency=low
+sunwsmbskr (5.11.134-31-6973-0) nexenta; urgency=low
 
   * Issue 6809: OS X Lion (10.7) Finder access denied
 

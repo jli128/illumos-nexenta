@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011 by Delphix. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -1381,38 +1382,6 @@ spa_update_dspace(spa_t *spa)
 }
 
 /*
- * After every spa_sync, we will update the root vdev's vdev_stat_t to get sum
- * of top vdev iotime statistics, for use in the metaslab allocator.
- */
-
-void
-spa_update_iotime(spa_t *spa)
-{
-	vdev_t *rvd = spa->spa_root_vdev;
-	vdev_stat_t *rvs = &rvd->vdev_stat;
-	for (int c = 0; c < rvd->vdev_children; c++) {
-		vdev_t *cvd = rvd->vdev_child[c];
-		vdev_stat_t *cvs = &cvd->vdev_stat;
-                mutex_enter(&rvd->vdev_stat_lock);
-
-		/* FIXME - need a prettier way to account for the fact that we're zeroing the rvs->vs_* every time before summing the children */
-
-                for (int t = 0; t < ZIO_TYPES; t++) {
-			if (c==0) {
-				rvs->vs_ops[t] = cvs->vs_ops[t];
-				rvs->vs_bytes[t] = cvs->vs_bytes[t];
-				rvs->vs_iotime[t] = cvs->vs_iotime[t];
-			} else {
-                                rvs->vs_ops[t] += cvs->vs_ops[t];
-                                rvs->vs_bytes[t] += cvs->vs_bytes[t];
-                                rvs->vs_iotime[t] += cvs->vs_iotime[t];
-			}
-		}
-		mutex_exit(&rvd->vdev_stat_lock);
-	}
-}
-
-/*
  * EXPERIMENTAL
  * Use exponential moving average to track root vdev iotime, as well as top level vdev iotime.
  * The principle: avg_new = avg_prev + (cur - avg_prev) * a / 100; a is tuneable. For example,
@@ -1751,4 +1720,10 @@ spa_scan_get_stats(spa_t *spa, pool_scan_stat_t *ps)
 	ps->pss_pass_exam = spa->spa_scan_pass_exam;
 
 	return (0);
+}
+
+boolean_t
+spa_debug_enabled(spa_t *spa)
+{
+	return (spa->spa_debug);
 }

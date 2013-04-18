@@ -1,3 +1,76 @@
+sunwzfsu (5.11.134-31-12271-13409) nexenta; urgency=low
+
+  * Issue 13409: Fixed section definition in libzfs mapfile-vers file
+
+ -- Ilys Usvyatsky <ilya.usvyatsky@nexenta.com>  Wed, 27 Mar 2013 18:02:44 -0700
+
+sunwzfsu (5.11.134-31-12270-13409) nexenta; urgency=low
+
+  * Issue 13409: Parallel unmount of datasets for zpool export - another fix
+
+ -- Ilys Usvyatsky <ilya.usvyatsky@nexenta.com>  Wed, 27 Mar 2013 14:53:56 -0700
+
+sunwzfsu (5.11.134-31-12269-10054) nexenta; urgency=low
+
+  * Issue 10054: Parallel unmount of datasets for zpool export - minor fix
+
+ -- Ilys Usvyatsky <ilya.usvyatsky@nexenta.com>  Sat, 16 Mar 2013 17:14:23 -0400
+
+sunwzfsu (5.11.134-31-12268-10054) nexenta; urgency=low
+
+  * Issue 10054: Parallel unmount of datasets for zpool export
+
+ -- Ilys Usvyatsky <ilya.usvyatsky@nexenta.com>  Wed, 13 Mar 2013 21:26:18 -0400
+
+sunwzfsu (5.11.134-31-12267-12379) nexenta; urgency=low
+
+  * Issue 12379: Backport request for Illumos changeset 13379 "zfs should handle imbalanced LUNs" to the 3.1.x branch
+
+ -- Nexenta Systems <support@nexenta.com>  Fri, 14 Dec 2012 14:31:20 +0100
+
+sunwzfsu (5.11.134-31-12266-12648) nexenta; urgency=low
+
+  * Issue 12648: backout zfs++ changes
+
+ -- Nexenta Systems <support@nexenta.com>  Thu, 10 Jan 2013 19:42:16 +0400
+
+sunwzfsu (5.11.134-31-12265-11612) nexenta; urgency=high
+
+  * Issue 11612: Failing vdev of a mirrored pool should not take zfs
+    operations out of action for extended periods of time.
+
+ -- Nexenta Systems <support@nexenta.com>  Tue, 04 Dec 2012 10:00:00 -0400
+
+sunwzfsu (5.11.134-31-12264-8622) nexenta; urgency=low
+
+  * Issue 8622: SSD added to a zpool does not appear to be recognised with a 4KB native block size
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 05 Dec 2012 22:36:21 +0100
+
+sunwzfsu (5.11.134-31-12263-12236) nexenta; urgency=low
+
+  * Issue 12235: ZFS extensions for intelligent placement of data and metadata
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 28 Nov 2012 20:54:09 +0400
+
+sunwzfsu (5.11.134-31-12262-0) nexenta; urgency=low
+
+  * Issue 11462: Backport Illumos 1618
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 10 Oct 2012 14:40:47 +0400
+
+sunwzfsu (5.11.134-31-9465-0) nexenta; urgency=low
+
+  * Issue 8853: sharenfs property must accept more than 1024 bytes
+
+ -- Nexenta Systems <support@nexenta.com>  Thu, 29 Mar 2012 14:40:47 +0400
+
+sunwzfsu (5.11.134-31-9403-0) nexenta; urgency=low
+
+  * Issue 9110: Fix division by zero. Reformat output.
+
+ -- Nexenta Systems <support@nexenta.com>  Tue, 17 Apr 2012 20:57:20 +0400
+
 sunwzfsu (5.11.134-31-8936-0) nexenta; urgency=low
 
   * Issue 8923: ZFS should track latency, use latency-aware hybrid allocator

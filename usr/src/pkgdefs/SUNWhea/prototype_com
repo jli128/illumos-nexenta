@@ -670,7 +670,6 @@ f none usr/include/sys/acpi_drv.h 644 root bin
 f none usr/include/sys/bitmap.h 644 root bin
 f none usr/include/sys/bitset.h 644 root bin
 f none usr/include/sys/bl.h 644 root bin
-f none usr/include/sys/bmc_intf.h 644 root bin
 f none usr/include/sys/bofi.h 644 root bin
 f none usr/include/sys/bofi_impl.h 644 root bin
 f none usr/include/sys/bootconf.h 644 root bin
@@ -978,6 +977,7 @@ f none usr/include/sys/ioctl.h 644 root bin
 f none usr/include/sys/ipc.h 644 root bin
 f none usr/include/sys/ipc_impl.h 644 root bin
 f none usr/include/sys/ipc_rctl.h 644 root bin
+f none usr/include/sys/ipmi.h 644 root bin
 f none usr/include/sys/isa_defs.h 644 root bin
 f none usr/include/sys/jioctl.h 644 root bin
 f none usr/include/sys/kbd.h 644 root bin
@@ -1438,7 +1438,7 @@ f none usr/include/utime.h 644 root bin
 f none usr/include/utmp.h 644 root bin
 f none usr/include/utmpx.h 644 root bin
 d none usr/include/uuid 755 root bin
-#f none usr/include/uuid/uuid.h 644 root bin
+f none usr/include/uuid/uuid.h 644 root bin
 f none usr/include/valtools.h 644 root bin
 f none usr/include/values.h 644 root bin
 f none usr/include/varargs.h 644 root bin

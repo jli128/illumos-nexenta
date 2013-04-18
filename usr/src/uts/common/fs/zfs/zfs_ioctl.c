@@ -1108,6 +1108,30 @@ put_nvlist(zfs_cmd_t *zc, nvlist_t *nvl)
 }
 
 static int
+getzfsvfs_from_ds(dsl_dataset_t *ds, zfsvfs_t **zfvp)
+{
+	objset_t *os;
+	int error;
+
+	error = dmu_objset_from_ds(ds, &os);
+	if (error)
+		return (error);
+
+	if (dmu_objset_type(os) != DMU_OST_ZFS)
+		return (EINVAL);
+
+	mutex_enter(&os->os_user_ptr_lock);
+	*zfvp = dmu_objset_get_user(os);
+	if (*zfvp) {
+		VFS_HOLD((*zfvp)->z_vfs);
+	} else {
+		error = ESRCH;
+	}
+	mutex_exit(&os->os_user_ptr_lock);
+	return (error);
+}
+
+static int
 getzfsvfs(const char *dsname, zfsvfs_t **zfvp)
 {
 	objset_t *os;
@@ -3248,7 +3272,7 @@ zfs_ioc_rollback(zfs_cmd_t *zc)
 	/*
 	 * Do clone swap.
 	 */
-	if (getzfsvfs(zc->zc_name, &zfsvfs) == 0) {
+	if (getzfsvfs_from_ds(ds, &zfsvfs) == 0) {
 		error = zfs_suspend_fs(zfsvfs);
 		if (error == 0) {
 			int resume_err;
@@ -3731,7 +3755,11 @@ zfs_ioc_recv(zfs_cmd_t *zc)
 	if (error == 0) {
 		zfsvfs_t *zfsvfs = NULL;
 
-		if (getzfsvfs(tofs, &zfsvfs) == 0) {
+		if (drc.drc_logical_ds != drc.drc_real_ds)
+			error = getzfsvfs_from_ds(drc.drc_logical_ds, &zfsvfs);
+		else
+			error = getzfsvfs(tofs, &zfsvfs);
+		if (error == 0) {
 			/* online recv */
 			int end_err;
 

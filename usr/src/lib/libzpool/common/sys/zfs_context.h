@@ -20,6 +20,8 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SYS_ZFS_CONTEXT_H
@@ -327,8 +329,11 @@ extern void kstat_delete(kstat_t *);
 #define	kmem_debugging()	0
 #define	kmem_cache_reap_now(_c)		/* nothing */
 #define	kmem_cache_set_move(_c, _cb)	/* nothing */
+#define	vmem_qcache_reap(_v)		/* nothing */
 #define	POINTER_INVALIDATE(_pp)		/* nothing */
 #define	POINTER_IS_VALID(_p)	0
+
+extern vmem_t *zio_arena;
 
 typedef umem_cache_t kmem_cache_t;
 
@@ -484,6 +489,11 @@ extern vnode_t *rootdir;
 #define	hz	119	/* frequency when using gethrtime() >> 23 for lbolt */
 
 extern void delay(clock_t ticks);
+extern timeout_id_t timeout(void (*)(void *), void *, clock_t);
+extern clock_t untimeout(timeout_id_t);
+
+#define	SEC_TO_TICK(sec)	((sec) * hz)
+#define	NSEC_TO_TICK(usec)	((usec) / (NANOSEC / hz))
 
 #define	gethrestime_sec() time(NULL)
 #define	gethrestime(t) \

@@ -22,6 +22,10 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2010, Intel Corporation.
+ * All rights reserved.
+ */
 
 /*
  * PSMI 1.1 extensions are supported only in 2.6 and later versions.
@@ -93,6 +97,7 @@ static int apic_setup_irq_table(dev_info_t *dip, int irqno,
     struct apic_io_intr *intrp, struct intrspec *ispec, iflag_t *intr_flagp,
     int type);
 static void apic_set_pwroff_method_from_mpcnfhdr(struct apic_mp_cnf_hdr *hdrp);
+static void apic_free_apic_cpus(void);
 static void apic_try_deferred_reprogram(int ipl, int vect);
 static void delete_defer_repro_ent(int which_irq);
 static void apic_ioapic_wait_pending_clear(int ioapicindex,
@@ -544,12 +549,17 @@ apic_probe_common(char *modname)
 
 	for (i = 0; i < apic_io_max; i++)
 		mapout_ioapic((caddr_t)apicioadr[i], APIC_IO_MEMLEN);
-	if (apic_cpus)
+	if (apic_cpus) {
 		kmem_free(apic_cpus, apic_cpus_size);
-	if (apicadr)
+		apic_cpus = NULL;
+	}
+	if (apicadr) {
 		mapout_apic((caddr_t)apicadr, APIC_LOCAL_MEMLEN);
+		apicadr = NULL;
+	}
 apic_fail1:
-	psm_unmap_phys(mpct, mpct_size);
+	if (mpct)
+		psm_unmap_phys(mpct, mpct_size);
 	return (retval);
 }
 
@@ -594,6 +604,16 @@ apic_set_pwroff_method_from_mpcnfhdr(struct apic_mp_cnf_hdr *hdrp)
 		    hdrp->mpcnf_prod_str[9],
 		    hdrp->mpcnf_prod_str[10],
 		    hdrp->mpcnf_prod_str[11]);
+	}
+}
+
+static void
+apic_free_apic_cpus(void)
+{
+	if (apic_cpus != NULL) {
+		kmem_free(apic_cpus, apic_cpus_size);
+		apic_cpus = NULL;
+		apic_cpus_size = 0;
 	}
 }
 
@@ -926,6 +946,7 @@ acpi_probe(char *modname)
 	/* if setting APIC mode failed above, we fall through to cleanup */
 
 cleanup:
+	apic_free_apic_cpus();
 	if (apicadr != NULL) {
 		mapout_apic((caddr_t)apicadr, APIC_LOCAL_MEMLEN);
 		apicadr = NULL;
@@ -954,11 +975,11 @@ apic_handle_defconf()
 {
 	uint_t	lid;
 
-	/*LINTED: pointer cast may result in improper alignment */
-	apicioadr[0] = mapin_ioapic(APIC_IO_ADDR,
+	apic_free_apic_cpus();
+
+	apicioadr[0] = (void *)mapin_ioapic(APIC_IO_ADDR,
 	    APIC_IO_MEMLEN, PROT_READ | PROT_WRITE);
-	/*LINTED: pointer cast may result in improper alignment */
-	apicadr = (uint32_t *)psm_map_phys(APIC_LOCAL_ADDR,
+	apicadr = (void *)psm_map_phys(APIC_LOCAL_ADDR,
 	    APIC_LOCAL_MEMLEN, PROT_READ);
 	apic_cpus_size = 2 * sizeof (*apic_cpus);
 	apic_cpus = (apic_cpus_info_t *)
@@ -998,8 +1019,6 @@ apic_handle_defconf()
 	return (PSM_SUCCESS);
 
 apic_handle_defconf_fail:
-	if (apic_cpus)
-		kmem_free(apic_cpus, apic_cpus_size);
 	if (apicadr)
 		mapout_apic((caddr_t)apicadr, APIC_LOCAL_MEMLEN);
 	if (apicioadr[0])
@@ -1125,9 +1144,8 @@ apic_parse_mpct(caddr_t mpct, int bypass_cpus_and_ioapics)
 			if (ioapicp->io_flags & IOAPIC_FLAGS_EN) {
 				apic_io_id[apic_io_max] = ioapicp->io_apicid;
 				apic_io_ver[apic_io_max] = ioapicp->io_version;
-		/*LINTED: pointer cast may result in improper alignment */
 				apicioadr[apic_io_max] =
-				    mapin_ioapic(
+				    (void *)mapin_ioapic(
 				    (uint32_t)ioapicp->io_apic_addr,
 				    APIC_IO_MEMLEN, PROT_READ | PROT_WRITE);
 

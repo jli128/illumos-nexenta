@@ -45,7 +45,7 @@ extern "C" {
  */
 #define	ZFS_MAXNAMELEN		MAXNAMELEN
 #define	ZPOOL_MAXNAMELEN	MAXNAMELEN
-#define	ZFS_MAXPROPLEN		MAXPATHLEN
+#define	ZFS_MAXPROPLEN		(2 * MAXPATHLEN)
 #define	ZPOOL_MAXPROPLEN	MAXPATHLEN
 
 /*
@@ -678,6 +678,7 @@ int zfs_smb_acl_rename(libzfs_handle_t *, char *, char *, char *, char *);
  */
 extern int zpool_enable_datasets(zpool_handle_t *, const char *, int);
 extern int zpool_disable_datasets(zpool_handle_t *, boolean_t);
+extern int zpool_disable_datasets_ex(zpool_handle_t *, boolean_t, int);
 
 /*
  * Mappings between vdev and FRU.

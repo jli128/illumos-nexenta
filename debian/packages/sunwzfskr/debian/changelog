@@ -1,3 +1,96 @@
+sunwzfskr (5.11.134-31-12276-13503) nexenta; urgency=high
+
+  * Issue 13503: revert changes by (5.11.134-31-12274-12619)
+
+ -- Boris Protopopov <boris.protopopov@nexenta.com>  Wed, 27 Mar 2013 17:03:17 -0700
+
+sunwzfskr (5.11.134-31-12275-10054) nexenta; urgency=high
+
+  * Issue 10054: turn on zfs_fastflush by default
+
+ -- Boris Protopopov <boris.protopopov@nexenta.com>  Wed, 27 Mar 2013 16:21:29 -0700
+
+sunwzfskr (5.11.134-31-12274-12619) nexenta; urgency=high
+
+  * Issue 12619: Deadlocked zfs txg processing in dsl_sync_task_group_sync() (updated)
+
+ -- Alexander Stetsenko <ams@nexenta.com>  Tue, 26 Mar 2013 16:35:00 +0400
+
+sunwzfskr (5.11.134-31-12273-10054) nexenta; urgency=high
+
+  * Issue 10054: asynchronous ARC/L2ARC eviction to reduce zpool export time
+
+ -- Boris Protopopov <boris.protopopov@nexenta.com>  Mon, 25 Mar 2013 11:19:25 -0500
+
+sunwzfskr (5.11.134-31-12272-13318) nexenta; urgency=high
+
+  * Issue 13318: kernel panic during failover with autosync running on the active node
+
+ -- Nexenta Systems <support@nexenta.com>  Mon, 11 Mar 2013 21:18:25 -0500
+
+sunwzfskr (5.11.134-31-12271-13333) nexenta; urgency=high
+
+  * Issue 13333: zpool iostat doubles metrics for pool operations and bandwidth
+
+ -- Ilya Usvyatsky <ilya.usvyatsky@nexenta.com>  Sat, 09 Mar 2013 18:22:58 -0500
+
+sunwzfskr (5.11.134-31-12270-12619) nexenta; urgency=high
+
+  * Issue 12619: Deadlocked zfs txg processing in dsl_sync_task_group_sync()
+  * Issue 13204: zfs receive/rollback deadlock
+
+ -- Alexander Stetsenko <ams@nexenta.com>  Mon, 25 Feb 2013 06:18:25 -0800
+
+sunwzfskr (5.11.134-31-12269-10054) nexenta; urgency=high
+
+  * Issue 10054: Long export time causes failover to fail
+
+ -- Nexenta Systems <support@nexenta.com>  Fri, 08 Feb 2013 21:00:00 +0400
+
+sunwzfskr (5.11.134-31-12268-12770) nexenta; urgency=high
+
+  * Issue 12644: ASSERT() in zio.c in io error path
+  * Issue 12770: zio latency reports can produce false positives
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 23 Jan 2012 12:40:30 -0400
+
+sunwzfskr (5.11.134-31-12267-12379) nexenta; urgency=high
+
+  * Issue 12379: Backport request for Illumos changeset 13379 "zfs should handle imbalanced LUNs" to the 3.1.x branch
+
+ -- Nexenta Systems <support@nexenta.com>  Fri, 14 Dec 2012 15:58:31 +0100
+
+sunwzfskr (5.11.134-31-12266-12648) nexenta; urgency=high
+
+  * Issue 12648: backout zfs++ changes
+
+ -- Nexenta Systems <support@nexenta.com>  Thu, 10 Jan 2013 19:42:16 +0400
+
+sunwzfskr (5.11.134-31-12265-11612) nexenta; urgency=high
+
+  * Issue 11612: Failing vdev of a mirrored pool should not take zfs
+    operations out of action for extended periods of time.
+
+ -- Nexenta Systems <support@nexenta.com>  Tue, 04 Dec 2012 10:00:00 -0400
+
+sunwzfskr (5.11.134-31-12264-8622) nexenta; urgency=low
+
+  * Issue 8622: SSD added to a zpool does not appear to be recognised with a 4KB native block size
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 05 Dec 2012 22:32:37 +0100
+
+sunwzfskr (5.11.134-31-12263-12236) nexenta; urgency=low
+
+  * Issue 12235: ZFS extensions for intelligent placement of data and metadata
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 28 Nov 2012 20:54:09 +0400
+
+sunwzfskr (5.11.134-31-12262-0) nexenta; urgency=low
+
+  * Issue 11462: Backport Illumos 1618
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 10 Oct 2012 14:42:34 -0400
+
 sunwzfskr (5.11.134-31-8936-0) nexenta; urgency=low
 
   * Issue 8923: ZFS should track latency, use latency-aware hybrid allocator
@@ -524,18 +617,4 @@ sunwzfskr (5.11.34-1) nexenta; urgency=low
   * Synchronized with OpenSolaris code (5.11 build 34)
 
  -- Mac <mac@gnusolaris.org>  Sun, 19 Feb 2006 00:05:34 -0800
-
-sunwzfskr (5.11.33-2) elatte; urgency=low
-
-  * conflicts with sunwzfsr (<< 5.11.33)
-
- -- Erast Benson <erast@gnusolaris.org>  Thu, 16 Feb 2006 10:49:13 -0800
-
-sunwzfskr (5.11.33-1) nexenta; urgency=low
-
-  * Converted from .pkg format to .deb
-    by alien version 8.53
-
- -- Mac <mac@gnusolaris.org>  Sun,  5 Feb 2006 11:49:00 -0800
-
 

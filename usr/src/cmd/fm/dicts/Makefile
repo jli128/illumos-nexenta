@@ -21,6 +21,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
 
 include ../../Makefile.cmd
@@ -37,6 +38,9 @@ common_DCNAMES = \
 	SCA1000 \
 	SENSOR \
 	TEST
+
+common_DCNAMESONLY = \
+	DEV
 
 i386_DCNAMES = \
 	AMD \
@@ -58,14 +62,16 @@ ALLDCNAMES = \
 	$(sparc_DCNAMES) \
 	$(i386_DCNAMES)
 
-DCFILES = $(DCNAMES:%=%.dict)
+DCFILES = $(DCNAMES:%=%.dict) \
+	$(common_DCNAMESONLY:%=%.dict)
 POFILES = $(DCNAMES:%=%.po)
 MOFILES = $(DCNAMES:%=%.mo)
 
 ROOTDCDIR = $(ROOTLIB)/fm/dict
 ROOTLCDIR = $(ROOTLIB)/locale/C/LC_MESSAGES
 
-ROOTDCFILES = $(DCNAMES:%=$(ROOTDCDIR)/%.dict)
+ROOTDCFILES = $(DCNAMES:%=$(ROOTDCDIR)/%.dict) \
+	$(common_DCNAMESONLY:%=$(ROOTDCDIR)/%.dict)
 ROOTPOFILES = $(DCNAMES:%=$(ROOTLCDIR)/%.po)
 ROOTMOFILES = $(DCNAMES:%=$(ROOTLCDIR)/%.mo)
 ROOTALLPOFILES = $(ALLDCNAMES:%=$(ROOTLCDIR)/%.po)

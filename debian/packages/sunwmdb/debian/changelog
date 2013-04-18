@@ -1,4 +1,11 @@
-sunwmdb (5.11.134-31-3-0) nexenta; urgency=low
+sunwmdb (5.11.134-31-8545-9517) nexenta; urgency=high
+
+  * Issue 9517: After single disk fault patch installed single disk fault
+    still causes process hangs
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 23 Jan 2013 12:00:00 -0400
+
+sunwmdb (5.11.134-31-8544-0) nexenta; urgency=low
 
   * Issue 6231: should allow domain groups as member of local groups
 

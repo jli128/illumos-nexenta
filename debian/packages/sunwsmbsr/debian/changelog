@@ -1,3 +1,11 @@
+sunwsmbsr (5.11.134-31-10734-0) nexenta; urgency=high
+
+  * Issue 10734: NT Trans. Notify returning too quickly
+  * Issue 10733: Windows 7 directory listing keeps restarting
+  * Issue 6854:  FindFirstFile,FindFirstFileEx,... are not working correctly on Nexenta CIFS-shares
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 10 Oct 2012 17:26:00 -0700
+
 sunwsmbsr (5.11.134-31-2-0) nexenta; urgency=low
 
   * Issue 5827: authentication type is not supported (when joining a domain)

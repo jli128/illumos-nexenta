@@ -1,3 +1,15 @@
+sunwintgige (5.11.134-31-11945-12675) nexenta; urgency=low
+
+  * Issue 12675: some e1000g devices don't support 15 unicast addresses
+
+ -- Nexenta Systems <support@nexenta.com>  Tue, 22 Jan 2013 22:29:48 +0100
+
+sunwintgige (5.11.134-31-11944-0) nexenta; urgency=low
+
+  * Issue 11944: need workaround for QEMU bug that induces bad e1000g checksums
+
+ -- Nexenta Systems <support@nexenta.com>  Thu, 01 Nov 2012 21:55:45 +0100
+
 sunwintgige (5.11.134-31-6710-0) nexenta; urgency=low
 
   * Issue 6679: Need 82579 PHY support in e1000g

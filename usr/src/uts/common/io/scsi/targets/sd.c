@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -4214,6 +4215,18 @@ sd_set_properties(struct sd_lun *un, char *name, char *value)
 		    "RMW type set to %d\n", un->un_f_rmw_type);
 	}
 
+	if (strcasecmp(name, "physical-block-size") == 0) {
+		if (ddi_strtol(value, &endptr, 0, &val) == 0 &&
+		    ISP2(val) && val >= un->un_tgt_blocksize &&
+		    val >= un->un_sys_blocksize) {
+			un->un_phy_blocksize = val;
+		} else {
+			goto value_invalid;
+		}
+		SD_INFO(SD_LOG_ATTACH_DETACH, un, "sd_set_properties: "
+		    "physical block size set to %d\n", un->un_phy_blocksize);
+	}
+
 	/*
 	 * Validate the throttle values.
 	 * If any of the numbers are invalid, set everything to defaults.
@@ -4958,12 +4971,17 @@ sd_get_physical_geometry(struct sd_lun *un, cmlb_geom_t *pgeom_p,
 	 * and MMC spec). To prevent soft errors just return
 	 * using the default LBA size.
 	 *
+	 * Since sata.c MODE SENSE function (sata_txlt_mode_sense())
+	 * does not implement support for mode page four or five
+	 * to prevent illegal requests on SATA drives return here.
+	 *
 	 * These pages are also reserved in SBC-2 and later.
 	 * We assume SBC-2 or later for a direct-attached block
 	 * device if the SCSI version is at least SPC-3 or if
 	 * the device is solid-state.
 	 */
 	if (ISCD(un) || (un->un_f_is_solid_state == TRUE) ||
+	    un->un_interconnect_type == SD_INTERCONNECT_SATA ||
 	    ((un->un_ctype == CTYPE_CCS) && (SD_INQUIRY(un)->inq_ansi >= 5)))
 		return (ret);
 
@@ -7552,9 +7570,9 @@ sd_unit_attach(dev_info_t *devi)
 		ddi_prop_free(variantp);
 	}
 
-	un->un_cmd_timeout	= SD_IO_TIME;
-
-	un->un_busy_timeout  = SD_BSY_TIMEOUT;
+	un->un_cmd_timeout	= ((ISCD(un)) ? 2 : 1) * (ushort_t)sd_io_time;
+	un->un_uscsi_timeout	= un->un_cmd_timeout;
+	un->un_busy_timeout	= SD_BSY_TIMEOUT;
 
 	/* Info on current states, statuses, etc. (Updated frequently) */
 	un->un_state		= SD_STATE_NORMAL;
@@ -7608,6 +7626,13 @@ sd_unit_attach(dev_info_t *devi)
 	un->un_f_mmc_gesn_polling = TRUE;
 
 	/*
+	 * physical sector size defaults to DEV_BSIZE currently. We can
+	 * override this value via the driver configuration file so we must
+	 * set it before calling sd_read_unit_properties().
+	 */
+	un->un_phy_blocksize = DEV_BSIZE;
+
+	/*
 	 * Retrieve the properties from the static driver table or the driver
 	 * configuration file (.conf) for this unit and update the soft state
 	 * for the device as needed for the indicated properties.
@@ -7650,11 +7675,6 @@ sd_unit_attach(dev_info_t *devi)
 	 */
 	un->un_tgt_blocksize  = un->un_sys_blocksize  = DEV_BSIZE;
 	un->un_blockcount = 0;
-
-	/*
-	 * physical sector size default to DEV_BSIZE currently.
-	 */
-	un->un_phy_blocksize = DEV_BSIZE;
 
 	/*
 	 * Set up the per-instance info needed to determine the correct
@@ -13613,8 +13633,6 @@ sd_init_cdb_limits(struct sd_lun *un)
 
 	un->un_status_len = (int)((un->un_f_arq_enabled == TRUE)
 	    ? sizeof (struct scsi_arq_status) : 1);
-	un->un_cmd_timeout = (ushort_t)sd_io_time;
-	un->un_uscsi_timeout = ((ISCD(un)) ? 2 : 1) * un->un_cmd_timeout;
 }
 
 
@@ -16426,7 +16444,7 @@ sd_alloc_rqs(struct scsi_device *devp, struct sd_lun *un)
 
 	/* Set up the other needed members in the ARQ scsi_pkt. */
 	un->un_rqs_pktp->pkt_comp   = sdintr;
-	un->un_rqs_pktp->pkt_time   = sd_io_time;
+	un->un_rqs_pktp->pkt_time   = ((ISCD(un)) ? 2 : 1) * sd_io_time;
 	un->un_rqs_pktp->pkt_flags |=
 	    (FLAG_SENSING | FLAG_HEAD);	/* (1222170) */
 
@@ -20036,7 +20054,7 @@ sd_send_scsi_READ_CAPACITY(sd_ssc_t *ssc, uint64_t *capp, uint32_t *lbap,
 	ucmd_buf.uscsi_rqbuf	= (caddr_t)&sense_buf;
 	ucmd_buf.uscsi_rqlen	= sizeof (sense_buf);
 	ucmd_buf.uscsi_flags	= USCSI_RQENABLE | USCSI_READ | USCSI_SILENT;
-	ucmd_buf.uscsi_timeout	= 60;
+	ucmd_buf.uscsi_timeout	= un->un_uscsi_timeout;
 
 	status = sd_ssc_send(ssc, &ucmd_buf, FKIOCTL,
 	    UIO_SYSSPACE, path_flag);
@@ -20252,7 +20270,7 @@ sd_send_scsi_READ_CAPACITY_16(sd_ssc_t *ssc, uint64_t *capp,
 	ucmd_buf.uscsi_rqbuf	= (caddr_t)&sense_buf;
 	ucmd_buf.uscsi_rqlen	= sizeof (sense_buf);
 	ucmd_buf.uscsi_flags	= USCSI_RQENABLE | USCSI_READ | USCSI_SILENT;
-	ucmd_buf.uscsi_timeout	= 60;
+	ucmd_buf.uscsi_timeout	= un->un_uscsi_timeout;
 
 	/*
 	 * Read Capacity (16) is a Service Action In command.  One
@@ -20474,7 +20492,7 @@ sd_send_scsi_START_STOP_UNIT(sd_ssc_t *ssc, int pc_flag, int flag,
 	ucmd_buf.uscsi_rqbuf	= (caddr_t)&sense_buf;
 	ucmd_buf.uscsi_rqlen	= sizeof (struct scsi_extended_sense);
 	ucmd_buf.uscsi_flags	= USCSI_RQENABLE | USCSI_SILENT;
-	ucmd_buf.uscsi_timeout	= 200;
+	ucmd_buf.uscsi_timeout	= 3 * un->un_uscsi_timeout;
 
 	status = sd_ssc_send(ssc, &ucmd_buf, FKIOCTL,
 	    UIO_SYSSPACE, path_flag);
@@ -20693,7 +20711,7 @@ sd_send_scsi_INQUIRY(sd_ssc_t *ssc, uchar_t *bufaddr, size_t buflen,
 	ucmd_buf.uscsi_rqbuf	= NULL;
 	ucmd_buf.uscsi_rqlen	= 0;
 	ucmd_buf.uscsi_flags	= USCSI_READ | USCSI_SILENT;
-	ucmd_buf.uscsi_timeout	= 200;	/* Excessive legacy value */
+	ucmd_buf.uscsi_timeout	= 2 * un->un_uscsi_timeout;
 
 	status = sd_ssc_send(ssc, &ucmd_buf, FKIOCTL,
 	    UIO_SYSSPACE, SD_PATH_DIRECT);
@@ -20796,7 +20814,7 @@ sd_send_scsi_TEST_UNIT_READY(sd_ssc_t *ssc, int flag)
 	if ((flag & SD_DONT_RETRY_TUR) != 0) {
 		ucmd_buf.uscsi_flags |= USCSI_DIAGNOSE;
 	}
-	ucmd_buf.uscsi_timeout	= 60;
+	ucmd_buf.uscsi_timeout	= un->un_uscsi_timeout; 
 
 	status = sd_ssc_send(ssc, &ucmd_buf, FKIOCTL,
 	    UIO_SYSSPACE, ((flag & SD_BYPASS_PM) ? SD_PATH_DIRECT :
@@ -20893,7 +20911,7 @@ sd_send_scsi_PERSISTENT_RESERVE_IN(sd_ssc_t *ssc, uchar_t  usr_cmd,
 	ucmd_buf.uscsi_rqbuf	= (caddr_t)&sense_buf;
 	ucmd_buf.uscsi_rqlen	= sizeof (struct scsi_extended_sense);
 	ucmd_buf.uscsi_flags	= USCSI_RQENABLE | USCSI_READ | USCSI_SILENT;
-	ucmd_buf.uscsi_timeout	= 60;
+	ucmd_buf.uscsi_timeout	= un->un_uscsi_timeout; 
 
 	status = sd_ssc_send(ssc, &ucmd_buf, FKIOCTL,
 	    UIO_SYSSPACE, SD_PATH_STANDARD);
@@ -20999,7 +21017,7 @@ sd_send_scsi_PERSISTENT_RESERVE_OUT(sd_ssc_t *ssc, uchar_t usr_cmd,
 	ucmd_buf.uscsi_rqbuf	= (caddr_t)&sense_buf;
 	ucmd_buf.uscsi_rqlen	= sizeof (struct scsi_extended_sense);
 	ucmd_buf.uscsi_flags	= USCSI_RQENABLE | USCSI_WRITE | USCSI_SILENT;
-	ucmd_buf.uscsi_timeout	= 60;
+	ucmd_buf.uscsi_timeout	= un->un_uscsi_timeout;
 
 	switch (usr_cmd) {
 	case SD_SCSI3_REGISTER: {
@@ -21188,7 +21206,7 @@ sd_send_scsi_SYNCHRONIZE_CACHE(struct sd_lun *un, struct dk_callback *dkc)
 	uscmd->uscsi_rqlen = SENSE_LENGTH;
 	uscmd->uscsi_rqresid = SENSE_LENGTH;
 	uscmd->uscsi_flags = USCSI_RQENABLE | USCSI_SILENT;
-	uscmd->uscsi_timeout = sd_io_time;
+	uscmd->uscsi_timeout = un->un_cmd_timeout;
 
 	/*
 	 * Allocate an sd_uscsi_info struct and fill it with the info
@@ -21406,7 +21424,7 @@ sd_send_scsi_GET_CONFIGURATION(sd_ssc_t *ssc, struct uscsi_cmd *ucmdbuf,
 	ucmdbuf->uscsi_cdblen = CDB_GROUP1;
 	ucmdbuf->uscsi_bufaddr = (caddr_t)bufaddr;
 	ucmdbuf->uscsi_buflen = buflen;
-	ucmdbuf->uscsi_timeout = sd_io_time;
+	ucmdbuf->uscsi_timeout = un->un_uscsi_timeout;
 	ucmdbuf->uscsi_rqbuf = (caddr_t)rqbuf;
 	ucmdbuf->uscsi_rqlen = rqbuflen;
 	ucmdbuf->uscsi_flags = USCSI_RQENABLE|USCSI_SILENT|USCSI_READ;
@@ -21499,7 +21517,7 @@ sd_send_scsi_feature_GET_CONFIGURATION(sd_ssc_t *ssc,
 	ucmdbuf->uscsi_cdblen = CDB_GROUP1;
 	ucmdbuf->uscsi_bufaddr = (caddr_t)bufaddr;
 	ucmdbuf->uscsi_buflen = buflen;
-	ucmdbuf->uscsi_timeout = sd_io_time;
+	ucmdbuf->uscsi_timeout = un->un_uscsi_timeout;
 	ucmdbuf->uscsi_rqbuf = (caddr_t)rqbuf;
 	ucmdbuf->uscsi_rqlen = rqbuflen;
 	ucmdbuf->uscsi_flags = USCSI_RQENABLE|USCSI_SILENT|USCSI_READ;
@@ -21612,7 +21630,7 @@ sd_send_scsi_MODE_SENSE(sd_ssc_t *ssc, int cdbsize, uchar_t *bufaddr,
 	ucmd_buf.uscsi_rqbuf	= (caddr_t)&sense_buf;
 	ucmd_buf.uscsi_rqlen	= sizeof (struct scsi_extended_sense);
 	ucmd_buf.uscsi_flags	= USCSI_RQENABLE | USCSI_READ | USCSI_SILENT;
-	ucmd_buf.uscsi_timeout	= 60;
+	ucmd_buf.uscsi_timeout	= un->un_uscsi_timeout;
 
 	status = sd_ssc_send(ssc, &ucmd_buf, FKIOCTL,
 	    UIO_SYSSPACE, path_flag);
@@ -21731,7 +21749,7 @@ sd_send_scsi_MODE_SELECT(sd_ssc_t *ssc, int cdbsize, uchar_t *bufaddr,
 	ucmd_buf.uscsi_rqbuf	= (caddr_t)&sense_buf;
 	ucmd_buf.uscsi_rqlen	= sizeof (struct scsi_extended_sense);
 	ucmd_buf.uscsi_flags	= USCSI_RQENABLE | USCSI_WRITE | USCSI_SILENT;
-	ucmd_buf.uscsi_timeout	= 60;
+	ucmd_buf.uscsi_timeout	= un->un_uscsi_timeout;
 
 	status = sd_ssc_send(ssc, &ucmd_buf, FKIOCTL,
 	    UIO_SYSSPACE, path_flag);
@@ -21869,7 +21887,7 @@ sd_send_scsi_RDWR(sd_ssc_t *ssc, uchar_t cmd, void *bufaddr,
 	ucmd_buf.uscsi_rqbuf	= (caddr_t)&sense_buf;
 	ucmd_buf.uscsi_rqlen	= sizeof (struct scsi_extended_sense);
 	ucmd_buf.uscsi_flags	= flag | USCSI_RQENABLE | USCSI_SILENT;
-	ucmd_buf.uscsi_timeout	= 60;
+	ucmd_buf.uscsi_timeout	= un->un_cmd_timeout;
 	status = sd_ssc_send(ssc, &ucmd_buf, FKIOCTL,
 	    UIO_SYSSPACE, path_flag);
 
@@ -21951,7 +21969,7 @@ sd_send_scsi_LOG_SENSE(sd_ssc_t *ssc, uchar_t *bufaddr, uint16_t buflen,
 	ucmd_buf.uscsi_rqbuf	= (caddr_t)&sense_buf;
 	ucmd_buf.uscsi_rqlen	= sizeof (struct scsi_extended_sense);
 	ucmd_buf.uscsi_flags	= USCSI_RQENABLE | USCSI_READ | USCSI_SILENT;
-	ucmd_buf.uscsi_timeout	= 60;
+	ucmd_buf.uscsi_timeout	= un->un_uscsi_timeout;
 
 	status = sd_ssc_send(ssc, &ucmd_buf, FKIOCTL,
 	    UIO_SYSSPACE, path_flag);
@@ -22083,7 +22101,7 @@ sd_send_scsi_GET_EVENT_STATUS_NOTIFICATION(sd_ssc_t *ssc, uchar_t *bufaddr,
 	ucmd_buf.uscsi_rqbuf	= NULL;
 	ucmd_buf.uscsi_rqlen	= 0;
 	ucmd_buf.uscsi_flags	= USCSI_READ | USCSI_SILENT;
-	ucmd_buf.uscsi_timeout	= 60;
+	ucmd_buf.uscsi_timeout	= un->un_uscsi_timeout;
 
 	status = sd_ssc_send(ssc, &ucmd_buf, FKIOCTL,
 	    UIO_SYSSPACE, SD_PATH_DIRECT);
@@ -23425,9 +23443,16 @@ sd_get_media_info_com(dev_t dev, uint_t *dki_media_type, uint_t *dki_lbsize,
 	 * Now read the capacity so we can provide the lbasize,
 	 * pbsize and capacity.
 	 */
-	if (dki_pbsize && un->un_f_descr_format_supported)
+	if (dki_pbsize && un->un_f_descr_format_supported) {
 		rval = sd_send_scsi_READ_CAPACITY_16(ssc, &capacity, &lbasize,
 		    &pbsize, SD_PATH_DIRECT);
+
+		/*
+		 * Override the physical blocksize if the instance already
+		 * has a larger value.
+		 */
+		pbsize = MAX(pbsize, un->un_phy_blocksize);
+	}
 
 	if (dki_pbsize == NULL || rval != 0 ||
 	    !un->un_f_descr_format_supported) {
@@ -27932,7 +27957,7 @@ sr_read_tochdr(dev_t dev, caddr_t data, int flag)
 	com->uscsi_cdblen  = CDB_GROUP1;
 	com->uscsi_bufaddr = buffer;
 	com->uscsi_buflen  = 0x04;
-	com->uscsi_timeout = 300;
+	com->uscsi_timeout = 3 * un->un_cmd_timeout;
 	com->uscsi_flags   = USCSI_DIAGNOSE|USCSI_SILENT|USCSI_READ;
 
 	rval = sd_send_scsi_cmd(dev, com, FKIOCTL, UIO_SYSSPACE,
@@ -31671,7 +31696,11 @@ sd_check_emulation_mode(sd_ssc_t *ssc)
 		} else {
 			if (!ISP2(pbsize % DEV_BSIZE) || pbsize == 0) {
 				un->un_phy_blocksize = DEV_BSIZE;
-			} else {
+			} else if (pbsize > un->un_phy_blocksize) {
+				/*
+				 * Don't reset the physical blocksize
+				 * unless we've detected a larger value.
+				 */
 				un->un_phy_blocksize = pbsize;
 			}
 		}

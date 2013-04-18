@@ -1,3 +1,27 @@
+sunwcsu (5.11.134-31-13249-13190) nexenta; urgency=high
+
+  * Issue 13190: idmapd error -9961 (No AD servers)
+
+ -- Nexenta Systems <support@nexenta.com>  Sat, 23 Feb 2013 18:30:35 -0500
+
+sunwcsu (5.11.134-31-11339-0) nexenta; urgency=low
+
+  * Issue 11339: Enhancments for OpenIPMI driver
+
+ -- Nexenta Systems <support@nexenta.com>  Tue, 18 Sep 2012 12:32:07 -0700
+
+sunwcsu (5.11.134-31-11126-0) nexenta; urgency=low
+
+  * Issue 11126: OpenIPMI driver support added
+
+ -- Nexenta Systems <support@nexenta.com>  Tue, 21 Aug 2012 12:51:30 -0700
+
+sunwcsu (5.11.134-31-9465-0) nexenta; urgency=low
+
+  * Issue 8853: sharenfs property must accept more than 1024 bytes
+
+ -- Nexenta Systems <support@nexenta.com>  Thu, 29 Mar 2012 14:40:47 +0400
+
 sunwcsu (5.11.134-31-7090-1) nexenta; urgency=low
 
   * Corrected version to include patch-id instead of bug-id.

@@ -2029,8 +2029,20 @@ zfs_suspend_fs(zfsvfs_t *zfsvfs)
 {
 	int error;
 
-	if ((error = zfsvfs_teardown(zfsvfs, B_FALSE)) != 0)
+	mutex_enter(&zfsvfs->z_lock);
+	if (zfsvfs->z_busy) {
+		mutex_exit(&zfsvfs->z_lock);
+		return (EBUSY);
+	}
+	zfsvfs->z_busy = B_TRUE;
+	mutex_exit(&zfsvfs->z_lock);
+
+	if ((error = zfsvfs_teardown(zfsvfs, B_FALSE)) != 0) {
+		mutex_enter(&zfsvfs->z_lock);
+		zfsvfs->z_busy = B_FALSE;
+		mutex_exit(&zfsvfs->z_lock);
 		return (error);
+	}
 	dmu_objset_disown(zfsvfs->z_os, zfsvfs);
 
 	return (0);
@@ -2110,6 +2122,10 @@ bail:
 		if (vn_vfswlock(zfsvfs->z_vfs->vfs_vnodecovered) == 0)
 			(void) dounmount(zfsvfs->z_vfs, MS_FORCE, CRED());
 	}
+	mutex_enter(&zfsvfs->z_lock);
+	zfsvfs->z_busy = B_FALSE;
+	mutex_exit(&zfsvfs->z_lock);
+
 	return (err);
 }
 

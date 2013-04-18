@@ -20,6 +20,8 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -1585,6 +1587,8 @@ arc_buf_size(arc_buf_t *buf)
 	return (buf->b_hdr->b_size);
 }
 
+int zfs_fastflush = 1;
+
 /*
  * Evict buffers from list until we've removed the specified number of
  * bytes.  Move the removed buffers to the appropriate evict state.
@@ -1909,36 +1913,33 @@ arc_do_user_evicts(void)
 	mutex_exit(&arc_eviction_mtx);
 }
 
-/*
- * Flush all *evictable* data from the cache for the given spa.
- * NOTE: this will not touch "active" (i.e. referenced) data.
- */
-void
-arc_flush(spa_t *spa)
+typedef struct arc_async_flush_data {
+	uint64_t	aaf_guid;
+} arc_async_flush_data_t;
+
+static taskq_t *arc_flush_taskq;
+
+static void
+_arc_flush(uint64_t guid)
 {
-	uint64_t guid = 0;
-
-	if (spa)
-		guid = spa_guid(spa);
-
 	while (list_head(&arc_mru->arcs_list[ARC_BUFC_DATA])) {
 		(void) arc_evict(arc_mru, guid, -1, FALSE, ARC_BUFC_DATA);
-		if (spa)
+		if (guid)
 			break;
 	}
 	while (list_head(&arc_mru->arcs_list[ARC_BUFC_METADATA])) {
 		(void) arc_evict(arc_mru, guid, -1, FALSE, ARC_BUFC_METADATA);
-		if (spa)
+		if (guid)
 			break;
 	}
 	while (list_head(&arc_mfu->arcs_list[ARC_BUFC_DATA])) {
 		(void) arc_evict(arc_mfu, guid, -1, FALSE, ARC_BUFC_DATA);
-		if (spa)
+		if (guid)
 			break;
 	}
 	while (list_head(&arc_mfu->arcs_list[ARC_BUFC_METADATA])) {
 		(void) arc_evict(arc_mfu, guid, -1, FALSE, ARC_BUFC_METADATA);
-		if (spa)
+		if (guid)
 			break;
 	}
 
@@ -1948,7 +1949,54 @@ arc_flush(spa_t *spa)
 	mutex_enter(&arc_reclaim_thr_lock);
 	arc_do_user_evicts();
 	mutex_exit(&arc_reclaim_thr_lock);
-	ASSERT(spa || arc_eviction_list == NULL);
+}
+
+static void
+arc_flush_task(void *arg)
+{
+	arc_async_flush_data_t *aaf = (arc_async_flush_data_t *)arg;
+	_arc_flush(aaf->aaf_guid);
+	kmem_free(aaf, sizeof (arc_async_flush_data_t));
+}
+
+/*
+ * Flush all *evictable* data from the cache for the given spa.
+ * NOTE: this will not touch "active" (i.e. referenced) data.
+ */
+void
+arc_flush(spa_t *spa)
+{
+	uint64_t guid = 0;
+	boolean_t async_flush = (spa ? zfs_fastflush : FALSE);
+	arc_async_flush_data_t *aaf;
+
+	if (spa) {
+		guid = spa_guid(spa);
+		if (async_flush) {
+			aaf = kmem_alloc(sizeof (arc_async_flush_data_t),
+			    KM_SLEEP);
+			aaf->aaf_guid = guid;
+		}
+	}
+
+	/*
+	 * Try to flush per-spa remaining ARC ghost buffers and buffers in
+	 * arc_eviction_list asynchronously while a pool is being closed.
+	 * An ARC buffer is bound to spa only by guid, so buffer can
+	 * exist even when pool has already gone. If asynchronous flushing
+	 * fails we fall back to regular (synchronous) one.
+	 * NOTE: If asynchronous flushing had not yet finished when the pool
+	 * was imported again it wouldn't be a problem, even when guids before
+	 * and after export/import are the same. We can evict only unreferenced
+	 * buffers, other are skipped.
+	 */
+	if (!async_flush || (taskq_dispatch(arc_flush_taskq, arc_flush_task,
+	    aaf, TQ_NOSLEEP) == NULL)) {
+		_arc_flush(guid);
+		ASSERT(spa || arc_eviction_list == NULL);
+		if (async_flush)
+			kmem_free(aaf, sizeof (arc_async_flush_data_t));
+	}
 }
 
 void
@@ -1980,6 +2028,11 @@ arc_shrink(void)
 		arc_adjust();
 }
 
+/*
+ * Determine if the system is under memory pressure and is asking
+ * to reclaim memory. A return value of 1 indicates that the system
+ * is under memory pressure and that the arc should adjust accordingly.
+ */
 static int
 arc_reclaim_needed(void)
 {
@@ -2027,11 +2080,24 @@ arc_reclaim_needed(void)
 	 * heap is allocated.  (Or, in the calculation, if less than 1/4th is
 	 * free)
 	 */
-	if (btop(vmem_size(heap_arena, VMEM_FREE)) <
-	    (btop(vmem_size(heap_arena, VMEM_FREE | VMEM_ALLOC)) >> 2))
+	if (vmem_size(heap_arena, VMEM_FREE) <
+	    (vmem_size(heap_arena, VMEM_FREE | VMEM_ALLOC) >> 2))
 		return (1);
 #endif
 
+	/*
+	 * If zio data pages are being allocated out of a separate heap segment,
+	 * then enforce that the size of available vmem for this arena remains
+	 * above about 1/16th free.
+	 *
+	 * Note: The 1/16th arena free requirement was put in place
+	 * to aggressively evict memory from the arc in order to avoid
+	 * memory fragmentation issues.
+	 */
+	if (zio_arena != NULL &&
+	    vmem_size(zio_arena, VMEM_FREE) <
+	    (vmem_size(zio_arena, VMEM_ALLOC) >> 4))
+		return (1);
 #else
 	if (spa_get_random(100) == 0)
 		return (1);
@@ -2083,6 +2149,13 @@ arc_kmem_reap_now(arc_reclaim_strategy_t strat)
 	}
 	kmem_cache_reap_now(buf_cache);
 	kmem_cache_reap_now(hdr_cache);
+
+	/*
+	 * Ask the vmem areana to reclaim unused memory from its
+	 * quantum caches.
+	 */
+	if (zio_arena != NULL && strat == ARC_RECLAIM_AGGR)
+		vmem_qcache_reap(zio_arena);
 }
 
 static void
@@ -2215,18 +2288,6 @@ arc_evict_needed(arc_buf_contents_t type)
 {
 	if (type == ARC_BUFC_METADATA && arc_meta_used >= arc_meta_limit)
 		return (1);
-
-#ifdef _KERNEL
-	/*
-	 * If zio data pages are being allocated out of a separate heap segment,
-	 * then enforce that the size of available vmem for this area remains
-	 * above about 1/32nd free.
-	 */
-	if (type == ARC_BUFC_DATA && zio_arena != NULL &&
-	    vmem_size(zio_arena, VMEM_FREE) <
-	    (vmem_size(zio_arena, VMEM_ALLOC) >> 5))
-		return (1);
-#endif
 
 	if (arc_reclaim_needed())
 		return (1);
@@ -3536,6 +3597,8 @@ arc_init(void)
 	list_create(&arc_l2c_only->arcs_list[ARC_BUFC_DATA],
 	    sizeof (arc_buf_hdr_t), offsetof(arc_buf_hdr_t, b_arc_node));
 
+	arc_flush_taskq = taskq_create("arc_flush_tq",
+	    max_ncpus, minclsyspri, 1, 4, TASKQ_DYNAMIC);
 	buf_init();
 
 	arc_thread_exit = 0;
@@ -3604,6 +3667,7 @@ arc_fini(void)
 
 	mutex_destroy(&zfs_write_limit_lock);
 
+	taskq_destroy(arc_flush_taskq);
 	buf_fini();
 
 	ASSERT(arc_loaned_bytes == 0);
@@ -4092,7 +4156,8 @@ l2arc_list_locked(int list_num, kmutex_t **lock)
  * If the 'all' boolean is set, every buffer is evicted.
  */
 static void
-l2arc_evict(l2arc_dev_t *dev, uint64_t distance, boolean_t all)
+_l2arc_evict(l2arc_dev_t *dev, uint64_t distance, boolean_t all,
+	     boolean_t space_update)
 {
 	list_t *buflist;
 	l2arc_buf_hdr_t *abl2;
@@ -4212,8 +4277,96 @@ top:
 	}
 	mutex_exit(&l2arc_buflist_mtx);
 
-	vdev_space_update(dev->l2ad_vdev, -(taddr - dev->l2ad_evict), 0, 0);
-	dev->l2ad_evict = taddr;
+	if (space_update) {
+		vdev_space_update(dev->l2ad_vdev, -(taddr - dev->l2ad_evict), 0, 0);
+		dev->l2ad_evict = taddr;
+	}
+}
+
+/*
+ * Asynchronous task for eviction of all the buffers for this L2ARC device
+ * The task is dispatched in l2arc_evict()
+ */
+typedef struct {
+	l2arc_dev_t *dev;
+} l2arc_evict_data_t;
+
+static void
+l2arc_evict_task(void *arg)
+{
+	l2arc_evict_data_t *d = (l2arc_evict_data_t*)arg;
+	ASSERT(d && d->dev);
+
+	/*
+	 * Evict l2arc buffers asynchronously; we need to keep the device
+	 * around until we are sure there aren't any buffers referencing it.
+	 * We do not need to hold any config locks, etc. because at this point,
+	 * we are the only ones who knows about this device (the in-core
+	 * structure), so no new buffers can be created (e.g. if the pool is
+	 * re-imported while the asynchronous eviction is in progress) that
+	 * reference this same in-core structure
+	 */
+	_l2arc_evict(d->dev, 0LL, B_TRUE, B_FALSE);
+
+	/* Same cleanup as in the synchronous path */
+	list_destroy(d->dev->l2ad_buflist);
+	kmem_free(d->dev->l2ad_buflist, sizeof (list_t));
+	kmem_free(d->dev, sizeof (l2arc_dev_t));
+	/* Task argument cleanup */
+	kmem_free(arg, sizeof (l2arc_evict_data_t));
+}
+
+boolean_t zfs_l2arc_async_evict = B_TRUE;
+
+/*
+ * Perform l2arc eviction for buffers associated with this device
+ * If evicting all buffers (done at pool export time), try to evict
+ * asynchronously, and fall back to synchronous eviction in case of error
+ * Tell the caller whether to cleanup the device:
+ *  - B_TRUE means "asynchronous eviction, do not cleanup"
+ *  - B_FALSE means "synchronous eviction, done, please cleanup"
+ */
+static boolean_t
+l2arc_evict(l2arc_dev_t *dev, uint64_t distance, boolean_t all)
+{
+	/*
+	 *  If we are evicting all the buffers for this device, which happens
+	 *  at pool export time, schedule asynchronous task
+	 */
+	if (all && zfs_l2arc_async_evict) {
+		l2arc_evict_data_t *arg =
+		    kmem_alloc(sizeof (l2arc_evict_data_t), KM_SLEEP);
+		arg->dev = dev;
+
+		/*
+		 * Preemptively adjust the space stats for vdev
+		 * and metaslab class
+		 */
+		vdev_space_update(dev->l2ad_vdev,
+		    -(dev->l2ad_end - dev->l2ad_evict), 0, 0);
+		dev->l2ad_evict = dev->l2ad_end;
+
+		if ((taskq_dispatch(arc_flush_taskq, l2arc_evict_task,
+		    arg, TQ_NOSLEEP) == NULL)) {
+			/*
+			 * Failed to dispatch asynchronous task
+			 * cleanup, evict synchronously, avoid adjusting
+			 * vdev space second time
+			 */
+			kmem_free(arg, sizeof (l2arc_evict_data_t));
+			_l2arc_evict(dev, distance, all, B_FALSE);
+		} else {
+			/*
+			 * Successfull dispatch, vdev space updated
+			 */
+			return B_TRUE;
+		}
+	} else {
+		/* Evict synchronously */
+		_l2arc_evict(dev, distance, all, B_TRUE);
+	}
+
+	return B_FALSE;
 }
 
 /*
@@ -4469,8 +4622,9 @@ l2arc_feed_thread(void)
 
 		/*
 		 * Evict L2ARC buffers that will be overwritten.
+		 * B_FALSE guarantees synchronous eviction.
 		 */
-		l2arc_evict(dev, size, B_FALSE);
+		(void) l2arc_evict(dev, size, B_FALSE);
 
 		/*
 		 * Write ARC buffers.
@@ -4584,10 +4738,15 @@ l2arc_remove_vdev(vdev_t *vd)
 	/*
 	 * Clear all buflists and ARC references.  L2ARC device flush.
 	 */
-	l2arc_evict(remdev, 0, B_TRUE);
-	list_destroy(remdev->l2ad_buflist);
-	kmem_free(remdev->l2ad_buflist, sizeof (list_t));
-	kmem_free(remdev, sizeof (l2arc_dev_t));
+	if (l2arc_evict(remdev, 0, B_TRUE) == B_FALSE) {
+		/*
+		 * The eviction was done synchronously, cleanup here
+		 * Otherwise, the asynchronous task will cleanup
+		 */
+		list_destroy(remdev->l2ad_buflist);
+		kmem_free(remdev->l2ad_buflist, sizeof (list_t));
+		kmem_free(remdev, sizeof (l2arc_dev_t));
+	}
 }
 
 void

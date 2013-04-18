@@ -1,0 +1,120 @@
+#!/sbin/sh
+#
+# Copyright 2005-2012 Nexenta Systems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+PATH=/var/lib/dpkg/alien/sunwstmf:/bin:/usr/bin:/sbin:/usr/sbin; export PATH
+ARCH=i386;				export ARCH
+PKGINST=sunwstmf;			export PKGINST
+PKG=sunwstmf;				export PKG
+EXT=;					export EXT
+SUN_PERSONALITY=1;				export SUN_PERSONALITY
+BASEDIR=/etc/../;				export BASEDIR
+PKG_INSTALL_ROOT=/etc/../;				export PKG_INSTALL_ROOT
+INST_DATADIR=/var/lib/dpkg/alien;	export INST_DATADIR
+UPDATE=
+cat /var/lib/dpkg/status | grep "^Package:\s* sunwstmf" >/dev/null && UPDATE=yes
+export UPDATE
+
+test x$1 != xupgrade; true
+
+installf() {
+if test "x$1" = "x-R"; then shift; shift; fi
+_op=$1; _class=$2; _pkginst=$3; _path=$4; _type=$5; _major=$6; _minor=$7
+_mode=$8; _owner=$9; shift; _group=$9
+if test "x$_op" = "x-f"; then
+	_pkginst=$_class
+	_pipefile=/tmp/$_pkginst.installf
+	echo "Applying $_pkginst.installf"
+	test -f $_pipefile && . $_pipefile
+	rm -f $_pipefile
+	return 0
+else
+	_pipefile=/tmp/$_pkginst.installf
+fi
+if test "x$_op" != "x-c"; then
+	echo "unsupported operation: $_op"; return 1
+fi
+if test "x$_path" = "x-"; then
+	read _dstsrc _type
+	_dst=`echo $_dstsrc | cut -d= -f1`
+	_src=`echo $_dstsrc | cut -d= -f2`
+	test "x$_type" = "xs" && _type="-s"
+	test "x$_type" = "xl" && _type=""
+	if test "x$_type" = "xs" -a "x$_type" != "xl"; then
+		echo "unsupported type: $_type"; return 1
+	fi
+	test x$_dst = x -o x$_src = x && return 1
+	echo "rm -f $_dst; ln $_type $_src $_dst" >> $_pipefile
+	return 0
+fi
+echo "rm -f $_path; mknod $_path $_type $_major $_minor; chown $_owner $_path; chgrp $_group $_path; chmod $_mode $_path" >> $_pipefile
+return 0
+}
+
+removef() {
+_op=$1; _pkginst=$2; _path=$3
+test "x$_op" = "x-f" && return 0
+echo $_path
+return 0
+}
+
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+PATH="/usr/bin:/usr/sbin:${PATH}"
+export PATH
+
+SERVICE="svc:/system/stmf:default"
+
+driver_installed()
+{
+        grep $1 /etc/name_to_major >/dev/null 2>&1
+        return $?
+}
+
+remove_drv()
+{
+	if driver_installed $1
+	then
+		/usr/sbin/rem_drv -b ${BASEDIR} $1 > /dev/null 2>&1
+	fi
+}
+
+svcadm clear $SERVICE >/dev/null 2>&1
+svcadm disable $SERVICE >/dev/null 2>&1
+sleep 2
+
+if [ "$UPDATE" != 'yes' ];
+then
+        remove_drv qlt
+fi
+
+remove_drv fct
+remove_drv pppt
+remove_drv stmf_sbd
+echo 'stmf_allow_modunload/W 1' | /bin/mdb -kw >/dev/null 2>&1
+remove_drv stmf
+
+exit 0

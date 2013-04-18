@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/atomic.h>
@@ -29,6 +29,7 @@
 #include <sys/types.h>
 #include <sys/socketvar.h>
 #include <sys/sdt.h>
+#include <sys/random.h>
 #include <smbsrv/netbios.h>
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/string.h>
@@ -46,6 +47,7 @@ static smb_user_t *smb_session_lookup_user(smb_session_t *, char *, char *);
 static void smb_session_logoff(smb_session_t *);
 static void smb_request_init_command_mbuf(smb_request_t *sr);
 void dump_smb_inaddr(smb_inaddr_t *ipaddr);
+static void smb_session_genkey(smb_session_t *);
 
 void
 smb_session_timers(smb_llist_t *ll)
@@ -393,13 +395,14 @@ smb_request_cancel(smb_request_t *sr)
 		break;
 
 	case SMB_REQ_STATE_WAITING_EVENT:
-	case SMB_REQ_STATE_EVENT_OCCURRED:
 		/*
-		 * Cancellations for these states are handled by the
-		 * notify-change code
+		 * This request is waiting in change notify.
 		 */
+		sr->sr_state = SMB_REQ_STATE_CANCELED;
+		cv_signal(&sr->sr_ncr.nc_cv);
 		break;
 
+	case SMB_REQ_STATE_EVENT_OCCURRED:
 	case SMB_REQ_STATE_COMPLETED:
 	case SMB_REQ_STATE_CANCELED:
 		/*
@@ -643,6 +646,8 @@ smb_session_create(ksocket_t new_so, uint16_t port, smb_server_t *sv,
 	session->keep_alive = smb_keep_alive;
 	session->activity_timestamp = now;
 
+	smb_session_genkey(session);
+
 	smb_slist_constructor(&session->s_req_list, sizeof (smb_request_t),
 	    offsetof(smb_request_t, sr_session_lnd));
 
@@ -785,8 +790,6 @@ smb_session_cancel_requests(
     smb_request_t	*exclude_sr)
 {
 	smb_request_t	*sr;
-
-	smb_process_session_notify_change_queue(session, tree);
 
 	smb_slist_enter(&session->s_req_list);
 	sr = smb_slist_head(&session->s_req_list);
@@ -1077,6 +1080,7 @@ smb_request_alloc(smb_session_t *session, int req_length)
 	bzero(sr, sizeof (smb_request_t));
 
 	mutex_init(&sr->sr_mutex, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&sr->sr_ncr.nc_cv, NULL, CV_DEFAULT, NULL);
 	smb_srm_init(sr);
 	sr->session = session;
 	sr->sr_server = session->s_server;
@@ -1105,6 +1109,7 @@ smb_request_free(smb_request_t *sr)
 	ASSERT(sr->sr_magic == SMB_REQ_MAGIC);
 	ASSERT(sr->session);
 	ASSERT(sr->r_xa == NULL);
+	ASSERT(sr->sr_ncr.nc_fname == NULL);
 
 	if (sr->fid_ofile != NULL) {
 		smb_ofile_request_complete(sr->fid_ofile);
@@ -1133,6 +1138,7 @@ smb_request_free(smb_request_t *sr)
 		m_freem(sr->raw_data.chain);
 
 	sr->sr_magic = 0;
+	cv_destroy(&sr->sr_ncr.nc_cv);
 	mutex_destroy(&sr->sr_mutex);
 	kmem_cache_free(sr->sr_cache, sr);
 }
@@ -1202,4 +1208,18 @@ smb_session_oplock_break(smb_session_t *session,
 		SMB_PANIC();
 	}
 	smb_rwx_rwexit(&session->s_lock);
+}
+
+static void
+smb_session_genkey(smb_session_t *session)
+{
+	uint8_t		tmp_key[SMB_CHALLENGE_SZ];
+
+	(void) random_get_pseudo_bytes(tmp_key, SMB_CHALLENGE_SZ);
+	bcopy(tmp_key, &session->challenge_key, SMB_CHALLENGE_SZ);
+	session->challenge_len = SMB_CHALLENGE_SZ;
+
+	(void) random_get_pseudo_bytes(tmp_key, 4);
+	session->sesskey = tmp_key[0] | tmp_key[1] << 8 |
+	    tmp_key[2] << 16 | tmp_key[3] << 24;
 }
