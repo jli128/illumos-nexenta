@@ -1,3 +1,9 @@
+sunwmrsas (5.11.134-31-11243-13556) nexenta; urgency=low
+
+  * Issue #13556:  LSI Skinny MegaRAID support for mr_sas(7D)
+
+ -- Gate Keeper <support@nexenta.com>  Thu, 04 Apr 2013 12:08:55 -0700
+
 sunwmrsas (5.11.134-31-11242-0) nexenta; urgency=low
 
   * Issue #11242:  LSI 2208 and 3108 support for mr_sas
