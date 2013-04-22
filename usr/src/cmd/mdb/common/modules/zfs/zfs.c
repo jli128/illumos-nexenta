@@ -311,8 +311,6 @@ zfs_params(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		"zfs_default_bs",
 		"zfs_default_ibs",
 		"metaslab_aliquot",
-		"reference_tracking_enable",
-		"reference_history",
 		"spa_max_replication_override",
 		"spa_mode_global",
 		"zfs_flags",
@@ -345,6 +343,9 @@ zfs_params(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		"metaslab_df_free_pct",
 		"zio_injection_enabled",
 		"zvol_immediate_write_sz",
+		"zio_max_timeout_ms",
+		"zio_min_timeout_ms",
+		"zio_timeout_shift",
 	};
 
 	for (int i = 0; i < sizeof (params) / sizeof (params[0]); i++) {
