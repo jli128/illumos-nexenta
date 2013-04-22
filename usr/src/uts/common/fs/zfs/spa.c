@@ -2642,7 +2642,7 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 	error = spa_dir_prop(spa, DMU_POOL_VDEV_PROPS,
 	    &spa->spa_vdev_props_object);
 	if (error == 0)
-		(void) vdev_load_props(spa);
+		(void) vdev_load_props(spa, B_FALSE);
 
 	/*
 	 * If the 'autoreplace' property is set, then post a resource notifying
@@ -4130,6 +4130,9 @@ spa_import(const char *pool, nvlist_t *config, nvlist_t *props, uint64_t flags)
 		spa_config_exit(spa, SCL_ALL, FTAG);
 		spa->spa_l2cache.sav_sync = B_TRUE;
 	}
+
+	/* At this point, we can load spare props */
+	(void) vdev_load_props(spa, B_TRUE);
 
 	/*
 	 * Check for any removed devices.

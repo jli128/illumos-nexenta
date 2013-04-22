@@ -218,6 +218,7 @@ struct vdev {
 
 	cos_t		*vdev_cos;	  /* assigned class of storage */
 
+	char		*vdev_spare_group; /* spare group name */
 	/*
 	 * For DTrace to work in userland (libzpool) context, these fields must
 	 * remain at the end of the structure.  DTrace will use the kernel's

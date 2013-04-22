@@ -216,7 +216,7 @@ find_by_fru(libzfs_handle_t *zhdl, const char *fru, nvlist_t **vdevp)
 
 /*
  * Given a vdev, attempt to replace it with every known spare until one
- * succeeds.
+ * succeeds, while preferring spares in the same spare group
  */
 static void
 replace_with_spare(fmd_hdl_t *hdl, zpool_handle_t *zhp, nvlist_t *vdev)
@@ -225,6 +225,13 @@ replace_with_spare(fmd_hdl_t *hdl, zpool_handle_t *zhp, nvlist_t *vdev)
 	nvlist_t **spares;
 	uint_t s, nspares;
 	char *dev_name;
+
+	nvlist_t *vdev_props;
+	char dspr_group[MAXPATHLEN];
+	char sspr_group[MAXPATHLEN];
+
+	boolean_t done = B_FALSE;
+	boolean_t unassigned = B_FALSE;
 
 	config = zpool_get_config(zhp, NULL);
 	if (nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
@@ -245,23 +252,71 @@ replace_with_spare(fmd_hdl_t *hdl, zpool_handle_t *zhp, nvlist_t *vdev)
 
 	dev_name = zpool_vdev_name(NULL, zhp, vdev, B_FALSE);
 
+	/* Get spare group of the vdev to be replaced, remember if none */
+	if ((vdev_get_prop(zhp, dev_name, VDEV_PROP_SPAREGROUP, dspr_group,
+	    MAXPATHLEN, &vdev_props)))
+		unassigned = B_TRUE;
+	nvlist_free(vdev_props);
+
 	/*
-	 * Try to replace each spare, ending when we successfully
-	 * replace it.
+	 * See if any of the spares are in the sought spare group, use one, 
+	 * if unsuccessful, try to find a device not assigned to any group,
+	 * and if there are none of those, fail
 	 */
-	for (s = 0; s < nspares; s++) {
+	for (s = 0, vdev_props = NULL;
+	     s < nspares && !done && !unassigned; s++) {
 		char *spare_name;
 
 		if (nvlist_lookup_string(spares[s], ZPOOL_CONFIG_PATH,
 		    &spare_name) != 0)
 			continue;
 
-		(void) nvlist_add_nvlist_array(replacement,
-		    ZPOOL_CONFIG_CHILDREN, &spares[s], 1);
+		if ((vdev_get_prop(zhp, spare_name, VDEV_PROP_SPAREGROUP,
+		    sspr_group, MAXPATHLEN, &vdev_props) == 0) &&
+		    (strncmp(dspr_group, sspr_group, MAXPATHLEN) == 0)) {
+			/* found spare in the the same group */
+			(void) nvlist_add_nvlist_array(replacement,
+			    ZPOOL_CONFIG_CHILDREN, &spares[s], 1);
 
-		if (zpool_vdev_attach(zhp, dev_name, spare_name,
-		    replacement, B_TRUE) == 0)
-			break;
+			if (zpool_vdev_attach(zhp, dev_name, spare_name,
+			    replacement, B_TRUE) == 0) {
+				done = B_TRUE;
+			}
+		}
+
+		if (vdev_props) {
+			nvlist_free(vdev_props);
+			vdev_props = NULL;
+		}
+	}
+
+	/*
+	 * Try to replace each spare that does not belong to a spare group,
+	 * ending when we successfully replace it.
+	 */
+	for (s = 0, vdev_props = NULL; s < nspares && !done; s++) {
+		char *spare_name;
+
+		if (nvlist_lookup_string(spares[s], ZPOOL_CONFIG_PATH,
+		    &spare_name) != 0)
+			continue;
+
+		if ((vdev_get_prop(zhp, spare_name, VDEV_PROP_SPAREGROUP,
+		    sspr_group, MAXPATHLEN, &vdev_props) == 0) &&
+		    (strcmp("-", sspr_group) == 0)) {
+			/* found spare with sparegroup property not set */
+			(void) nvlist_add_nvlist_array(replacement,
+			    ZPOOL_CONFIG_CHILDREN, &spares[s], 1);
+
+			if (zpool_vdev_attach(zhp, dev_name, spare_name,
+			    replacement, B_TRUE) == 0)
+				done = B_TRUE;
+		}
+
+		if (vdev_props) {
+			nvlist_free(vdev_props);
+			vdev_props = NULL;
+		}
 	}
 
 	free(dev_name);

@@ -212,7 +212,7 @@ spa_set_specialclass(spa_t *dummy, objset_t *dummy2, spa_specialclass_id_t dummy
 
 /* ARGSUSED */
 int
-vdev_load_props(spa_t *dummy)
+vdev_load_props(spa_t *dummy, boolean_t load_aux)
 {
 	return (0);
 }

@@ -210,6 +210,7 @@ typedef enum vdev_prop {
 	VDEV_PROP_MAXPENDING,
 	VDEV_PROP_PREFREAD,
 	VDEV_PROP_COS,
+	VDEV_PROP_SPAREGROUP,
 	VDEV_NUM_PROPS
 } vdev_prop_t;
 
