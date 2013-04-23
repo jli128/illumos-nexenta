@@ -20,9 +20,9 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
 #include <sys/dmu_objset.h>
@@ -3621,33 +3621,51 @@ dsl_dataset_set_reservation(const char *dsname, zprop_source_t source,
 }
 
 typedef struct zfs_hold_cleanup_arg {
-	dsl_pool_t *dp;
-	uint64_t dsobj;
-	char htag[MAXNAMELEN];
+	char zhca_spaname[MAXNAMELEN];
+	uint64_t zhca_spa_load_guid;
+	uint64_t zhca_dsobj;
+	char zhca_htag[MAXNAMELEN];
 } zfs_hold_cleanup_arg_t;
 
 static void
 dsl_dataset_user_release_onexit(void *arg)
 {
 	zfs_hold_cleanup_arg_t *ca = arg;
+	spa_t *spa;
+	int error;
 
-	(void) dsl_dataset_user_release_tmp(ca->dp, ca->dsobj, ca->htag,
-	    B_TRUE);
-	spa_close(ca->dp->dp_spa, ca->htag);
+	error = spa_open(ca->zhca_spaname, &spa, FTAG);
+	if (error != 0) {
+		zfs_dbgmsg("couldn't release hold on pool=%s ds=%llu tag=%s "
+		    "because pool is no longer loaded",
+		    ca->zhca_spaname, ca->zhca_dsobj, ca->zhca_htag);
+		return;
+	}
+	if (spa->spa_load_guid != ca->zhca_spa_load_guid) {
+		zfs_dbgmsg("couldn't release hold on pool=%s ds=%llu tag=%s "
+		    "because pool is no longer loaded (guid doesn't match)",
+		    ca->zhca_spaname, ca->zhca_dsobj, ca->zhca_htag);
+		spa_close(spa, FTAG);
+		return;
+	}
+
+	dsl_dataset_user_release_tmp(spa_get_dsl(spa),
+	    ca->zhca_dsobj, ca->zhca_htag, B_TRUE);
 	kmem_free(ca, sizeof (zfs_hold_cleanup_arg_t));
+	spa_close(spa, FTAG);
 }
 
 void
 dsl_register_onexit_hold_cleanup(dsl_dataset_t *ds, const char *htag,
     minor_t minor)
 {
-	zfs_hold_cleanup_arg_t *ca;
-
-	ca = kmem_alloc(sizeof (zfs_hold_cleanup_arg_t), KM_SLEEP);
-	ca->dp = ds->ds_dir->dd_pool;
-	ca->dsobj = ds->ds_object;
-	(void) strlcpy(ca->htag, htag, sizeof (ca->htag));
-	spa_open_ref(ca->dp->dp_spa, ca->htag);
+	zfs_hold_cleanup_arg_t *ca = kmem_alloc(sizeof (*ca), KM_SLEEP);
+	spa_t *spa = dsl_dataset_get_spa(ds);
+	(void) strlcpy(ca->zhca_spaname, spa_name(spa),
+	    sizeof (ca->zhca_spaname));
+	ca->zhca_spa_load_guid = spa->spa_load_guid;
+	ca->zhca_dsobj = ds->ds_object;
+	(void) strlcpy(ca->zhca_htag, htag, sizeof (ca->zhca_htag));
 	VERIFY3U(0, ==, zfs_onexit_add_cb(minor,
 	    dsl_dataset_user_release_onexit, ca, NULL));
 }
