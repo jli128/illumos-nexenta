@@ -50,6 +50,7 @@ SUNWprivate_1.1 {
 		_nss_files_group_constr;
 		_nss_files_hosts_constr;
 		_nss_files_ipnodes_constr;
+		_nss_files_netgroup_constr;
 		_nss_files_netmasks_constr;
 		_nss_files_networks_constr;
 		_nss_files_passwd_constr;

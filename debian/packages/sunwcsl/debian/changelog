@@ -1,3 +1,9 @@
+sunwcsl (5.11.134-31-13250-13657) nexenta; urgency=high
+
+  * Issue 13657: Backport request for Enhancment 11201 - nss: need local netgroup implementation
+
+ -- Nexenta Systems <support@nexenta.com>  Tue, 23 Apr 2013 18:30:35 +0400
+
 sunwcsl (5.11.134-31-11339-0) nexenta; urgency=low
 
   * Issue 11339: Enhancments for OpenIPMI driver

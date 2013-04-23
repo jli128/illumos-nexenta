@@ -282,6 +282,7 @@ COMMON_SUBDIRS=		\
 	nohup		\
 	nsadmin		\
 	nscd		\
+	nsstest		\
 	oamuser		\
 	oawk		\
 	pack		\
