@@ -42,7 +42,7 @@ patch-stamp:
 	fi
 	for p in $(shell cat debian/series); \
 	do \
-		patch -p1 < $(PATCHDIR)/$$p; \
+		patch -N -p1 < $(PATCHDIR)/$$p; \
 	done
 	cp $(GATEROOT)/usr/src/tools/env/opensolaris.sh $(GATEROOT)
 	cd $(GATEROOT) && cat $(CURDIR)/debian/opensolaris.patch | patch -p1
@@ -118,11 +118,23 @@ rm_log_proto:
 			echo "no proto-dir present"; \
 	fi
 
-clean: clobber_on rm_log_proto
+unpatch: 
+	if [ -f patch-stamp ]; then \
+		if [ ! -d $(PATCHDIR)/. ]; then \
+			echo "You need the closed patches"; \
+			exit 1; \
+		fi; \
+		for p in $(shell /usr/sun/bin/rev -l debian/series); \
+		do \
+			patch -N -p1 -R < $(PATCHDIR)/$$p; \
+		done; \
+		rm -f opensolaris.sh patch-stamp; \
+	fi
+
+clean: clobber_on rm_log_proto unpatch
 	dh_testdir
 	dh_testroot
 	dh_clean -d
-	rm -f opensolaris.sh patch-stamp
 	rm -f build-on-stamp build-stamp upload-packages-stamp build-packages-stamp debian/files
 
 
