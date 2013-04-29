@@ -2185,6 +2185,7 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 	int parse;
 	uint64_t obj;
 	boolean_t missing_feat_write = B_FALSE;
+	spa_meta_placement_t *mp;
 
 	/*
 	 * If this is an untrusted config, access the pool in read-only mode.
@@ -2593,7 +2594,19 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 		spa->spa_l2cache.sav_sync = B_TRUE;
 	}
 
+	mp = &spa->spa_meta_policy;
+
 	spa->spa_delegation = zpool_prop_default_numeric(ZPOOL_PROP_DELEGATION);
+	spa->spa_hiwat = zpool_prop_default_numeric(ZPOOL_PROP_HIWATERMARK);
+	spa->spa_lowat = zpool_prop_default_numeric(ZPOOL_PROP_LOWATERMARK);
+	spa->spa_dedup_lo_best_effort = zpool_prop_default_numeric(ZPOOL_PROP_DEDUP_LO_BEST_EFFORT);
+	spa->spa_dedup_hi_best_effort = zpool_prop_default_numeric(ZPOOL_PROP_DEDUP_HI_BEST_EFFORT);
+
+	mp->spa_enable_meta_placement_selection = zpool_prop_default_numeric(ZPOOL_PROP_META_PLACEMENT);
+	mp->spa_ddt_to_special = zpool_prop_default_numeric(ZPOOL_PROP_DDT_TO_METADEV);
+	mp->spa_general_meta_to_special = zpool_prop_default_numeric(ZPOOL_PROP_GENERAL_META_TO_METADEV);
+	mp->spa_other_meta_to_special = zpool_prop_default_numeric(ZPOOL_PROP_OTHER_META_TO_METADEV);
+	spa_set_ddt_classes(spa, zpool_prop_default_numeric(ZPOOL_PROP_DDT_DESEGREGATION));
 
 	error = spa_dir_prop(spa, DMU_POOL_PROPS, &spa->spa_pool_props_object);
 	if (error && error != ENOENT)
@@ -2602,7 +2615,6 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 	if (error == 0) {
 		uint64_t autoreplace;
 		uint64_t val = 0;
-		spa_meta_placement_t *mp = &spa->spa_meta_policy;
 
 		spa_prop_find(spa, ZPOOL_PROP_BOOTFS, &spa->spa_bootfs);
 		spa_prop_find(spa, ZPOOL_PROP_AUTOREPLACE, &autoreplace);
@@ -2612,10 +2624,6 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 		spa_prop_find(spa, ZPOOL_PROP_DEDUPDITTO,
 		    &spa->spa_dedup_ditto);
 
-		spa->spa_hiwat = zpool_prop_default_numeric(
-		    ZPOOL_PROP_HIWATERMARK);
-		spa->spa_lowat = zpool_prop_default_numeric(
-		    ZPOOL_PROP_LOWATERMARK);
 		spa_prop_find(spa, ZPOOL_PROP_HIWATERMARK, &spa->spa_hiwat);
 		spa_prop_find(spa, ZPOOL_PROP_LOWATERMARK, &spa->spa_lowat);
 		spa_prop_find(spa, ZPOOL_PROP_DEDUPMETA_DITTO,
