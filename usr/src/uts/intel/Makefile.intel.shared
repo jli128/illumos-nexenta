@@ -408,14 +408,11 @@ DRV_KMODS	+= vr
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= ixgb
 
 #
-# Virtio drivers
+#	Virtio drivers
 #
-
-# Virtio core
 DRV_KMODS	+= virtio
-
-# Virtio block driver
 DRV_KMODS	+= vioblk
+DRV_KMODS	+= vioif
 
 #
 #	DTrace and DTrace Providers
