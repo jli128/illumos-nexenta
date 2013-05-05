@@ -504,7 +504,7 @@ bd_xfer_ctor(void *buf, void *arg, int kmflag)
 	bd_t		*bd = arg;
 	int		(*dcb)(caddr_t);
 
-	if (kmflag == KM_SLEEP) {
+	if (kmflag == KM_PUSHPAGE || kmflag == KM_SLEEP) {
 		dcb = DDI_DMA_SLEEP;
 	} else {
 		dcb = DDI_DMA_DONTWAIT;
