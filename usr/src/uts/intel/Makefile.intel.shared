@@ -409,6 +409,13 @@ DRV_KMODS	+= vr
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= ixgb
 
 #
+# Virtio drivers
+#
+
+# Virtio core
+DRV_KMODS	+= virtio
+
+#
 #	DTrace and DTrace Providers
 #
 DRV_KMODS	+= dtrace

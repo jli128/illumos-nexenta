@@ -1948,6 +1948,13 @@ NXGE_HCALL_OBJS =	\
 		nxge_hcall.o
 
 #
+# Virtio modules
+#
+
+# Virtio core
+VIRTIO_OBJS = virtio.o
+
+#
 #	kiconv modules
 #
 KICONV_EMEA_OBJS += kiconv_emea.o
