@@ -202,7 +202,9 @@ typedef enum dmu_object_type {
 	 * and DMU_OTN_* types).
 	 */
 	DMU_OT_COS_PROPS,		/* UINT64 */
+	DMU_OT_COS_PROPS_SIZE,
 	DMU_OT_VDEV_PROPS,		/* UINT64 */
+	DMU_OT_VDEV_PROPS_SIZE,
 	DMU_OT_NUMTYPES,
 
 	/*

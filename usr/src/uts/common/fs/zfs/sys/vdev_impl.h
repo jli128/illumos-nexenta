@@ -361,6 +361,21 @@ typedef struct vdev_buf {
 #define	VDEV_PROPS_PERSISTENT
 #endif
 
+/*
+ * Deal with persisting and loading properties from persistent store
+ */
+
+typedef struct vdev_props_phys_hdr {
+	uint64_t	vpph_guid;
+	uint64_t	vpph_nvsize;
+	uint64_t	vpph_size;
+} vdev_props_phys_hdr_t;
+
+typedef struct vdev_props_phys {
+	vdev_props_phys_hdr_t	vpp_hdr;
+	uint64_t		vpp_nvl_packed[1];
+} vdev_props_phys_t;
+
 #ifdef	__cplusplus
 }
 #endif
