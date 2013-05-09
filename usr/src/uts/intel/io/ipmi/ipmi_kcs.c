@@ -28,6 +28,7 @@
 
 /*
  * Copyright 2012, Joyent, Inc.  All rights reserved.
+ * Copyright 2013, Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -35,6 +36,7 @@
 #include <sys/condvar.h>
 #include <sys/cmn_err.h>
 #include <sys/ddi.h>
+#include <sys/disp.h>
 #include <sys/sunddi.h>
 
 #include <sys/ipmi.h>
@@ -466,7 +468,6 @@ kcs_loop(void *arg)
 static int
 kcs_startup(struct ipmi_softc *sc)
 {
-	extern pri_t minclsyspri; /* priority for taskq */
 	sc->ipmi_kthread = taskq_create_proc("ipmi_kcs", 1, minclsyspri, 1, 1,
 	    curzone->zone_zsched, TASKQ_PREPOPULATE);
 

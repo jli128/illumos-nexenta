@@ -1,3 +1,9 @@
+openipmi (5.11.134-31-11753-11753) nexenta; urgency=low
+
+  * Issue 11753: Fixes for ipmi attach and detach
+
+ -- Nexenta Systems <support@nexenta.com>  Friday, 03 May 2013 12:32:07 -0700
+
 openipmi (5.11.134-31-11339-0) nexenta; urgency=low
 
   * Issue 11339: Enhancments for OpenIPMI driver
