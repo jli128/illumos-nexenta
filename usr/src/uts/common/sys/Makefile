@@ -1378,9 +1378,10 @@ LVMDERIVED_H:
 	cd $(SRC)/uts/common/sys/lvm; pwd; $(MAKE)
 
 clean:
-	$(RM) $(GENHDRS)
+	-$(RM) $(GENHDRS)
 
 clobber:	clean
+	cd $(SRC)/uts/common/sys/lvm; pwd; $(MAKE) clobber
 
 check:	$(CHECKHDRS)
 

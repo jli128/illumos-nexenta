@@ -18,11 +18,41 @@
 #
 # CDDL HEADER END
 #
-
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Path to the base of the uts directory tree (usually /usr/src/uts).
+#
+UTSBASE	= ../../../..
 
-syntax: glob
-*
+#
+#	Include common rules.
+#
+include $(SRC)/Makefile.master
+
+MD_XDR_CSRC	=	$(UTSBASE)/common/io/lvm/md
+MD_XDR_XSRC	=	$(UTSBASE)/common/sys/lvm
+RPCGENFLAGS	+=	-C -M -D_KERNEL -DSYSV
+
+DERIVED_FILES	=	meta_basic_xdr.c metamed_xdr.c
+
+all_h install_h : $(DERIVED_FILES)
+
+check:
+
+clean:
+
+clobber:
+	-$(RM) $(DERIVED_FILES)
+
+%_xdr.c:	$(MD_XDR_XSRC)/%.x
+	$(RPCGEN) $(RPCGENFLAGS) -c -i 100 $(MD_XDR_XSRC)/$*.x | \
+$(NAWK) '/^#include/ {\
+    sub(/(\.\.\/)*common\//,"");\
+    sub(/meta_basic.h/, "md_basic.h");\
+    sub(/metamed.h/, "mdmed.h");\
+}\
+{   print $0; }' > $@
+
+.KEEP_STATE:

@@ -41,6 +41,7 @@ CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-parentheses
 CPPFLAGS +=	-D_REENTRANT -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 $(HAL_DBUS_CPPFLAGS)
 LINTFLAGS += 	-um
+CLOBBERFILES =	$(POFILE) messages.po
 
 $(ROOTBIN)/cdrw := FILEMODE = 04755
 

@@ -96,12 +96,16 @@ $(POFILE):	$(MSGFILES)
 
 GROWFSFILE=	$(GROWFSSCRIPT:%=$(ROOTUSRSBIN)/%)
 
-clobber lint: $(SUBDIRS)
+lint: $(SUBDIRS)
 
 check:	$(CHKMANIFEST)
 
+clobber: $(SUBDIRS) clobber_local
+
+clobber_local:
+	-$(RM) $(POFILE) $(MSGFILES)
+
 clean: $(SUBDIRS)
-	$(RM) $(MSGFILES)
 
 install:	$(SCRIPTS) $(GROWFSFILE) $(ROOTSVCMETHOD) $(ROOTMANIFEST) $(SUBDIRS)
 

@@ -58,6 +58,7 @@ ASFLAGS =	-P $(ASFLAGS_$(CURTYPE)) -D_ASM -I. -I../sys
 #
 # build the offset header before trying to compile any files.  (it's included
 # by brand_misc.h, so it's needed for all objects, not just assembly ones.)
+#
 # Note we have to build assym.h via its dependency on pics/% so that the
 # target dependent assignment of CTF_FLAGS will be there, otherwise make
 # will see two different commands to build it (endless rebuilds).

@@ -48,9 +48,10 @@ RPCGENFLAGS	+=	-C -M -D_KERNEL -DSYSV
 
 
 def all install lint modlintlib clean.lint:	$(DERIVED_FILES)
+all_h install_h: $(DERIVED_FILES)
 
 clean clobber:
-	$(RM) $(DERIVED_FILES)
+	-$(RM) $(DERIVED_FILES)
 
 md_basic.h:	meta_basic.x
 	$(RPCGEN) $(RPCGENFLAGS) -h meta_basic.x  | \

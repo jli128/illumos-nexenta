@@ -55,13 +55,10 @@ _msg :=		TARGET= catalog
 
 .KEEP_STATE:
 
-all install cstyle lint: $(SUBDIRS)
-
-clean: $(SUBDIRS)
-	$(RM) $(POFILES)
+all install clean cstyle lint: $(SUBDIRS)
 
 clobber: $(SUBDIRS)
-	$(RM) $(POFILE)
+	-$(RM) $(POFILE) $(POFILES)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

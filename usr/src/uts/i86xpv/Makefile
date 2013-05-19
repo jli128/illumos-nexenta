@@ -22,8 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 #	This makefile drives the production of all implementation architecture
 #	dependent modules for the i86xpv architecture.
 #
@@ -42,11 +40,16 @@ INTEL_LIB_DIR	 = $(UTSBASE)/intel/lint-libs/$(OBJS_DIR)
 
 INTEL_LINTS	 = genunix
 
-LINT_LIBS	 = $(LINT_LIB) \
+LINT_LIBS	 = \
 		   $(GENUNIX_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln) \
 		   $(PARALLEL_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln) \
 		   $(CLOSED_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln) \
 		   $(INTEL_LINTS:%=$(INTEL_LIB_DIR)/llib-l%.ln)
+
+CLEANFILES +=	$(LINT_LIBS)
+
+I86XPV_LINTS =	xdb xnb xnbe xnbo xnbu xpvtab
+CLEANFILES +=	$(I86XPV_LINTS:%=lint-libs/$(OBJS_DIR)/llib-l%.ln)
 
 #
 #
@@ -144,7 +147,7 @@ globallint := LINTFLAGS += -erroff=E_NAME_MULTIPLY_DEF2
 
 globallint:
 	@-$(ECHO) "\nFULL KERNEL: global crosschecks:"
-	@-$(LINT) $(LINTFLAGS) $(LINT_LIBS) 2>&1 | $(LGREP.2)
+	@-$(LINT) $(LINTFLAGS) $(LINT_LIB) $(LINT_LIBS) 2>&1 | $(LGREP.2)
 
 lint:	lintlib .WAIT modlintlib .WAIT $(INTEL_LINTS) $(LINT_DEPS)
 

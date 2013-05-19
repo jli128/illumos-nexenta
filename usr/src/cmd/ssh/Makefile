@@ -49,6 +49,8 @@ SUBDIRS= \
 MSGFILE=ssh.po
 POFILE=_messages.po
 
+CLOBBERFILES += $(POFILE) $(MSGFILE) THIRDPARTYLICENSE
+
 .KEEP_STATE:
 
 all :=          TARGET= all
@@ -62,10 +64,12 @@ package :=      TARGET= package
 _msg :=		TARGET= _msg
 $(POFILE) :=	TARGET= $(POFILE)
 
-all clean clobber install lint $(POFILE): $(SUBDIRS)
+all:
 
-clobber: FRC
-	$(RM) THIRDPARTYLICENSE
+all clean install lint $(POFILE): $(SUBDIRS)
+clobber: $(SUBDIRS) clobber_local
+clobber_local:
+	-$(RM) $(CLOBBERFILES)
 
 all install: THIRDPARTYLICENSE
 

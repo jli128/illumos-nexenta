@@ -48,16 +48,10 @@ CFLAGS += $(CCVERBOSE)
 
 all:	$(ROOTFS_PROG)
 
-include		$(SRC)/cmd/fs.d/Makefile.mount.targ
+$(LIBPROG):	$(OBJS)
+		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
+		$(POST_PROCESS)
 
-#
-# Message catalog
-#
-POFILE= umount.po
-
-#
-# message catalog
-#
 catalog: $(POFILE)
 
 install:	$(ROOTLIBFSTYPEPROG)

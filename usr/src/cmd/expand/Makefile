@@ -37,7 +37,7 @@ include		../Makefile.cmd
 POFILES= expand_cmd.po unexpand.po
 POFILE= expand.po
 
-CLEANFILES += expand_cmd.c
+CLOBBERFILES += expand_cmd.c
 
 .KEEP_STATE:
 

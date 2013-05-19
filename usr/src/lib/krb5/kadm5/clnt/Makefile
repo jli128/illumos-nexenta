@@ -42,7 +42,9 @@ POFILES=	generic.po
 
 .KEEP_STATE:
 
-all clean clobber install lint: $(SUBDIRS)
+all clean install lint: $(SUBDIRS)
+clobber: $(SUBDIRS)
+	-$(RM) $(CLOBBERFILES)
 
 _msg: $(MSGDOMAIN) .WAIT $(POFILE)
 	$(RM) $(MSGDOMAIN)/$(POFILE)

@@ -130,13 +130,13 @@ install: all $$(ROOTTGTS)
 dmods: install
 
 clean.lint:
-	$(RM) $(LINTFILES)
+	-$(RM) $(LINTFILES) $(MODSRCS:.c=.ln)
 
 clean:
-	$(RM) $(MODOBJS) $(KMODOBJS) $(CLEANFILES)
+	-$(RM) $(MODOBJS) $(KMODOBJS) $(CLEANFILES)
 
 clobber: clean clean.lint
-	$(RM) $(MODFILE) $(KMODFILE) $(CLOBBERFILES)
+	-$(RM) $(MODFILE) $(KMODFILE) $(CLOBBERFILES)
 
 lint: $$(LINTFILES)
 

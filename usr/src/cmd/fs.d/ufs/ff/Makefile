@@ -33,6 +33,7 @@ include		../Makefile.roll
 
 OBJS=           $(LIBPROG).o $(ROLLOBJS)
 SRCS=           $(LIBPROG).c $(ROLLSRCS)
+POFILE=
 
 CPPFLAGS +=	-D_LARGEFILE64_SOURCE
 
@@ -41,5 +42,8 @@ CERRWARN +=	-_gcc=-Wno-uninitialized
 $(LIBPROG):	$(OBJS)
 		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 		$(POST_PROCESS)
+
+clean:
+		-$(RM) $(LIBPROG).o
 
 lint:		lint_SRCS

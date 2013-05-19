@@ -56,6 +56,8 @@ $(SPARC_BLD)LDLIBS +=	-R/usr/platform/\$$PLATFORM/lib/picl/plugins \
 			-R/usr/platform/sun4u/lib/picl/plugins
 LDLIBS +=	-R/usr/lib/picl/plugins
 
+CLOBBERFILES += $(LIBLINKS)
+
 .KEEP_STATE:
 
 SUBDIRS=

@@ -88,8 +88,8 @@ install_h: all_h $(RPCDIRS) $(RPCSVCDIRS) $(ROOTHDRS)
 #
 all_h: $(DERIVED_FILES)
 
-clean:
-	$(RM) $(DERIVED_FILES)
+clean clobber:
+	-$(RM) $(DERIVED_FILES)
 
 $(RPCDIRS):
 	$(INS.dir)

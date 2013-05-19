@@ -32,12 +32,13 @@ DCOPY=		dcopy
 ATTMK=		$(LIBPROG)
 
 OTHERINSTALL=	$(ROOTLIBFSTYPE)/$(DCOPY)
-		
+
 include		../../Makefile.fstype
 include		../Makefile.roll
 
 OBJS=		$(LIBPROG).o $(ROLLOBJS)
 SRCS=		$(LIBPROG).c $(ROLLSRCS)
+POFILE=
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_LARGEFILE64_SOURCE
@@ -45,6 +46,9 @@ CPPFLAGS +=	-D_LARGEFILE64_SOURCE
 $(LIBPROG):	$(OBJS)
 		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 		$(POST_PROCESS)
+
+clean:
+		-$(RM) $(LIBPROG).o
 
 lint :=		PROG=$(LIBPROG)
 lint:		lint_PROG

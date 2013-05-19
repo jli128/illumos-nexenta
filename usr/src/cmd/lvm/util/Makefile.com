@@ -87,7 +87,7 @@ include ../../Makefile.lvm
 
 ROOTLIBSVM = $(ROOTLIB)/lvm
 
-CLOBBERFILES += $(ROOTFS_PROG)
+CLOBBERFILES += $(ROOTFS_PROG) $(METACLUST)
 
 ROOTUSRSBINPROG = $(PROG:%=$(ROOTUSRSBIN)/%)
 
@@ -147,7 +147,7 @@ lint:
 	done
 
 clean:
-	$(RM) $(OBJECTS) $(PROG)
+	-$(RM) $(OBJECTS) $(PROG)
 
 include ../../../Makefile.targ
 

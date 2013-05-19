@@ -85,10 +85,10 @@ lint:
 	${LINT.c} $(LINTFLAGS) ${LINTSRCS}
 
 clean:
-	${RM} ${OBJS} ${DERIVED_FILES} *.o a.out core metad.x
+	-${RM} ${OBJS} ${DERIVED_FILES} *.o a.out core metad.x
 
 clobber: clean
-	${RM} $(PROG)
+	-${RM} $(PROG)
 
 metad_svc.c: $(SRC)/head/metad.x
 	$(CP) $(SRC)/head/metad.x .

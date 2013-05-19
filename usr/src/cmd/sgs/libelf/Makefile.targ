@@ -57,11 +57,13 @@ lint:		$(LINTLIB) $(LINTOUT32) $(LINTOUT64) $(SGSLINTOUT)
 .PARALLEL:	$(LINTOUT32) $(LINTOUT64)
 
 delete:
-		$(RM) $(DYNLIB)
+		-$(RM) $(DYNLIB)
 
 $(LIBLINKS):
-		$(RM) $(LIBLINKS)
+		-$(RM) $(LIBLINKS)
 		$(SYMLINK) $(DYNLIB) $(LIBLINKS)
+
+CLOBBERFILES += $(LIBLINKS)
 
 # include common library targets
 #
@@ -73,7 +75,6 @@ xlate.c:	../common/xlate.m4
 
 xlate64.c:	../common/xlate64.m4
 		$(M4) < ../common/xlate64.m4 > xlate64.c
-
 
 objs/msg.o \
 pics/msg.o:	msg.c

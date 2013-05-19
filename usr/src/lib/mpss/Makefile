@@ -41,7 +41,9 @@ lint :=		TARGET= lint
 
 .KEEP_STATE:
 
-all install clean clobber lint: $(SUBDIRS)
+all install clean lint: $(SUBDIRS)
+clobber: $(SUBDIRS)
+	-$(RM) $(POFILE)
 
 $(POFILE):	pofile_MSGFILES
 

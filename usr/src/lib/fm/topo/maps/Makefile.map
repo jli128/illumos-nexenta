@@ -64,10 +64,11 @@ include ../../Makefile.rootdirs
 all: $(TOPOFILE)
 
 clean:
-	$(RM) $(ROOTTOPOMAPS)
-	$(RM) $(TEMPTOPOFILE)
+	-$(RM) $(ROOTTOPOMAPS)
+	-$(RM) $(TEMPTOPOFILE)
 
 clobber: clean
+	-$(RM) $(CLOBBERFILES)
 
 check: $(CHECKHDRS)
 

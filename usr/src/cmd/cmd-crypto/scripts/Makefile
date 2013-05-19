@@ -52,4 +52,6 @@ install: $(CLASS_SCR_FILES) $(ROOTMANIFEST)
 
 check: $(CHKMANIFEST)
 
+clean:
+
 include ../../Makefile.targ

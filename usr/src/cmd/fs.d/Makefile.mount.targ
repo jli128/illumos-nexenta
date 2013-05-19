@@ -38,6 +38,9 @@ $(LIBPROG):	$(OBJS)
 		$(COMPILE.c) -o $@ $<
 		$(POST_PROCESS_O)
 
+clean:
+	-$(RM) $(CLEANFILES)
+
 lint:		lint_SRCS
 
 catalog:	$(POFILE)

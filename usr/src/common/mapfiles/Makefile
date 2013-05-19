@@ -40,11 +40,13 @@ package:=	TARGET= package
 
 .KEEP_STATE:
 
-clean clobber lint package:
-
 all:		gen
 
 install:	$(SUBDIRS)
+
+clean lint package:
+
+clobber:	gen
 
 $(SUBDIRS):	FRC
 		@cd $@; pwd; $(MAKE) $(TARGET)

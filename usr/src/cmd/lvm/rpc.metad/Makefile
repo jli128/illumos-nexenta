@@ -56,13 +56,12 @@ all:    $(SUBDIRS)
 catalog:	$(POFILE)
 
 $(POFILE): $(POFILES)
-	$(RM) $@
+	-$(RM) $@
 	cat $(POFILES) > $(POFILE)
 
-clean:	$(SUBDIRS)
-	$(RM) metad_svc.c *.po
+CLOBBERFILES = $(POFILE) $(POFILES) metad_svc.c
 
-lint:     $(SUBDIRS)
+clean clobber lint:	$(SUBDIRS)
 
 install:        $(SUBDIRS) $(ROOTMANIFEST)
 

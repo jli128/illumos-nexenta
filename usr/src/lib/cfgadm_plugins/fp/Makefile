@@ -49,7 +49,10 @@ CP=	cp
 
 .KEEP_STATE:
 
-all lint clean clobber delete install package: $(SUBDIRS)
+all lint clean delete install package: $(SUBDIRS)
+clobber: $(SUBDIRS) clobber_local
+clobber_local:
+	-$(RM) $(POFILE) $(POFILES)
 
 $(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

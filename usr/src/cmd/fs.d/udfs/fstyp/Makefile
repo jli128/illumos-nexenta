@@ -48,6 +48,7 @@ LINTFLAGS64 += -erroff=E_STATIC_UNUSED -erroff=E_NAME_DEF_NOT_USED2
 # Override PMAP dependency
 #
 PMAP=
+POFILE=
 
 OBJS= fstyp.o ud_lib.o
 
@@ -78,6 +79,4 @@ cstyle:
 	$(CSTYLE) $(SRCS)
 
 clean:     
-	$(RM) $(LIBPROG)
-
-clobber: clean
+	-$(RM) $(OBJS)

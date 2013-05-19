@@ -83,6 +83,8 @@ clean :=		TARGET= clean
 clobber :=		TARGET= clobber
 check :=		TARGET= check
 
+clean clobber :=		MAKEFLAGS += -k
+
 .KEEP_STATE:
 
 #
@@ -123,7 +125,12 @@ _msg: _msgdirs rootdirs install2 FRC
 mapfiles: bldtools
 	@cd common/mapfiles; pwd; $(MAKE) install
 
-clean clobber: $(SUBDIRS) head pkg
+clean: $(SUBDIRS) head pkg
+clobber: $(SUBDIRS) head pkg clobber_local
+clobber_local:
+	@cd tools; pwd; $(MAKE) clobber
+	@cd common/mapfiles; pwd; $(MAKE) clobber
+	@cd msg; pwd; $(MAKE) clobber
 
 closedbins: bldtools $(ROOTDIRS) FRC
 	@CLOSED_ROOT="$$ON_CLOSED_BINS/root_$(MACH)$${RELEASE_BUILD+-nd}"; \
@@ -154,7 +161,7 @@ closedbins: bldtools $(ROOTDIRS) FRC
 .PARALLEL: $(PARALLEL_DIRS) DUMMY
 
 $(SUBDIRS) head pkg: FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+	@cd $@; pwd; $(MAKE) $(MAKEFLAGS) $(TARGET)
 
 # librpcsvc has a dependency on headers installed by
 # userheaders, hence the .WAIT before libheaders.

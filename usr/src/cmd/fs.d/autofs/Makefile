@@ -210,6 +210,6 @@ lint:
 	$(LINT.c) $(TYPESRCS)
 
 clean:	clean_dump
-	$(RM) $(OBJS) webnfs_xdr.c webnfs_client.c webnfs.h webnfs.x
+	-$(RM) $(OBJS) webnfs_xdr.c webnfs_client.c webnfs.h webnfs.x
 
 check:	$(CHKMANIFEST)

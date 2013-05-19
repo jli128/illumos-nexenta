@@ -58,8 +58,9 @@ $(PROG):	$(OBJS)
 		$(POST_PROCESS)
 
 clean:
+	-$(RM) $(OBJS)
 
-clobber:
-	$(RM) $(PROG) $(CLOBBERFILES)
+clobber: clean
+	-$(RM) $(PROG) $(CLOBBERFILES)
 
 lint:

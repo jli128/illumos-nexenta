@@ -48,6 +48,7 @@ FILES =		Config Devconfig Devices Dialcodes	\
 		Poll Sysfiles Systems
 
 CLEANFILES =	$(SRCS:%.c=%.o) common.o
+CLOBBERFILES=	$(POFILES) $(SRCS:%.c=%.po) bnu.po common.po
 
 TXTFILES =	README $(FILES)	\
 		dkbreak.c dkdial.c dkerr.c dkminor.c dtnamer.c	\
@@ -161,7 +162,7 @@ $(ROOTREMOTE):
 check:		$(CHKMANIFEST)
 
 clean:
-		$(RM) $(CLEANFILES)
+		-$(RM) $(CLEANFILES)
 
 lint:		lint_SRCS
 

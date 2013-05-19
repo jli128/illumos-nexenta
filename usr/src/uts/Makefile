@@ -143,6 +143,8 @@ COMMON_HDRDIRS= common/avs \
 		common/inet/nca \
 		common/inet/sockmods/netpacket \
 		common/io/bpf/net \
+		common/io/fibre-channel/fca/qlc \
+		common/io/lvm/md \
 		common/ipp \
 		common/net \
 		common/netinet \
@@ -167,7 +169,14 @@ $(CLOSED_BUILD)COMMON_HDRDIRS += $(CLOSED)/uts/common/sys
 # other directories that should be included and do not yet have the
 # necessary Makefile support.  See 6414855.)
 #
-DYNHDRDIRS = common/rpcsvc common/idmap common/sys
+DYNHDRDIRS =	common/avs \
+		common/gssapi \
+		common/idmap \
+		common/io/fibre-channel/fca/qlc \
+		common/io/lvm/md \
+		common/rpc \
+		common/rpcsvc \
+		common/sys
 
 sparc_HDRDIRS= sun/sys
 i386_HDRDIRS= i86pc/vm i86xpv/vm
@@ -193,10 +202,6 @@ clean clobber: $($(MACH)_ARCHITECTURES) $(DYNHDRDIRS)
 		echo $(RM) $(PMTMO_FILE) ; \
 		$(RM) $(PMTMO_FILE) ; \
 	fi
-
-EXTRA_CLOBBER_TARGETS= common/avs/ns/rdc
-clobber: $(EXTRA_CLOBBER_TARGETS)
-
 
 clean.lint modlist: $($(MACH)_ARCHITECTURES)
 

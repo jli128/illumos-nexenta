@@ -41,7 +41,7 @@ LDLIBS =	$(MY_NATIVE_LDLIBS)
 # We must use the build's avl headers, to match the common avl.c
 #
 AVLHEADERS = sys/avl.h sys/avl_impl.h
-CLOBBERFILES += $(AVLHEADERS)
+CLOBBERFILES += $(AVLHEADERS) $(LIBS)
 
 all: $(LIBS)
 

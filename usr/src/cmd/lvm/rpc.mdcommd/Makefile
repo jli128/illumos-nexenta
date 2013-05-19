@@ -52,13 +52,12 @@ all:    $(SUBDIRS)
 catalog:	$(POFILE)
 
 $(POFILE): $(POFILES)
-	$(RM) $@
+	-$(RM) $@
 	cat $(POFILES) > $(POFILE)
 
-clean:	$(SUBDIRS)
-	$(RM) *.po
+CLOBBERFILES = $(POFILE) $(POFILES)
 
-lint:     $(SUBDIRS)
+clean clobber lint:	$(SUBDIRS)
 
 install:        $(SUBDIRS) $(ROOTMANIFEST)
 

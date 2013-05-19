@@ -44,15 +44,18 @@ clobber:=	TARGET= clobber
 lint:=		TARGET= lint
 _msg:=		TARGET= _msg
 
+# so we can remove .po files for the other arch.
+clobber:=	MAKEFLAGS += -k
+
 .KEEP_STATE:
 
-all clean clobber lint: $(SUBDIRS)
+all clean lint: $(SUBDIRS)
 
 install: all $(SUBDIRS)
 
-_msg: $(MSGSUBDIRS)
+_msg clobber: $(MSGSUBDIRS)
 
 $(ALL_SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+	@cd $@; pwd; $(MAKE) $(MAKEFLAGS) $(TARGET)
 
 FRC:

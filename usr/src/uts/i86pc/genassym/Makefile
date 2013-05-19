@@ -59,7 +59,7 @@ DSF_DIR		= .
 #	Overrides
 #
 CLEANFILES	= $(GENASSYM) Nothing_to_remove
-CLOBBERFILES	= $(ASSYM_H) $(KDI_ASSYM.H) $(CLEANFILES) Nothing_to_remove
+CLOBBERFILES	= $(ASSYM_H) $(KDI_ASSYM_H) $(CLEANFILES) Nothing_to_remove
 
 #
 #	Default build targets.

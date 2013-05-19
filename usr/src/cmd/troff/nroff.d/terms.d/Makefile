@@ -51,4 +51,7 @@ $(ROOTNTERM)/% :	%
 $(ROOTLNKFILES) :	$$(ROOTLNKDEST)
 			-$(RM) $@; $(LN) $(ROOTLNKDEST) $@
 
-clean clobber lint strip :
+clean lint strip :
+
+clobber:
+	-$(RM) $(FILES)
