@@ -1,3 +1,9 @@
+sunwfmd (5.11.134-31-11345-10360) nexenta; urgency=high
+
+  * Issue 10360: Unable to use /usr/lib/fm/fmd/fmtopo to discover SES / drive topology with the Dell MD1200.
+
+ -- Nexenta Systems <support@nexenta.com>  Fri, 05 Apr 2013 17:46:32 +0200
+
 sunwfmd (5.11.134-31-11344-13272) nexenta; urgency=high
 
   * Issue 13272: Stucked Inquiry commands put a pool to degraded state
