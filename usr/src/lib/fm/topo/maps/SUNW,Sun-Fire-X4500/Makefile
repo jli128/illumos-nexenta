@@ -23,7 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 # NOTE: The name of the xml file we are building is 'platform'
 # specific, but its build is structured as 'arch' specific since

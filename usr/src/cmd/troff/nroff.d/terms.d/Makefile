@@ -1,6 +1,4 @@
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1989 by Sun Microsystems, Inc.
 #
 # cmd/troff/nroff.d/terms.d/Makefile
