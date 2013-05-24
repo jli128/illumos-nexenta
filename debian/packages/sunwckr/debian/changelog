@@ -1,3 +1,9 @@
+sunwckr (5.11.134-31-12270-12783) nexenta; urgency=medium
+
+  * Issue 12783: Flow control is needed in rpcmod when the NFS server is unable to keep up with the network
+
+ -- Nexenta Systems <support@nexenta.com>  Fri, 24 May 2013 23:37:07 +0200
+
 sunwckr (5.11.134-31-12269-10173) nexenta; urgency=medium
 
   * Issue 10173: VLAN fanout stuck to one CPU

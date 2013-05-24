@@ -22,6 +22,9 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 /*
  * Copyright (c) 2007, The Ohio State University. All rights reserved.
@@ -1420,7 +1423,8 @@ rib_svc_rcq_handler(ibt_cq_hdl_t cq_hdl, void *arg)
 				rdp->rpcmsg.len = wc.wc_bytes_xfer;
 				rdp->status = wc.wc_status;
 				mp->b_wptr += sizeof (*rdp);
-				svc_queuereq((queue_t *)rib_stat->q, mp);
+				(void) svc_queuereq((queue_t *)rib_stat->q, mp,
+				    FALSE);
 				mutex_exit(&plugin_state_lock);
 			} else {
 				/*
