@@ -161,7 +161,7 @@ closedbins: bldtools $(ROOTDIRS) FRC
 .PARALLEL: $(PARALLEL_DIRS) DUMMY
 
 $(SUBDIRS) head pkg: FRC
-	@cd $@; pwd; $(MAKE) $(MAKEFLAGS) $(TARGET)
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
 # librpcsvc has a dependency on headers installed by
 # userheaders, hence the .WAIT before libheaders.

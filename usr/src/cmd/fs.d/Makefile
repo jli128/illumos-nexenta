@@ -45,7 +45,7 @@ SUBDIR2= dev fd pcfs nfs hsfs proc ctfs udfs ufs tmpfs cachefs \
 SUBDIRS= $(SUBDIR1) $(SUBDIR2)
 I18NDIRS= $(SUBDIR2)
 
-CLEANFILES +=	deffs.o df.o df.xpg4.o ff.o fsck.o fssnapsup.o \
+CLEANFILES +=	$(FSLIB) deffs.o df.o df.xpg4.o ff.o fsck.o fssnapsup.o \
 		mount.o preenlib.o switchout.o umount.o volcopy.o
 CLOBBERFILES += $(POFILES_XPG4)
 

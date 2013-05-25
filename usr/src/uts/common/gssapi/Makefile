@@ -87,9 +87,9 @@ gssd_xdr.c:    gssd.x
 check:	$(CHECKHDRS)
 
 clean:
-
-clobber:
 	-$(RM) $(DERIVED_FILES)
+
+clobber: clean
 
 # EXPORT DELETE START
 # Special target to clean up the source tree for export distribution

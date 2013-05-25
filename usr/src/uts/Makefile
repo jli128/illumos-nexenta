@@ -76,6 +76,7 @@ install		:=	TARGET= install
 install_h	:=	TARGET= install_h
 clean		:=	TARGET= clean
 clobber		:=	TARGET= clobber
+clobber_h	:=	TARGET= clobber
 lint		:=	TARGET= lint
 clean.lint	:=	TARGET= clean.lint
 check		:=	TARGET= check
@@ -202,6 +203,9 @@ clean clobber: $($(MACH)_ARCHITECTURES) $(DYNHDRDIRS)
 		echo $(RM) $(PMTMO_FILE) ; \
 		$(RM) $(PMTMO_FILE) ; \
 	fi
+
+# Undo install_h without going through everything under uts.
+clobber_h: $(DYNHDRDIRS)
 
 clean.lint modlist: $($(MACH)_ARCHITECTURES)
 
