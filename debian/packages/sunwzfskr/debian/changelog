@@ -1,3 +1,9 @@
+sunwzfskr (5.11.134-31-12277-13729) nexenta; urgency=high
+
+  * Issue 13729: assign each ARC hash bucket its own mutex
+
+ -- Ilya Usvyatsky <ilya.usvyatsky@nexenta.com>  Tue, 28 May 2013 13:03:17 -0700
+
 sunwzfskr (5.11.134-31-12276-13503) nexenta; urgency=high
 
   * Issue 13503: revert changes by (5.11.134-31-12274-12619)
