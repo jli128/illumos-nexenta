@@ -539,28 +539,21 @@ static boolean_t l2arc_write_eligible(uint64_t spa_guid, arc_buf_hdr_t *ab);
  * Hash table routines
  */
 
-#define	HT_LOCK_PAD	64
-
-struct ht_lock {
-	kmutex_t	ht_lock;
-#ifdef _KERNEL
-	unsigned char	pad[(HT_LOCK_PAD - sizeof (kmutex_t))];
-#endif
+struct ht_table {
+	arc_buf_hdr_t	*hdr;
+	kmutex_t	lock;
 };
 
-#define	BUF_LOCKS 256
 typedef struct buf_hash_table {
 	uint64_t ht_mask;
-	arc_buf_hdr_t **ht_table;
-	struct ht_lock ht_locks[BUF_LOCKS];
+	struct ht_table *ht_table;
 } buf_hash_table_t;
 
 static buf_hash_table_t buf_hash_table;
 
 #define	BUF_HASH_INDEX(spa, dva, birth) \
 	(buf_hash(spa, dva, birth) & buf_hash_table.ht_mask)
-#define	BUF_HASH_LOCK_NTRY(idx) (buf_hash_table.ht_locks[idx & (BUF_LOCKS-1)])
-#define	BUF_HASH_LOCK(idx)	(&(BUF_HASH_LOCK_NTRY(idx).ht_lock))
+#define	BUF_HASH_LOCK(idx) (&buf_hash_table.ht_table[idx].lock)
 #define	HDR_LOCK(hdr) \
 	(BUF_HASH_LOCK(BUF_HASH_INDEX(hdr->b_spa, &hdr->b_dva, hdr->b_birth)))
 
@@ -697,7 +690,7 @@ buf_hash_find(uint64_t spa, const dva_t *dva, uint64_t birth, kmutex_t **lockp)
 	arc_buf_hdr_t *buf;
 
 	mutex_enter(hash_lock);
-	for (buf = buf_hash_table.ht_table[idx]; buf != NULL;
+	for (buf = buf_hash_table.ht_table[idx].hdr; buf != NULL;
 	    buf = buf->b_hash_next) {
 		if (BUF_EQUAL(spa, dva, birth, buf)) {
 			*lockp = hash_lock;
@@ -726,14 +719,14 @@ buf_hash_insert(arc_buf_hdr_t *buf, kmutex_t **lockp)
 	ASSERT(!HDR_IN_HASH_TABLE(buf));
 	*lockp = hash_lock;
 	mutex_enter(hash_lock);
-	for (fbuf = buf_hash_table.ht_table[idx], i = 0; fbuf != NULL;
+	for (fbuf = buf_hash_table.ht_table[idx].hdr, i = 0; fbuf != NULL;
 	    fbuf = fbuf->b_hash_next, i++) {
 		if (BUF_EQUAL(buf->b_spa, &buf->b_dva, buf->b_birth, fbuf))
 			return (fbuf);
 	}
 
-	buf->b_hash_next = buf_hash_table.ht_table[idx];
-	buf_hash_table.ht_table[idx] = buf;
+	buf->b_hash_next = buf_hash_table.ht_table[idx].hdr;
+	buf_hash_table.ht_table[idx].hdr = buf;
 	buf->b_flags |= ARC_IN_HASH_TABLE;
 
 	/* collect some hash table performance data */
@@ -760,7 +753,7 @@ buf_hash_remove(arc_buf_hdr_t *buf)
 	ASSERT(MUTEX_HELD(BUF_HASH_LOCK(idx)));
 	ASSERT(HDR_IN_HASH_TABLE(buf));
 
-	bufp = &buf_hash_table.ht_table[idx];
+	bufp = &buf_hash_table.ht_table[idx].hdr;
 	while ((fbuf = *bufp) != buf) {
 		ASSERT(fbuf != NULL);
 		bufp = &fbuf->b_hash_next;
@@ -772,8 +765,8 @@ buf_hash_remove(arc_buf_hdr_t *buf)
 	/* collect some hash table performance data */
 	ARCSTAT_BUMPDOWN(arcstat_hash_elements);
 
-	if (buf_hash_table.ht_table[idx] &&
-	    buf_hash_table.ht_table[idx]->b_hash_next == NULL)
+	if (buf_hash_table.ht_table[idx].hdr &&
+	    buf_hash_table.ht_table[idx].hdr->b_hash_next == NULL)
 		ARCSTAT_BUMPDOWN(arcstat_hash_chains);
 }
 
@@ -788,10 +781,10 @@ buf_fini(void)
 {
 	int i;
 
+	for (i = 0; i < buf_hash_table.ht_mask + 1; i++)
+		mutex_destroy(&buf_hash_table.ht_table[i].lock);
 	kmem_free(buf_hash_table.ht_table,
-	    (buf_hash_table.ht_mask + 1) * sizeof (void *));
-	for (i = 0; i < BUF_LOCKS; i++)
-		mutex_destroy(&buf_hash_table.ht_locks[i].ht_lock);
+	    (buf_hash_table.ht_mask + 1) * sizeof (struct ht_table));
 	kmem_cache_destroy(hdr_cache);
 	kmem_cache_destroy(buf_cache);
 }
@@ -890,7 +883,7 @@ buf_init(void)
 retry:
 	buf_hash_table.ht_mask = hsize - 1;
 	buf_hash_table.ht_table =
-	    kmem_zalloc(hsize * sizeof (void*), KM_NOSLEEP);
+	    kmem_zalloc(hsize * sizeof (struct ht_table), KM_NOSLEEP);
 	if (buf_hash_table.ht_table == NULL) {
 		ASSERT(hsize > (1ULL << 8));
 		hsize >>= 1;
@@ -906,8 +899,8 @@ retry:
 		for (ct = zfs_crc64_table + i, *ct = i, j = 8; j > 0; j--)
 			*ct = (*ct >> 1) ^ (-(*ct & 1) & ZFS_CRC64_POLY);
 
-	for (i = 0; i < BUF_LOCKS; i++) {
-		mutex_init(&buf_hash_table.ht_locks[i].ht_lock,
+	for (i = 0; i < hsize; i++) {
+		mutex_init(&buf_hash_table.ht_table[i].lock,
 		    NULL, MUTEX_DEFAULT, NULL);
 	}
 }
