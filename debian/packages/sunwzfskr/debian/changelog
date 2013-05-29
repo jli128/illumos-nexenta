@@ -1,3 +1,10 @@
+sunwzfskr (5.11.134-31-12279-13741) nexenta; urgency=high
+
+  * Issue 13741: Multiple disks being falsely failed/retired by new
+    zio_timeout handling code
+
+ -- Nexenta Systems <support@nexenta.com>  Tue, 28 May 2013 14:00:00 -0500
+
 sunwzfskr (5.11.134-31-12278-13803) nexenta; urgency=high
 
   * Issue 13803: backport illumos 1909

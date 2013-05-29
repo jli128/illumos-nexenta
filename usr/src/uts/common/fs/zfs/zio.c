@@ -212,7 +212,7 @@ zio_init(void)
 	 */
 	if (zio_min_timeout_ms == -1) {
 		zio_min_timeout_ms =
-		    MIN(5 * zfs_txg_synctime_ms, zfs_txg_timeout * MILLISEC);
+		    MIN(zfs_txg_synctime_ms, zfs_txg_timeout * MILLISEC);
 	}
 	if (zio_min_timeout_ms > zio_max_timeout_ms)
 		zio_min_timeout_ms = zio_max_timeout_ms;
@@ -2342,6 +2342,9 @@ zio_timeout_handler(void *arg)
 	zio_type_t type = zio->io_type;
 	uint64_t delta;
 	uint64_t io_timeout;
+	uint64_t max_timeout =
+	    (uint64_t)zio_max_timeout_ms * (NANOSEC / MILLISEC);
+
 
 	ASSERT(vd != NULL);
 	mutex_enter(&zio->io_lock);
@@ -2356,7 +2359,7 @@ zio_timeout_handler(void *arg)
 	/*
 	 * Update timeout.
 	 */
-	io_timeout = MIN(zio_max_timeout_ms * (NANOSEC / MILLISEC),
+	io_timeout = MIN(max_timeout,
 	    vd->vdev_stat.vs_latency[type] << zio_timeout_shift);
 
 	/*
@@ -2466,6 +2469,10 @@ zio_vdev_io_start(zio_t *zio)
 	if (vd->vdev_ops->vdev_op_leaf &&
 	    (type == ZIO_TYPE_READ || type == ZIO_TYPE_WRITE)) {
 		uint64_t io_timeout;
+		uint64_t min_timeout =
+		    (uint64_t)zio_min_timeout_ms * (NANOSEC / MILLISEC);
+		uint64_t max_timeout =
+		    (uint64_t)zio_max_timeout_ms * (NANOSEC / MILLISEC);
 
 		if (type == ZIO_TYPE_READ && vdev_cache_read(zio) == 0)
 			return (ZIO_PIPELINE_CONTINUE);
@@ -2482,7 +2489,7 @@ zio_vdev_io_start(zio_t *zio)
 		/*
 		 * Set timeout based on current latency for this I/O type.
 		 */
-		io_timeout = MAX(zio_min_timeout_ms * (NANOSEC / MILLISEC),
+		io_timeout = MAX(min_timeout,
 		    vd->vdev_stat.vs_latency[type] << zio_timeout_shift);
 		/*
 		 * If this is a high priority I/O, the minimum timeout possible
@@ -2490,10 +2497,10 @@ zio_vdev_io_start(zio_t *zio)
 		 * We mostly care about high priority synchronous I/O.
 		 */
 		if (zio->io_priority != ZIO_PRIORITY_NOW)
-			io_timeout += zio_min_timeout_ms * (NANOSEC / MILLISEC);
+			io_timeout += min_timeout;
 
-		if (io_timeout > zio_max_timeout_ms * (NANOSEC / MILLISEC))
-			io_timeout = zio_max_timeout_ms  * (NANOSEC / MILLISEC);
+		if (io_timeout > max_timeout)
+			io_timeout = max_timeout;
 
 		/*
 		 * Arm timeout handler for this zio.
