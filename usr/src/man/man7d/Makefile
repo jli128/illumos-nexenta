@@ -11,7 +11,7 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2013 Nexenta Systems, Inc. All rights reserved.
 #
 
 include		$(SRC)/Makefile.master
@@ -120,6 +120,7 @@ _MANFILES=	aac.7d		\
  	 	ses.7d		\
  	 	sfe.7d		\
  	 	sgen.7d		\
+ 	 	skd.7d		\
  	 	srpt.7d		\
  	 	st.7d		\
  	 	sv.7d		\
