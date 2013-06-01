@@ -76,7 +76,7 @@ YFLAGS = -d
 CLOBBERFILES += svccfg_lex.c svccfg_grammar.c svccfg_grammar.h \
     $(MYPROG:%=%-native)
 
-SVCCFG_EXTRA_LIBS = -lxml2 -lscf -ll -luutil -lumem -lmd5 -lintl
+SVCCFG_EXTRA_LIBS = -lxml2 -lscf -ll -luutil -lumem -lmd5
 $(NOT_NATIVE)SVCCFG_EXTRA_LIBS += -ltecla
 
 LIBSCF		= $(SRC)/lib/libscf
@@ -103,7 +103,7 @@ $(NATIVE_BUILD)LDFLAGS =
 $(NATIVE_BUILD)LDLIBS = \
 	-L$(LIBUUTIL)/native -R $(LIBUUTIL)/native \
 	-L$(LIBSCF)/native -R $(LIBSCF)/native \
-	$(SVCCFG_EXTRA_LIBS)
+	$(SVCCFG_EXTRA_LIBS) -lintl
 
 svccfg_lex.o svccfg_grammar.o := CCVERBOSE =
 

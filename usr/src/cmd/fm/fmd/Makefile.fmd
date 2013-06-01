@@ -115,8 +115,7 @@ LINTFLAGS += -mu
 
 $(PROG) := LDFLAGS += -R/usr/lib/fm
 $(PROG) := LDLIBS += -L$(ROOTLIB)/fm -ltopo -ldiagcode -lsysevent -lsmbios \
-		-luuid -lnvpair -lexacct -lnsl -lumem -ldevinfo -lfmd_msg \
-		-lnetsnmp -lnetsnmpagent -lnetsnmphelpers
+		-luuid -lnvpair -lexacct -lnsl -lumem -ldevinfo -lfmd_msg
 
 $(DMOD) := CFLAGS += $(CC_PICFLAGS) -G $(XREGSFLAG)
 $(DMOD) := LDFLAGS += $(ZTEXT) $(ZDEFS) $(MAPFILE-DMOD:%=-M%)

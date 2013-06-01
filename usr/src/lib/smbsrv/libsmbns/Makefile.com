@@ -50,7 +50,7 @@ SRCS=   $(OBJS_COMMON:%.o=$(SRCDIR)/%.c)	\
 	$(OBJS_SHARED:%.o=$(SRC)/common/smbsrv/%.c)
 
 LDLIBS +=	$(MACH_LDLIBS)
-LDLIBS +=	-lsmb -lgss -lldap -lresolv -lnsl -lsocket -lc -lcryptoutil
+LDLIBS +=	-lsmb -lgss -lldap -lresolv -lnsl -lsocket -lc
 CPPFLAGS +=	-D_REENTRANT
 
 # DYNLIB libraries do not have lint libs and are not linted

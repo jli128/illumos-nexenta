@@ -51,7 +51,7 @@ ROOTCMDDIR=	$(ROOT)/lib/svc/bin
 MYCPPFLAGS = -I. -I../common -I../../../common/svc -I$(ROOT)/usr/include/sqlite -D_REENTRANT
 CPPFLAGS += $(MYCPPFLAGS)
 CFLAGS	+= -v
-MYLDLIBS = -lumem -luutil -lbsm -lintl
+MYLDLIBS = -lumem -luutil -lbsm
 LDLIBS	+= -lsecdb $(MYLDLIBS)
 LINTFLAGS += -errtags -erroff=E_BAD_FORMAT_ARG_TYPE2
 
@@ -69,7 +69,8 @@ $(NATIVE_BUILD)CFLAGS =	$(NATIVE_CFLAGS)
 $(NATIVE_BUILD)CPPFLAGS = $(MYCPPFLAGS) -I$(LIBUUTIL)/common -I$(LIBSCF)/inc
 $(NATIVE_BUILD)CPPFLAGS += -DNATIVE_BUILD
 $(NATIVE_BUILD)LDFLAGS =
-$(NATIVE_BUILD)LDLIBS = -L$(LIBUUTIL)/native -R $(LIBUUTIL)/native $(MYLDLIBS)
+$(NATIVE_BUILD)LDLIBS = -L$(LIBUUTIL)/native -R $(LIBUUTIL)/native \
+		$(MYLDLIBS) -lintl
 
 DIRMODE = 0755
 FILEMODE = 0555

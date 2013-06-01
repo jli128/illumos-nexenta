@@ -62,6 +62,7 @@ SKIP		^usr/platform/.*/libpsvcpolicy\.so\.1
 SKIP		^usr/lib/sysevent/modules/picl_slm.so$
 
 # Objects that don't require a non-executable stack definition
+EXEC_STACK	^opt/SUNWdtrt/tst/.*\.exe$
 EXEC_STACK	^platform/.*/MACH(kernel)/unix$
 EXEC_STACK	^platform/.*/multiboot$
 
@@ -69,6 +70,7 @@ EXEC_STACK	^platform/.*/multiboot$
 TEXTREL		^platform/.*/MACH(kernel)/unix$
 
 # Directories and files that are allowed to have no direct bound symbols
+NODIRECT	^opt/SUNWdtrt/tst/.*\.exe$
 NODIRECT	^platform/.*/MACH(kernel)/unix$
 NODIRECT	^usr/ucb
 NODIRECT	^usr/4lib/sbcp$
@@ -84,6 +86,10 @@ STAB	^platform/.*/MACH(kernel)/unix$
 # Files that are allowed undefined references
 UNDEF_REF	^usr/lib/libnisdb\.so\.2$
 UNDEF_REF	^usr/snadm/lib/libsvm\.so\.1$
+
+# ncp3 plugin modules with known unused dependencies
+UNDEF_REF	^usr/lib/apache2/modules/
+UNDEF_REF	^usr/lib/fm/fmd/plugins/
 
 # Objects allowed to have unused dependencies
 UNUSED_DEPS	^usr/lib/picl/plugins/		# require devtree dependencies
@@ -136,10 +142,10 @@ UNUSED_RPATH	/usr.*\ from\ .*tst\.gcc\.exe			# gcc built
 # Unreferenced objects of non-OSnet objects we can't change
 UNREF_OBJ	/lib.*\ of\ .*libcimapi\.so
 UNREF_OBJ	/lib.*\ of\ .*libjvm\.so
-UNREF_OBJ	/lib.*\ of\ .*libnetsnmp\.so\.15
-UNREF_OBJ	/lib.*\ of\ .*libnetsnmpagent\.so\.15
-UNREF_OBJ	/lib.*\ of\ .*libnetsnmpmibs\.so\.15
-UNREF_OBJ	/lib.*\ of\ .*libnetsnmphelpers\.so\.15
+UNREF_OBJ	/lib.*\ of\ .*libnetsnmp\.so\.20
+UNREF_OBJ	/lib.*\ of\ .*libnetsnmpagent\.so\.20
+UNREF_OBJ	/lib.*\ of\ .*libnetsnmpmibs\.so\.20
+UNREF_OBJ	/lib.*\ of\ .*libnetsnmphelpers\.so\.20
 UNREF_OBJ	/lib.*\ of\ .*libnspr4\.so
 UNREF_OBJ	/lib.*\ of\ .*libpq\.so\.5
 UNREF_OBJ	/lib.*\ of\ .*libsoftokn3\.so
@@ -159,6 +165,35 @@ UNREF_OBJ	/libm\.so\.2.*\ of\ .*libstdc\+\+\.so\.6	# gcc build
 UNREF_OBJ	/lib.*\ of\ .*/lib/picl/plugins/		# picl
 UNREF_OBJ	/lib.*\ of\ .*kcfd				# interposer
 UNREF_OBJ	/libpkcs11\.so\.1; .*\ of\ .*libkmf\.so\.1	# interposed
+
+# Unreferenced objects from debian libraries
+UNREF_OBJ	/lib.*\ of\ .*libORBit-2\.so\.0
+UNREF_OBJ	/lib.*\ of\ .*libavahi-client\.so\.3
+UNREF_OBJ	/lib.*\ of\ .*libavahi-common\.so\.3
+UNREF_OBJ	/lib.*\ of\ .*libavahi-glib\.so\.1
+UNREF_OBJ	/lib.*\ of\ .*libcrypto\.so\.0\.9\.8
+UNREF_OBJ	/lib.*\ of\ .*libdbus-1\.so\.3
+UNREF_OBJ	/lib.*\ of\ .*libdbus-glib-1\.so\.2
+UNREF_OBJ	/lib.*\ of\ .*libgconf-2\.so\.4
+UNREF_OBJ	/lib.*\ of\ .*libglib-2\.0\.so\.0
+UNREF_OBJ	/lib.*\ of\ .*libgmodule-2\.0\.so\.0
+UNREF_OBJ	/lib.*\ of\ .*libgnutls\.so\.13
+UNREF_OBJ	/lib.*\ of\ .*libgobject-2\.0\.so\.0
+UNREF_OBJ	/lib.*\ of\ .*libgthread-2\.0\.so\.0
+UNREF_OBJ	/lib.*\ of\ .*libgssapi_krb5\.so\.2
+UNREF_OBJ	/lib.*\ of\ .*libk5crypto\.so\.3
+UNREF_OBJ	/lib.*\ of\ .*libkrb5\.so\.3
+UNREF_OBJ	/lib.*\ of\ .*libkrb5support\.so\.0
+UNREF_OBJ	/lib.*\ of\ .*libintl\.so\.8
+UNREF_OBJ	/lib.*\ of\ .*liblber-2\.4\.so\.2
+UNREF_OBJ	/lib.*\ of\ .*libldap_r-2\.4\.so\.2
+UNREF_OBJ	/lib.*\ of\ .*libnss3\.so
+UNREF_OBJ	/lib.*\ of\ .*libnssutil3\.so
+UNREF_OBJ	/lib.*\ of\ .*libsasl2\.so\.2
+UNREF_OBJ	/lib.*\ of\ .*libsmime3\.so
+UNREF_OBJ	/lib.*\ of\ .*libssl\.so\.0\.9\.8
+# the ncp3 build jams in -liconv indescriminately
+UNREF_OBJ	/libiconv\.so\.2;
 
 # Objects that used to contain system functionalty that has since
 # migrated to libc. We preserve these libraries as pure filters for

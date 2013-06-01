@@ -46,9 +46,10 @@ LDLIBS +=	-lmeta -ldevid -lc
 # XXX There isn't a lint library for libspmicommon.  For now, we work
 # around this by only using the library when we build (as opposed to lint).
 #
-all debug install := LDLIBS += -L/usr/snadm/lib
+# NCP3 does not have or use /usr/snadm/lib
+# all debug install := LDLIBS += -L/usr/snadm/lib -lspmicommon
+# DYNFLAGS +=	-R/usr/snadm/lib
 
-DYNFLAGS +=	-R/usr/snadm/lib
 CPPFLAGS +=	-D_FILE_OFFSET_BITS=64
 CPPFLAGS +=	-I$(SRC)/lib/lvm/libsvm/common/hdrs
 ZDEFS =

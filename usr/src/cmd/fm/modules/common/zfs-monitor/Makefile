@@ -29,5 +29,4 @@ SRCS = zfs_monitor.c
 
 include ../../Makefile.plugin
 
-LDLIBS += -L$(ROOTLIB)/fm -luutil -lzfs -ltopo
-LDFLAGS += -R/usr/lib/fm
+LDLIBS += -luutil -lzfs
