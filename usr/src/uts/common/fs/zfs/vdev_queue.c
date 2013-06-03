@@ -171,6 +171,104 @@ vdev_queue_agg_io_done(zio_t *aio)
 #define	IO_SPAN(fio, lio) ((lio)->io_offset + (lio)->io_size - (fio)->io_offset)
 #define	IO_GAP(fio, lio) (-IO_SPAN(lio, fio))
 
+/*
+ * This is a helper function that consolidates a collection of I/Os.
+ * We are holding the queue lock at this point. Blocking memory allocations
+ * with this lock held were shown to result in locking out pageout() and
+ * subsequent hangs. Therefore, we will do two passes, and we will first take
+ * zios under consolidation off the queue, then drop the lock, then allocate
+ * space for the consolidated I/O and finish constructing the zio parent/child
+ * tree, and then finally take back the lock and queue the consolidated I/O.
+ */
+static zio_t *
+consolidate_ios(vdev_queue_t *vq, avl_tree_t *t, zio_t *fio, zio_t *lio,
+    int flags)
+{
+	enum { GATHER, ISSUE, DONE } pass;
+	uint64_t size = IO_SPAN(fio, lio);
+	zio_t *aio = NULL, *io_to_issue = NULL, **last_to_issue = &io_to_issue;
+	boolean_t done = B_FALSE;
+
+	ASSERT(size <= zfs_vdev_aggregation_limit);
+	ASSERT(fio && lio && fio != lio);
+
+	for (pass = GATHER; pass < DONE; pass++) {
+		zio_t *nio, *dio;
+
+		ASSERT(MUTEX_HELD(&vq->vq_lock));
+
+		if (pass == GATHER) {
+			nio = fio;
+		} else {
+			ASSERT(pass == ISSUE);
+			/* Drop the lock before potentially blocking */
+			mutex_exit(&vq->vq_lock);
+			aio = zio_vdev_delegated_io(fio->io_vd, fio->io_offset,
+			    zio_buf_alloc(size), size, fio->io_type,
+			    ZIO_PRIORITY_AGG,
+			    flags | ZIO_FLAG_DONT_CACHE | ZIO_FLAG_DONT_QUEUE,
+			    vdev_queue_agg_io_done, NULL);
+			nio = io_to_issue;
+		}
+
+		ASSERT(nio);
+
+		done = B_FALSE;
+		do {
+			dio = nio;
+
+			if (pass == GATHER) {
+				ASSERT(MUTEX_HELD(&vq->vq_lock));
+				ASSERT(dio->io_vdev_tree == t);
+
+				nio = AVL_NEXT(t, dio);
+				if (dio == lio)
+					done = B_TRUE;
+
+				vdev_queue_io_remove(vq, dio);
+				dio->io_to_issue = NULL;
+				*last_to_issue = dio;
+				last_to_issue = &dio->io_to_issue;
+			} else {
+				ASSERT(pass == ISSUE);
+				ASSERT(!MUTEX_HELD(&vq->vq_lock));
+				ASSERT(dio->io_type == aio->io_type);
+
+				nio = dio->io_to_issue;
+				if (nio == NULL)
+					done = B_TRUE;
+				dio->io_to_issue = NULL;
+
+				if (dio->io_flags & ZIO_FLAG_NODATA) {
+					ASSERT(dio->io_type == ZIO_TYPE_WRITE);
+					bzero((char *)aio->io_data +
+					    (dio->io_offset - aio->io_offset),
+					    dio->io_size);
+				} else if (dio->io_type == ZIO_TYPE_WRITE) {
+					bcopy(dio->io_data,
+					    (char *)aio->io_data +
+					    (dio->io_offset - aio->io_offset),
+					    dio->io_size);
+				}
+				zio_add_child(dio, aio);
+				zio_vdev_io_bypass(dio);
+				zio_execute(dio);
+			}
+
+		} while (!done);
+	}
+
+	/*
+	 * Queue the consolidated I/O, return with queue lock held
+	 */
+	ASSERT(aio);
+	ASSERT(!MUTEX_HELD(&vq->vq_lock));
+	mutex_enter(&vq->vq_lock);
+	avl_add(&vq->vq_pending_tree, aio);
+
+	return (aio);
+}
+
 static zio_t *
 vdev_queue_io_to_issue(vdev_queue_t *vq, uint64_t pending_limit)
 {
@@ -280,42 +378,11 @@ again:
 		}
 	}
 
-	if (fio != lio) {
-		uint64_t size = IO_SPAN(fio, lio);
-		ASSERT(size <= zfs_vdev_aggregation_limit);
-
-		aio = zio_vdev_delegated_io(fio->io_vd, fio->io_offset,
-		    zio_buf_alloc(size), size, fio->io_type, ZIO_PRIORITY_AGG,
-		    flags | ZIO_FLAG_DONT_CACHE | ZIO_FLAG_DONT_QUEUE,
-		    vdev_queue_agg_io_done, NULL);
-
-		nio = fio;
-		do {
-			dio = nio;
-			nio = AVL_NEXT(t, dio);
-			ASSERT(dio->io_type == aio->io_type);
-			ASSERT(dio->io_vdev_tree == t);
-
-			if (dio->io_flags & ZIO_FLAG_NODATA) {
-				ASSERT(dio->io_type == ZIO_TYPE_WRITE);
-				bzero((char *)aio->io_data + (dio->io_offset -
-				    aio->io_offset), dio->io_size);
-			} else if (dio->io_type == ZIO_TYPE_WRITE) {
-				bcopy(dio->io_data, (char *)aio->io_data +
-				    (dio->io_offset - aio->io_offset),
-				    dio->io_size);
-			}
-
-			zio_add_child(dio, aio);
-			vdev_queue_io_remove(vq, dio);
-			zio_vdev_io_bypass(dio);
-			zio_execute(dio);
-		} while (dio != lio);
-
-		avl_add(&vq->vq_pending_tree, aio);
-
-		return (aio);
-	}
+	/*
+	 * We found a span in the queue that can be consolidated
+	 */
+	if (fio != lio)
+		return (consolidate_ios(vq, t, fio, lio, flags));
 
 	ASSERT(fio->io_vdev_tree == t);
 	vdev_queue_io_remove(vq, fio);

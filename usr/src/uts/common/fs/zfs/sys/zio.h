@@ -435,6 +435,9 @@ struct zio {
 
 	/* Timestamp for tracking vdev I/O latency */
 	hrtime_t io_vd_timestamp;
+
+	/* I/O consilidation list */
+	zio_t *io_to_issue;
 };
 
 extern zio_t *zio_null(zio_t *pio, spa_t *spa, vdev_t *vd,
