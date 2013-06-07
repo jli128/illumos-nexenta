@@ -1,3 +1,9 @@
+sunwzfskr (5.11.134-31-12280-13441) nexenta; urgency=high
+
+  * Issue 13441: pageout() can deadlock in ZFS under memory pressure
+
+ -- Boris Protopopov <boris.protopopov@nexenta.com>  Mon, 3 Jun 2013 12:25:19 -0700
+
 sunwzfskr (5.11.134-31-12279-13741) nexenta; urgency=high
 
   * Issue 13741: Multiple disks being falsely failed/retired by new

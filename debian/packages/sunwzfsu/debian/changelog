@@ -1,3 +1,9 @@
+sunwzfsu (5.11.134-31-12273-13441) nexenta; urgency=high
+
+  * Issue 13441: pageout() can deadlock in ZFS under memory pressure
+
+ -- Boris Protopopov <boris.protopopov@nexenta.com>  Mon, 3 Jun 2013 12:25:19 -0700
+
 sunwzfsu (5.11.134-31-12272-13803) nexenta; urgency=high
 
   * Issue 13803: backport illumos 1909

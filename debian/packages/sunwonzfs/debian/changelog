@@ -1,3 +1,9 @@
+sunwonzfs (5.11.134-31-8938-13441) nexenta; urgency=high
+
+  * Issue 13441: pageout() can deadlock in ZFS under memory pressure
+
+ -- Boris Protopopov <boris.protopopov@nexenta.com>  Mon, 3 Jun 2013 12:25:19 -0700
+
 sunwonzfs (5.11.134-31-8937-12379) nexenta; urgency=low
 
   * Issue 12379: Backport request for Illumos changeset 13379 "zfs should handle imbalanced LUNs" to the 3.1.x branch
