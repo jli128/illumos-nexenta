@@ -1514,9 +1514,10 @@ zfs_ioc_pool_export(zfs_cmd_t *zc)
 	int error;
 	boolean_t force = (boolean_t)zc->zc_cookie;
 	boolean_t hardforce = (boolean_t)zc->zc_guid;
+	boolean_t saveconfig = (boolean_t)zc->zc_obj;
 
 	zfs_log_history(zc);
-	error = spa_export(zc->zc_name, NULL, force, hardforce);
+	error = spa_export(zc->zc_name, NULL, force, hardforce, saveconfig);
 	if (error == 0)
 		zvol_remove_minors(zc->zc_name);
 	return (error);

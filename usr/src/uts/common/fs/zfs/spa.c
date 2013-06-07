@@ -4055,7 +4055,7 @@ spa_tryimport(nvlist_t *tryconfig)
  */
 static int
 spa_export_common(char *pool, int new_state, nvlist_t **oldconfig,
-    boolean_t force, boolean_t hardforce)
+    boolean_t force, boolean_t hardforce, boolean_t saveconfig)
 {
 	spa_t *spa;
 	boolean_t wrcthr_stopped = B_FALSE;
@@ -4158,7 +4158,7 @@ spa_export_common(char *pool, int new_state, nvlist_t **oldconfig,
 
 	if (new_state != POOL_STATE_UNINITIALIZED) {
 		if (!hardforce)
-			spa_config_sync(spa, B_TRUE, B_TRUE);
+			spa_config_sync(spa, !saveconfig, B_TRUE);
 		spa_remove(spa);
 	}
 	mutex_exit(&spa_namespace_lock);
@@ -4173,7 +4173,7 @@ int
 spa_destroy(char *pool)
 {
 	return (spa_export_common(pool, POOL_STATE_DESTROYED, NULL,
-	    B_FALSE, B_FALSE));
+	    B_FALSE, B_FALSE, B_FALSE));
 }
 
 /*
@@ -4181,10 +4181,10 @@ spa_destroy(char *pool)
  */
 int
 spa_export(char *pool, nvlist_t **oldconfig, boolean_t force,
-    boolean_t hardforce)
+    boolean_t hardforce, boolean_t saveconfig)
 {
 	return (spa_export_common(pool, POOL_STATE_EXPORTED, oldconfig,
-	    force, hardforce));
+	    force, hardforce, saveconfig));
 }
 
 /*
@@ -4195,7 +4195,7 @@ int
 spa_reset(char *pool)
 {
 	return (spa_export_common(pool, POOL_STATE_UNINITIALIZED, NULL,
-	    B_FALSE, B_FALSE));
+	    B_FALSE, B_FALSE, B_FALSE));
 }
 
 /*
@@ -5008,7 +5008,7 @@ spa_vdev_split_mirror(spa_t *spa, char *newname, nvlist_t *config,
 	/* if we're not going to mount the filesystems in userland, export */
 	if (exp)
 		error = spa_export_common(newname, POOL_STATE_EXPORTED, NULL,
-		    B_FALSE, B_FALSE);
+		    B_FALSE, B_FALSE, B_FALSE);
 
 	return (error);
 

@@ -14,7 +14,7 @@
 .\" CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your
 .\" own identifying information:
 .\" Portions Copyright [yyyy] [name of copyright owner]
-.TH ZPOOL 1M "Mar 16, 2012"
+.TH ZPOOL 1M "Jun 7, 2013"
 .SH NAME
 zpool \- configures ZFS storage pools
 .SH SYNOPSIS
@@ -56,7 +56,7 @@ zpool \- configures ZFS storage pools
 
 .LP
 .nf
-\fBzpool export\fR [\fB-f\fR] \fIpool\fR ...
+\fBzpool export\fR [\fB-fFc\fR] [\fB-t\fR \fInumthreads\fR] \fIpool\fR ...
 .fi
 
 .LP
@@ -1086,7 +1086,7 @@ other valid replicas of the data.
 .sp
 .ne 2
 .na
-\fB\fBzpool export\fR [\fB-f\fR] \fIpool\fR ...\fR
+\fBzpool export\fR [\fB-fFc\fR] [\fB-t\fR \fInumthreads\fR] \fIpool\fR ...
 .ad
 .sp .6
 .RS 4n
@@ -1112,6 +1112,35 @@ Forcefully unmount all datasets, using the "\fBunmount -f\fR" command.
 .sp
 This command will forcefully export the pool even if it has a shared spare that
 is currently being used. This may lead to potential data corruption.
+.RE
+.sp
+.ne 2
+.na
+\fB\fB-F\fR\fR
+.ad
+.RS 6n
+Do not update device labels or cache file with new configuration
+.sp
+This command will export the pool without flushing configuration information.
+.RE
+.sp
+.ne 2
+.na
+\fB\fB-c\fR\fR
+.ad
+.RS 6n
+Keep configuarion information of exported pool in the cache file
+.sp
+This command will export the pool and keep the latest configuration of it
+in the cache file.
+.RE
+.sp
+.ne 2
+.na
+\fB\fB-t\fR \fInumthreads\fR\fR
+.ad
+.RS 6n
+Unmount datasets in parallel using up to \fInumthreads\fR threads.
 .RE
 
 .RE

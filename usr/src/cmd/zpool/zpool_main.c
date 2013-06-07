@@ -1096,6 +1096,7 @@ zpool_do_export(int argc, char **argv)
 {
 	boolean_t force = B_FALSE;
 	boolean_t hardforce = B_FALSE;
+	boolean_t saveconfig = B_FALSE;
 	int c;
 	int n_threads = sysconf(_SC_NPROCESSORS_ONLN) * 2;
 	zpool_handle_t *zhp;
@@ -1103,13 +1104,16 @@ zpool_do_export(int argc, char **argv)
 	int i;
 
 	/* check options */
-	while ((c = getopt(argc, argv, ":fFt:")) != -1) {
+	while ((c = getopt(argc, argv, ":fFct:")) != -1) {
 		switch (c) {
 		case 'f':
 			force = B_TRUE;
 			break;
 		case 'F':
 			hardforce = B_TRUE;
+			break;
+		case 'c':
+			saveconfig = B_TRUE;
 			break;
 		case 't':
 			n_threads = atoi(optarg);
@@ -1153,9 +1157,11 @@ zpool_do_export(int argc, char **argv)
 		log_history = B_FALSE;
 
 		if (hardforce) {
-			if (zpool_export_force(zhp, history_str) != 0)
+			if (zpool_export_force(zhp, saveconfig, history_str)
+			    != 0)
 				ret = 1;
-		} else if (zpool_export(zhp, force, history_str) != 0) {
+		} else if (zpool_export(zhp, force, saveconfig, history_str)
+		    != 0) {
 			ret = 1;
 		}
 
