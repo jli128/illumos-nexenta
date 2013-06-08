@@ -1319,6 +1319,17 @@ spa_guid(spa_t *spa)
 }
 
 uint64_t
+spa_load_guid(spa_t *spa)
+{
+		/*
+		 * This is a GUID that exists solely as a reference for the
+		 * purposes of the arc.  It is generated at load time, and
+		 * is never written to persistent storage.
+		 */
+		return (spa->spa_load_guid);
+}
+
+uint64_t
 spa_last_synced_txg(spa_t *spa)
 {
 	return (spa->spa_ubsync.ub_txg);
