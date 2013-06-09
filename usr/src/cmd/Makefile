@@ -584,6 +584,7 @@ MSGSUBDIRS=		\
 	dfs.cmds	\
 	diff		\
 	diffmk		\
+	disk-dmc	\
 	dladm		\
 	dlstat		\
 	du		\

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2012 Nexenta, Systems Inc.  All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <stdio.h>
@@ -28,10 +28,13 @@
 #include <sys/scsi/scsi.h>
 #include <assert.h>
 #include <libdiskmgt.h>
+#include <libintl.h>
 
 #define	VERSION "1.0"
 
 #define	DISK_DRIVER "sd"
+
+#define	DEFAULT_WAIT 5
 
 /* will set timeout to 30 sec for all USCSI commands that we will issue */
 #define	DISK_CMD_TIMEOUT 30
@@ -39,7 +42,7 @@
 #define	IMPOSSIBLE_RQ_STATUS 0xff
 
 /* length bigger then this can not be represented by 3 bytes */
-#define MAX_FW_SIZE_IN_BYTES 16777215
+#define	MAX_FW_SIZE_IN_BYTES 16777215
 
 /* 10 is strlen("/dev/rdsk/") */
 #define	CTD_START_IN_PATH(path) (path + 10)
@@ -48,6 +51,9 @@
 #define	INQ_VENDOR_LEN 9 /* struct scsi_inquiry defines these fields at: */
 #define	INQ_MODEL_LEN 17 /* 8, 16 and 4 chars */
 #define	INQ_REV_LEN 5 /* without string terminating zeros */
+
+/* to reduce clutter and fprintf length */
+#define	_(x) (gettext(x))
 
 /* struct to hold relevant disk info */
 typedef struct disk_info {
@@ -62,51 +68,53 @@ typedef struct disk_info {
 } disk_info_t;
 
 /* prints sense data and status */
-void print_status_and_sense(char *cmd, int rc, int status,
-		struct scsi_extended_sense *sense) {
-	fprintf(stdout, "%s ioctl() returned: %d ", cmd, rc);
-	fprintf(stdout, "status: 0x%02x, ", status & STATUS_MASK);
-	fprintf(stdout, "sense - skey: 0x%02x, ", sense->es_key);
-	fprintf(stdout, "asc: 0x%02x, ", sense->es_add_code);
-	fprintf(stdout, "ascq: 0x%02x\n", sense->es_qual_code);
+void
+print_status_and_sense(char *cmd, int rc, int status,
+		struct scsi_extended_sense *sense)
+{
+	(void) fprintf(stdout, _("%s ioctl() returned: %d status: 0x%02x, sense - "
+	    "skey: 0x%02x, asc: 0x%02x, ascq: 0x%02x\n"), cmd, rc,
+		status & STATUS_MASK, sense->es_key, sense->es_add_code,
+		sense->es_qual_code);
 }
 
 /* determine if the uscsi cmd failed or not */
-boolean_t uscsi_parse_status(struct uscsi_cmd *ucmd, int rc, boolean_t verbose) {
+boolean_t
+uscsi_parse_status(struct uscsi_cmd *ucmd, int rc, boolean_t verbose)
+{
 	struct scsi_extended_sense *sense;
 
 	if (rc == -1 && errno == EAGAIN) {
 		if (verbose)
-			fprintf(stderr, "Disk is temporarily unavailable.\n");
+			(void) fprintf(stderr, _("Disk is temporarily unavailable.\n"));
 		return (B_FALSE); /* unavailable */
 	}
 
 	if ((ucmd->uscsi_status & STATUS_MASK) == STATUS_RESERVATION_CONFLICT) {
 		if (verbose)
-			fprintf(stderr, "Disk is reserved.\n");
+			(void) fprintf(stderr, _("Disk is reserved.\n"));
 		return (B_FALSE); /* reserved by another system */
 	}
 
 	if (rc == -1 && ucmd->uscsi_status == 0 && errno == EIO) {
 		if (verbose)
-			fprintf(stderr, "Disk is unavailable.\n");
+			(void) fprintf(stderr, _("Disk is unavailable.\n"));
 		return (B_FALSE); /* unavailable */
 	}
 
 	/* check if we have valid sense status */
 	if (ucmd->uscsi_rqstatus == IMPOSSIBLE_RQ_STATUS) {
 		if (verbose) {
-			fprintf(stderr, "No sense data for command ");
-			fprintf(stderr, "0x%02x.\n", ucmd->uscsi_cdb[0]);
+			(void) fprintf(stderr, _("No sense data for command 0x%02x.\n"),
+			    ucmd->uscsi_cdb[0]);
 		}
 		return (B_FALSE);
 	}
 
 	if (ucmd->uscsi_rqstatus != STATUS_GOOD) {
 		if (verbose) {
-			fprintf(stderr, "Sense status for command ");
-			fprintf(stderr, "0x%02x: ", ucmd->uscsi_cdb[0]);
-			fprintf(stderr, "0x%02x.\n", ucmd->uscsi_rqstatus);
+			(void) fprintf(stderr, _("Sense status for command 0x%02x: "
+			    "0x%02x.\n"), ucmd->uscsi_cdb[0], ucmd->uscsi_rqstatus);
 		}
 		return (B_FALSE);
 	}
@@ -116,61 +124,67 @@ boolean_t uscsi_parse_status(struct uscsi_cmd *ucmd, int rc, boolean_t verbose) 
 			(sense->es_key != KEY_NO_SENSE)) {
 		if (verbose && sense->es_key == KEY_ILLEGAL_REQUEST &&
 				sense->es_add_code == 0x2C && sense->es_qual_code == 0x0) {
-			fprintf(stderr, " Illegal Request - Command ");
-			fprintf(stderr, "0x%02x sequence error.\n", ucmd->uscsi_cdb[0]);
+			(void) fprintf(stderr, _(" Illegal Request - Command 0x%02x sequence "
+			    "error.\n"), ucmd->uscsi_cdb[0]);
 		} else if (verbose && sense->es_key == KEY_ILLEGAL_REQUEST &&
 				sense->es_add_code == 0x24 && sense->es_qual_code == 0x0) {
-			fprintf(stderr, " cmd 0x%02x: Illegal Request", ucmd->uscsi_cdb[0]);
-			fprintf(stderr, " - Invalid field in CDB for  command.\n");
+			(void) fprintf(stderr, _(" cmd 0x%02x: Illegal Request - Invalid "
+			    "field in CDB for  command.\n"), ucmd->uscsi_cdb[0]);
 		} else if (verbose && sense->es_key == KEY_UNIT_ATTENTION &&
 				sense->es_add_code == 0x3F && sense->es_qual_code == 0x01) {
-			fprintf(stderr, " cmd 0x%02x: Unit Attention", ucmd->uscsi_cdb[0]);
-			fprintf(stderr, " - Microcode changed.\n");
+			(void) fprintf(stderr, _(" cmd 0x%02x: Unit Attention - Microcode "
+			    "changed.\n"), ucmd->uscsi_cdb[0]);
 		} else if (verbose && sense->es_key == KEY_UNIT_ATTENTION &&
 				sense->es_add_code == 0x29 && sense->es_qual_code == 0x0) {
-			fprintf(stderr, " cmd 0x%02x: Unit Attention", ucmd->uscsi_cdb[0]);
-			fprintf(stderr, " - Reset Occurred.\n");
+			(void) fprintf(stderr, _(" cmd 0x%02x: Unit Attention - Reset "
+			    "Occurred.\n"), ucmd->uscsi_cdb[0]);
 		} else if (verbose) {
-			fprintf(stderr, "Command 0x%02x produced", ucmd->uscsi_cdb[0]);
-			fprintf(stderr, " sense data that indicated an error.\n");
+			(void) fprintf(stderr, _("Command 0x%02x produced sense data that "
+			    "indicated an error.\n"), ucmd->uscsi_cdb[0]);
 		}
 		return (B_FALSE);
 	}
 
 	if (rc == -1 && errno == EIO) {
 		if (verbose) {
-			fprintf(stderr, "Command 0x%02x", ucmd->uscsi_cdb[0]);
-			fprintf(stderr, " resulted in I/O error.\n");
+			(void) fprintf(stderr, _("Command 0x%02x resulted in I/O error.\n"),
+			    ucmd->uscsi_cdb[0]);
 		}
 		return (B_FALSE);
 	}
 
 	if (rc != 0) {
-		if (verbose)
-			fprintf(stderr, "cmd 0x%02x: Unknown error.\n", ucmd->uscsi_cdb[0]);
+		if (verbose) {
+			(void) fprintf(stderr, _("cmd 0x%02x: Unknown error.\n"),
+			    ucmd->uscsi_cdb[0]);
+		}
 		return (B_FALSE);
 	}
 
 	if (verbose) {
-		fprintf(stderr, "USCSI command 0x%02x", ucmd->uscsi_cdb[0]);
-		fprintf(stderr, " completed successfully.\n");
+		(void) fprintf(stderr, _("USCSI command 0x%02x completed "
+		    "successfully.\n"), ucmd->uscsi_cdb[0]);
 	}
 	return (B_TRUE);
 }
 
 /* dump raw hex cdb */
-void print_cdb(union scsi_cdb *cdb, const char *cmd, int cdb_len) {
+void
+print_cdb(union scsi_cdb *cdb, const char *cmd, int cdb_len)
+{
 	int i;
 
-	fprintf(stderr, "\n%s cdb (hex): ", cmd);
+	(void) fprintf(stderr, "\n%s CDB (hex): ", cmd);
 	for (i = 0; i < cdb_len; i++)
-		fprintf(stderr, "%02x ", cdb->cdb_opaque[i]);
-	fprintf(stderr, "\n");
+		(void) fprintf(stderr, "%02x ", cdb->cdb_opaque[i]);
+	(void) fprintf(stderr, "\n");
 }
 
 /* will write microcode located in fw_img to the disk_fd */
-boolean_t uscsi_write_buffer_dmc(int disk_fd, uint8_t mode, void * fw_img,
-		size_t fw_len, struct scsi_extended_sense *sense, boolean_t verbose) {
+boolean_t
+uscsi_write_buffer_dmc(int disk_fd, uint8_t mode, void * fw_img,
+		size_t fw_len, struct scsi_extended_sense *sense, boolean_t verbose)
+{
 	struct uscsi_cmd ucmd;
 	union scsi_cdb cdb;
 	int rc;
@@ -209,17 +223,17 @@ boolean_t uscsi_write_buffer_dmc(int disk_fd, uint8_t mode, void * fw_img,
 
 	if (sense->es_key == KEY_ILLEGAL_REQUEST && sense->es_add_code == 0x2C &&
 			sense->es_qual_code == 0x0) {
-		fprintf(stderr, " Downloading of microcode has failed - ");
-		fprintf(stderr, "Command sequence error.\n");
+		(void) fprintf(stderr, _(" Downloading of microcode has failed - "
+		    "Command sequence error.\n"));
 		rc = B_FALSE;
 	} else if (sense->es_key == KEY_ILLEGAL_REQUEST &&
 			sense->es_add_code == 0x24 && sense->es_qual_code == 0x0) {
-		fprintf(stderr, " Downloading of microcode has failed - ");
-		fprintf(stderr, "Invalid field in CDB.\n");
+		(void) fprintf(stderr, _(" Downloading of microcode has failed - "
+		    "Invalid field in CDB.\n"));
 		rc = B_FALSE;
 	} else if (sense->es_key == KEY_UNIT_ATTENTION &&
 			sense->es_add_code == 0x3F && sense->es_qual_code == 0x01) {
-		fprintf(stderr, " Microcode download successful\n");
+		(void) fprintf(stderr, _(" Microcode download successful\n"));
 		rc = B_TRUE;
 	}
 
@@ -227,8 +241,10 @@ boolean_t uscsi_write_buffer_dmc(int disk_fd, uint8_t mode, void * fw_img,
 }
 
 /* Issue TUR command to device identified by file descriptor disk_fd */
-boolean_t uscsi_test_unit_ready(int disk_fd, struct scsi_extended_sense *sense,
-		boolean_t verbose) {
+boolean_t
+uscsi_test_unit_ready(int disk_fd, struct scsi_extended_sense *sense,
+		boolean_t verbose)
+{
 	struct uscsi_cmd ucmd;
 	int rc;
 	union scsi_cdb cdb;
@@ -258,8 +274,10 @@ boolean_t uscsi_test_unit_ready(int disk_fd, struct scsi_extended_sense *sense,
 }
 
 /* Execute a uscsi inquiry command and put the resulting data into inqbuf. */
-boolean_t uscsi_inquiry(int disk_fd, struct scsi_inquiry *inqbuf,
-		struct scsi_extended_sense *sense, boolean_t verbose) {
+boolean_t
+uscsi_inquiry(int disk_fd, struct scsi_inquiry *inqbuf,
+		struct scsi_extended_sense *sense, boolean_t verbose)
+{
 	struct uscsi_cmd ucmd;
 	union scsi_cdb cdb;
 	int rc;
@@ -296,8 +314,10 @@ boolean_t uscsi_inquiry(int disk_fd, struct scsi_inquiry *inqbuf,
 }
 
 /* Issue start command to device identified by file descriptor disk_fd */
-boolean_t uscsi_start_unit(int disk_fd, struct scsi_extended_sense *sense,
-		boolean_t verbose) {
+boolean_t
+uscsi_start_unit(int disk_fd, struct scsi_extended_sense *sense,
+    boolean_t verbose)
+{
 	struct uscsi_cmd ucmd;
 	union scsi_cdb cdb;
 	int rc;
@@ -330,7 +350,9 @@ boolean_t uscsi_start_unit(int disk_fd, struct scsi_extended_sense *sense,
 }
 
 /* copy chars to out without trailing and leading "space" chars */
-void mem_trim_and_cpy(char *out, const char *buf, size_t buf_len) {
+void
+mem_trim_and_cpy(char *out, const char *buf, size_t buf_len) {
+
 	while (buf_len != 0 && isspace(*buf) != 0) { /* ignore leading space(s) */
 		buf++;
 		buf_len--;
@@ -338,13 +360,15 @@ void mem_trim_and_cpy(char *out, const char *buf, size_t buf_len) {
 	while (buf_len && isspace(buf[buf_len - 1]))
 		buf_len--; /* ignore trailing space(s) */
 
-	memcpy(out, buf, buf_len);
+	(void) memcpy(out, buf, buf_len);
 	out[buf_len] = 0; /* stringify */
 }
 
 /* given a disk - check if it's in use */
 /* define NOINUSE_CHECK environment variable to turn of disk inuse check. */
-void set_disk_inuse(disk_info_t *disk, boolean_t verbose) {
+void
+set_disk_inuse(disk_info_t *disk, boolean_t verbose)
+{
 	char *msg, *slice, *character;
 	char dev[MAXPATHLEN];
 	int error = 0;
@@ -357,7 +381,7 @@ void set_disk_inuse(disk_info_t *disk, boolean_t verbose) {
 	dm_who_type_t who = DM_WHO_FORMAT;
 
 	/* need to give dm_get_slices() a "whole" disk name, ie - c#t#d# */
-	strncpy(dev, CTD_START_IN_PATH(disk->path), MAXPATHLEN);
+	(void) strncpy(dev, CTD_START_IN_PATH(disk->path), MAXPATHLEN);
 	if ((character = strrchr(dev, 'd')) != NULL) {
 		character++;
 		while (isdigit(*character))
@@ -369,8 +393,8 @@ void set_disk_inuse(disk_info_t *disk, boolean_t verbose) {
 	dm_get_slices(dev, &slices, &error);
 	if (error != 0) {
 		if (verbose) {
-			fprintf(stderr, "dm_get_slices() failed: %s.\n", strerror(error));
-			fprintf(stderr, "Marking disk inuse.\n");
+			(void) fprintf(stderr, _("dm_get_slices() failed: %s.\n Marking disk "
+			    "inuse.\n"), strerror(error));
 		}
 		/*
 		 * Marking disk as "in use" on errors since it's
@@ -394,13 +418,13 @@ void set_disk_inuse(disk_info_t *disk, boolean_t verbose) {
 			disk->inuse = B_TRUE;
 			if (error == 0) {
 				if (verbose) {
-					fprintf(stderr, "Disk '%s' is in use: ", disk->device);
-					fprintf(stderr, "%s", msg);
+					(void) fprintf(stderr, _("Disk '%s' is in use: %s"),
+					    disk->device, msg);
 				}
 				free(msg);
 			} else if (verbose) {
-				fprintf(stderr, "dm_inuse() failed: %s.\n", strerror(error));
-				fprintf(stderr, "Marking disk inuse.\n");
+				(void) fprintf(stderr, _("dm_inuse() failed: %s.\n"
+				    "Marking disk inuse.\n"), strerror(error));
 			}
 			dm_free_name(slice);
 			break;
@@ -411,20 +435,24 @@ void set_disk_inuse(disk_info_t *disk, boolean_t verbose) {
 }
 
 /* obtain devlink (c*d*t* path) from /device path */
-int devlink_walk_cb(di_devlink_t devlink, void *arg) {
+int
+devlink_walk_cb(di_devlink_t devlink, void *arg)
+{
 	const char *path;
 	if ((path = di_devlink_path(devlink)) != NULL) {
 		assert(strlen(path) < MAXPATHLEN);
-		strncpy(arg, path, strlen(path)+1);
-	} else
-		strncpy(arg, "unknown_device_path", strlen("unknown_device_path")+1);
+		(void) strncpy(arg, path, strlen(path)+1);
+	} else {
+		(void) strcpy(arg, "unknown_device_path");
+	}
 
 	return (DI_WALK_TERMINATE);
 }
 
 /*  get relevant disk info for char devices */
-boolean_t set_disk_info(const di_node_t *node, disk_info_t *disk,
-		boolean_t verbose) {
+boolean_t
+set_disk_info(const di_node_t *node, disk_info_t *disk, boolean_t verbose)
+{
 	int instance;
 	char *m_path = NULL;
 	di_minor_t di_minor;
@@ -437,39 +465,39 @@ boolean_t set_disk_info(const di_node_t *node, disk_info_t *disk,
 
 	/* populate device field with sd */
 	assert(MAX_DISK_LEN > strlen(DISK_DRIVER) + sizeof (int) + 1);
-	strncpy(disk->device, DISK_DRIVER, strlen(DISK_DRIVER)+1);
+	(void) strncpy(disk->device, DISK_DRIVER, strlen(DISK_DRIVER)+1);
 
 	instance = di_instance(*node);
 	if (instance == -1) {
-		fprintf(stderr, "Could not get the instance number of the device - ");
-		fprintf(stderr, "di_instance() failed\n");
-		strcpy(disk->device + strlen(DISK_DRIVER), "?");
+		(void) fprintf(stderr, _("Could not get the instance number of the "
+		    "device - di_instance() failed\n"));
+		(void) strcpy(disk->device + strlen(DISK_DRIVER), "?");
 		disk->bad_info = -1;
 		return (B_FALSE);
 	}
 
 	/* append instance # to device name making sd# */
-	snprintf(disk->device + strlen(DISK_DRIVER), MAX_DISK_LEN -
+	(void) snprintf(disk->device + strlen(DISK_DRIVER), MAX_DISK_LEN -
 			strlen(DISK_DRIVER), "%d", instance);
 
 	/* take a snapshot of devlinks bound to sd driver */
-	if ((devlink_h = di_devlink_init(DISK_DRIVER, DI_MAKE_LINK)) == DI_LINK_NIL)
-	{
-		fprintf(stderr, "di_link_init() failed for disk %s.\n", disk->device);
+	if ((devlink_h = di_devlink_init(DISK_DRIVER, DI_MAKE_LINK)) ==
+		    DI_LINK_NIL) {
+		(void) fprintf(stderr, _("di_link_init() failed for disk %s.\n"),
+		    disk->device);
 		return (B_FALSE);
 	}
 	/* traverse devlink minor nodes */
 	di_minor = di_minor_next(*node, DI_MINOR_NIL);
-	for (; di_minor != DI_MINOR_NIL; di_minor = di_minor_next(*node, di_minor))
-	{
+	for (; di_minor != DI_MINOR_NIL;
+		di_minor = di_minor_next(*node, di_minor)) {
 		if (di_minor_spectype(di_minor) != S_IFCHR)
 			continue; /* skip minor nodes that are not char devs */
 
 		/* phys path to minor node (/devices/...) */
 		if ((m_path = di_devfs_minor_path(di_minor)) == NULL) {
-			fprintf(stderr, "couldn't get path for a minor node of disk ");
-			fprintf(stderr, "'%s' - di_devfs_minor_path() ", disk->device);
-			fprintf(stderr, "failed.\n");
+			(void)  fprintf(stderr, _("couldn't get path for a minor node of "
+			    "disk '%s' - di_devfs_minor_path() failed.\n"), disk->device);
 			break;
 		}
 		if (strstr(m_path, ":a,raw") == NULL) {
@@ -484,8 +512,8 @@ boolean_t set_disk_info(const di_node_t *node, disk_info_t *disk,
 		 */
 		if (di_devlink_walk(devlink_h, "^rdsk/", m_path, DI_PRIMARY_LINK,
 				disk->path, devlink_walk_cb) == -1) {
-			fprintf(stderr, "di_devlink_walk() failed for ");
-			fprintf(stderr, "disk '%s'\n", disk->device);
+			(void) fprintf(stderr, _("di_devlink_walk() failed for disk "
+			    "'%s'\n"), disk->device);
 			di_devfs_path_free(m_path);
 			break;
 		}
@@ -493,15 +521,15 @@ boolean_t set_disk_info(const di_node_t *node, disk_info_t *disk,
 
 		/* check that the devlink (/dev/rdsk/) path was found by the above */
 		if (strcmp(disk->path, "unknown_device_path") == 0) {
-			fprintf(stderr, "di_devlink_path() for '%s' failed.", disk->device);
+			(void) fprintf(stderr, _("di_devlink_path() for '%s' failed"),
+			    disk->device);
 			break;
 		}
 
 		disk_fd = open(disk->path, O_RDONLY | O_NDELAY);
 		if (disk_fd < 0) {
-			fprintf(stderr, "open() on disk '%s', ", disk->device);
-			fprintf(stderr, "dev path '%s' ", disk->path);
-			fprintf(stderr, "failed: %s\n", strerror(errno));
+			(void) fprintf(stderr, _("open() on disk '%s', dev path '%s' "
+			    "failed: %s\n"), disk->device, disk->path, strerror(errno));
 			break;
 		}
 
@@ -515,62 +543,69 @@ boolean_t set_disk_info(const di_node_t *node, disk_info_t *disk,
 			set_disk_inuse(disk, verbose);
 		} else {
 			if (verbose) {
-				fprintf(stderr, "uscsi_inquiry() failed, disk ");
-				fprintf(stderr, "'%s' will be skipped\n", disk->device);
+				(void) fprintf(stderr, _("uscsi_inquiry() failed, disk '%s' will "
+				    "be skipped\n"), disk->device);
 			}
 		}
-		close(disk_fd);
+		(void) close(disk_fd);
 		break; /* have found slice 0 for a char device, can now exit */
 	}
-	di_devlink_fini(&devlink_h);
+	(void) di_devlink_fini(&devlink_h);
 
 	return (disk->bad_info == 0 ? B_TRUE : B_FALSE);
 }
 
 /* kernel device tree walk */
-int walk_nodes(di_node_t *root_node, list_t *disks, boolean_t verbose) {
+int
+walk_nodes(di_node_t *root_node, list_t *disks, boolean_t verbose)
+{
 	int *dtype;
 	int disks_found = 0;
 	disk_info_t *disk;
 	di_node_t node;
 
-	fprintf(stdout, "Searching for disks, found: ");
+	(void) fprintf(stdout, _("Searching for disks, found: "));
 	/* start at root node and walk all sd nodes */
 	node = di_drv_first_node(DISK_DRIVER, *root_node);
 	for (; node != DI_NODE_NIL; node = di_drv_next_node(node)) {
-		fflush(stdout);
+		(void) fflush(stdout);
 		if (di_prop_lookup_ints(DDI_DEV_T_ANY, node, "inquiry-device-type",
 				&dtype) >= 0) {
 			if (((*dtype) & DTYPE_MASK) != DTYPE_DIRECT)
 				continue; /* skip dev types that are not type 0 (not disks) */
 		} else {
 			if (verbose) {
-				fprintf(stderr, "di_prop_lookup_ints(inquiry-device-type) ");
-				fprintf(stderr, "failed, ignoring this node\n");
+				(void) fprintf(stderr, _("di_prop_lookup_ints(inquiry-device-type) "
+				    "failed, ignoring this node\n"));
 			}
 			continue;
 		}
 		disks_found++;
 		if ((disk = (disk_info_t *) malloc(sizeof (disk_info_t))) == NULL) {
-			if (verbose)
-				fprintf(stderr, "malloc(%d) failed\n", sizeof (disk_info_t));
+			if (verbose) {
+				(void)  fprintf(stderr, _("malloc(%d) failed\n"),
+				    sizeof (disk_info_t));
+			}
 			return (-disks_found);
 		}
 		list_insert_tail(disks, disk); /* preserves discovery order */
 		if (set_disk_info(&node, disk, verbose) || verbose) {
-			fprintf(stdout, "%s ", disk->device);
+			(void) fprintf(stdout, "%s ", disk->device);
 			if ((disks_found % 10) == 0)
-				fprintf(stdout, "\n");
-		} else
+				(void) fprintf(stdout, "\n");
+		} else {
 			disks_found--;
+		}
 	}
-	fprintf(stdout, "(%d total).\n", disks_found);
+	(void) fprintf(stdout, _("(%d total).\n"), disks_found);
 
 	return (disks_found);
 }
 
 /* allocate space and read into it the fw image */
-char * get_fw_image(const char *fw_file, size_t *fw_len, boolean_t verbose) {
+char *
+get_fw_image(const char *fw_file, size_t *fw_len, boolean_t verbose)
+{
 	struct stat stat_buf;
 	char *fw_buf = NULL;
 	FILE * fw_stream = fopen(fw_file, "r");
@@ -578,18 +613,20 @@ char * get_fw_image(const char *fw_file, size_t *fw_len, boolean_t verbose) {
 	*fw_len = 0;
 	if (fw_stream != NULL) {
 		if (fstat(fileno(fw_stream), &stat_buf) == -1) { /* fstat failed */
-			if (verbose)
-				fprintf(stderr, "fstat() on file '%s' failed\n", fw_file);
+			if (verbose) {
+				(void) fprintf(stderr, _("fstat() on file '%s' failed\n"),
+				    fw_file);
+			}
 		} else {
 			if ((fw_buf = malloc(stat_buf.st_size)) != NULL)
 				*fw_len = stat_buf.st_size;
 			else if (verbose)
-				fprintf(stderr, "malloc() failed\n");
+				(void) fprintf(stderr, _("malloc() failed\n"));
 		}
 	} else { /* fopen failed */
 		if (verbose) {
-			fprintf(stderr, "fopen() on fw image ");
-			fprintf(stderr, "'%s' failed: %s\n", fw_file, strerror(errno));
+			(void) fprintf(stderr, _("fopen() on fw image '%s' failed: %s\n"),
+			    fw_file, strerror(errno));
 		}
 	}
 
@@ -598,90 +635,97 @@ char * get_fw_image(const char *fw_file, size_t *fw_len, boolean_t verbose) {
 		fw_buf = NULL;
 		*fw_len = 0;
 		if (verbose)
-			fprintf(stderr, "fread() failed\n");
+			(void) fprintf(stderr, _("fread() failed\n"));
 	}
 
 	if (fw_stream != NULL)
-		fclose(fw_stream);
+		(void) fclose(fw_stream);
 
 	return (fw_buf);
 }
 
 /* print a dot for every second we wait as to not look like process is hanging */
-void wait_print(int sec) {
-	fprintf(stdout, " waiting for %d seconds:\n", sec);
+void
+wait_print(int sec)
+{
+	(void) fprintf(stdout, _(" waiting for %d seconds:\n"), sec);
 	while (sec--) {
-		fprintf(stdout, " .");
-		fflush(stdout);
+		(void) fprintf(stdout, " .");
+		(void) fflush(stdout);
 		if (! (sec % 30))
-			fprintf(stdout, "\n");
-		sleep(1);
+			(void) fprintf(stdout, "\n");
+		(void) sleep(1);
 	}
 }
 
 /* perform some housekeeping before write buffer */
-boolean_t prep_disk_for_fw_dl(int disk_fd, int wait, boolean_t verbose) {
+boolean_t
+prep_disk_for_fw_dl(int disk_fd, int wait, boolean_t verbose)
+{
 	struct scsi_extended_sense sense;
-	boolean_t sts;
 
 	if (verbose)
-		fprintf(stderr, "  before dl prep\n");
+		(void) fprintf(stderr, _("  before dl prep\n"));
 
 	sync(); /* schedule in flight stuff to be put onto disk before dmc */
 
-	if ((sts = uscsi_test_unit_ready(disk_fd, &sense, verbose)))
+	if (uscsi_test_unit_ready(disk_fd, &sense, verbose)) {
 		return (B_TRUE);
-	else {
+	} else {
 		if (sense.es_key == KEY_NOT_READY && sense.es_add_code == 0x04 &&
 				sense.es_qual_code == 0x02) {
 			/* above sense data indicates disk needs a start command */
-			sts = uscsi_start_unit(disk_fd, &sense, verbose);
+			(void) uscsi_start_unit(disk_fd, &sense, verbose);
 			wait_print(wait);
 		} else if (sense.es_key == KEY_UNIT_ATTENTION &&
-				sense.es_add_code == 0x29 && sense.es_qual_code == 0x0)
+				sense.es_add_code == 0x29 && sense.es_qual_code == 0x0) {
 			wait_print(wait); /* reset occurred */
-		else if (sense.es_key == KEY_NOT_READY && sense.es_add_code == 0x04 &&
-				sense.es_qual_code == 0x0)
+		} else if (sense.es_key == KEY_NOT_READY && sense.es_add_code == 0x04 &&
+				sense.es_qual_code == 0x0) {
 			wait_print(wait); /* becoming ready */
+		}
 	}
 
 	return (uscsi_test_unit_ready(disk_fd, &sense, verbose)); /* trying again */
 }
 
 /* test disk after buffer write to make sure it's ready for operation */
-boolean_t after_dl_prep(int disk_fd, int wait, boolean_t verbose) {
+boolean_t
+after_dl_prep(int disk_fd, int wait, boolean_t verbose)
+{
 	struct scsi_extended_sense sense;
-	boolean_t sts;
 
 	if (verbose)
-		fprintf(stderr, " after dl prep\n");
+		(void) fprintf(stderr, _(" after dl prep\n"));
 	wait_print(wait);	/* give disk time to become ready after dmc */
 
-	if ((sts = uscsi_test_unit_ready(disk_fd, &sense, verbose)))
+	if (uscsi_test_unit_ready(disk_fd, &sense, verbose)) {
 		return (B_TRUE);
-	else {
+	} else {
 		if (sense.es_key == KEY_NOT_READY && sense.es_add_code == 0x04 &&
 				sense.es_qual_code == 0x02) {
 			/* above sense data indicates disk needs a start command */
-			sts = uscsi_start_unit(disk_fd, &sense, verbose);
+			(void) uscsi_start_unit(disk_fd, &sense, verbose);
 			wait_print(wait);
 		} else if (sense.es_key == KEY_UNIT_ATTENTION &&
-				sense.es_add_code == 0x63 && sense.es_qual_code == 0x01)
+				sense.es_add_code == 0x63 && sense.es_qual_code == 0x01) {
 			wait_print(wait); /* microcode changed */
-		else if (sense.es_key == KEY_UNIT_ATTENTION &&
-				sense.es_add_code == 0x29 && sense.es_qual_code == 0x0)
+		} else if (sense.es_key == KEY_UNIT_ATTENTION &&
+				sense.es_add_code == 0x29 && sense.es_qual_code == 0x0) {
 			wait_print(wait); /* reset occurred */
-		else if (sense.es_key == KEY_NOT_READY && sense.es_add_code == 0x04 &&
-				sense.es_qual_code == 0x0)
+		} else if (sense.es_key == KEY_NOT_READY && sense.es_add_code == 0x04 &&
+				sense.es_qual_code == 0x0) {
 			wait_print(wait); /* becoming ready */
+		}
 	}
 
 	return (uscsi_test_unit_ready(disk_fd, &sense, verbose)); /* trying again */
 }
 
 /* read through fw image and look for model string */
-boolean_t match_fw_image_to_model(const char *fw_image, size_t fw_len,
-		const char *model) {
+boolean_t
+match_fw_image_to_model(const char *fw_image, size_t fw_len, const char *model)
+{
 	size_t model_len = strlen(model);
 	size_t limit = fw_len - model_len + 1;
 	size_t i;
@@ -695,17 +739,19 @@ boolean_t match_fw_image_to_model(const char *fw_image, size_t fw_len,
 }
 
 /* check if the bad_info field is set, if so print the error */
-boolean_t has_bad_info(disk_info_t *disk, boolean_t verbose) {
+boolean_t
+has_bad_info(disk_info_t *disk, boolean_t verbose)
+{
 	if (disk->bad_info == -1) {
 		if (verbose) {
-			fprintf(stderr, "Encountered a device without an instance, ");
-			fprintf(stderr, "it will be skipped.\n");
+			(void)  fprintf(stderr, _("Encountered a device without an "
+			    "instance, it will be skipped.\n"));
 		}
 		return (B_TRUE);
 	} else if (disk->bad_info == 1) {
 		if (verbose) {
-			fprintf(stderr, "Was not able to get all of the needed info for ");
-			fprintf(stderr, "disk '%s', it will be skipped.\n", disk->device);
+			(void) fprintf(stderr, _("Was not able to get all of the needed "
+			    "info for disk '%s', it will be skipped.\n"), disk->device);
 		}
 		return (B_TRUE);
 	}
@@ -714,73 +760,75 @@ boolean_t has_bad_info(disk_info_t *disk, boolean_t verbose) {
 }
 
 /* print info for a single disk entry */
-void print_disk(const disk_info_t *disk) {
-	fprintf(stdout, "%-8s", disk->device);
-	fprintf(stdout, " %-35s", CTD_START_IN_PATH(disk->path));
-	fprintf(stdout, " %-9s", disk->vendor);
-	fprintf(stdout, " %-17s", disk->model);
-	fprintf(stdout, " %6s\n", disk->rev);
+void
+print_disk(const disk_info_t *disk)
+{
+	(void) fprintf(stdout, "%-8s %-35s %-9s %-17s %6s\n",
+	    disk->device, CTD_START_IN_PATH(disk->path), disk->vendor, disk->model,
+	    disk->rev);
 }
 
 /* print header and info for all disks */
-void print_disks(list_t *disks, boolean_t verbose) {
+void
+print_disks(list_t *disks, boolean_t verbose)
+{
 	disk_info_t *disk;
-	fprintf(stdout, "%-8s", "DEVICE");
-	fprintf(stdout, " %-35s", "LUN");
-	fprintf(stdout, " %-9s", "VENDOR");
-	fprintf(stdout, " %-17s", "MODEL");
-	fprintf(stdout, " %6s\n", "FW REV");
-	fprintf(stdout, "========================================");
-	fprintf(stdout, "=======================================\n");
+
+	(void) fprintf(stdout, "%-8s %-35s %-9s %-17s %6s\n"
+	    "========================================"
+	    "=======================================\n",
+		"DEVICE", "LUN", "VENDOR", "MODEL", "FW REV");
 	for (disk = list_head(disks); disk; disk = list_next(disks, disk))
 		if (!has_bad_info(disk, verbose))
 			print_disk(disk);
 }
 
 /* perform fw update on one disk */
-boolean_t process_disk(disk_info_t *disk, uint8_t mode, char * fw_buf,
-		size_t fw_len, int wait, boolean_t ignore_mismatch, boolean_t verbose) {
+boolean_t
+process_disk(disk_info_t *disk, uint8_t mode, char * fw_buf,
+		size_t fw_len, int wait, boolean_t ignore_mismatch, boolean_t verbose)
+{
 	int disk_fd;
 	struct scsi_extended_sense sense;
 	boolean_t status;
 	struct scsi_inquiry inq;
 
-	fprintf(stdout, "Processing disk %s:\n\n", disk->device);
+	(void) fprintf(stdout, _("Processing disk %s:\n\n"), disk->device);
 	status = match_fw_image_to_model(fw_buf, fw_len, disk->model);
 
 	if (verbose) {
-		fprintf(stderr, " fw img matched to model ");
-		fprintf(stderr, "%s? %s\n", disk->model, status ? "yes" : "no");
+		(void) fprintf(stderr, _(" fw img matched to model %s? %s\n"),
+		    disk->model, status ? "yes" : "no");
 	}
+
 	if (!ignore_mismatch && !status) {
-		fprintf(stdout, "Could not match fw image to disk ");
-		fprintf(stdout, "(%s) model (%s), ",  disk->device, disk->model);
-		fprintf(stdout, "will not proceed without ignore mismatch (-i) ");
-		fprintf(stdout, "argument specified.\n");
+		(void) fprintf(stdout, _("Could not match fw image to disk (%s) model "
+		    "(%s), will not proceed without ignore mismatch (-i) "
+		    "argument specified.\n"), disk->device, disk->model);
 		return (B_FALSE);
 	}
 
 	if (disk->inuse) {
-		fprintf(stderr, "Disk '%s' is in use, ", disk->device);
-		fprintf(stdout, "will not continue.\n");
+		(void) fprintf(stdout, _("Disk '%s' is in use, will not continue.\n"),
+		    disk->device);
 		return (B_FALSE);
 	}
 
 	disk_fd = open(disk->path, O_RDWR | O_NONBLOCK);
 	if (disk_fd < 0) {
-		fprintf(stderr, "open() on disk ");
-		fprintf(stderr, "'%s' failed: %s\n", disk->path, strerror(errno));
+		(void) fprintf(stderr, _("open() on disk '%s' failed: %s\n"), disk->path,
+		    strerror(errno));
 		return (B_FALSE);
 	}
 
 	status = prep_disk_for_fw_dl(disk_fd, wait, verbose);
 	if (verbose) {
-		fprintf(stderr, " Prep disk status: ");
-		fprintf(stderr, "%s\n", status ? "success" : "failure");
+		(void) fprintf(stderr, _(" Prep disk status: %s\n"),
+		    status ? _("success") : _("failure"));
 	}
 
 	if (!status) {
-		close(disk_fd);
+		(void) close(disk_fd);
 		return (B_FALSE);
 	}
 
@@ -788,13 +836,16 @@ boolean_t process_disk(disk_info_t *disk, uint8_t mode, char * fw_buf,
 	status = uscsi_write_buffer_dmc(disk_fd, mode, fw_buf, fw_len, &sense,
 			verbose);
 
-	if (after_dl_prep(disk_fd, wait, verbose) && verbose)
-		fprintf(stderr, " After fw download disk seem to be online.\n");
-	else if (verbose)
-		fprintf(stderr, " After fw download disk doesn't seem to be online.\n");
+	if (after_dl_prep(disk_fd, wait, verbose) && verbose) {
+		(void) fprintf(stderr, _(" After fw download disk seem to be "
+		    "online.\n"));
+	} else if (verbose) {
+		(void) fprintf(stderr, _(" After fw download disk doesn't seem to be "
+		    "online.\n"));
+	}
 
-	fprintf(stdout, "\nFlashing %s firmware: ",  disk->device);
-	fprintf(stdout, "%s\n", status ? "successful" : "failed");
+	(void) fprintf(stdout, _("\nFlashing %s firmware: %s\n"), disk->device,
+	    status ? _("successful") : _("failed"));
 
 	if (verbose) { /* get and display the "new" disk revision */
 		if (uscsi_inquiry(disk_fd, &inq, &sense, verbose)) {
@@ -802,41 +853,46 @@ boolean_t process_disk(disk_info_t *disk, uint8_t mode, char * fw_buf,
 					sizeof (inq.inq_revision));
 			print_disk(disk);
 		} else {
-			fprintf(stderr, "uscsi_inquiry() failed on disk ");
-			fprintf(stderr, "'%s', can't get revision.\n", disk->device);
+			(void) fprintf(stderr, _("uscsi_inquiry() failed on disk '%s', "
+			    "can't get revision.\n"), disk->device);
 		}
 	}
-	close(disk_fd);
+	(void) close(disk_fd);
 
 	return (status);
 }
 
-void usage(const char * prog_name) {
-	fprintf(stdout, "\nUsage: %s <-d (c#t#d# | sd#) | ", prog_name);
-	fprintf(stdout, "-m model_string> <-p /path/to/fw/img> <-h> <-l> ");
-	fprintf(stdout, "<-i> <-v> <-V> <-w #sec>\n");
-	fprintf(stdout, "\t-h\tPrint this help message.\n");
-	fprintf(stdout, "\t-l\tList discovered drives.\n");
-	fprintf(stdout, "\t-d\tSpecify single disk to use for firmware download ");
-	fprintf(stdout, "in c#t#d# or sd# format.\n");
-	fprintf(stdout, "\t-m str\tSpecify model of drive(s) to download firmware");
-	fprintf(stdout, " to. Disks whose model (obtained through SCSI INQUIRY ");
-	fprintf(stdout, "command) exactly matches model str provided will be ");
-	fprintf(stdout, "upgraded.\n");
-	fprintf(stdout, "\t-p\tPath to the firmware file that will be downloaded ");
-	fprintf(stdout, "onto the specified disk(s).\n");
-	fprintf(stdout, "\t-i\tIgnore disk and fw model mismatch.\n");
-	fprintf(stdout, "\t-v\tVerbose mode: turns on extra debug messages.\n");
-	fprintf(stdout, "\t-V\tShow %s version.\n", prog_name);
-	fprintf(stdout, "\t-w #sec\tNumber of seconds to delay checking for disk ");
-	fprintf(stdout, "readiness after downloading the firmware. Also used for ");
-	fprintf(stdout, "disk preparation timeouts. Default is 5.\n");
+void
+usage(const char * prog_name)
+{
+	(void)  fprintf(stdout, _("\nUsage: %s <-d (c#t#d# | sd#) | "
+	    "-m model_string> <-p /path/to/fw/img> <-h> <-l> <-i> <-v> <-V> "
+	    "<-w #sec>\n"
+	    "\t-h\tPrint this help message.\n"
+	    "\t-l\tList discovered drives.\n"
+	    "\t-d\tSpecify single disk to use for firmware "
+	    "download in c#t#d# or sd# format.\n"
+	    "\t-m str\tSpecify model of drive(s) to download "
+	    "firmware to. Disks whose model (obtained through SCSI INQUIRY "
+		"command) exactly matches model str provided will be upgraded.\n"
+	    "\t-p\tPath to the firmware file that will be "
+	    "downloaded onto the specified disk(s).\n"
+	    "\t-i\tIgnore disk and fw model mismatch.\n"
+	    "\t-v\tVerbose mode: turns on extra debug "
+	    "messages.\n"
+	    "\t-V\tShow %s version.\n"
+	    "\t-w #sec\tNumber of seconds to delay checking "
+	    "for disk readiness after downloading the firmware. Also "
+	    "used for disk preparation timeouts. Default is %d.\n"),
+	    prog_name, prog_name, DEFAULT_WAIT);
 	exit(1);
 }
 
-int main(int argc, char *argv[]) {
+int
+main(int argc, char *argv[])
+{
 	di_node_t root_node;
-	int opt, i, wait = 5;
+	int opt, i, wait = DEFAULT_WAIT;
 	uint8_t mode = 0x05; /* download, save and activate microcode */
 	boolean_t ctd = B_FALSE, list = B_FALSE, model = B_FALSE, verbose = B_FALSE;
 	boolean_t ignore_mismatch = B_FALSE, user_wait = B_FALSE;
@@ -848,8 +904,8 @@ int main(int argc, char *argv[]) {
 	disk_info_t *disk = NULL;
 
 	if (geteuid() > 1) {
-		fprintf(stderr, "This utility requires root level permissions due to ");
-		fprintf(stderr, "the use of USCSI(7i).\n");
+		(void) fprintf(stderr, _("This utility requires root level permissions "
+			"due to the use of USCSI(7i).\n"));
 		return (1);
 	}
 
@@ -861,11 +917,11 @@ int main(int argc, char *argv[]) {
 		switch (opt) {
 		case 'd': /* single disk mode */
 			if (strlen(optarg) < MAXPATHLEN) {
-				strncpy(dl_fw_to_disk, optarg, strlen(optarg)+1);
+				(void) strncpy(dl_fw_to_disk, optarg, strlen(optarg)+1);
 				ctd = B_TRUE;
 			} else {
-				fprintf(stderr, "disk name given to '-%c' ", optopt);
-				fprintf(stderr, "is too long (%d)\n", MAXPATHLEN);
+				(void) fprintf(stderr, _("disk name given to '-%c' is too "
+				    "long (%d)\n"), optopt, MAXPATHLEN);
 				usage(argv[0]);
 			}
 			break;
@@ -873,19 +929,19 @@ int main(int argc, char *argv[]) {
 			if (strlen(optarg) < MAXPATHLEN) {
 				fw_img = get_fw_image(optarg, &fw_len, verbose);
 				if (!fw_img) {
-					fprintf(stderr, "could not use fw file '%s', ", optarg);
-					fprintf(stderr, "check file permissions and existence.\n");
+					(void) fprintf(stderr, _("could not use fw file '%s', "
+					    "check file permissions and existence.\n"), optarg);
 					usage(argv[0]);
 				}
 				if (fw_len > MAX_FW_SIZE_IN_BYTES) {
-					fprintf(stderr, "%s does not support fw files ", argv[0]);
-					fprintf(stderr, "bigger then ");
-					fprintf(stderr, "%d bytes.\n", MAX_FW_SIZE_IN_BYTES);
+					(void) fprintf(stderr, _("%s does not support fw files "
+					    "bigger than %d bytes.\n"),
+					    argv[0], MAX_FW_SIZE_IN_BYTES);
 					exit(1);
 				}
 			} else {
-				fprintf(stderr, "fw path provided to ");
-				fprintf(stderr, "'-%c' is too long (%d)\n", optopt, MAXPATHLEN);
+				(void) fprintf(stderr, _("fw path provided to '-%c' is too "
+				    "long (%d)\n"), optopt, MAXPATHLEN);
 				usage(argv[0]);
 			}
 			break;
@@ -900,11 +956,11 @@ int main(int argc, char *argv[]) {
 			break;
 		case 'm': /* only flash this model */
 			if (strlen(optarg) < INQ_MODEL_LEN) {
-				strncpy(dl_fw_to_model, optarg, strlen(optarg)+1);
+				(void) strncpy(dl_fw_to_model, optarg, strlen(optarg)+1);
 				model = B_TRUE;
 			} else {
-				fprintf(stderr, "model provided to ");
-				fprintf(stderr, "'-%c' is too long (%d)\n", optopt, MAXPATHLEN);
+				(void) fprintf(stderr, _("model provided to '-%c' is too long "
+				    "(%d)\n"), optopt, MAXPATHLEN);
 				usage(argv[0]);
 			}
 			break;
@@ -912,14 +968,14 @@ int main(int argc, char *argv[]) {
 			verbose = B_TRUE;
 			break;
 		case 'V': /* display program version */
-			fprintf(stderr, "%s version " VERSION "\n", argv[0]);
+			(void) fprintf(stderr, _("%s version " VERSION "\n"), argv[0]);
 			break;
 		case 'w': /* wait time after dl */
 			wait = atoi(optarg);
 			if (wait < 0 || wait > 300) {
-				fprintf(stderr, "'-%c %d' - time to wait after ", optopt, wait);
-				fprintf(stderr, "microcode download is too long ( > 5min) or ");
-				fprintf(stderr, "negative.\n");
+				(void) fprintf(stderr, _("'-%c %d' - time to wait after "
+				    "microcode download is too long ( > 5min ) or negative.\n"),
+				    optopt, wait);
 				usage(argv[0]);
 			}
 			user_wait = B_TRUE;
@@ -932,33 +988,32 @@ int main(int argc, char *argv[]) {
 	}
 
 	for (i = optind; i < argc; i++) {
-		printf("Unexpected argument '%s'\n", argv[i]);
+		(void) printf(_("Unexpected argument '%s'\n"), argv[i]);
 		usage(argv[0]);
 	}
 
 	if (fw_img && (!ctd && !model)) {
 		/* if fw file is given, need to associate it with a disk or model */
-		fprintf(stderr, "Expected a disk specification ");
-		fprintf(stderr, "('-m model' or '-d c#t#d#') to associate ");
-		fprintf(stderr, "fw file with.\n");
+		(void) fprintf(stderr, _("Expected a disk specification "
+		    "('-m model' or '-d c#t#d#') to associate fw file with.\n"));
 		usage(argv[0]);
 	}
 	if (!fw_img && (ctd || model)) {
 		/* if no fw file is given, having model or disk doesn't make sense */
-		fprintf(stderr, "Expected a fw file ('-p /path/to/fw/file') to ");
-		fprintf(stderr, "associate '-m model' or '-d c#t#d#' with.\n");
+		(void) fprintf(stderr, _("Expected a fw file ('-p /path/to/fw/file') to"
+		    " associate '-m model' or '-d c#t#d#' with.\n"));
 		usage(argv[0]);
 	}
 
 	if (model && ctd) {
 		/* can't have both disk and model for fw download specified */
-		fprintf(stderr, "-m and -d are mutually exclusive.\n");
+		(void) fprintf(stderr, _("-m and -d are mutually exclusive.\n"));
 		usage(argv[0]);
 	}
 
 	if ((ignore_mismatch || user_wait) && !fw_img) {
 		/* need firmware to work with if above args are given */
-		fprintf(stderr, "Expected '-p /path/to/fw.'\n");
+		(void) fprintf(stderr, _("Expected '-p /path/to/fw.'\n"));
 		usage(argv[0]);
 	}
 
@@ -967,7 +1022,7 @@ int main(int argc, char *argv[]) {
 	 * properties and subtree
 	 */
 	if ((root_node = di_init("/", DINFOCPYALL)) == DI_NODE_NIL) {
-		fprintf(stderr, "di_init() failed\n");
+		(void) fprintf(stderr, _("di_init() failed\n"));
 		return (1);
 	}
 
@@ -976,19 +1031,19 @@ int main(int argc, char *argv[]) {
 	di_fini(root_node);
 
 	if (i == 0) {
-		fprintf(stdout, "No disk(s) serviced by '" DISK_DRIVER "' ");
-		fprintf(stderr, "driver were found.\n");
+		(void) fprintf(stdout, _("No disk(s) serviced by '" DISK_DRIVER "' "
+		    "driver were found.\n)"));
 		return (1);
 	}
 	if (i < 0) {
-		fprintf(stderr, "malloc() failed so not all disk(s) serviced by ");
-		fprintf(stderr, "'" DISK_DRIVER "' driver were walked.\n");
-		fprintf(stderr, "Encountered %d disk(s) before failure.\n", -i);
+		(void) fprintf(stderr, _("malloc() failed so not all disk(s) serviced "
+		    "by '" DISK_DRIVER "' driver were walked.\n"
+		    "Encountered %d disk(s) before failure.\n"), -i);
 		return (1);
 	}
 	if (verbose) {
-		fprintf(stderr, "Found %d disk(s) serviced by '" DISK_DRIVER "'", i);
-		fprintf(stderr, " driver.\n");
+		(void) fprintf(stderr, _("Found %d disk(s) serviced by '" DISK_DRIVER
+		    "' driver.\n"), i);
 	}
 
 	if (list)
@@ -1001,25 +1056,24 @@ int main(int argc, char *argv[]) {
 			if (strcmp(CTD_START_IN_PATH(disk->path), dl_fw_to_disk) == 0 ||
 					strcmp(disk->device, dl_fw_to_disk) == 0) {
 				if (verbose) {
-					fprintf(stderr, "matched provided disk ");
-					fprintf(stderr, "'%s' to ", dl_fw_to_disk);
-					fprintf(stderr, "'%s' or ", CTD_START_IN_PATH(disk->path));
-					fprintf(stderr, "'%s'.\n", disk->device);
+					(void) fprintf(stderr, _("matched provided disk '%s' to "
+					    "'%s' or '%s'.\n"), dl_fw_to_disk,
+					    CTD_START_IN_PATH(disk->path), disk->device);
 				}
 				break;
 			} else if (verbose) {
-				fprintf(stderr, "did not match provided disk ");
-				fprintf(stderr, "'%s' to ", dl_fw_to_disk);
-				fprintf(stderr, "'%s' or ", CTD_START_IN_PATH(disk->path));
-				fprintf(stderr, "'%s'.\n", disk->device);
+				(void) fprintf(stderr, _("did not match provided disk '%s' to "
+				    "'%s' or '%s'.\n"), dl_fw_to_disk,
+				    CTD_START_IN_PATH(disk->path), disk->device);
 			}
 		}
 		if (disk == NULL) {
-			fprintf(stdout, "disk '%s' was not found.\n", dl_fw_to_disk);
+			(void) fprintf(stdout, _("disk '%s' was not found.\n"),
+		    dl_fw_to_disk);
+		} else {
+			(void) process_disk(disk, mode, fw_img, fw_len, wait,
+			    ignore_mismatch, verbose);
 		}
-		else
-			process_disk(disk, mode, fw_img, fw_len, wait, ignore_mismatch,
-				verbose);
 	}
 
 	if (model) { /* if we were given a model */
@@ -1030,20 +1084,20 @@ int main(int argc, char *argv[]) {
 			if (strcmp(dl_fw_to_model, disk->model) == 0) {
 				i++;
 				if (verbose) {
-					fprintf(stderr, "matched provided model: ");
-					fprintf(stderr, "'%s' to disk ", dl_fw_to_model);
-					fprintf(stderr, "'%s'.\n", disk->device);
+					(void) fprintf(stderr, _("matched provided model: '%s' to "
+					    "disk '%s'.\n"), dl_fw_to_model, disk->device);
 				}
-				process_disk(disk, mode, fw_img, fw_len, wait, ignore_mismatch,
-					verbose);
+				(void) process_disk(disk, mode, fw_img, fw_len, wait,
+				    ignore_mismatch, verbose);
 			} else if (verbose) {
-				fprintf(stderr, "did not match provided model: ");
-				fprintf(stderr, "'%s' to disk ", dl_fw_to_model);
-				fprintf(stderr, "'%s'.\n", disk->device);
+				(void) fprintf(stderr, _("did not match provided model: '%s' to"
+				    " disk '%s'.\n"), dl_fw_to_model, disk->device);
 			}
 		}
-		if (i == 0)
-			fprintf(stdout, "disk model '%s' was not found.\n", dl_fw_to_model);
+		if (i == 0) {
+			(void) fprintf(stdout, _("disk model '%s' was not found.\n"),
+			    dl_fw_to_model);
+		}
 	}
 
 	/* cleanup start */
