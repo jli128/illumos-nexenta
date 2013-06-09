@@ -131,6 +131,7 @@ COMMON_SUBDIRS=		\
 	dis		\
 	diskmgtd	\
 	dispadmin	\
+	disk-dmc	\
 	dladm		\
 	dlstat		\
 	dmesg		\
