@@ -1,3 +1,10 @@
+sunwndmpu (5.11.134-31-3-13998) nexenta; urgency=low
+
+  * Issue 13998: Failed to open device /dev/rmt/0n because of too many files
+    open
+
+ -- Nexenta Systems <support@nexenta.com>  Thu, 11 Jul 2013 15:10:32 -0400
+
 sunwndmpu (5.11.134-31-2-12332) nexenta; urgency=medium
 
   * Issue 12332: NDMP backup jobs error out when reaching the end of media (EOM)
