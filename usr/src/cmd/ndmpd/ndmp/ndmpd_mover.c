@@ -37,6 +37,9 @@
  */
 /* Copyright (c) 2007, The Storage Networking Industry Association. */
 /* Copyright (c) 1996, 1997 PDC, Network Appliance. All Rights Reserved */
+/*
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #include <sys/ioctl.h>
 #include <sys/types.h>
@@ -1471,7 +1474,7 @@ ndmpd_local_write(ndmpd_session_t *session, char *data, ulong_t length)
 		    session->ns_mover.md_record_size) {
 			n = tape_write(session, session->ns_mover.md_buf,
 			    session->ns_mover.md_record_size);
-			if (n < 0) {
+			if (n <= 0) {
 				ndmpd_mover_error(session,
 				    (n == 0 ? NDMP_MOVER_HALT_ABORTED :
 				    NDMP_MOVER_HALT_INTERNAL_ERROR));
@@ -2299,6 +2302,9 @@ tape_write(ndmpd_session_t *session, char *data, ssize_t length)
 	ssize_t n;
 	int err;
 
+	if (length == 0)
+		return (0);
+
 	for (; ; ) {
 		/*
 		 * Refer to the comment at the top of ndmpd_tape.c file for
@@ -2322,8 +2328,6 @@ tape_write(ndmpd_session_t *session, char *data, ssize_t length)
 			/* Operation aborted or connection terminated? */
 			if (err < 0)
 				return (-1);
-
-			continue;
 		}
 
 		n = write(session->ns_tape.td_fd, data, length);
@@ -2331,37 +2335,24 @@ tape_write(ndmpd_session_t *session, char *data, ssize_t length)
 			NDMP_LOG(LOG_ERR, "Tape write error: %m.");
 			return (-1);
 		}
+		session->ns_tape.td_write = TRUE;
 		NS_ADD(wtape, n);
 
-		if (n == 0 || n != length) {
+		if (n < length) {
+			NDMP_LOG(LOG_DEBUG, "LEOT n: %d", n);
+			session->ns_tape.td_eom_seen = TRUE;
 			if (n != 0) {
-				NDMP_LOG(LOG_DEBUG, "LEOT n: %d", n);
-
-				NDMP_LOG(LOG_DEBUG, "Backup one record");
+				/*
+				 * Backup one record since the record
+				 * hits the EOM.
+				 */
+				NDMP_LOG(LOG_DEBUG, "Back up one record");
 				(void) ndmp_mtioctl(session->ns_tape.td_fd,
 				    MTBSR, 1);
-
-				/* setting logical EOM */
+				/* Setting logical EOM. */
 				ndmpd_write_eom(session->ns_tape.td_fd);
 			}
-
-			/*
-			 * End of media reached.
-			 * Notify client and wait for the client to
-			 * either abort the operation or continue the
-			 * operation after changing the tape.
-			 */
-			NDMP_APILOG((void*)session, NDMP_LOG_NORMAL,
-			    ++ndmp_log_msg_id,
-			    "End of tape reached. Load next tape.\n");
-
-			err = change_tape(session);
-
-			/* Operation aborted or connection terminated? */
-			if (err < 0)
-				return (-1);
-
-			/* Retry the write to the new tape. */
+			/* Notify the client to change the tape. */
 			continue;
 		}
 
@@ -3670,6 +3661,9 @@ mover_tape_write_v3(ndmpd_session_t *session, char *data, ssize_t length)
 	ssize_t n;
 	int err;
 
+	if (length == 0)
+		return (0);
+
 	for (; ; ) {
 		/*
 		 * Refer to the comment at the top of ndmpd_tape.c file for
@@ -3677,7 +3671,6 @@ mover_tape_write_v3(ndmpd_session_t *session, char *data, ssize_t length)
 		 */
 		if (session->ns_tape.td_eom_seen) {
 			NDMP_LOG(LOG_DEBUG, "eom_seen");
-
 			session->ns_tape.td_eom_seen = FALSE;
 			/*
 			 * End of media reached.
@@ -3694,9 +3687,6 @@ mover_tape_write_v3(ndmpd_session_t *session, char *data, ssize_t length)
 			/* Operation aborted or connection terminated? */
 			if (err < 0)
 				return (-1);
-
-			/* Retry the write to the new tape. */
-			continue;
 		}
 
 		/*
@@ -3719,9 +3709,21 @@ mover_tape_write_v3(ndmpd_session_t *session, char *data, ssize_t length)
 			NDMP_LOG(LOG_ERR, "Tape write error: %m.");
 			return (-1);
 		}
+		session->ns_tape.td_write = TRUE;
 		NS_ADD(wtape, n);
 
-		if (n == 0 || n != length) {
+		if (n < length) {
+			struct mtget mtstatus;
+			NDMP_LOG(LOG_DEBUG, "LEOT n: %d", n);
+			NDMP_LOG(LOG_DEBUG, "LEOT record count: %d",
+			    session->ns_tape.td_record_count);
+			if (ioctl(session->ns_tape.td_fd, MTIOCGET,
+			    &mtstatus) == 0) {
+				NDMP_LOG(LOG_DEBUG, "LEOT blkno: %d",
+				    mtstatus.mt_blkno);
+			}
+
+			session->ns_tape.td_eom_seen = TRUE;
 			if (n != 0) {
 				/*
 				 * Backup one record since the record
@@ -3730,28 +3732,15 @@ mover_tape_write_v3(ndmpd_session_t *session, char *data, ssize_t length)
 				NDMP_LOG(LOG_DEBUG, "Back up one record");
 				(void) ndmp_mtioctl(session->ns_tape.td_fd,
 				    MTBSR, 1);
-
-				/* setting logical EOM */
+				if (ioctl(session->ns_tape.td_fd, MTIOCGET,
+				    &mtstatus) == 0) {
+					NDMP_LOG(LOG_DEBUG, "MTBSR blkno: %d",
+					    mtstatus.mt_blkno);
+				}
+				/* Setting logical EOM. */
 				ndmpd_write_eom(session->ns_tape.td_fd);
 			}
-
-			/*
-			 * End of media reached.
-			 * Notify client and wait for the client to
-			 * either abort the operation or continue the
-			 * operation after changing the tape.
-			 */
-			NDMP_APILOG((void*)session, NDMP_LOG_NORMAL,
-			    ++ndmp_log_msg_id,
-			    "End of tape reached. Load next tape");
-
-			err = mover_pause_v3(session, NDMP_MOVER_PAUSE_EOM);
-
-			/* Operation aborted or connection terminated? */
-			if (err < 0)
-				return (-1);
-
-			/* Retry the write to the new tape. */
+			/* Notify the client to change the tape. */
 			continue;
 		}
 
@@ -3904,7 +3893,7 @@ ndmpd_local_write_v3(ndmpd_session_t *session, char *data, ulong_t length)
 			n = mover_tape_write_v3(session,
 			    session->ns_mover.md_buf,
 			    session->ns_mover.md_record_size);
-			if (n < 0) {
+			if (n <= 0) {
 				ndmpd_mover_error(session,
 				    (n == 0 ?  NDMP_MOVER_HALT_ABORTED :
 				    NDMP_MOVER_HALT_MEDIA_ERROR));
