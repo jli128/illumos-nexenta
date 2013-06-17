@@ -56,7 +56,8 @@ typedef uintptr_t pc_t;
  * Random set of variables used by more than one routine.
  */
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
+#include <sys/types32.h>
 #include <sys/varargs.h>
 #include <sys/uadmin.h>
 
@@ -196,7 +197,9 @@ int strident_valid(const char *);
 void strident_canon(char *, size_t);
 int getsubopt(char **optionsp, char * const *tokens, char **valuep);
 char *append_subopt(const char *, size_t, char *, const char *);
+#ifndef	_FAKE_KERNEL
 int ffs(uintmax_t);
+#endif
 int copyin(const void *, void *, size_t);
 void copyin_noerr(const void *, void *, size_t);
 int xcopyin(const void *, void *, size_t);
@@ -249,7 +252,7 @@ int suword64(void *, uint64_t);
 void suword64_noerr(void *, uint64_t);
 #endif
 
-#if !defined(_BOOT)
+#if !defined(_BOOT) && !defined(_FAKE_KERNEL)
 int setjmp(label_t *) __RETURNS_TWICE;
 extern void longjmp(label_t *)
 	__NORETURN;
@@ -385,7 +388,7 @@ union rval {
 
 typedef union rval rval_t;
 
-#ifdef	_KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 extern void reset_syscall_args(void);
 extern int save_syscall_args(void);
@@ -424,7 +427,7 @@ extern int start_init_common(void);
 
 #endif	/* _KERNEL */
 
-#if defined(_KERNEL) || defined(_BOOT)
+#if defined(_KERNEL) || defined(_FAKE_KERNEL) || defined(_BOOT)
 
 size_t strlcat(char *, const char *, size_t);
 size_t strlen(const char *) __PURE;
@@ -432,6 +435,13 @@ char *strcat(char *, const char *);
 char *strncat(char *, const char *, size_t);
 char *strcpy(char *, const char *);
 char *strncpy(char *, const char *, size_t);
+
+extern size_t strlcpy(char *, const char *, size_t);
+extern size_t strspn(const char *, const char *);
+extern size_t strcspn(const char *, const char *);
+extern char *strdup(const char *);
+extern void strfree(char *);
+
 /* Need to be consistent with <string.h> C++ definitions */
 #if __cplusplus >= 199711L
 extern const char *strchr(const char *, int);
