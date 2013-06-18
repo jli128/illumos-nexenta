@@ -30,7 +30,7 @@
 #include <libdiskmgt.h>
 #include <libintl.h>
 
-#define	VERSION "1.0"
+#define	VERSION "1.1"
 
 #define	DISK_DRIVER "sd"
 
@@ -378,9 +378,9 @@ set_disk_inuse(disk_info_t *disk, boolean_t verbose)
 	 * Let libdiskmgt think we are the format consumer, meaning slices will not
 	 * be considered "inuse" if they have a filesystem or an exported zpool
 	 */
-	dm_who_type_t who = DM_WHO_FORMAT;
+	dm_who_type_t who = DM_WHO_ZPOOL;
 
-	/* need to give dm_get_slices() a "whole" disk name, ie - c#t#d# */
+	/* need to give dm_get_slices() a "whole" disk name, ie - c#t#d...s0 */
 	(void) strncpy(dev, CTD_START_IN_PATH(disk->path), MAXPATHLEN);
 	if ((character = strrchr(dev, 'd')) != NULL) {
 		character++;
@@ -508,7 +508,7 @@ set_disk_info(const di_node_t *node, disk_info_t *disk, boolean_t verbose)
 		/*
 		 * Lookup /dev/rdsk/ path for minor node defined by m_path
 		 * The reason we're not just using the /devices m_path for WRITE_BUFFER
-		 * is we need the c#t#d# lun to display to the user anyway
+		 * is we need the c#t#d...s0 lun to display to the user anyway
 		 */
 		if (di_devlink_walk(devlink_h, "^rdsk/", m_path, DI_PRIMARY_LINK,
 				disk->path, devlink_walk_cb) == -1) {
@@ -533,7 +533,7 @@ set_disk_info(const di_node_t *node, disk_info_t *disk, boolean_t verbose)
 			break;
 		}
 
-		/* found p0 for a char disk, now get vendor, model, and rev */
+		/* found s0 for a char disk, now get vendor, model, and rev */
 		if (uscsi_inquiry(disk_fd, &inq, &sense, verbose)) {
 			disk->bad_info = 0;
 			mem_trim_and_cpy(disk->vendor, inq.inq_vid, sizeof (inq.inq_vid));
@@ -617,7 +617,14 @@ get_fw_image(const char *fw_file, size_t *fw_len, boolean_t verbose)
 				(void) fprintf(stderr, _("fstat() on file '%s' failed\n"),
 				    fw_file);
 			}
-		} else {
+		} else if (stat_buf.st_size < 1 ||
+		    stat_buf.st_size > MAX_FW_SIZE_IN_BYTES) {
+			/* fw file empty or too big to fit into 1 SCSI WRITEBUFFER buffer */
+			(void) fprintf(stderr, _("'%s' is of size %lld bytes.\ndisk-dmc v"
+			    VERSION " does not support fw files bigger then %d bytes or "
+				"smaller then 1 byte.\n"), fw_file, (intmax_t) stat_buf.st_size,
+				MAX_FW_SIZE_IN_BYTES);
+		} else { /* alloc buffer to hold fw img */
 			if ((fw_buf = malloc(stat_buf.st_size)) != NULL)
 				*fw_len = stat_buf.st_size;
 			else if (verbose)
@@ -837,7 +844,7 @@ process_disk(disk_info_t *disk, uint8_t mode, char * fw_buf,
 			verbose);
 
 	if (after_dl_prep(disk_fd, wait, verbose) && verbose) {
-		(void) fprintf(stderr, _(" After fw download disk seem to be "
+		(void) fprintf(stderr, _(" After fw download disk seems to be "
 		    "online.\n"));
 	} else if (verbose) {
 		(void) fprintf(stderr, _(" After fw download disk doesn't seem to be "
@@ -865,26 +872,24 @@ process_disk(disk_info_t *disk, uint8_t mode, char * fw_buf,
 void
 usage(const char * prog_name)
 {
-	(void)  fprintf(stdout, _("\nUsage: %s <-d (c#t#d# | sd#) | "
-	    "-m model_string> <-p /path/to/fw/img> <-h> <-l> <-i> <-v> <-V> "
+	(void) fprintf(stdout, _("%s v" VERSION "\n"
+	    "\nUsage: %s <-d (c#t#d...s0 | sd#) | "
+	    "-m model_string> <-p /path/to/fw/img> <-h> <-l> <-i> <-v> "
 	    "<-w #sec>\n"
-	    "\t-h\tPrint this help message.\n"
+	    "\t-h\tPrint this help message and exit.\n"
 	    "\t-l\tList discovered drives.\n"
-	    "\t-d\tSpecify single disk to use for firmware "
-	    "download in c#t#d# or sd# format.\n"
+	    "\t-d dsk\tSpecify single drive to use for firmware "
+	    "download in c#t#d...s0 or sd# format.\n"
 	    "\t-m str\tSpecify model of drive(s) to download "
-	    "firmware to. Disks whose model (obtained through SCSI INQUIRY "
-		"command) exactly matches model str provided will be upgraded.\n"
-	    "\t-p\tPath to the firmware file that will be "
-	    "downloaded onto the specified disk(s).\n"
-	    "\t-i\tIgnore disk and fw model mismatch.\n"
-	    "\t-v\tVerbose mode: turns on extra debug "
-	    "messages.\n"
-	    "\t-V\tShow %s version.\n"
+	    "firmware to. Drives whose model exactly matches model str provided "
+		"will be upgraded.\n\t-p img\tPath to the firmware file that will be "
+	    "downloaded onto the specified drive(s).\n"
+	    "\t-i\tIgnore drive and fw model mismatch.\n"
+	    "\t-v\tVerbose mode: turns on extra debug messages.\n"
 	    "\t-w #sec\tNumber of seconds to delay checking "
-	    "for disk readiness after downloading the firmware. Also "
-	    "used for disk preparation timeouts. Default is %d.\n"),
-	    prog_name, prog_name, DEFAULT_WAIT);
+	    "for drive readiness after downloading the firmware. Also "
+	    "used for drive preparation timeouts. Default is %d.\n"),
+	    prog_name, prog_name, prog_name, DEFAULT_WAIT);
 	exit(1);
 }
 
@@ -909,11 +914,11 @@ main(int argc, char *argv[])
 		return (1);
 	}
 
-	/* if no command line args received do a disk list */
-	if (argc == 1)
+	/* if only verbose arg or no command line args received do a disk list */
+	if (argc == 1 || (argc == 2 && strcmp("-v", argv[1]) == 0))
 		list = B_TRUE;
 
-	while ((opt = getopt(argc, argv, "d:p:hilm:vVw:")) != -1) {
+	while ((opt = getopt(argc, argv, "d:p:hilm:vw:")) != -1) {
 		switch (opt) {
 		case 'd': /* single disk mode */
 			if (strlen(optarg) < MAXPATHLEN) {
@@ -928,20 +933,14 @@ main(int argc, char *argv[])
 		case 'p': /* fw file */
 			if (strlen(optarg) < MAXPATHLEN) {
 				fw_img = get_fw_image(optarg, &fw_len, verbose);
-				if (!fw_img) {
-					(void) fprintf(stderr, _("could not use fw file '%s', "
-					    "check file permissions and existence.\n"), optarg);
+				if (fw_img == NULL) {
+					(void) fprintf(stderr, _("could not use fw file '%s', check"
+					    " file size, permissions and/or existence.\n"), optarg);
 					usage(argv[0]);
-				}
-				if (fw_len > MAX_FW_SIZE_IN_BYTES) {
-					(void) fprintf(stderr, _("%s does not support fw files "
-					    "bigger than %d bytes.\n"),
-					    argv[0], MAX_FW_SIZE_IN_BYTES);
-					exit(1);
 				}
 			} else {
 				(void) fprintf(stderr, _("fw path provided to '-%c' is too "
-				    "long (%d)\n"), optopt, MAXPATHLEN);
+				    "long.\n"), optopt);
 				usage(argv[0]);
 			}
 			break;
@@ -966,9 +965,6 @@ main(int argc, char *argv[])
 			break;
 		case 'v': /* verbose mode */
 			verbose = B_TRUE;
-			break;
-		case 'V': /* display program version */
-			(void) fprintf(stderr, _("%s version " VERSION "\n"), argv[0]);
 			break;
 		case 'w': /* wait time after dl */
 			wait = atoi(optarg);
@@ -995,13 +991,13 @@ main(int argc, char *argv[])
 	if (fw_img && (!ctd && !model)) {
 		/* if fw file is given, need to associate it with a disk or model */
 		(void) fprintf(stderr, _("Expected a disk specification "
-		    "('-m model' or '-d c#t#d#') to associate fw file with.\n"));
+		    "('-m model' or '-d dsk') to associate fw file with.\n"));
 		usage(argv[0]);
 	}
 	if (!fw_img && (ctd || model)) {
 		/* if no fw file is given, having model or disk doesn't make sense */
 		(void) fprintf(stderr, _("Expected a fw file ('-p /path/to/fw/file') to"
-		    " associate '-m model' or '-d c#t#d#' with.\n"));
+		    " associate '-m model' or '-d dsk' with.\n"));
 		usage(argv[0]);
 	}
 
