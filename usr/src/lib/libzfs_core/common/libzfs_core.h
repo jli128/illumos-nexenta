@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_LIBZFS_CORE_H
@@ -38,6 +39,10 @@ extern "C" {
 int libzfs_core_init(void);
 void libzfs_core_fini(void);
 
+int lzc_pool_configs(uint64_t *generation, nvlist_t **configs);
+int lzc_pool_get_props(const char *poolname, nvlist_t **props);
+int lzc_pool_stats(const char *poolname, nvlist_t **stats);
+
 int lzc_snapshot(nvlist_t *snaps, nvlist_t *props, nvlist_t **errlist);
 int lzc_create(const char *fsname, dmu_objset_type_t type, nvlist_t *props);
 int lzc_clone(const char *fsname, const char *origin, nvlist_t *props);
@@ -52,8 +57,15 @@ int lzc_receive(const char *snapname, nvlist_t *props, const char *origin,
 int lzc_send_space(const char *snapname, const char *fromsnap,
     uint64_t *result);
 
-boolean_t lzc_exists(const char *dataset);
+int lzc_dataset_list_next(const char *data, uint64_t *offset, char **nextds,
+    nvlist_t **stats, nvlist_t **props);
+int lzc_snapshot_list_next(const char *data, uint64_t *offset, char **nextsnap,
+    nvlist_t **stats, nvlist_t **props);
+int lzc_objset_stats(const char *dataset, dmu_objset_type_t *type,
+    nvlist_t **props, nvlist_t **stats);
 
+boolean_t lzc_exists(const char *dataset);
+boolean_t lzc_has_snaps(const char *dataset);
 
 #ifdef	__cplusplus
 }

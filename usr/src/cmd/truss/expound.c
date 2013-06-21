@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -100,7 +100,7 @@
 
 void	show_sigset(private_t *, long, const char *);
 void	show_ioctl(private_t *, int, long);
-void	show_zfs_ioc(private_t *, long);
+void	show_zfs_ioc(private_t *, long, int);
 
 static void
 mk_ctime(char *str, size_t maxsize, time_t value)
@@ -1486,7 +1486,7 @@ show_ioctl(private_t *pri, int code, long offset)
 
 	default:
 		if ((code & ~0xff) == ZFS_IOC) {
-			show_zfs_ioc(pri, offset);
+			show_zfs_ioc(pri, offset, err);
 			break;
 		}
 
@@ -4857,7 +4857,7 @@ show_sockconfig(private_t *pri)
 }
 
 void
-show_zfs_ioc(private_t *pri, long addr)
+show_zfs_ioc(private_t *pri, long addr, int err)
 {
 	static const zfs_share_t zero_share = {0};
 	static const dmu_objset_stats_t zero_objstats = {0};
@@ -4894,9 +4894,14 @@ show_zfs_ioc(private_t *pri, long addr)
 		    zc.zc_nvlist_src_size);
 	}
 	if (zc.zc_nvlist_dst_size) {
-		(void) printf("    nvlist_dst:\n");
-		show_packed_nvlist(pri, zc.zc_nvlist_dst,
-		    zc.zc_nvlist_dst_size);
+		if (zc.zc_nvlist_dst_filled) {
+			(void) printf("    nvlist_dst:\n");
+			show_packed_nvlist(pri, zc.zc_nvlist_dst,
+			    zc.zc_nvlist_dst_size);
+		} else if (err == ENOMEM) {
+			(void) printf("    nvlist_dst_size: %llu\n",
+			    (u_longlong_t)zc.zc_nvlist_dst_size);
+		}
 	}
 	if (zc.zc_cookie != 0) {
 		(void) printf("    zc_cookie=%llu\n",

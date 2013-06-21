@@ -3082,8 +3082,7 @@ spa_add_feature_stats(spa_t *spa, nvlist_t *config)
 }
 
 int
-spa_get_stats(const char *name, nvlist_t **config,
-    char *altroot, size_t buflen)
+spa_get_stats(const char *name, nvlist_t **config)
 {
 	int error;
 	spa_t *spa;
@@ -3120,28 +3119,7 @@ spa_get_stats(const char *name, nvlist_t **config,
 			spa_add_l2cache(spa, *config);
 			spa_add_feature_stats(spa, *config);
 		}
-	}
 
-	/*
-	 * We want to get the alternate root even for faulted pools, so we cheat
-	 * and call spa_lookup() directly.
-	 */
-	if (altroot) {
-		if (spa == NULL) {
-			mutex_enter(&spa_namespace_lock);
-			spa = spa_lookup(name);
-			if (spa)
-				spa_altroot(spa, altroot, buflen);
-			else
-				altroot[0] = '\0';
-			spa = NULL;
-			mutex_exit(&spa_namespace_lock);
-		} else {
-			spa_altroot(spa, altroot, buflen);
-		}
-	}
-
-	if (spa != NULL) {
 		spa_config_exit(spa, SCL_CONFIG, FTAG);
 		spa_close(spa, FTAG);
 	}
