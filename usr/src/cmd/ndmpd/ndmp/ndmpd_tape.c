@@ -794,9 +794,9 @@ tape_is_at_bot(ndmpd_session_t *session)
 
 	if (ioctl(session->ns_tape.td_fd, MTIOCGET, &mtstatus) == 0 &&
 	    mtstatus.mt_fileno == 0 && mtstatus.mt_blkno == 0)
-		return 1;
+		return (1);
 
-	return 0;
+	return (0);
 }
 
 /*
@@ -881,8 +881,8 @@ ndmpd_tape_read_v3(ndmp_connection_t *connection, void *body)
 
 			/*
 			 * CommVault doesn't handle the I/O error it gets for
-			 * reading from a erased tape. As a workaround, return EOM
-			 * if we get an I/O error at BOT.
+			 * reading from a erased tape. As a workaround, return
+			 * EOM if we get an I/O error at BOT.
 			 */
 			if (errno == EIO && tape_is_at_bot(session)) {
 				NDMP_LOG(LOG_ERR, "Tape at BOT, returning EOM");
