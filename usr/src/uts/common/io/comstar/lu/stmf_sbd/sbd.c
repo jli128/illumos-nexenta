@@ -20,7 +20,8 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
 #include <sys/conf.h>
@@ -3041,7 +3042,6 @@ sbd_data_read(sbd_lu_t *sl, struct scsi_task *task,
 {
 	int ret;
 	long resid;
-	hrtime_t xfer_start, xfer_done;
 
 	if ((offset + size) > sl->sl_lu_size) {
 		return (SBD_IO_PAST_EOF);
@@ -3060,8 +3060,6 @@ sbd_data_read(sbd_lu_t *sl, struct scsi_task *task,
 		size = store_end;
 	}
 
-	xfer_start = gethrtime();
-	stmf_lu_xfer_start(task);
 	DTRACE_PROBE5(backing__store__read__start, sbd_lu_t *, sl,
 	    uint8_t *, buf, uint64_t, size, uint64_t, offset,
 	    scsi_task_t *, task);
@@ -3082,8 +3080,6 @@ sbd_data_read(sbd_lu_t *sl, struct scsi_task *task,
 	    &resid);
 	rw_exit(&sl->sl_access_state_lock);
 
-	xfer_done = gethrtime() - xfer_start;
-	stmf_lu_xfer_done(task, B_TRUE /* read */, size, xfer_done);
 	DTRACE_PROBE6(backing__store__read__end, sbd_lu_t *, sl,
 	    uint8_t *, buf, uint64_t, size, uint64_t, offset,
 	    int, ret, scsi_task_t *, task);
@@ -3106,7 +3102,6 @@ sbd_data_write(sbd_lu_t *sl, struct scsi_task *task,
 	long resid;
 	sbd_status_t sret = SBD_SUCCESS;
 	int ioflag;
-	hrtime_t xfer_start, xfer_done;
 
 	if ((offset + size) > sl->sl_lu_size) {
 		return (SBD_IO_PAST_EOF);
@@ -3121,8 +3116,6 @@ sbd_data_write(sbd_lu_t *sl, struct scsi_task *task,
 		ioflag = 0;
 	}
 
-	xfer_start = gethrtime();
-	stmf_lu_xfer_start(task);
 	DTRACE_PROBE5(backing__store__write__start, sbd_lu_t *, sl,
 	    uint8_t *, buf, uint64_t, size, uint64_t, offset,
 	    scsi_task_t *, task);
@@ -3143,8 +3136,6 @@ sbd_data_write(sbd_lu_t *sl, struct scsi_task *task,
 	    &resid);
 	rw_exit(&sl->sl_access_state_lock);
 
-	xfer_done = gethrtime() - xfer_start;
-	stmf_lu_xfer_done(task, B_FALSE /* write */, size, xfer_done);
 	DTRACE_PROBE6(backing__store__write__end, sbd_lu_t *, sl,
 	    uint8_t *, buf, uint64_t, size, uint64_t, offset,
 	    int, ret, scsi_task_t *, task);
