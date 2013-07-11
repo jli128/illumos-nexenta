@@ -1,3 +1,9 @@
+sunwndmpu (5.11.134-31-1-249) nexenta; urgency=low
+
+  * NEX-249 NS ndmp can't write to a brand new tape with IO error
+
+ -- Gate Keeper <support@nexenta.com>  Wed, 10 Jul 2013 14:18:38 +0200
+
 sunwndmpu (5.11.134-31-0-100) nexenta; urgency=low
 
   * Renumber packages in preparation for 3.1 release

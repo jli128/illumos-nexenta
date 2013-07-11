@@ -2,6 +2,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 /*
  * BSD 3 Clause License
@@ -389,6 +392,7 @@ ndmpd_tape_mtio_v2(ndmp_connection_t *connection, void *body)
 
 		do {
 			NS_UPD(twait, trun);
+			errno = 0;
 			rc = ioctl(session->ns_tape.td_fd, MTIOCTOP, &tapeop);
 			NS_UPD(trun, twait);
 			NDMP_LOG(LOG_DEBUG,
@@ -854,6 +858,23 @@ ndmpd_tape_write_v3(ndmp_connection_t *connection, void *body)
 	    "sending tape_write reply");
 }
 
+/*
+ * tape_is_at_bot
+ *
+ * Returns 1 if tape is at BOT, 0 on error or not at BOT.
+ *
+ */
+static int
+tape_is_at_bot(ndmpd_session_t *session)
+{
+	struct mtget mtstatus;
+
+	if (ioctl(session->ns_tape.td_fd, MTIOCGET, &mtstatus) == 0 &&
+	    mtstatus.mt_fileno == 0 && mtstatus.mt_blkno == 0)
+		return (1);
+
+	return (0);
+}
 
 /*
  * ndmpd_tape_read_v3
@@ -934,6 +955,16 @@ ndmpd_tape_read_v3(ndmp_connection_t *connection, void *body)
 		} else {
 			NDMP_LOG(LOG_ERR, "Tape read error: %m.");
 			reply.error = NDMP_IO_ERR;
+
+			/*
+			 * CommVault doesn't handle the I/O error it gets for
+			 * reading from a erased tape. As a workaround, return
+			 * EOM if we get an I/O error at BOT.
+			 */
+			if (errno == EIO && tape_is_at_bot(session)) {
+				NDMP_LOG(LOG_ERR, "Tape at BOT, returning EOM");
+				reply.error = NDMP_EOM_ERR;
+			}
 		}
 	} else if (n == 0) {
 		(void) ndmp_mtioctl(session->ns_tape.td_fd, MTFSF, 1);
