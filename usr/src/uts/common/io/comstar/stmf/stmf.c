@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/conf.h>
@@ -4484,15 +4485,6 @@ stmf_task_alloc(struct stmf_local_port *lport, stmf_scsi_session_t *ss,
 			return (NULL);
 		}
 		task->task_lu = lu;
-		l = task->task_lun_no;
-		l[0] = lun[0];
-		l[1] = lun[1];
-		l[2] = lun[2];
-		l[3] = lun[3];
-		l[4] = lun[4];
-		l[5] = lun[5];
-		l[6] = lun[6];
-		l[7] = lun[7];
 		task->task_cdb = (uint8_t *)task->task_port_private;
 		if ((ulong_t)(task->task_cdb) & 7ul) {
 			task->task_cdb = (uint8_t *)(((ulong_t)
@@ -4502,6 +4494,22 @@ stmf_task_alloc(struct stmf_local_port *lport, stmf_scsi_session_t *ss,
 		itask->itask_cdb_buf_size = cdb_length;
 		mutex_init(&itask->itask_audit_mutex, NULL, MUTEX_DRIVER, NULL);
 	}
+
+	/*
+	 * Since a LUN can be mapped as different LUN ids to different initiator
+	 * groups, we need to set LUN id for a new task and reset LUN id for
+	 * a reused task.
+	 */
+	l = task->task_lun_no;
+	l[0] = lun[0];
+	l[1] = lun[1];
+	l[2] = lun[2];
+	l[3] = lun[3];
+	l[4] = lun[4];
+	l[5] = lun[5];
+	l[6] = lun[6];
+	l[7] = lun[7];
+
 	task->task_session = ss;
 	task->task_lport = lport;
 	task->task_cdb_length = cdb_length_in;
