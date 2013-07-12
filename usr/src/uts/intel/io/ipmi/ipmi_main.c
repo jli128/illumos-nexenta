@@ -21,7 +21,7 @@
 
 /*
  * Copyright 2012, Joyent, Inc.  All rights reserved.
- * Copyright 2013, Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -527,7 +527,18 @@ ipmi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	minor_ids = id_space_create("ipmi_id_space", 1, 128);
 
 	if (ipmi_startup(sc) != B_TRUE) {
+		/* poke the taskq so that it can terminate */
+		sc->ipmi_detaching = 1;
+		cv_signal(&sc->ipmi_request_added);
+
 		ipmi_shutdown(sc);
+		ddi_remove_minor_node(dip, NULL);
+		ipmi_dip = NULL;
+
+		list_destroy(&dev_list);
+		id_space_destroy(minor_ids);
+
+		sc->ipmi_detaching = 0;
 		return (DDI_FAILURE);
 	}
 
