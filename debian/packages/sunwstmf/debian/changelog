@@ -1,3 +1,9 @@
+sunwstmf (5.11.134-31-13104-540) nexenta; urgency=high
+
+  * Issue SUP-540: panic on page fault in stmf_task_lu_free()
+
+ -- Nexenta Systems <support@nexenta.com> Mon, 15 Jul 2013 20:54:06 +0100
+
 sunwstmf (5.11.134-31-13103-13796) nexenta; urgency=high
 
   * Issue 13796: OSX FC Initiator cannot attach to LUN if LUN id is different then other OSX
