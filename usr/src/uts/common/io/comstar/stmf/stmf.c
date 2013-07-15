@@ -4577,12 +4577,12 @@ stmf_task_lu_free(scsi_task_t *task, stmf_i_scsi_session_t *iss)
 	ASSERT(rw_lock_held(iss->iss_lockp));
 	itask->itask_flags = ITASK_IN_FREE_LIST;
 	itask->itask_proxy_msg_id = 0;
+	atomic_add_32(itask->itask_ilu_task_cntr, -1);
 	mutex_enter(&ilu->ilu_task_lock);
 	itask->itask_lu_free_next = ilu->ilu_free_tasks;
 	ilu->ilu_free_tasks = itask;
 	ilu->ilu_ntasks_free++;
 	mutex_exit(&ilu->ilu_task_lock);
-	atomic_add_32(itask->itask_ilu_task_cntr, -1);
 }
 
 void
