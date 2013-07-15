@@ -1,3 +1,9 @@
+sunwsmbfsu (5.11.134-31-12972-548) nexenta; urgency=high
+
+  * Issue SUP-548: Panic from NULL pointer dereference in smb_iod_disconnect
+
+ -- Nexenta Systems <support@nexenta.com>  Mon, 15 Jul 2013 20:38:27 +0100
+
 sunwsmbfsu (5.11.134-31-12971-12739) nexenta; urgency=high
 
   * Issue 12739: AD join with lmauth_level=2 fails (2)
