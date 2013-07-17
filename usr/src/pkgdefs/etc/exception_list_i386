@@ -1121,6 +1121,7 @@ usr/lib/amd64/llib-lsmbfs.ln		i386
 #
 usr/lib/fs/smbfs/chacl		i386
 usr/lib/fs/smbfs/lsacl		i386
+opt/smbcl-tests			i386
 #
 # FC related files
 kernel/kmdb/amd64/fcip		i386
