@@ -38,7 +38,7 @@
 #
 
 # For the stmf_sbd mdb(1) modules, no extra includes are needed.
-NZA_STMFSBDBASE_FLAGS=
+
 NZA_ZFSPLUSBASE_FLAGS=
 NZA_ZFSPLUS_SHARED_OBJS=
 NZA_ZFSPLUS_SHARED_SRCS=

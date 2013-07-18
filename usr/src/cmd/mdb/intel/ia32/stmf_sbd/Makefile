@@ -20,7 +20,6 @@
 #
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 #
 
 MODULE = stmf_sbd.so
@@ -36,10 +35,7 @@ include ../../../../Makefile.cmd
 include ../../Makefile.ia32
 include ../../../Makefile.module
 
-include $(NZA_MAKEDEFS)
-
 CPPFLAGS += -I$(UTSBASE)/common -I$(UTSBASE)/common/sys -I$(STMFSBDBASE)
-CPPFLAGS += $(NZA_STMFSBDBASE_FLAGS)
 
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
