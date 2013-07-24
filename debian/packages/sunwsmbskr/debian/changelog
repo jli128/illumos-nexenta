@@ -1,3 +1,9 @@
+sunwsmbskr (5.11.134-31-13068-46) nexenta; urgency=low
+
+  * Issue SMB-46: SMB-46 File handle leaks exposed by mtime fixes (rm 7815)
+
+ -- Nexenta Systems <support@nexenta.com>  Tue, 23 Jul 2013 23:24:25 -0400
+
 sunwsmbskr (5.11.134-31-13067-7815) nexenta; urgency=low
 
   * Issue 7815: SMB server delivers old modification time...
