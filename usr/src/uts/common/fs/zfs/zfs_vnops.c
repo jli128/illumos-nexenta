@@ -22,8 +22,8 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Portions Copyright 2007 Jeremy Teo
  * Portions Copyright 2010 Robert Milkowski
- * Copyright 2011, Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -3467,13 +3467,14 @@ zfs_rename(vnode_t *sdvp, char *snm, vnode_t *tdvp, char *tnm, cred_t *cr,
 	if (VOP_REALVP(tdvp, &realvp, ct) == 0)
 		tdvp = realvp;
 
-	if (tdvp->v_vfsp != sdvp->v_vfsp || zfsctl_is_node(tdvp)) {
+	tdzp = VTOZ(tdvp);
+	ZFS_VERIFY_ZP(tdzp);
+
+	if (tdzp->z_zfsvfs != zfsvfs || zfsctl_is_node(tdvp)) {
 		ZFS_EXIT(zfsvfs);
 		return (EXDEV);
 	}
 
-	tdzp = VTOZ(tdvp);
-	ZFS_VERIFY_ZP(tdzp);
 	if (zfsvfs->z_utf8 && u8_validate(tnm,
 	    strlen(tnm), NULL, U8_VALIDATE_ENTIRE, &error) < 0) {
 		ZFS_EXIT(zfsvfs);
@@ -4031,13 +4032,13 @@ zfs_link(vnode_t *tdvp, vnode_t *svp, char *name, cred_t *cr,
 		return (EPERM);
 	}
 
-	if (svp->v_vfsp != tdvp->v_vfsp || zfsctl_is_node(svp)) {
+	szp = VTOZ(svp);
+	ZFS_VERIFY_ZP(szp);
+
+	if (szp->z_zfsvfs != zfsvfs || zfsctl_is_node(svp)) {
 		ZFS_EXIT(zfsvfs);
 		return (EXDEV);
 	}
-
-	szp = VTOZ(svp);
-	ZFS_VERIFY_ZP(szp);
 
 	/* Prevent links to .zfs/shares files */
 
