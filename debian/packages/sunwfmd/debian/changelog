@@ -1,3 +1,9 @@
+sunwfmd (5.11.134-31-11346-1877) nexenta; urgency=high
+
+  * Issue 1877, SUP-510: Make spare activation more reliable
+
+ -- Nexenta Systems <support@nexenta.com>  Thu, 01 Aug 2013 13:45:00 -0700
+
 sunwfmd (5.11.134-31-11345-10360) nexenta; urgency=high
 
   * Issue 10360: Unable to use /usr/lib/fm/fmd/fmtopo to discover SES / drive topology with the Dell MD1200.
