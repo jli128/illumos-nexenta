@@ -348,7 +348,6 @@ ipmi_ioctl(dev_t dv, int cmd, intptr_t data, int flags, cred_t *cr, int *rvalp)
 		len = kreq->ir_replylen + 1;
 		if (recv.msg.data_len < len && cmd == IPMICTL_RECEIVE_MSG) {
 			IPMI_UNLOCK(sc);
-			ipmi_free_request(kreq);
 			return (EMSGSIZE);
 		}
 		TAILQ_REMOVE(&dev->ipmi_completed_requests, kreq, ir_link);
@@ -482,6 +481,25 @@ ipmi_info(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **resultp)
 	return (DDI_FAILURE);
 }
 
+static void
+ipmi_cleanup(dev_info_t *dip)
+{
+	/* poke the taskq so that it can terminate */
+	IPMI_LOCK(sc);
+	sc->ipmi_detaching = 1;
+	cv_signal(&sc->ipmi_request_added);
+	IPMI_UNLOCK(sc);
+
+	ipmi_shutdown(sc);
+	ddi_remove_minor_node(dip, NULL);
+	ipmi_dip = NULL;
+
+	list_destroy(&dev_list);
+	id_space_destroy(minor_ids);
+
+	sc->ipmi_detaching = 0;
+}
+
 static int
 ipmi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
@@ -490,7 +508,8 @@ ipmi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* this driver only supports one device instance */
 	if (ddi_get_instance(dip) != 0) {
-		cmn_err(CE_WARN, "!not attaching to non-zero device instance %d",
+		cmn_err(CE_WARN,
+		    "!not attaching to non-zero device instance %d",
 		    ddi_get_instance(dip));
 		return (DDI_FAILURE);
 	}
@@ -527,18 +546,7 @@ ipmi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	minor_ids = id_space_create("ipmi_id_space", 1, 128);
 
 	if (ipmi_startup(sc) != B_TRUE) {
-		/* poke the taskq so that it can terminate */
-		sc->ipmi_detaching = 1;
-		cv_signal(&sc->ipmi_request_added);
-
-		ipmi_shutdown(sc);
-		ddi_remove_minor_node(dip, NULL);
-		ipmi_dip = NULL;
-
-		list_destroy(&dev_list);
-		id_space_destroy(minor_ids);
-
-		sc->ipmi_detaching = 0;
+		ipmi_cleanup(dip);
 		return (DDI_FAILURE);
 	}
 
@@ -559,18 +567,8 @@ ipmi_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	if (!list_is_empty(&dev_list))
 		return (DDI_FAILURE);
 
-	/* poke the taskq so that it can terminate */
-	sc->ipmi_detaching = 1;
-	cv_signal(&sc->ipmi_request_added);
+	ipmi_cleanup(dip);
 
-	ipmi_shutdown(sc);
-	ddi_remove_minor_node(dip, NULL);
-	ipmi_dip = NULL;
-
-	list_destroy(&dev_list);
-	id_space_destroy(minor_ids);
-
-	sc->ipmi_detaching = 0;
 	ipmi_attached = B_FALSE;
 	return (DDI_SUCCESS);
 }
