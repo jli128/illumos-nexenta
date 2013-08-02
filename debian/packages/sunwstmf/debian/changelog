@@ -1,16 +1,23 @@
+sunwstmf (5.11.134-31-13105-14226) nexenta; urgency=high
+
+  * Issue 14226: kernel crash dump on comstar icscit
+  * Issue 14227: backport Illumos 3862, 3863, 3864, 3621, 434 
+
+ -- Nexenta Systems <support@nexenta.com> Fri, 2 Aug 2013 11:17:08 +0100
+
 sunwstmf (5.11.134-31-13104-540) nexenta; urgency=high
 
   * Issue SUP-540: panic on page fault in stmf_task_lu_free()
 
  -- Nexenta Systems <support@nexenta.com> Mon, 15 Jul 2013 20:54:06 +0100
 
-sunwstmf (5.11.134-31-13103-13796) nexenta; urgency=high
+sunwstmf (5.11.134-3 1-13103-13796) nexenta; urgency=high
 
   * Issue 13796: OSX FC Initiator cannot attach to LUN if LUN id is different then other OSX
 
  -- Nexenta Systems <support@nexenta.com> Fri, 12 Jul 2013 11:15:00 -0400
 
-sunwstmf (5.11.134-31-13102-13365) nexenta; urgency=high
+sunwstmf (5.11.134-31 -13102-13365) nexenta; urgency=high
 
   * Issue 13365: pppt "mutex_enter: bad mutex" panic (son of 8564)
 
