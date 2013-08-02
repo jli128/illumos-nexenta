@@ -1,3 +1,9 @@
+sunwcsr (5.11.134-31-13250-13658) nexenta; urgency=high
+
+  * Issue OS-7: Add cache timeout settings to idmapd manifest, increase defaults
+
+ -- Nexenta Systems <support@nexenta.com>  Fri, 02 Aug 2013 20:55:00 +0000
+
 sunwcsr (5.11.134-31-13250-13657) nexenta; urgency=high
 
   * Issue 13657: Backport request for Enhancment 11201 - nss: need local netgroup implementation
