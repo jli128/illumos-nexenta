@@ -1,3 +1,9 @@
+sunwcakr (5.11.134-31-14230-0) nexenta; urgency=low
+
+  * Issue 14230: panic while reaping htable cache
+
+ -- Nexenta Systems <support@nexenta.com>  Tue, 6 Aug 2013 22:37:07 -0500
+
 sunwcakr (5.11.134-31-11828-0) nexenta; urgency=low
 
   * Issue 6696: NexentaStor 3.1.1 installation CD panics on kvm
