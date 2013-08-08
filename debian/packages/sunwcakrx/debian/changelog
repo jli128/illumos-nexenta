@@ -1,3 +1,10 @@
+sunwcakrx (5.11.134-31-14240-0) nexenta; urgency=low
+
+  * Issue 14240: backport illumos 2638 page coalescing can dissociate 
+                 locked pages from their pfn
+
+ -- Nexenta Systems <support@nexenta.com>  Tue, 13 Aug 2013 16:26:51 -0500
+
 sunwcakrx (5.11.134-31-14230-0) nexenta; urgency=low
 
  * Issue 14230: panic while reaping htable cache
