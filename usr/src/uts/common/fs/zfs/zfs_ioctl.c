@@ -1290,6 +1290,7 @@ put_nvlist(zfs_cmd_t *zc, nvlist_t *nvl)
 
 	size = fnvlist_size(nvl);
 
+	zc->zc_nvlist_dst_filled = B_FALSE;
 	if (size > zc->zc_nvlist_dst_size) {
 		error = ENOMEM;
 	} else {
@@ -1297,11 +1298,12 @@ put_nvlist(zfs_cmd_t *zc, nvlist_t *nvl)
 		if (ddi_copyout(packed, (void *)(uintptr_t)zc->zc_nvlist_dst,
 		    size, zc->zc_iflags) != 0)
 			error = EFAULT;
+		else
+			zc->zc_nvlist_dst_filled = B_TRUE;
 		fnvlist_pack_free(packed, size);
 	}
 
 	zc->zc_nvlist_dst_size = size;
-	zc->zc_nvlist_dst_filled = B_TRUE;
 	return (error);
 }
 
