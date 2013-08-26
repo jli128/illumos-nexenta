@@ -1286,24 +1286,22 @@ put_nvlist(zfs_cmd_t *zc, nvlist_t *nvl)
 {
 	char *packed = NULL;
 	int error = 0;
+	size_t size;
 
-	if (!nvlist_empty(nvl)) {
-		size_t size = fnvlist_size(nvl);
-		if (size > zc->zc_nvlist_dst_size) {
-			error = ENOMEM;
-		} else {
-			packed = fnvlist_pack(nvl, &size);
-			if ((error = ddi_copyout(packed,
-			    (void *)(uintptr_t)zc->zc_nvlist_dst, size,
-			    zc->zc_iflags)) == 0)
-				zc->zc_nvlist_dst_filled = B_TRUE;
-			else
-				error = EFAULT;
-			fnvlist_pack_free(packed, size);
-		}
-		zc->zc_nvlist_dst_size = size;
+	size = fnvlist_size(nvl);
+
+	if (size > zc->zc_nvlist_dst_size) {
+		error = ENOMEM;
+	} else {
+		packed = fnvlist_pack(nvl, &size);
+		if (ddi_copyout(packed, (void *)(uintptr_t)zc->zc_nvlist_dst,
+		    size, zc->zc_iflags) != 0)
+			error = EFAULT;
+		fnvlist_pack_free(packed, size);
 	}
 
+	zc->zc_nvlist_dst_size = size;
+	zc->zc_nvlist_dst_filled = B_TRUE;
 	return (error);
 }
 
