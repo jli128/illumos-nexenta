@@ -1,3 +1,9 @@
+sunwzfsu (5.11.134-31-12274-642) nexenta; urgency=high
+
+  * Issue SUP-642: Regression leading to AD usernames not being displayed by zfs userspace command.
+
+ -- Nexenta Systems <support@nexenta.com>  Fri, 30 Aug 2013 17:40:29 -0400
+
 sunwzfsu (5.11.134-31-12273-13441) nexenta; urgency=high
 
   * Issue 13441: pageout() can deadlock in ZFS under memory pressure
