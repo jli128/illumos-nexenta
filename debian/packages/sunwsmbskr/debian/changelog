@@ -1,3 +1,9 @@
+sunwsmbskr (5.11.134-31-13069-599) nexenta; urgency=high
+
+  * Issue SUP-599: smb_oplock_acquire thread deadlock
+
+ -- Nexenta Systems <support@nexenta.com>  Fri, 30 Aug 2013 21:11:00 -0400
+
 sunwsmbskr (5.11.134-31-13068-46) nexenta; urgency=low
 
   * Issue SMB-46: SMB-46 File handle leaks exposed by mtime fixes (rm 7815)
