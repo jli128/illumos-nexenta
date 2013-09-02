@@ -902,12 +902,19 @@ ndmpd_tape_read_v3(ndmp_connection_t *connection, void *body)
 		if (strncmp(buf, NDMP_EOM_MAGIC, len) == 0) {
 			reply.error = NDMP_EOM_ERR;
 			NDMP_LOG(LOG_DEBUG, "NDMP_EOM_ERR");
+			/*
+			 * Keep tape position on EOT side of file mark.
+			 */
+			(void) ndmp_mtioctl(session->ns_tape.td_fd, MTBSR, 1);
 		} else {
 			reply.error = NDMP_EOF_ERR;
 			NDMP_LOG(LOG_DEBUG, "NDMP_EOF_ERR");
+			/*
+			 * Tape position should remain on BOT side of last
+			 * file mark as required by NDMPv4.
+			 */
+			(void) ndmp_mtioctl(session->ns_tape.td_fd, MTBSF, 1);
 		}
-		if (n > 0)
-			(void) ndmp_mtioctl(session->ns_tape.td_fd, MTBSR, 1);
 	} else {
 		/*
 		 * Symantec fix for import phase
