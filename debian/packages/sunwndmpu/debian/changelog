@@ -1,3 +1,9 @@
+sunwndmpu (5.11.134-31-4-355) nexenta; urgency=high
+
+  * NEX-355 NDMP backup, EOF position remains on BOT side of filemark
+
+ -- Nexenta Systems <support@nexenta.com>  Mon, 09 Sep 2013 17:00:00 -0400
+
 sunwndmpu (5.11.134-31-3-13998) nexenta; urgency=low
 
   * Issue 13998: Failed to open device /dev/rmt/0n because of too many files
