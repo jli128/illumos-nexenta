@@ -380,7 +380,7 @@ set_disk_inuse(disk_info_t *disk, boolean_t verbose)
 	 */
 	dm_who_type_t who = DM_WHO_ZPOOL;
 
-	/* need to give dm_get_slices() a "whole" disk name, ie - c#t#d...s0 */
+	/* need to give dm_get_slices() a "whole" disk name, ie - c#t...d#p0 */
 	(void) strncpy(dev, CTD_START_IN_PATH(disk->path), MAXPATHLEN);
 	if ((character = strrchr(dev, 'd')) != NULL) {
 		character++;
@@ -500,7 +500,7 @@ set_disk_info(const di_node_t *node, disk_info_t *disk, boolean_t verbose)
 			    "disk '%s' - di_devfs_minor_path() failed.\n"), disk->device);
 			break;
 		}
-		if (strstr(m_path, ":a,raw") == NULL) {
+		if (strstr(m_path, ":q,raw") == NULL) {
 			di_devfs_path_free(m_path);
 			continue; /* skips minor nodes that are not slice 0 */
 		}
@@ -508,7 +508,7 @@ set_disk_info(const di_node_t *node, disk_info_t *disk, boolean_t verbose)
 		/*
 		 * Lookup /dev/rdsk/ path for minor node defined by m_path
 		 * The reason we're not just using the /devices m_path for WRITE_BUFFER
-		 * is we need the c#t#d...s0 lun to display to the user anyway
+		 * is we need the c#t...d#p0 lun to display to the user anyway
 		 */
 		if (di_devlink_walk(devlink_h, "^rdsk/", m_path, DI_PRIMARY_LINK,
 				disk->path, devlink_walk_cb) == -1) {
@@ -533,7 +533,7 @@ set_disk_info(const di_node_t *node, disk_info_t *disk, boolean_t verbose)
 			break;
 		}
 
-		/* found s0 for a char disk, now get vendor, model, and rev */
+		/* found p0 for a char disk, now get vendor, model, and rev */
 		if (uscsi_inquiry(disk_fd, &inq, &sense, verbose)) {
 			disk->bad_info = 0;
 			mem_trim_and_cpy(disk->vendor, inq.inq_vid, sizeof (inq.inq_vid));
@@ -873,13 +873,13 @@ void
 usage(const char * prog_name)
 {
 	(void) fprintf(stdout, _("%s v" VERSION "\n"
-	    "\nUsage: %s <-d (c#t#d...s0 | sd#) | "
+	    "\nUsage: %s <-d (c#t...d#p0 | sd#) | "
 	    "-m model_string> <-p /path/to/fw/img> <-h> <-l> <-i> <-v> "
 	    "<-w #sec>\n"
 	    "\t-h\tPrint this help message and exit.\n"
 	    "\t-l\tList discovered drives.\n"
 	    "\t-d dsk\tSpecify single drive to use for firmware "
-	    "download in c#t#d...s0 or sd# format.\n"
+	    "download in c#t...d#p0 or sd# format.\n"
 	    "\t-m str\tSpecify model of drive(s) to download "
 	    "firmware to. Drives whose model exactly matches model str provided "
 		"will be upgraded.\n\t-p img\tPath to the firmware file that will be "
@@ -889,7 +889,7 @@ usage(const char * prog_name)
 	    "\t-w #sec\tNumber of seconds to delay checking "
 	    "for drive readiness after downloading the firmware. Also "
 	    "used for drive preparation timeouts. Default is %d.\n"),
-	    prog_name, prog_name, prog_name, DEFAULT_WAIT);
+	    prog_name, prog_name, DEFAULT_WAIT);
 	exit(1);
 }
 
