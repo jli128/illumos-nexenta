@@ -1,3 +1,9 @@
+sunwndmpu (5.11.134-31-5-426) nexenta; urgency=low
+
+  * NEX-426 ndmp_config_get_ext_list failed
+
+ -- Nexenta Systems <support@nexenta.com>  Mon, 09 Sep 2013 17:00:00 -0400
+
 sunwndmpu (5.11.134-31-4-355) nexenta; urgency=high
 
   * NEX-355 NDMP backup, EOF position remains on BOT side of filemark
