@@ -37,6 +37,9 @@
  */
 /* Copyright (c) 2007, The Storage Networking Industry Association. */
 /* Copyright (c) 1996, 1997 PDC, Network Appliance. All Rights Reserved */
+/*
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #ifndef _NDMPD_H
 #define	_NDMPD_H
@@ -524,6 +527,7 @@ typedef struct ndmpd_session {
 	/*
 	 * NDMP V4 related data
 	 */
+	boolean_t ns_get_ext_list;
 	boolean_t ns_set_ext_list;
 
 	/* handling of hardlink, hardlink queue head */
