@@ -126,6 +126,7 @@
 #include <sys/vdev.h>
 #include <sys/vdev_impl.h>
 #ifdef _KERNEL
+#include <sys/disp.h>
 #include <sys/vmsystm.h>
 #include <vm/anon.h>
 #include <sys/fs/swapnode.h>
@@ -150,6 +151,12 @@ typedef enum arc_reclaim_strategy {
 	ARC_RECLAIM_AGGR,		/* Aggressive reclaim strategy */
 	ARC_RECLAIM_CONS		/* Conservative reclaim strategy */
 } arc_reclaim_strategy_t;
+
+/*
+ * The number of iterations through arc_evict_*() before we
+ * drop & reacquire the lock.
+ */
+int arc_evict_iterations = 100;
 
 /* number of seconds before growing cache again */
 static int		arc_grow_retry = 60;
@@ -1606,6 +1613,8 @@ arc_evict(arc_state_t *state, uint64_t spa, int64_t bytes, boolean_t recycle,
 	kmutex_t *hash_lock;
 	boolean_t have_lock;
 	void *stolen = NULL;
+        arc_buf_hdr_t marker = { 0 };
+        int count = 0;
 
 	ASSERT(state == arc_mru || state == arc_mfu);
 
@@ -1629,6 +1638,33 @@ arc_evict(arc_state_t *state, uint64_t spa, int64_t bytes, boolean_t recycle,
 		if (recycle && ab->b_size != bytes &&
 		    ab_prev && ab_prev->b_size == bytes)
 			continue;
+
+		/* ignore markers */
+	        if (ab->b_spa == 0)
+			continue;
+
+		/*
+                 * It may take a long time to evict all the bufs requested.
+                 * To avoid blocking all arc activity, periodically drop
+                 * the arcs_mtx and give other threads a chance to run
+                 * before reacquiring the lock.
+                 *
+                 * If we are looking for a buffer to recycle, we are in
+                 * the hot code path, so don't sleep.
+                 */
+                if (!recycle && count++ > arc_evict_iterations) {
+                        list_insert_after(list, ab, &marker);
+                        mutex_exit(&evicted_state->arcs_mtx);
+                        mutex_exit(&state->arcs_mtx);
+                        kpreempt(KPREEMPT_SYNC);
+                        mutex_enter(&state->arcs_mtx);
+                        mutex_enter(&evicted_state->arcs_mtx);
+                        ab_prev = list_prev(list, &marker);
+                        list_remove(list, &marker);
+                        count = 0;
+                        continue;
+                }
+
 		hash_lock = HDR_LOCK(ab);
 		have_lock = MUTEX_HELD(hash_lock);
 		if (have_lock || mutex_tryenter(hash_lock)) {
@@ -1710,25 +1746,11 @@ arc_evict(arc_state_t *state, uint64_t spa, int64_t bytes, boolean_t recycle,
 		ARCSTAT_INCR(arcstat_mutex_miss, missed);
 
 	/*
-	 * We have just evicted some date into the ghost state, make
-	 * sure we also adjust the ghost state size if necessary.
+	 *  Note: we have just evicted some data into the ghost state,
+	 *  potentially putting the ghost size over the desired size.  Rather
+	 *  that evicting from the ghost list in this hot code path, leave
+	 *  this chore to the arc_reclaim_thread().
 	 */
-	if (arc_no_grow &&
-	    arc_mru_ghost->arcs_size + arc_mfu_ghost->arcs_size > arc_c) {
-		int64_t mru_over = arc_anon->arcs_size + arc_mru->arcs_size +
-		    arc_mru_ghost->arcs_size - arc_c;
-
-		if (mru_over > 0 && arc_mru_ghost->arcs_lsize[type] > 0) {
-			int64_t todelete =
-			    MIN(arc_mru_ghost->arcs_lsize[type], mru_over);
-			arc_evict_ghost(arc_mru_ghost, NULL, todelete);
-		} else if (arc_mfu_ghost->arcs_lsize[type] > 0) {
-			int64_t todelete = MIN(arc_mfu_ghost->arcs_lsize[type],
-			    arc_mru_ghost->arcs_size +
-			    arc_mfu_ghost->arcs_size - arc_c);
-			arc_evict_ghost(arc_mfu_ghost, NULL, todelete);
-		}
-	}
 
 	return (stolen);
 }
@@ -1746,12 +1768,15 @@ arc_evict_ghost(arc_state_t *state, uint64_t spa, int64_t bytes)
 	kmutex_t *hash_lock;
 	uint64_t bytes_deleted = 0;
 	uint64_t bufs_skipped = 0;
+	int count = 0;
 
 	ASSERT(GHOST_STATE(state));
 top:
 	mutex_enter(&state->arcs_mtx);
 	for (ab = list_tail(list); ab; ab = ab_prev) {
 		ab_prev = list_prev(list, ab);
+		if (ab->b_type > ARC_BUFC_NUMTYPES)
+			panic("invalid ab=%p", (void *)ab);
 		if (spa && ab->b_spa != spa)
 			continue;
 
@@ -1763,6 +1788,23 @@ top:
 		/* caller may be trying to modify this buffer, skip it */
 		if (MUTEX_HELD(hash_lock))
 			continue;
+
+		/*
+                 * It may take a long time to evict all the bufs requested.
+                 * To avoid blocking all arc activity, periodically drop
+                 * the arcs_mtx and give other threads a chance to run
+                 * before reacquiring the lock.
+                 */
+                if (count++ > arc_evict_iterations) {
+                        list_insert_after(list, ab, &marker);
+                        mutex_exit(&state->arcs_mtx);
+                        kpreempt(KPREEMPT_SYNC);
+                        mutex_enter(&state->arcs_mtx);
+                        ab_prev = list_prev(list, &marker);
+                        list_remove(list, &marker);
+                        count = 0;
+                        continue;
+                }
 		if (mutex_tryenter(hash_lock)) {
 			ASSERT(!HDR_IO_IN_PROGRESS(ab));
 			ASSERT(ab->b_buf == NULL);
@@ -1798,8 +1840,9 @@ top:
 			mutex_enter(&state->arcs_mtx);
 			ab_prev = list_prev(list, &marker);
 			list_remove(list, &marker);
-		} else
+		} else {
 			bufs_skipped += 1;
+		}
 	}
 	mutex_exit(&state->arcs_mtx);
 
@@ -2059,6 +2102,16 @@ arc_reclaim_needed(void)
 	 * circumstances from getting really dire.
 	 */
 	if (availrmem < swapfs_minfree + swapfs_reserve + extra)
+		return (1);
+
+	/*
+	 * Check that we have enough availrmem that memory locking (e.g., via
+	 * mlock(3C) or memcntl(2)) can still succeed.  (pages_pp_maximum
+	 * stores the number of pages that cannot be locked; when availrmem
+	 * drops below pages_pp_maximum, page locking mechanisms such as
+	 * page_pp_lock() will fail.)
+	 */
+	if (availrmem <= pages_pp_maximum)
 		return (1);
 
 #if defined(__i386)
