@@ -681,7 +681,6 @@ htable_steal(uint_t cnt, boolean_t reap)
 				/*
 				 * We are finished
 				 */
-				break;
 			}
 
 			/*
