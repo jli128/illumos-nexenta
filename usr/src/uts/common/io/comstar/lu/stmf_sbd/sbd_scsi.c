@@ -3634,12 +3634,18 @@ sbd_dbuf_xfer_done(struct scsi_task *task, struct stmf_data_buf *dbuf)
 		break;
 
 	case (SBD_CMD_SCSI_WRITE):
-		if ((task->task_cdb[0] == SCMD_WRITE_SAME_G1) ||
-		    (task->task_cdb[0] == SCMD_WRITE_SAME_G4)) {
+		switch (task->task_cdb[0]) {
+		case SCMD_WRITE_SAME_G1:
+		case SCMD_WRITE_SAME_G4:
 			sbd_handle_write_same_xfer_completion(task, scmd, dbuf,
 			    1);
-		} else {
+			break;
+		case SCMD_COMPARE_AND_WRITE:
+			sbd_handle_ats_xfer_completion(task, scmd, dbuf, 1);
+			break;
+		default:
 			sbd_handle_write_xfer_completion(task, scmd, dbuf, 1);
+			/* FALLTHRU */
 		}
 		break;
 
