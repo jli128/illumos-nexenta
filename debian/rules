@@ -44,9 +44,6 @@ patch-stamp:
 	do \
 		patch -N -p1 < $(PATCHDIR)/$$p; \
 	done
-	cp $(GATEROOT)/usr/src/tools/env/opensolaris.sh $(GATEROOT)
-	cd $(GATEROOT) && cat $(CURDIR)/debian/opensolaris.patch | patch -p1
-	cd $(GATEROOT) && sed -i -e "s#__GATEROOT__#$(GATEROOT)#" opensolaris.sh
 	touch $@
 
 setup-closed: setup-closed-stamp
@@ -64,7 +61,8 @@ setup-closed-stamp:
 build-on: patch setup-closed build-on-stamp
 build-on-stamp:
 	dh_testdir
-	env - bash -c 'cd $(GATEROOT); /opt/onbld/bin/nightly -i ./opensolaris.sh'
+	env - GATEROOT=$(GATEROOT) \
+	  /opt/onbld/bin/nightly -i debian/ncp3-env.sh
 	touch $@
 
 build-packages: build-on build-packages-stamp
@@ -100,9 +98,8 @@ build-stamp:
 # This target needs the patches to be still applied.
 # If patch-stamp is not there, do nothing.
 clobber_on:
-	if test -f patch-stamp -a -d $(GATEROOT) ;then \
-		cd $(GATEROOT) ; \
-		/opt/onbld/bin/bldenv ./opensolaris.sh \
+	if test -f patch-stamp ; then \
+		/opt/onbld/bin/bldenv debian/ncp3-env.sh \
 		  'cd usr/src ; dmake clobber' </dev/null ;\
 	fi
 
@@ -128,7 +125,7 @@ unpatch:
 		do \
 			patch -N -p1 -R < $(PATCHDIR)/$$p; \
 		done; \
-		rm -f opensolaris.sh patch-stamp; \
+		rm -f patch-stamp; \
 	fi
 
 clean: clobber_on rm_log_proto unpatch
