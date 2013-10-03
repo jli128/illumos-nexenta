@@ -27,8 +27,6 @@
 #ifndef	_MOUNTD_H
 #define	_MOUNTD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <door.h>
 #include <nfs/nfs.h>
 
@@ -65,6 +63,10 @@ extern struct share *findentry(char *);
 extern int check_client(struct share *, struct netbuf *,
 				struct nd_hostservlist *, int);
 extern struct nd_hostservlist *anon_client(char *host);
+extern int getclientsnames_lazy(char *, struct netbuf **,
+	struct nd_hostservlist **);
+extern int getclientsnames(SVCXPRT *, struct netbuf **,
+	struct nd_hostservlist **);
 
 /*
  * These functions are defined here due to the fact

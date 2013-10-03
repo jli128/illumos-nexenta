@@ -3286,7 +3286,7 @@ nfsreaddir(vnode_t *vp, rddir_cache *rdc, cred_t *cr)
 		fip = NULL;
 	}
 
-	rd.rd_entries = kmem_alloc(rdc->buflen, KM_SLEEP);
+	rd.rd_dirents = kmem_alloc(rdc->buflen, KM_SLEEP);
 	rd.rd_size = count;
 	rd.rd_offset = rda.rda_offset;
 
@@ -3336,7 +3336,7 @@ nfsreaddir(vnode_t *vp, rddir_cache *rdc, cred_t *cr)
 #else
 			rdc->entries = kmem_alloc(rdc->buflen, KM_SLEEP);
 #endif
-			bcopy(rd.rd_entries, rdc->entries, rdc->entlen);
+			bcopy(rd.rd_dirents, rdc->entries, rdc->entlen);
 			rdc->error = 0;
 			if (mi->mi_io_kstats) {
 				mutex_enter(&mi->mi_lock);
@@ -3353,7 +3353,7 @@ nfsreaddir(vnode_t *vp, rddir_cache *rdc, cred_t *cr)
 		rdc->entries = NULL;
 		rdc->error = error;
 	}
-	kmem_free(rd.rd_entries, rdc->buflen);
+	kmem_free(rd.rd_dirents, rdc->buflen);
 
 	mutex_enter(&rp->r_statelock);
 	rdc->flags &= ~RDDIR;

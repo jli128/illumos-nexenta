@@ -21,9 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- */
-/*
- * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -184,7 +182,7 @@ struct option_defs optdefs[] = {
  * Add new names here to add new property support. If we ever get a
  * way to query the kernel for character sets, this should become
  * dynamically loaded. Make sure changes here are reflected in
- * cmd/fs.d/nfs/mountd/nfscmd.c
+ * cmd/fs.d/nfs/mountd/nfs_cmd.c
  */
 
 static char *legal_conv[] = {
