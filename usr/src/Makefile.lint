@@ -82,7 +82,6 @@ COMMON_SUBDIRS = \
 	cmd/cmd-inet/usr.lib/vrrpd \
 	cmd/cmd-inet/usr.lib/wpad \
 	cmd/cmd-inet/usr.lib/wanboot \
-	cmd/cmd-inet/usr.sadm \
 	cmd/cmd-inet/usr.sbin \
 	cmd/cmd-inet/usr.sbin/ilbadm \
 	cmd/col \
@@ -301,7 +300,6 @@ COMMON_SUBDIRS = \
 	cmd/vrrpadm \
 	cmd/vt \
 	cmd/wall \
-	cmd/wbem \
 	cmd/who \
 	cmd/whodo \
 	cmd/wracct \

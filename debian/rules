@@ -62,8 +62,13 @@ build-on: patch setup-closed build-on-stamp
 build-on-stamp:
 	dh_testdir
 	env - GATEROOT=$(GATEROOT) \
-	  /opt/onbld/bin/nightly -i debian/ncp3-env.sh
+	  /opt/onbld/bin/nightly debian/ncp3-env.sh
 	touch $@
+
+# helpful rule for when your ON build fails...
+rebuild-on: patch setup-closed
+	env - GATEROOT=$(GATEROOT) \
+	  /opt/onbld/bin/nightly -i debian/ncp3-env.sh
 
 build-packages: build-on build-packages-stamp
 build-packages-stamp:
@@ -99,7 +104,7 @@ build-stamp:
 clobber_on:
 	if test -f patch-stamp ; then \
 		/opt/onbld/bin/bldenv debian/ncp3-env.sh \
-		  'cd usr/src ; dmake clobber' </dev/null ;\
+		  'cd usr/src ; dmake -k clobber' </dev/null ;\
 	fi
 
 rm_log_proto:
