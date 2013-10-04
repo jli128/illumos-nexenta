@@ -28,27 +28,35 @@
 # for the build. This example is suitable for building an OpenSolaris
 # workspace, which will contain the resulting archives. It is based
 # off the onnv release. It sets NIGHTLY_OPTIONS to make nightly do:
-#	DEBUG build only (-D, -F)
+#	DEBUG and non-DEBUG builds (-D)
 #	do not run protocmp or checkpaths (-N)
 #	do not bringover from the parent (-n)
-#	creates cpio archives for bfu (-a)
 #	runs 'make check' (-C)
 #	runs lint in usr/src (-l plus the LINTDIRS variable)
 #	sends mail on completion (-m and the MAILTO variable)
 #	checks for changes in ELF runpaths (-r)
 #	build and use this workspace's tools in $SRC/tools (-t)
 #
-NIGHTLY_OPTIONS="-Nndr";		export NIGHTLY_OPTIONS
-CW_NO_SHADOW=1; export CW_NO_SHADOW; SUN_PERSONALITY=1; export SUN_PERSONALITY
+NIGHTLY_OPTIONS="-CDMNlnrt";		export NIGHTLY_OPTIONS
+
+# Keep both DEBUG and non-DEBUG proto areas
+MULTI_PROTO=yes; export MULTI_PROTO
+
+# Don't bother with shadow (gcc) compiles here.
+CW_NO_SHADOW=1; export CW_NO_SHADOW
+
+# NCP3 has many GNU by default without this, which breaks the build.
+SUN_PERSONALITY=1; export SUN_PERSONALITY
+
+# CODEMGR_WS - full path to your workspace
+# Would prefer `git rev-parse --show-toplevel`
+# but the old git in NS3 does not have that.
+CODEMGR_WS=`pwd`
+export CODEMGR_WS
 
 # This is a variable for the rest of the script - GATE doesn't matter to
 # nightly itself
-GATE=nexenta-gate;			export GATE
-
-# CODEMGR_WS - full path to your workspace
-# GATEROOT is provided by the environment
-CODEMGR_WS=${GATEROOT}
-export CODEMGR_WS
+GATE=`basename ${CODEMGR_WS}`
 
 # G11N_PKGDIR - where does the globalization package live
 G11N_PKGDIR="$CODEMGR_WS/usr/src/pkgdefs/SUNW0on";	export G11N_PKGDIR
@@ -94,9 +102,8 @@ export CLONE_WS
 # workspace as root.
 # Some scripts optionally send mail messages to MAILTO.
 #
-STAFFER=root;			export STAFFER
-#MAILTO=$STAFFER;		export MAILTO
-LOGNAME=$STAFFER;
+STAFFER=$LOGNAME;			export STAFFER
+MAILTO=$STAFFER;			export MAILTO
 
 # The project (see project(4)) under which to run this build.  If not
 # specified, the build is simply run in a new task in the current project.
@@ -131,16 +138,26 @@ CPIODIR="${CODEMGR_WS}/archives/${MACH}/nightly";	export CPIODIR
 ROOT="$CODEMGR_WS/proto/root_${MACH}";	export ROOT
 SRC="$CODEMGR_WS/usr/src";         	export SRC
 VERSION="NexentaOS_134f";		export VERSION
-DATE=`date +%Y-%m-%d`;
-RELEASE_CM='"@(#)SunOS Nexenta '$RELEASE' '$VERSION' '$RELEASE_DATE'"'; export RELEASE_CM
-DEV_CM='"@(#)SunOS Nexenta: ['$LOGNAME'] '$DATE'"'; export DEV_CM
+
 #
 # the RELEASE and RELEASE_DATE variables are set in Makefile.master;
 # there might be special reasons to override them here, but that
 # should not be the case in general
 #
 RELEASE="5.11";				export RELEASE
-RELEASE_DATE="February 2010";		export RELEASE_DATE
+# RELEASE_DATE="February 2010";		export RELEASE_DATE
+# Put the Git rev. where ON used to put RELEASE_DATE
+RELEASE_DATE=`git rev-parse --short=10 HEAD`
+export RELEASE RELEASE_DATE
+
+# Override RELEASE_CM, DEV_CM used for mcs processing
+# For developer builds, include the WS basename & date.
+# Note that in a release build only RELEASE_CM goes in,
+# and in a developer build, BOTH comments are used.
+DATE=`date +%Y-%m-%d`;
+RELEASE_CM='"@(#)SunOS Nexenta '$RELEASE' '$VERSION' '$RELEASE_DATE'"'
+DEV_CM='"@(#)SunOS Developer: '$LOGNAME' '$GATE' '$DATE'"'
+export RELEASE_CM DEV_CM
 
 # proto area in parent for optionally depositing a copy of headers and
 # libraries corresponding to the protolibs target
