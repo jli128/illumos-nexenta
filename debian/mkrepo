@@ -1,0 +1,89 @@
+#!/bin/bash
+
+##############################################################################
+#                      C O N F I G U R A T I O N
+##############################################################################
+
+DNAME="hardy"
+DISTRO="$DNAME-unstable"
+
+##############################################################################
+
+mkinput_conf() {
+	local output=$1
+	echo "\$distinputcriteria = \".*\\\\.deb\";" > $output
+	echo "%distinputdirs = (" >> $output
+	echo "	stable => '$DNAME-stable'," >> $output
+	echo "	testing => '$DNAME-testing'," >> $output
+	echo "	unstable => '$DNAME-unstable'" >> $output
+	echo "	);" >> $output
+	echo "@distributions = ('stable', 'testing', 'unstable');" >> $output
+	echo "%distmapping =" >> $output
+	echo "	(" >> $output
+	echo "	stable => '$DNAME-stable'," >> $output
+	echo "	testing => '$DNAME-testing'," >> $output
+	echo "	unstable => '$DNAME-unstable'" >> $output
+	echo "	);" >> $output
+	echo "@architectures = ('solaris-i386');" >> $output
+	echo "@sections = ('main', 'contrib', 'non-free');" >> $output
+	echo "%release = ('origin' => \"NexentaOS\"," >> $output
+	echo "	    'label' => \"NexentaOS\"," >> $output
+	echo "	    'description' => \"Nexenta GNU/OpenSolaris extension\");" >> $output
+	echo "\$gpgkey = \"Nexenta Systems <maintainer\@nexenta.com>\";" >> $output
+	echo "\$destdir = \"$repodir/dists\";" >> $output
+	echo "\$inputdir = \"$repodir/incoming\";" >>  $output
+}
+
+ndmkrepo() {
+	mkdir $repodir
+	mkdir $repodir/dists
+	mkdir $repodir/incoming
+	mkdir $repodir/incoming/$DISTRO
+	mkinput_conf "$repodir/incoming/input.conf"
+	echo -n "Creating new APT repository at $repodir ..."
+	debarchiver -o -x -i $repodir/incoming || return
+	echo "done"
+
+	SOURCES_LIST=$repodir/nexenta-on-local.list
+
+	echo "deb file://$repodir/ $DISTRO main contrib non-free" > $SOURCES_LIST
+	echo "deb-src file://$repodir/ $DISTRO main contrib non-free" >> $SOURCES_LIST
+	echo "Local APT repository configured: $SOURCES_LIST"
+
+	echo "#!/bin/bash" > $uploadscript
+	echo "rm -f /var/cache/debarchiver/cache.db" >> $uploadscript
+	echo "/usr/bin/debarchiver --dl 1 --ql 0 --gpgkey Nexenta -o -x -i $repodir/incoming" >> $uploadscript
+	chmod 755 $uploadscript
+	echo "Upload script created: $uploadscript"
+}
+
+usage() {
+	echo "Usage: $mode <repodir> <uploadscript> [-h|--help]"
+	exit 0
+}
+
+mode="`basename $0`"
+test "x$1" != x && repodir="$1"
+shift
+test "x$1" != x && uploadscript="$1"
+shift
+test "x$repodir" = x -o \
+     "x$uploadscript" = x -o \
+     "x$repodir" = "x-h" -o \
+     "x$repodir" = "x--help" -o \
+     "x$repodir" = "x/" -o \
+     "x$repodir" = "x/export" \
+     && usage
+while test "x$1" != x; do
+	test "x$1" != x-h -a \
+	     "x$1" != x--help \
+		&& usage
+	test "x$1" = x-h -o "x$1" = x--help && usage
+done
+
+if test -d $repodir/incoming; then
+	echo "Error: destination '$repodir' already exists and it contains older repo"
+	exit 1
+fi
+
+ndmkrepo

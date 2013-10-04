@@ -28,19 +28,19 @@ BUILD  := $(shell cat debian/packages/RELEASE|egrep "^BUILD="|sed -e 's/^BUILD=\
 CORE_BUILD_REVISION=$(OS_REL).$(BUILD)
 
 # Location where built packages will be uploaded..
-APTDIR=/var/tmp/apt
+APTDIR=$(CURDIR)/apt
 
 # Location where Debian packages will be produced..
-PKGDIR=/var/tmp/packages
+PKGDIR=$(CURDIR)/packages
 
 patch: patch-stamp
 patch-stamp:
 	dh_testdir
-	if [ ! -d $(PATCHDIR)/. ]; then \
+	@if [ ! -d $(PATCHDIR)/. ]; then \
 		echo "You need the closed patches"; \
 		exit 1; \
 	fi
-	for p in $(shell cat debian/series); \
+	@for p in $(shell cat debian/series); \
 	do \
 		patch -N -p1 < $(PATCHDIR)/$$p; \
 	done
@@ -76,7 +76,7 @@ build-packages-stamp:
 upload-packages: build-packages upload-packages-stamp
 upload-packages-stamp:
 	rm -rf $(APTDIR)
-	ndmkrepo $(APTDIR) $(APTDIR)/upload
+	debian/mkrepo $(APTDIR) $(APTDIR)/upload
 	@rm -f /etc/apt/sources.list.d/nexenta-on-local.list
 	cp $(PKGDIR)/*.{deb,changes} $(APTDIR)/incoming/hardy-unstable
 	$(APTDIR)/upload
@@ -116,11 +116,11 @@ rm_log_proto:
 	fi
 
 unpatch: 
-	if [ -f patch-stamp ]; then \
-		if [ ! -d $(PATCHDIR)/. ]; then \
-			echo "You need the closed patches"; \
-			exit 1; \
-		fi; \
+	@if [ ! -d $(PATCHDIR)/. ]; then \
+		echo "You need the closed patches"; \
+		exit 1; \
+	fi
+	@if [ -f patch-stamp ]; then \
 		for p in $(shell /usr/sun/bin/rev -l debian/series); \
 		do \
 			patch -N -p1 -R < $(PATCHDIR)/$$p; \
@@ -130,7 +130,6 @@ unpatch:
 
 clean: clobber_on rm_log_proto unpatch
 	dh_testdir
-	dh_testroot
 	dh_clean -d
 	rm -f build-on-stamp build-stamp upload-packages-stamp build-packages-stamp debian/files
 
@@ -139,7 +138,6 @@ binary-indep: build
 
 binary-arch: build
 	dh_testdir
-	dh_testroot
 	dh_clean -k -d
 	dh_installdirs
 	dh_installdocs
