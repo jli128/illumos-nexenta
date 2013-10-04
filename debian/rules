@@ -77,7 +77,6 @@ upload-packages: build-packages upload-packages-stamp
 upload-packages-stamp:
 	rm -rf $(APTDIR)
 	debian/mkrepo $(APTDIR) $(APTDIR)/upload
-	@rm -f /etc/apt/sources.list.d/nexenta-on-local.list
 	cp $(PKGDIR)/*.{deb,changes} $(APTDIR)/incoming/hardy-unstable
 	$(APTDIR)/upload
 	@echo -e "\n\n \
@@ -104,16 +103,8 @@ clobber_on:
 	fi
 
 rm_log_proto:
-	if test -d "onnv-gate/log" ; then \
-			rm -rf onnv-gate/log; \
-	else \
-			echo "no logs present"; \
-	fi
-	if test -d "onnv-gate/proto" ; then \
-			rm -rf onnv-gate/proto; \
-	else \
-			echo "no proto-dir present"; \
-	fi
+	rm -rf log
+	rm -rf proto
 
 unpatch: 
 	@if [ ! -d $(PATCHDIR)/. ]; then \
