@@ -214,7 +214,7 @@ oce_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	dev->dev_list_index = MAX_DEVS;
 	while (dev_index < MAX_DEVS) {
-		atomic_cas_ptr(&oce_dev_list[dev_index], NULL, dev);
+		(void) atomic_cas_ptr(&oce_dev_list[dev_index], NULL, dev);
 		if (oce_dev_list[dev_index] == dev) {
 			break;
 		}
