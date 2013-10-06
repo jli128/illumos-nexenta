@@ -1337,6 +1337,7 @@ static void
 zfs_acl_chmod(zfsvfs_t *zfsvfs, vtype_t vtype, uint64_t mode, boolean_t trim,
     zfs_acl_t *aclp)
 {
+	_NOTE(ARGUNUSED(zfsvfs))
 	void		*acep = NULL;
 	uint64_t	who;
 	int		new_count, new_bytes;

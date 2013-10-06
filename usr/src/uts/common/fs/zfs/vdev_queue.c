@@ -272,7 +272,7 @@ consolidate_ios(vdev_queue_t *vq, avl_tree_t *t, zio_t *fio, zio_t *lio,
 static zio_t *
 vdev_queue_io_to_issue(vdev_queue_t *vq, uint64_t pending_limit)
 {
-	zio_t *fio, *lio, *aio, *dio, *nio, *mio;
+	zio_t *fio, *lio, *dio, *nio, *mio;
 	avl_tree_t *t;
 	int flags;
 	uint64_t maxspan = zfs_vdev_aggregation_limit;

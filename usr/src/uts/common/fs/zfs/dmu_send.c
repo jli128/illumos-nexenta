@@ -401,7 +401,6 @@ dmu_sendbackup(objset_t *tosnap, objset_t *fromsnap, boolean_t fromorigin,
 	struct backuparg ba;
 	int err;
 	uint64_t fromtxg = 0;
-	uint64_t starting_off = *off;
 
 	/* tosnap must be a snapshot */
 	if (ds->ds_phys->ds_next_snap_obj == 0)
