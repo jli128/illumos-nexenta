@@ -211,4 +211,4 @@ SPRO_VROOT=$SPRO_ROOT;				export SPRO_VROOT
 
 # POST_NIGHTLY can be any command to be run at the end of nightly.  See
 # nightly(1) for interactions between environment variables and this command.
-#POST_NIGHTLY=
+POST_NIGHTLY=$SRC/tools/scripts/check_mail_msg

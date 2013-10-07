@@ -47,6 +47,8 @@ all: $(LIBS)
 
 install: all
 
+check:
+
 $(PICS): $(AVLHEADERS)
 
 sys/%: $(SRC)/uts/common/sys/%

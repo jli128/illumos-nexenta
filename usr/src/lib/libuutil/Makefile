@@ -67,7 +67,7 @@ check:		$(CHECKHDRS)
 
 _msg:		$(MSGDOMAINPOFILE)
 
-naive $(SUBDIRS): FRC
+native $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:

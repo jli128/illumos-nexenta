@@ -2009,11 +2009,13 @@ function logshuffle {
 	NIGHTLY_STATUS=$state
 	export NIGHTLY_STATUS
 
+	# Want ${LLOG}/mail_msg available to POST_NIGHTLY
+	cat $build_time_file $build_environ_file $mail_msg_file \
+	    > ${LLOG}/mail_msg
+
 	run_hook POST_NIGHTLY $state
 	run_hook SYS_POST_NIGHTLY $state
 
-	cat $build_time_file $build_environ_file $mail_msg_file \
-	    > ${LLOG}/mail_msg
 	if [ "$m_FLAG" = "y" ]; then
 	    	cat ${LLOG}/mail_msg | /usr/bin/mailx -s \
 	"Nightly ${MACH} Build of `basename ${CODEMGR_WS}` ${state}." \
@@ -2213,10 +2215,14 @@ else
 WARNING: the p option (create packages) is set, but so is the N option (do
          not run protocmp); this is dangerous; you should unset the N option
 EOF
-		else
-			cat <<EOF | tee -a $mail_msg_file >> $LOGFILE
-Warning: the N option (do not run protocmp) is set; it probably shouldn't be
-EOF
+#
+# ncp3 builds can't properly run protocmp due to the changes made for
+# the "GNU alternatives" in userland.  Don't warn about -N.
+#
+#		else
+#			cat <<EOF | tee -a $mail_msg_file >> $LOGFILE
+#Warning: the N option (do not run protocmp) is set; it probably shouldn't be
+#EOF
 		fi
 		echo "" | tee -a $mail_msg_file >> $LOGFILE
 	fi

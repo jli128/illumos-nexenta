@@ -20,8 +20,10 @@ export GATEROOT=$(CURDIR)
 CLOSEDBIN_NAME=on-closed-bins-nd.i386.tar.bz2 
 CLOSEDBIN_URL=http://dlc.sun.com/osol/on/downloads/b134/$(CLOSEDBIN_NAME)
 
-CRYPTO_DIR=on-crypto-nd.i386.tar.bz2
-CRYPTO_URL=http://dlc.sun.com/osol/on/downloads/b134/$(CRYPTO_DIR)
+CRYPTO_D=on-crypto.i386.tar.bz2
+CRYPTO_ND=on-crypto-nd.i386.tar.bz2
+ CRYPTO_D_URL=http://dlc.sun.com/osol/on/downloads/b134/$(CRYPTO_D)
+CRYPTO_ND_URL=http://dlc.sun.com/osol/on/downloads/b134/$(CRYPTO_ND)
 
 OS_REL := $(shell cat debian/packages/RELEASE|egrep "^OS_REL="|sed -e 's/^OS_REL=\(.*\)/\1/')
 BUILD  := $(shell cat debian/packages/RELEASE|egrep "^BUILD="|sed -e 's/^BUILD=\(.*\)/\1/')
@@ -50,11 +52,12 @@ setup-closed: setup-closed-stamp
 setup-closed-stamp:
 	dh_testdir
 	rm -rf /var/tmp/$(CLOSEDBIN_NAME)
-	wget -c -O /var/tmp/$(CLOSEDBIN_NAME) $(CLOSEDBIN_URL)
+	wget -q -c -O /var/tmp/$(CLOSEDBIN_NAME) $(CLOSEDBIN_URL)
 	rm -rf $(GATEROOT)/closed
 	cd $(GATEROOT) && tar xjf /var/tmp/$(CLOSEDBIN_NAME)
 	cd $(GATEROOT)/closed && ln -s root_i386-nd root_i386
-	cd $(GATEROOT) && wget $(CRYPTO_URL)
+	cd $(GATEROOT) && wget -q $(CRYPTO_D_URL)
+	cd $(GATEROOT) && wget -q $(CRYPTO_ND_URL)
 	cp debian/eventlog.dll $(GATEROOT)/usr/src/cmd/smbsrv/smbd
 	touch $@
 
@@ -63,6 +66,7 @@ build-on-stamp:
 	dh_testdir
 	env - GATEROOT=$(GATEROOT) \
 	  /opt/onbld/bin/nightly debian/ncp3-env.sh
+	cat mail_msg.txt
 	touch $@
 
 # helpful rule for when your ON build fails...
@@ -104,8 +108,8 @@ build-stamp:
 clobber_on:
 	if test -f patch-stamp ; then \
 		/opt/onbld/bin/bldenv debian/ncp3-env.sh \
-		  'cd usr/src ; dmake -k clobber' </dev/null ;\
-	fi
+		  'cd usr/src ; dmake -k clobber' ;\
+	fi </dev/null >/dev/null 2>&1
 
 rm_log_proto:
 	rm -rf log

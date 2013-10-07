@@ -53,12 +53,12 @@ typedef struct ipmi_handle ipmi_handle_t;
 /*
  * Basic netfn definitions.  See section 5.1.
  */
-#define IPMI_NETFN_CHASSIS		0x0
-#define IPMI_NETFN_BRIDGE		0x2
-#define IPMI_NETFN_SE			0x4
-#define IPMI_NETFN_APP			0x6	
-#define IPMI_NETFN_FIRMWARE		0x8
-#define IPMI_NETFN_STORAGE		0xa
+#define	IPMI_NETFN_CHASSIS		0x0
+#define	IPMI_NETFN_BRIDGE		0x2
+#define	IPMI_NETFN_SE			0x4
+#define	IPMI_NETFN_APP			0x6
+#define	IPMI_NETFN_FIRMWARE		0x8
+#define	IPMI_NETFN_STORAGE		0xa
 #define	IPMI_NETFN_TRANSPORT	0x0C
 #define	IPMI_NETFN_OEM			0x2e
 
@@ -70,7 +70,7 @@ typedef struct ipmi_handle ipmi_handle_t;
 typedef enum {
 	EIPMI_NOMEM = EIPMI_BASE,	/* memory allocation failure */
 	EIPMI_BMC_OPEN_FAILED,		/* failed to open /dev/ipmi0 */
-	EIPMI_BMC_PUTMSG,		/* failed to send message to /dev/ipmi0 */
+	EIPMI_BMC_PUTMSG,	/* failed to send message to /dev/ipmi0 */
 	EIPMI_BMC_GETMSG,	/* failed to read response from /dev/ipmi0 */
 	EIPMI_BMC_RESPONSE,		/* response from /dev/ipmi0 failed */
 	EIPMI_INVALID_COMMAND,		/* invalid command */
