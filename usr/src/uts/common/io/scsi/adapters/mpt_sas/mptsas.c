@@ -350,8 +350,6 @@ static void mptsas_update_phymask(mptsas_t *mpt);
 
 static dev_info_t *mptsas_get_dip_from_dev(dev_t dev,
     mptsas_phymask_t *phymask);
-static mptsas_target_t *mptsas_addr_to_ptgt(mptsas_t *mpt, char *addr,
-    mptsas_phymask_t phymask);
 
 
 /*
@@ -7596,7 +7594,6 @@ mptsas_remove_cmd(mptsas_t *mpt, mptsas_cmd_t *cmd)
 {
 	int		slot;
 	mptsas_slots_t	*slots = mpt->m_active;
-	int		t;
 	mptsas_target_t	*ptgt = cmd->cmd_tgt_addr;
 
 	ASSERT(cmd != NULL);
@@ -7610,7 +7607,6 @@ mptsas_remove_cmd(mptsas_t *mpt, mptsas_cmd_t *cmd)
 		return;
 	}
 
-	t = Tgt(cmd);
 	slot = cmd->cmd_slot;
 
 	/*
@@ -7809,7 +7805,6 @@ mptsas_start_cmd(mptsas_t *mpt, mptsas_cmd_t *cmd)
 {
 	struct scsi_pkt		*pkt = CMD2PKT(cmd);
 	uint32_t		control = 0;
-	int			n;
 	caddr_t			mem;
 	pMpi2SCSIIORequest_t	io_request;
 	ddi_dma_handle_t	dma_hdl = mpt->m_dma_req_frame_hdl;
@@ -11385,10 +11380,6 @@ mptsas_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *credp,
 	int			iport_flag = 0;
 	dev_info_t		*dip = NULL;
 	mptsas_phymask_t	phymask = 0;
-	struct devctl_iocdata	*dcp = NULL;
-	uint32_t		slotstatus = 0;
-	char			*addr = NULL;
-	mptsas_target_t		*ptgt = NULL;
 
 	*rval = MPTIOCTL_STATUS_GOOD;
 	if (secpolicy_sys_config(credp, B_FALSE) != 0) {
@@ -12078,10 +12069,12 @@ mptsas_add_intrs(mptsas_t *mpt, int intr_type)
 		return (DDI_FAILURE);
 	}
 
-	if (0 && avail < count) {
+#if defined(MPTSAS_DEBUG)
+	if (mptsas_debug_flags && avail < count) {
 		mptsas_log(mpt, CE_NOTE, "ddi_intr_get_nvail returned %d, "
 		    "navail() returned %d", count, avail);
 	}
+#endif	/* defined(MPTSAS_DEBUG) */
 
 	/* Mpt only have one interrupt routine */
 	if ((intr_type == DDI_INTR_TYPE_MSI) && (count > 1)) {
@@ -15364,24 +15357,6 @@ mptsas_get_dip_from_dev(dev_t dev, mptsas_phymask_t *phymask)
 	*phymask = (mptsas_phymask_t)prop;
 	ddi_release_devi(dip);
 	return (dip);
-}
-static mptsas_target_t *
-mptsas_addr_to_ptgt(mptsas_t *mpt, char *addr, mptsas_phymask_t phymask)
-{
-	uint8_t			phynum;
-	uint64_t		wwn;
-	int			lun;
-	mptsas_target_t		*ptgt = NULL;
-
-	if (mptsas_parse_address(addr, &wwn, &phynum, &lun) != DDI_SUCCESS) {
-		return (NULL);
-	}
-	if (addr[0] == 'w') {
-		ptgt = mptsas_wwid_to_ptgt(mpt, (int)phymask, wwn);
-	} else {
-		ptgt = mptsas_phy_to_tgt(mpt, (int)phymask, phynum);
-	}
-	return (ptgt);
 }
 
 int
