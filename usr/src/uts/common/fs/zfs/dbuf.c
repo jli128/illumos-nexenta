@@ -254,6 +254,14 @@ dbuf_meta_to_special_default(dmu_buf_impl_t *db)
 	return B_FALSE;
 }
 
+#pragma weak dbuf_ddt_to_special = dbuf_ddt_to_special_default
+/* ARGSUSED */
+boolean_t
+dbuf_ddt_to_special_default(dmu_buf_impl_t *db)
+{
+	return B_FALSE;
+}
+
 void
 dbuf_evict(dmu_buf_impl_t *db)
 {
