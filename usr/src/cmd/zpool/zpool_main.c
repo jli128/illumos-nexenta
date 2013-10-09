@@ -5515,6 +5515,11 @@ cos_alloc_callback(zpool_handle_t *zhp, void *data)
 	if (!error)
 		cb->cb_any_successful = B_TRUE;
 
+	if (error == ENOTSUP) {
+		printf("Error: " 
+		    "CoS can not be allocated. Check related feature.\n");
+	}
+
 	return (error);
 }
 

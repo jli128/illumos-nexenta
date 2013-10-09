@@ -967,6 +967,9 @@ get_default_bootfsobj(dnode_phys_t *mosmdn, uint64_t *obj, char *stack)
 static const char *spa_feature_names[] = {
 	"org.illumos:lz4_compress",
 	"com.delphix:extensible_dataset",
+	"com.nexenta:meta_devices",
+	"com.nexenta:vdev_attributes",
+	"com.nexenta:class_of_storages",
 	NULL
 };
 

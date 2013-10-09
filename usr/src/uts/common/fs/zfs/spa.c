@@ -3654,12 +3654,20 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	spa->spa_ddt_meta_copies = zpool_prop_default_numeric(
 	    ZPOOL_PROP_DEDUPMETA_DITTO);
 
+	if (spa_has_special(spa)) {
+		(void) nvlist_remove(props, FEATURE_META_DEVICES, DATA_TYPE_STRING);
+		nvlist_add_string(props, FEATURE_META_DEVICES, "enabled");
+	}
+
 	spa_set_ddt_classes(spa, 0);
 
 	if (props != NULL) {
 		spa_configfile_set(spa, props, B_FALSE);
 		spa_sync_props(props, tx);
 	}
+
+	if (spa_has_special(spa))
+		spa_feature_incr(spa, SPA_FEATURE_META_DEVICES, tx);
 
 	dmu_tx_commit(tx);
 
@@ -3685,6 +3693,31 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	spa_start_perfmon_thread(spa);
 #endif
 	return (0);
+}
+
+static void
+spa_check_special_feature(spa_t *spa)
+{
+	if (spa_has_special(spa)) {
+		nvlist_t *props = NULL;
+		dmu_tx_t *tx = NULL;
+
+		if (!spa_feature_is_enabled(spa, SPA_FEATURE_META_DEVICES))
+		{
+			nvlist_alloc(&props, NV_UNIQUE_NAME, 0);
+			nvlist_add_uint64(props, FEATURE_META_DEVICES, 0);
+			spa_prop_set(spa, props);
+			nvlist_free(props);
+		}
+
+		if (!spa_feature_is_active(spa, SPA_FEATURE_META_DEVICES))
+		{
+			tx = dmu_tx_create_dd(spa->spa_dsl_pool->dp_mos_dir);
+			dmu_tx_assign(tx, TXG_WAIT);
+			spa_feature_incr(spa, SPA_FEATURE_META_DEVICES, tx);
+			dmu_tx_commit(tx);
+		}
+	}
 }
 
 #ifdef _KERNEL
@@ -4068,6 +4101,7 @@ spa_import(const char *pool, nvlist_t *config, nvlist_t *props, uint64_t flags)
 	spa_async_request(spa, SPA_ASYNC_AUTOEXPAND);
 
 	mutex_exit(&spa_namespace_lock);
+	spa_check_special_feature(spa);
 	spa_history_log_version(spa, "import");
 
 	return (0);
@@ -4423,6 +4457,8 @@ spa_vdev_add(spa_t *spa, nvlist_t *nvroot)
 	mutex_enter(&spa_namespace_lock);
 	spa_config_update(spa, SPA_CONFIG_UPDATE_POOL);
 	mutex_exit(&spa_namespace_lock);
+
+	spa_check_special_feature(spa);
 
 	return (0);
 }

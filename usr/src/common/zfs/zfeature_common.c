@@ -141,6 +141,9 @@ zfeature_register(spa_feature_t fid, const char *guid, const char *name,
 	feature->fi_depends = deps;
 }
 
+spa_feature_t cos_deps[] =
+    { SPA_FEATURE_VDEV_ATTR, SPA_FEATURE_NONE };
+
 void
 zpool_feature_init(void)
 {
@@ -163,4 +166,13 @@ zpool_feature_init(void)
 	    "com.delphix:extensible_dataset", "extensible_dataset",
 	    "Enhanced dataset functionality, used by other features.",
 	    B_FALSE, B_FALSE, NULL);
+	zfeature_register(SPA_FEATURE_META_DEVICES,
+	    "com.nexenta:meta_devices", "meta_devices",
+	    "Using dedicated devices for metadata.", B_TRUE, B_FALSE, NULL);
+	zfeature_register(SPA_FEATURE_VDEV_ATTR,
+	    "com.nexenta:vdev_attributes", "vdev_attributes",
+	    "Per vdev attributes.", B_TRUE, B_FALSE, NULL);
+	zfeature_register(SPA_FEATURE_COS_ATTR,
+	    "com.nexenta:class_of_storages", "class_of_storages",
+	    "Diverging storages.", B_TRUE, B_FALSE, cos_deps);
 }
