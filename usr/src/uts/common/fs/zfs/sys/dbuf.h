@@ -328,8 +328,8 @@ void dbuf_init(void);
 void dbuf_fini(void);
 
 boolean_t dbuf_is_metadata(dmu_buf_impl_t *db);
-boolean_t dbuf_ddt_to_special(dmu_buf_impl_t *db);
-boolean_t dbuf_meta_to_special(dmu_buf_impl_t *db);
+boolean_t dbuf_ddt_is_l2cacheable(dmu_buf_impl_t *db);
+boolean_t dbuf_meta_is_l2cacheable(dmu_buf_impl_t *db);
 
 #define	DBUF_GET_BUFC_TYPE(_db)	\
 	(dbuf_is_metadata(_db) ? ARC_BUFC_METADATA : ARC_BUFC_DATA)
@@ -339,26 +339,22 @@ boolean_t dbuf_meta_to_special(dmu_buf_impl_t *db);
 	(dbuf_is_metadata(_db) &&					\
 	((_db)->db_objset->os_primary_cache == ZFS_CACHE_METADATA)))
 
-/* returns B_TRUE if _db is DDT and it goes to special vdev */ 
-#define DBUF_DDT_TO_SPECIAL(_db)	\
-	(dbuf_ddt_to_special(_db))
-/* returns B_TRUE if _db is metadata and it goes to special vdev */ 
-#define DBUF_META_TO_SPECIAL(_db)	\
-	(dbuf_meta_to_special(_db))
 
 /*
- * note that ZFS_CACHE_DATA actually means: L2ARC gets data and metadata
- * that is not placed on special devices, if any
- * also note that explicit check for DDT is here because DDT is a part of
- * MOS, and MOS has ZFS_CACHE_ALL hardcoded at this time
+ * Next macro checks wheter we need to cache dbuf into l2arc.
+ * Metadata is l2cacheable if it is not placed on special device
+ * ot it is placed on special device in "dual" mode. We need to check
+ * ddt in ZFS_CACHE_ELL and ZFS_CACHE_METADATA due to it's MOS related.
+ * ZFS_CACHE_DATA mode actually means to cache both data and cacheable 
+ * metadata.
  */
 #define	DBUF_IS_L2CACHEABLE(_db)					\
 	(((_db)->db_objset->os_secondary_cache == ZFS_CACHE_ALL &&	\
-	(DBUF_DDT_TO_SPECIAL(_db) == B_FALSE)) ||			\
+	(dbuf_ddt_is_l2cacheable(_db) == B_TRUE)) ||			\
 	((_db)->db_objset->os_secondary_cache == ZFS_CACHE_METADATA &&  \
 	(dbuf_is_metadata(_db)) &&					\
-	(DBUF_DDT_TO_SPECIAL(_db) == B_FALSE)) ||			\
-	((DBUF_META_TO_SPECIAL(_db) == B_FALSE) &&			\
+	(dbuf_ddt_is_l2cacheable(_db) == B_TRUE)) ||			\
+	((dbuf_meta_is_l2cacheable(_db) == B_TRUE) &&			\
 	((_db)->db_objset->os_secondary_cache == ZFS_CACHE_DATA)))
 
 #define	DBUF_IS_L2COMPRESSIBLE(_db)					\

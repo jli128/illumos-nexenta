@@ -58,6 +58,13 @@ zpool_prop_init(void)
 		{ NULL }
 	};
 
+	static zprop_index_t meta_placement_table[] = {
+		{ "off",	META_PLACEMENT_OFF},
+		{ "on",		META_PLACEMENT_ON},
+		{ "dual",	META_PLACEMENT_DUAL},
+		{ NULL }
+	};
+
 	static zprop_index_t failuremode_table[] = {
 		{ "wait",	ZIO_FAILURE_MODE_WAIT },
 		{ "continue",	ZIO_FAILURE_MODE_CONTINUE },
@@ -128,12 +135,12 @@ zpool_prop_init(void)
 
 	zprop_register_index(ZPOOL_PROP_META_PLACEMENT, "meta_placement", 1,
 	    PROP_DEFAULT, ZFS_TYPE_POOL, "on | off", "META_PLCMNT", boolean_table);
-	zprop_register_index(ZPOOL_PROP_DDT_TO_METADEV, "ddt_to_metadev", 1,
-	    PROP_DEFAULT, ZFS_TYPE_POOL, "on | off", "DDT_TO_MD", boolean_table);
-	zprop_register_index(ZPOOL_PROP_GENERAL_META_TO_METADEV, "gen_meta_to_metadev", 1,
-	    PROP_DEFAULT, ZFS_TYPE_POOL, "on | off", "GENMETA_TO_MD", boolean_table);
-	zprop_register_index(ZPOOL_PROP_OTHER_META_TO_METADEV, "other_meta_to_metadev", 0,
-	    PROP_DEFAULT, ZFS_TYPE_POOL, "on | off", "OTHERMETA_TO_MD", boolean_table);
+	zprop_register_index(ZPOOL_PROP_DDT_TO_METADEV, "ddt_to_metadev", META_PLACEMENT_ON,
+	    PROP_DEFAULT, ZFS_TYPE_POOL, "on | dual | off", "DDT_TO_MD", meta_placement_table);
+	zprop_register_index(ZPOOL_PROP_GENERAL_META_TO_METADEV, "gen_meta_to_metadev", META_PLACEMENT_ON,
+	    PROP_DEFAULT, ZFS_TYPE_POOL, "on | dual | off", "GENMETA_TO_MD", meta_placement_table);
+	zprop_register_index(ZPOOL_PROP_OTHER_META_TO_METADEV, "other_meta_to_metadev", META_PLACEMENT_OFF,
+	    PROP_DEFAULT, ZFS_TYPE_POOL, "on | dual | off", "OTHERMETA_TO_MD", meta_placement_table);
 
 	/* default index properties */
 	zprop_register_index(ZPOOL_PROP_FAILUREMODE, "failmode",

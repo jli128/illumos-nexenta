@@ -480,11 +480,16 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 		case ZPOOL_PROP_DEDUP_BEST_EFFORT:
 		case ZPOOL_PROP_DDT_DESEGREGATION:
 		case ZPOOL_PROP_META_PLACEMENT:
+			error = nvpair_value_uint64(elem, &intval);
+			if (!error && intval > 1)
+				error = SET_ERROR(EINVAL);
+			break;
+
 		case ZPOOL_PROP_DDT_TO_METADEV:
 		case ZPOOL_PROP_GENERAL_META_TO_METADEV:
 		case ZPOOL_PROP_OTHER_META_TO_METADEV:
 			error = nvpair_value_uint64(elem, &intval);
-			if (!error && intval > 1)
+			if (!error && intval > META_PLACEMENT_DUAL)
 				error = SET_ERROR(EINVAL);
 			break;
 
@@ -545,14 +550,14 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 			error = nvpair_value_uint64(elem, &intval);
 			if ((intval < 0) || (intval > 100) ||
 			    (intval >= spa->spa_dedup_hi_best_effort))
-				error = EINVAL;
+				error = SET_ERROR(EINVAL);
 			break;
 
 		case ZPOOL_PROP_DEDUP_HI_BEST_EFFORT:
 			error = nvpair_value_uint64(elem, &intval);
 			if ((intval < 0) || (intval > 100) ||
 			    (intval <= spa->spa_dedup_lo_best_effort))
-				error = EINVAL;
+				error = SET_ERROR(EINVAL);
 			break;
 
 		case ZPOOL_PROP_FAILUREMODE:
@@ -617,7 +622,7 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 				check++;
 			}
 			if (strlen(strval) > ZPROP_MAX_COMMENT)
-				error = E2BIG;
+				error = SET_ERROR(E2BIG);
 			break;
 
 		case ZPOOL_PROP_DEDUPDITTO:
@@ -633,19 +638,19 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 		case ZPOOL_PROP_LOWATERMARK:
 			error = nvpair_value_uint64(elem, &intval);
 			if (!error && (intval > 100))
-				error = EINVAL;
+				error = SET_ERROR(EINVAL);
 			lowat = intval;
 			break;
 		case ZPOOL_PROP_HIWATERMARK:
 			error = nvpair_value_uint64(elem, &intval);
 			if (!error && (intval > 100))
-				error = EINVAL;
+				error = SET_ERROR(EINVAL);
 			hiwat = intval;
 			break;
 		case ZPOOL_PROP_DEDUPMETA_DITTO:
 			error = nvpair_value_uint64(elem, &intval);
 			if (!error && (intval > SPA_DVAS_PER_BP))
-				error = EINVAL;
+				error = SET_ERROR(EINVAL);
 			break;
 		}
 
@@ -655,7 +660,7 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 
 	/* check if low watermark is less than high watermark */
 	if (lowat > 0 && lowat >= hiwat)
-		error = EINVAL;
+		error = SET_ERROR(EINVAL);
 
 	if (!error && reset_bootfs) {
 		error = nvlist_remove(props,

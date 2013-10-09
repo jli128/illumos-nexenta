@@ -40,6 +40,10 @@ typedef enum spa_specialclass_id {
 	SPA_NUM_SPECIALCLASSES
 } spa_specialclass_id_t;
 
+#define	META_PLACEMENT_OFF	0
+#define	META_PLACEMENT_ON	1
+#define	META_PLACEMENT_DUAL	2
+
 void spa_set_specialclass(spa_t *, objset_t *, spa_specialclass_id_t);
 spa_specialclass_id_t spa_specialclass_id(objset_t *);
 spa_specialclass_t *spa_get_specialclass(objset_t *);
