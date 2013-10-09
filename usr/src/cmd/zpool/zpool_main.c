@@ -264,7 +264,7 @@ get_usage(zpool_help_t idx) {
 	case HELP_REOPEN:
 		return (gettext("\treopen <pool>\n"));
 	case HELP_SCRUB:
-		return (gettext("\tscrub [-s] <pool> ...\n"));
+		return (gettext("\tscrub [-s|-M|-m] <pool> ...\n"));
 	case HELP_STATUS:
 		return (gettext("\tstatus [-vx] [-T d|u] [pool] ... [interval "
 		    "[count]]\n"));
@@ -3883,10 +3883,31 @@ zpool_do_scrub(int argc, char **argv)
 	cb.cb_type = POOL_SCAN_SCRUB;
 
 	/* check options */
-	while ((c = getopt(argc, argv, "s")) != -1) {
+	while ((c = getopt(argc, argv, "sMm")) != -1) {
 		switch (c) {
 		case 's':
-			cb.cb_type = POOL_SCAN_NONE;
+			if (cb.cb_type != POOL_SCAN_SCRUB) {
+				(void) fprintf(stderr,
+				    gettext("incompatible options\n")); 
+				usage(B_FALSE);
+			} else
+				cb.cb_type = POOL_SCAN_NONE;
+			break;
+		case 'M':
+			if (cb.cb_type != POOL_SCAN_SCRUB) {
+				(void) fprintf(stderr,
+				    gettext("incompatible options\n")); 
+				usage(B_FALSE);
+			} else
+				cb.cb_type = POOL_SCAN_MOS;
+			break;
+		case 'm':
+			if (cb.cb_type != POOL_SCAN_SCRUB) {
+				(void) fprintf(stderr,
+				    gettext("incompatible options\n")); 
+				usage(B_FALSE);
+			} else
+				cb.cb_type = POOL_SCAN_META;
 			break;
 		case '?':
 			(void) fprintf(stderr, gettext("invalid option '%c'\n"),
@@ -3944,7 +3965,9 @@ print_scan_status(pool_scan_stat_t *ps)
 	zfs_nicenum(ps->pss_processed, processed_buf, sizeof (processed_buf));
 
 	assert(ps->pss_func == POOL_SCAN_SCRUB ||
-	    ps->pss_func == POOL_SCAN_RESILVER);
+	    ps->pss_func == POOL_SCAN_RESILVER ||
+	    ps->pss_func == POOL_SCAN_MOS ||
+	    ps->pss_func == POOL_SCAN_META);
 	/*
 	 * Scan is finished or canceled.
 	 */
@@ -3954,6 +3977,12 @@ print_scan_status(pool_scan_stat_t *ps)
 
 		if (ps->pss_func == POOL_SCAN_SCRUB) {
 			fmt = gettext("scrub repaired %s in %lluh%um with "
+			    "%llu errors on %s");
+		} else if (ps->pss_func == POOL_SCAN_MOS) {
+			fmt = gettext("MOS scrub repaired %s in %lluh%um with "
+			    "%llu errors on %s");
+		} else if (ps->pss_func == POOL_SCAN_META) {
+			fmt = gettext("meta scrub repaired %s in %lluh%um with "
 			    "%llu errors on %s");
 		} else if (ps->pss_func == POOL_SCAN_RESILVER) {
 			fmt = gettext("resilvered %s in %lluh%um with "
@@ -3970,6 +3999,12 @@ print_scan_status(pool_scan_stat_t *ps)
 		if (ps->pss_func == POOL_SCAN_SCRUB) {
 			(void) printf(gettext("scrub canceled on %s"),
 			    ctime(&end));
+		} else if (ps->pss_func == POOL_SCAN_MOS) {
+			(void) printf(gettext("MOS scrub canceled on %s"),
+			    ctime(&end));
+		} else if (ps->pss_func == POOL_SCAN_META) {
+			(void) printf(gettext("meta scrub canceled on %s"),
+			    ctime(&end));
 		} else if (ps->pss_func == POOL_SCAN_RESILVER) {
 			(void) printf(gettext("resilver canceled on %s"),
 			    ctime(&end));
@@ -3984,6 +4019,12 @@ print_scan_status(pool_scan_stat_t *ps)
 	 */
 	if (ps->pss_func == POOL_SCAN_SCRUB) {
 		(void) printf(gettext("scrub in progress since %s"),
+		    ctime(&start));
+	} else if (ps->pss_func == POOL_SCAN_MOS) {
+		(void) printf(gettext("MOS scrub in progress since %s"),
+		    ctime(&start));
+	} else if (ps->pss_func == POOL_SCAN_META) {
+		(void) printf(gettext("meta scrub in progress since %s"),
 		    ctime(&start));
 	} else if (ps->pss_func == POOL_SCAN_RESILVER) {
 		(void) printf(gettext("resilver in progress since %s"),
@@ -4023,7 +4064,9 @@ print_scan_status(pool_scan_stat_t *ps)
 	if (ps->pss_func == POOL_SCAN_RESILVER) {
 		(void) printf(gettext("    %s resilvered, %.2f%% done\n"),
 		    processed_buf, 100 * fraction_done);
-	} else if (ps->pss_func == POOL_SCAN_SCRUB) {
+	} else if (ps->pss_func == POOL_SCAN_SCRUB ||
+	           ps->pss_func == POOL_SCAN_MOS ||
+		   ps->pss_func == POOL_SCAN_META) {
 		(void) printf(gettext("    %s repaired, %.2f%% done\n"),
 		    processed_buf, 100 * fraction_done);
 	}

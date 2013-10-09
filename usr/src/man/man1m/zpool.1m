@@ -128,7 +128,7 @@ zpool \- configures ZFS storage pools
 
 .LP
 .nf
-\fBzpool scrub\fR [\fB-s\fR] \fIpool\fR ...
+\fBzpool scrub\fR [\fB-s|-M|-m\fR] \fIpool\fR ...
 .fi
 
 .LP
@@ -1648,7 +1648,7 @@ devices can be overridden in this manner.
 .sp
 .ne 2
 .na
-\fB\fBzpool scrub\fR [\fB-s\fR] \fIpool\fR ...\fR
+\fB\fBzpool scrub\fR [\fB-s|-M|-m\fR] \fIpool\fR ...\fR
 .ad
 .sp .6
 .RS 4n
@@ -1670,12 +1670,30 @@ scrub\fR" command terminates it and starts a new scrub. If a resilver is in
 progress, \fBZFS\fR does not allow a scrub to be started until the resilver
 completes.
 .sp
+Partial scrub may be requested using \fB-M\fR or \fB-m\fR flag.
+.sp
 .ne 2
 .na
 \fB\fB-s\fR\fR
 .ad
 .RS 6n
 Stop scrubbing.
+.RE
+.sp
+.ne 2
+.na
+\fB\fB-M\fR\fR
+.ad
+.RS 6n
+Scrub only MOS blocks.
+.RE
+.sp
+.ne 2
+.na
+\fB\fB-m\fR\fR
+.ad
+.RS 6n
+Scrub only metadata blocks.
 .RE
 
 .RE
