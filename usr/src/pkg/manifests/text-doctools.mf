@@ -343,5 +343,5 @@ license usr/src/cmd/vgrind/THIRDPARTYLICENSE \
 link path=usr/lib/tmac target=../share/lib/tmac
 link path=usr/share/man/man1/checkeq.1 target=eqn.1
 link path=usr/share/man/man1/neqn.1 target=eqn.1
-# man(1) was moved to text/doctools
+# man(1) was moved to text/mantools
 depend fmri=text/mantools type=require

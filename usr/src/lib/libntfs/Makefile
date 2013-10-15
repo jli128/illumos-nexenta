@@ -48,7 +48,7 @@ GREP=	grep
 
 all clean delete install package: $(SUBDIRS)
 clobber: $(SUBDIRS)
-	-$(RM) $(CLOBBERFILES)
+	$(RM) $(CLOBBERFILES)
 
 all install: THIRDPARTYLICENSE
 

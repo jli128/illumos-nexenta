@@ -11,7 +11,8 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2013 OmniTI Computer Consulting, Inc. All rights reserved.
 #
 
 file path=usr/share/man/man3c/__fbufsize.3c
@@ -148,6 +149,7 @@ file path=usr/share/man/man3c/getgrnam.3c
 file path=usr/share/man/man3c/gethostid.3c
 file path=usr/share/man/man3c/gethostname.3c
 file path=usr/share/man/man3c/gethrtime.3c
+file path=usr/share/man/man3c/getline.3c
 file path=usr/share/man/man3c/getloadavg.3c
 file path=usr/share/man/man3c/getlogin.3c
 file path=usr/share/man/man3c/getmntent.3c
@@ -695,6 +697,7 @@ link path=usr/share/man/man3c/door_setparam.3c target=door_getparam.3c
 link path=usr/share/man/man3c/door_unbind.3c target=door_bind.3c
 link path=usr/share/man/man3c/double_to_decimal.3c \
     target=floating_to_decimal.3c
+link path=usr/share/man/man3c/dup3.3c target=dup2.3c
 link path=usr/share/man/man3c/edata.3c target=end.3c
 link path=usr/share/man/man3c/endgrent.3c target=getgrnam.3c
 link path=usr/share/man/man3c/endnetgrent.3c target=getnetgrent.3c
@@ -751,6 +754,7 @@ link path=usr/share/man/man3c/getc.3c target=fgetc.3c
 link path=usr/share/man/man3c/getc_unlocked.3c target=fgetc.3c
 link path=usr/share/man/man3c/getchar.3c target=fgetc.3c
 link path=usr/share/man/man3c/getchar_unlocked.3c target=fgetc.3c
+link path=usr/share/man/man3c/getdelim.3c target=getline.3c
 link path=usr/share/man/man3c/getextmntent.3c target=getmntent.3c
 link path=usr/share/man/man3c/getgrent.3c target=getgrnam.3c
 link path=usr/share/man/man3c/getgrent_r.3c target=getgrnam.3c
@@ -850,6 +854,8 @@ link path=usr/share/man/man3c/memmove.3c target=memory.3c
 link path=usr/share/man/man3c/memset.3c target=memory.3c
 link path=usr/share/man/man3c/minor.3c target=makedev.3c
 link path=usr/share/man/man3c/mkdtemp.3c target=mkstemp.3c
+link path=usr/share/man/man3c/mkostemp.3c target=mkstemp.3c
+link path=usr/share/man/man3c/mkostemps.3c target=mkstemp.3c
 link path=usr/share/man/man3c/mkstemps.3c target=mkstemp.3c
 link path=usr/share/man/man3c/mq_reltimedreceive_np.3c target=mq_receive.3c
 link path=usr/share/man/man3c/mq_reltimedsend_np.3c target=mq_send.3c

@@ -102,9 +102,6 @@ clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 
-# NB: this file is generated during install_h
-# $(SRC)/uts/common/io/fibre-channel/fca/qlc/ql_fw_table.c
-
 #
 #	Include common targets.
 #

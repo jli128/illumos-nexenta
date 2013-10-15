@@ -51,9 +51,9 @@ _msg:=          TARGET= _msg
 
 .KEEP_STATE:
 
-all clean lint _msg: $(SUBDIRS1) $($(MACH)_SUBDIRS)
+all clean clobber lint _msg: $(SUBDIRS1) $($(MACH)_SUBDIRS)
 
-install clobber: $(SUBDIRS1) $(SUBDIRS2) $($(MACH)_SUBDIRS)
+install: $(SUBDIRS1) $(SUBDIRS2) $($(MACH)_SUBDIRS)
 
 $(SUBDIRS1) $(SUBDIRS2) $($(MACH)_SUBDIRS) : FRC
 	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)

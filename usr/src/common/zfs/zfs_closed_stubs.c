@@ -161,6 +161,7 @@ stop_wrc_thread(spa_t *dummy)
 	return (B_TRUE);
 }
 
+/* ARGSUSED */
 void
 start_wrc_thread(spa_t *dummy)
 {

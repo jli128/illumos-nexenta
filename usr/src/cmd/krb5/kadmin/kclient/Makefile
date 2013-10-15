@@ -103,7 +103,7 @@ $(USRLIBSEC)/%: %
 	$(INS.file)
 
 clean:
-	-$(RM) $(OBJS)
+	$(RM) $(OBJS)
 
 lint:	lint_SRCS
 

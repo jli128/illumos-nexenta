@@ -45,7 +45,7 @@ POFILES=        generic.po
 
 all clean install: $(SUBDIRS)
 clobber: $(SUBDIRS)
-	-$(RM) $(CLOBBERFILES)
+	$(RM) $(CLOBBERFILES)
 
 lint:
 	@ $(ECHO) "usr/src/lib/libldap5 is third-party code that"

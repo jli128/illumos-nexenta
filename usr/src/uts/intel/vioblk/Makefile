@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #

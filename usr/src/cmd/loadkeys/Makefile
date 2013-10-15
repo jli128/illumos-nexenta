@@ -72,10 +72,8 @@ clobber:=	TARGET= clobber
 lint:=		TARGET= lint
 _msg:=          TARGET= catalog
 
-clobber:	$(SUBDIRS) clobber_local
-
-clobber_local:
-	-$(RM) $(CLOBBERFILES)
+clobber:	$(SUBDIRS)
+	$(RM) $(CLOBBERFILES)
 
 clean:	$(SUBDIRS)
 

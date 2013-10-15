@@ -45,7 +45,7 @@ $(PROG):        $(OBJECTS)
 install: all $(ROOTPROG)
 
 clean:
-	-$(RM) $(OBJECTS)
+	$(RM) $(OBJECTS)
 
 lint:	lint_SRCS
 

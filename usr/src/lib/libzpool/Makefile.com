@@ -20,8 +20,8 @@
 #
 #
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+# Copyright (c) 2013 by Delphix. All rights reserved.
 #
 
 LIBRARY= libzpool.a
@@ -32,6 +32,7 @@ include $(NZA_MAKEDEFS)
 # include the list of ZFS sources
 include ../../../uts/common/Makefile.files
 KERNEL_OBJS = kernel.o taskq.o util.o
+DTRACE_OBJS = zfs.o
 
 OBJECTS=$(ZFS_COMMON_OBJS) $(ZFS_SHARED_OBJS) $(KERNEL_OBJS)
 OBJECTS += $(NZA_ZFSPLUS_OBJS)
@@ -57,7 +58,11 @@ INCS += -I../../../common/zfs
 INCS += -I../../../common
 INCS += $(NZA_ZFSPLUSBASE_FLAGS)
 
+CLEANFILES += ../common/zfs.h
+CLEANFILES += $(EXTPICS)
+
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
+$(LINTLIB): ../common/zfs.h
 
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
@@ -76,6 +81,12 @@ CERRWARN +=	-_gcc=-Wno-empty-body
 CERRWARN +=	-_gcc=-Wno-unused-function
 CERRWARN +=	-_gcc=-Wno-unused-label
 
+# uncomment these for gdb/dbx debugging
+#COPTFLAG = -g
+#CTF_FLAGS =
+#CTFCONVERT_O=
+#CTFMERGE_LIB=
+
 .KEEP_STATE:
 
 all: $(LIBS)
@@ -84,7 +95,9 @@ lint: $(LINTLIB)
 
 include ../../Makefile.targ
 
-pics/%.o: ../../../uts/common/fs/zfs/%.c
+EXTPICS= $(DTRACE_OBJS:%=pics/%)
+
+pics/%.o: ../../../uts/common/fs/zfs/%.c ../common/zfs.h
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
@@ -95,3 +108,10 @@ pics/%.o: ../../../common/zfs/%.c
 pics/%.o: $(NZA_ZFSPLUS_BASE)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
+
+pics/%.o: ../common/%.d $(PICS)
+	$(COMPILE.d) -C -s $< -o $@ $(PICS)
+	$(POST_PROCESS_O)
+
+../common/%.h: ../common/%.d
+	$(DTRACE) -xnolibs -h -s $< -o $@

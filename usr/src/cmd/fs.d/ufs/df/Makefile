@@ -54,6 +54,6 @@ $(LIBPROG):	$(OBJS)
 		$(POST_PROCESS)
 
 clean:
-		-$(RM) $(LIBPROG).o
+		$(RM) $(LIBPROG).o
 
 lint:		lint_SRCS

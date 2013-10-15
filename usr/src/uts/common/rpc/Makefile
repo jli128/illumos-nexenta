@@ -86,8 +86,10 @@ install_h: all_h $(RPCDIRS) $(RPCSVCDIRS) $(ROOTHDRS)
 #
 all_h: $(DERIVED_FILES)
 
-clean clobber:
-	-$(RM) $(DERIVED_FILES)
+clean:
+	$(RM) $(DERIVED_FILES)
+
+clobber: clean
 
 $(RPCDIRS):
 	$(INS.dir)
@@ -100,21 +102,6 @@ key_prot.h: key_prot.x
 
 pmap_prot.h: pmap_prot.x
 	$(RPCGEN) -h pmap_prot.x > $@
-
-# EXPORT DELETE START
-# Special target to clean up the source tree for export distribution
-# Warning: This target changes the source tree
-EXPORT_SRC:
-	$(RM) Makefile+ sec_gss/rpcsec_gss_misc.c+
-	$(SED) -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-		< Makefile > Makefile+
-	$(MV) Makefile+ Makefile
-	$(SED) -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
-	< sec_gss/rpcsec_gss_misc.c > sec_gss/rpcsec_gss_misc.c+
-	$(MV) sec_gss/rpcsec_gss_misc.c+ sec_gss/rpcsec_gss_misc.c
-	$(CHMOD) 444 Makefile sec_gss/rpcsec_gss_misc.c
-
-# EXPORT DELETE END 
 
 rpc_sztypes.h: rpc_sztypes.x
 	$(RPCGEN) -C -h rpc_sztypes.x > $@

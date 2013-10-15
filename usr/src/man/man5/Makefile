@@ -12,7 +12,7 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
 
 include		$(SRC)/Makefile.master
@@ -155,44 +155,44 @@ MANLINKS=	ANSI.5		\
 		step.5		\
 		teclarc.5
 
-intro.5		= Intro.5
+intro.5		:= LINKSRC = Intro.5
 
-CSI.5		= attributes.5
-MT-Level.5	= attributes.5
-architecture.5	= attributes.5
-availability.5	= attributes.5
-stability.5	= attributes.5
-standard.5	= attributes.5
+CSI.5		:= LINKSRC = attributes.5
+MT-Level.5	:= LINKSRC = attributes.5
+architecture.5	:= LINKSRC = attributes.5
+availability.5	:= LINKSRC = attributes.5
+stability.5	:= LINKSRC = attributes.5
+standard.5	:= LINKSRC = attributes.5
 
-RBAC.5		= rbac.5
+RBAC.5		:= LINKSRC = rbac.5
 
-advance.5	= regexp.5
-compile.5	= regexp.5
-step.5		= regexp.5
+advance.5	:= LINKSRC = regexp.5
+compile.5	:= LINKSRC = regexp.5
+step.5		:= LINKSRC = regexp.5
 
-ANSI.5		= standards.5
-C++.5		= standards.5
-C.5		= standards.5
-ISO.5		= standards.5
-POSIX.1.5	= standards.5
-POSIX.2.5	= standards.5
-POSIX.5		= standards.5
-SUS.5		= standards.5
-SUSv2.5		= standards.5
-SUSv3.5		= standards.5
-SVID.5		= standards.5
-SVID3.5		= standards.5
-XNS.5		= standards.5
-XNS4.5		= standards.5
-XNS5.5		= standards.5
-XPG.5		= standards.5
-XPG3.5		= standards.5
-XPG4.5		= standards.5
-XPG4v2.5	= standards.5
+ANSI.5		:= LINKSRC = standards.5
+C++.5		:= LINKSRC = standards.5
+C.5		:= LINKSRC = standards.5
+ISO.5		:= LINKSRC = standards.5
+POSIX.1.5	:= LINKSRC = standards.5
+POSIX.2.5	:= LINKSRC = standards.5
+POSIX.5		:= LINKSRC = standards.5
+SUS.5		:= LINKSRC = standards.5
+SUSv2.5		:= LINKSRC = standards.5
+SUSv3.5		:= LINKSRC = standards.5
+SVID.5		:= LINKSRC = standards.5
+SVID3.5		:= LINKSRC = standards.5
+XNS.5		:= LINKSRC = standards.5
+XNS4.5		:= LINKSRC = standards.5
+XNS5.5		:= LINKSRC = standards.5
+XPG.5		:= LINKSRC = standards.5
+XPG3.5		:= LINKSRC = standards.5
+XPG4.5		:= LINKSRC = standards.5
+XPG4v2.5	:= LINKSRC = standards.5
 
-teclarc.5	= tecla.5
+teclarc.5	:= LINKSRC = tecla.5
 
-pthreads.5	= threads.5
+pthreads.5	:= LINKSRC = threads.5
 
 .KEEP_STATE:
 

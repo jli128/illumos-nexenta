@@ -19,8 +19,8 @@
 # CDDL HEADER END
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2013 Nexenta Systems Inc.  All rights reserved.
+# Copyright (c) 2013 by Delphix. All rights reserved.
 #
 # MAPFILE HEADER START
 #
@@ -40,7 +40,6 @@ $mapfile_version 2
 SYMBOL_VERSION SUNWprivate {
     global:
 
-	lzc_dataset_list_next;
 	lzc_has_snaps;
 	lzc_objset_stats;
 	lzc_pool_configs;
@@ -58,7 +57,11 @@ SYMBOL_VERSION ILLUMOS_0.1 {
 	lzc_create;
 	lzc_destroy_snaps;
 	lzc_exists;
+	lzc_get_holds;
+	lzc_hold;
 	lzc_receive;
+	lzc_release;
+	lzc_rollback;
 	lzc_send;
 	lzc_send_space;
 	lzc_snaprange_space;

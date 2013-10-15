@@ -160,7 +160,7 @@ lshal: lshal.c
 install: all $(ROOTUSRSBINPROG) $(ROOTCMD) $(SUBDIR)
 
 clean: $(SUBDIR)
-	-$(RM) $(CLEANFILES)
+	$(RM) $(CLEANFILES)
 
 $(SUBDIR): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

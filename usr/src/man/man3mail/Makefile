@@ -11,7 +11,7 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
 
 include		$(SRC)/Makefile.master
@@ -23,9 +23,9 @@ MANFILES=	maillock.3mail
 MANLINKS=	mailunlock.3mail	\
 		touchlock.3mail
 
-mailunlock.3mail	= maillock.3mail
+mailunlock.3mail	:= LINKSRC = maillock.3mail
 
-touchlock.3mail		= maillock.3mail
+touchlock.3mail		:= LINKSRC = maillock.3mail
 
 .KEEP_STATE:
 

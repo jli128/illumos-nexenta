@@ -12,6 +12,7 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2013, OmniTI Computer Consulting, Inc.
 #
 
 file path=usr/share/man/man3socket/accept.3socket
@@ -20,6 +21,7 @@ file path=usr/share/man/man3socket/byteorder.3socket
 file path=usr/share/man/man3socket/connect.3socket
 file path=usr/share/man/man3socket/ethers.3socket
 file path=usr/share/man/man3socket/getaddrinfo.3socket
+file path=usr/share/man/man3socket/getifaddrs.3socket
 file path=usr/share/man/man3socket/getipnodebyname.3socket
 file path=usr/share/man/man3socket/getnetbyname.3socket
 file path=usr/share/man/man3socket/getpeername.3socket
@@ -50,6 +52,7 @@ file path=usr/share/man/man3socket/shutdown.3socket
 file path=usr/share/man/man3socket/socket.3socket
 file path=usr/share/man/man3socket/socketpair.3socket
 file path=usr/share/man/man3socket/spray.3socket
+link path=usr/share/man/man3socket/accept4.3socket target=accept.3socket
 link path=usr/share/man/man3socket/endnetent.3socket \
     target=getnetbyname.3socket
 link path=usr/share/man/man3socket/endprotoent.3socket \
@@ -65,6 +68,8 @@ link path=usr/share/man/man3socket/freeaddrinfo.3socket \
     target=getaddrinfo.3socket
 link path=usr/share/man/man3socket/freehostent.3socket \
     target=getipnodebyname.3socket
+link path=usr/share/man/man3socket/freeifaddrs.3socket \
+    target=getifaddrs.3socket
 link path=usr/share/man/man3socket/gai_strerror.3socket \
     target=getaddrinfo.3socket
 link path=usr/share/man/man3socket/getipnodebyaddr.3socket \

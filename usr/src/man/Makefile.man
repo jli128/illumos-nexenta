@@ -11,12 +11,12 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
 
 MANDOC=		$(ROOT)/usr/bin/mandoc
-ROOTHASMAN=	$(ROOT)/usr/has/man
 ROOTMAN=	$(ROOT)/usr/share/man
+ROOTHASMAN=	$(ROOT)/usr/has/man
 FILEMODE=	0444
 
 # The manual section being built, client Makefiles must set this to, for e.g.
@@ -30,8 +30,11 @@ ROOTMANLINKS=	$(MANLINKS:%=$(ROOTMAN)/man$(MANSECT)/%)
 $(ROOTMAN)/man$(MANSECT)/% $(ROOTHASMAN)/man$(MANSECT)/%: %
 		$(INS.file)
 
-$(ROOTMAN)/man$(MANSECT)/%:
-		$(RM) $@; $(SYMLINK) $($(@:$(ROOTMAN)/man$(MANSECT)/%=%)) $@
+$(MANLINKS):
+		$(RM) $@; $(SYMLINK) $(LINKSRC) $@
+
+$(ROOTMANLINKS): $(MANLINKS)
+		$(RM) $@; $(CP) -RP $(@F) $(@D)
 
 all:
 
@@ -41,6 +44,7 @@ check:
 clean:
 
 clobber:
+		$(RM) $(MANLINKS)
 
 .PARALLEL:
 

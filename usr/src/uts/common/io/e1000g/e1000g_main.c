@@ -23,6 +23,7 @@
  */
 
 /*
+ * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
@@ -682,6 +683,7 @@ e1000g_regs_map(struct e1000g *Adapter)
 	case e1000_ich10lan:
 	case e1000_pchlan:
 	case e1000_pch2lan:
+	case e1000_pch_lpt:
 		rnumber = ICH_FLASH_REG_SET;
 
 		/* get flash size */
@@ -888,6 +890,7 @@ e1000g_setup_max_mtu(struct e1000g *Adapter)
 		break;
 	/* pch2 can do jumbo frames up to 9K */
 	case e1000_pch2lan:
+	case e1000_pch_lpt:
 		Adapter->max_mtu = MAXIMUM_MTU_9K;
 		break;
 	/* types with a special limit */
@@ -1449,6 +1452,8 @@ e1000g_init(struct e1000g *Adapter)
 	} else if (hw->mac.type == e1000_pchlan) {
 		pba = E1000_PBA_26K;
 	} else if (hw->mac.type == e1000_pch2lan) {
+		pba = E1000_PBA_26K;
+	} else if (hw->mac.type == e1000_pch_lpt) {
 		pba = E1000_PBA_26K;
 	} else {
 		/*
@@ -2444,6 +2449,10 @@ e1000g_init_unicst(struct e1000g *Adapter)
 		if ((hw->mac.type == e1000_82571) &&
 		    (e1000_get_laa_state_82571(hw) == B_TRUE))
 			Adapter->unicst_total--;
+
+		/* VMware doesn't support multiple mac addresses properly */
+		if (hw->subsystem_vendor_id == 0x15ad)
+			Adapter->unicst_total = 1;
 
 		Adapter->unicst_avail = Adapter->unicst_total;
 

@@ -20,6 +20,8 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
@@ -93,6 +95,7 @@ zio_checksum_info_t zio_checksum_table[ZIO_CHECKSUM_FUNCTIONS] = {
 	{{fletcher_4_native,	fletcher_4_byteswap},	0, 1, 0, "zilog2"},
 	{{zio_checksum_SHA1CRC32,	zio_checksum_SHA1CRC32},	0, 0, 1,
 		"sha1crc32"},
+	{{zio_checksum_off,	zio_checksum_off},	0, 0, 0, "noparity"},
 };
 
 #pragma	weak zio_parallel_checksum_fsm = _zio_parallel_checksum_fsm
@@ -239,7 +242,7 @@ zio_checksum_error(zio_t *zio, zio_bad_cksum_t *info, int *zio_progress_p)
 	zio_cksum_t actual_cksum, expected_cksum, verifier;
 
 	if (checksum >= ZIO_CHECKSUM_FUNCTIONS || ci->ci_func[0] == NULL)
-		return (EINVAL);
+		return (SET_ERROR(EINVAL));
 
 	if (ci->ci_eck) {
 		zio_eck_t *eck;
@@ -254,10 +257,10 @@ zio_checksum_error(zio_t *zio, zio_bad_cksum_t *info, int *zio_progress_p)
 			else if (eck->zec_magic == BSWAP_64(ZEC_MAGIC))
 				nused = BSWAP_64(zilc->zc_nused);
 			else
-				return (ECKSUM);
+				return (SET_ERROR(ECKSUM));
 
 			if (nused > size)
-				return (ECKSUM);
+				return (SET_ERROR(ECKSUM));
 
 			size = P2ROUNDUP_TYPED(nused, ZIL_MIN_BLKSZ, uint64_t);
 		} else {

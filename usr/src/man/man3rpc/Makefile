@@ -11,7 +11,7 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
 
 include		$(SRC)/Makefile.master
@@ -25,8 +25,9 @@ MANFILES= 	rstat.3rpc	\
 MANLINKS=	havedisk.3rpc	\
 		rnusers.3rpc
 
-havedisk.3rpc	= rstat.3rpc
-rnusers.3rpc	= rusers.3rpc
+havedisk.3rpc	:= LINKSRC = rstat.3rpc
+
+rnusers.3rpc	:= LINKSRC = rusers.3rpc
 
 .KEEP_STATE:
 

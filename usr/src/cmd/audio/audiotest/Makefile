@@ -44,7 +44,7 @@ $(PROG):	$(OBJS)
 install: all $(ROOTPROG)
 
 clean:
-	-$(RM) $(OBJS)
+	$(RM) $(OBJS)
 
 lint:	lint_SRCS
 

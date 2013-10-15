@@ -11,7 +11,7 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
 
 include		$(SRC)/Makefile.master
@@ -43,28 +43,28 @@ MANLINKS=	dn_comp.3resolv			\
 	 	res_send.3resolv		\
 	 	res_setservers.3resolv
 
-dn_comp.3resolv			= resolver.3resolv
-dn_expand.3resolv		= resolver.3resolv
-fp_resstat.3resolv		= resolver.3resolv
-herror.3resolv			= resolver.3resolv
-hstrerror.3resolv		= resolver.3resolv
-res_getservers.3resolv		= resolver.3resolv
-res_hostalias.3resolv		= resolver.3resolv
-res_init.3resolv		= resolver.3resolv
-res_mkquery.3resolv		= resolver.3resolv
-res_nclose.3resolv		= resolver.3resolv
-res_ndestroy.3resolv		= resolver.3resolv
-res_ninit.3resolv		= resolver.3resolv
-res_nmkquery.3resolv		= resolver.3resolv
-res_nquery.3resolv		= resolver.3resolv
-res_nquerydomain.3resolv	= resolver.3resolv
-res_nsearch.3resolv		= resolver.3resolv
-res_nsend.3resolv		= resolver.3resolv
-res_nsendsigned.3resolv		= resolver.3resolv
-res_query.3resolv		= resolver.3resolv
-res_search.3resolv		= resolver.3resolv
-res_send.3resolv		= resolver.3resolv
-res_setservers.3resolv		= resolver.3resolv
+dn_comp.3resolv			:= LINKSRC = resolver.3resolv
+dn_expand.3resolv		:= LINKSRC = resolver.3resolv
+fp_resstat.3resolv		:= LINKSRC = resolver.3resolv
+herror.3resolv			:= LINKSRC = resolver.3resolv
+hstrerror.3resolv		:= LINKSRC = resolver.3resolv
+res_getservers.3resolv		:= LINKSRC = resolver.3resolv
+res_hostalias.3resolv		:= LINKSRC = resolver.3resolv
+res_init.3resolv		:= LINKSRC = resolver.3resolv
+res_mkquery.3resolv		:= LINKSRC = resolver.3resolv
+res_nclose.3resolv		:= LINKSRC = resolver.3resolv
+res_ndestroy.3resolv		:= LINKSRC = resolver.3resolv
+res_ninit.3resolv		:= LINKSRC = resolver.3resolv
+res_nmkquery.3resolv		:= LINKSRC = resolver.3resolv
+res_nquery.3resolv		:= LINKSRC = resolver.3resolv
+res_nquerydomain.3resolv	:= LINKSRC = resolver.3resolv
+res_nsearch.3resolv		:= LINKSRC = resolver.3resolv
+res_nsend.3resolv		:= LINKSRC = resolver.3resolv
+res_nsendsigned.3resolv		:= LINKSRC = resolver.3resolv
+res_query.3resolv		:= LINKSRC = resolver.3resolv
+res_search.3resolv		:= LINKSRC = resolver.3resolv
+res_send.3resolv		:= LINKSRC = resolver.3resolv
+res_setservers.3resolv		:= LINKSRC = resolver.3resolv
 
 .KEEP_STATE:
 

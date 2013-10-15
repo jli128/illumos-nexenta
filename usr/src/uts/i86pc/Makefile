@@ -46,10 +46,7 @@ LINT_LIBS	 = \
 		   $(CLOSED_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln) \
 		   $(INTEL_LINTS:%=$(INTEL_LIB_DIR)/llib-l%.ln)
 
-CLEANFILES +=	$(LINT_LIBS)
-
 I86PC_LINTS =	dr drmach_acpi
-CLEANFILES +=	$(I86PC_LINTS:%=lint-libs/$(OBJS_DIR)/llib-l%.ln)
 
 #
 #
@@ -83,6 +80,9 @@ def all clean clobber clean.lint: setup genassym unix .WAIT \
 
 install: install_platforms setup genassym unix .WAIT \
 	$(KMODS) $(CLOSED_KMODS) $(XMODS) $(CLOSED_XMODS) $(IMPLEMENTATIONS)
+
+# Need to clean in here too because of lint.
+clean: $(I86PC_LINTS)
 
 # list the modules under i86pc.
 modlist: unix $(KMODS) $(CLOSED_KMODS) $(XMODS) $(CLOSED_XMODS) \

@@ -11,7 +11,7 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
 
 include		$(SRC)/Makefile.master
@@ -41,12 +41,12 @@ MANLINKS=	picl_get_next_by_col.3picl	\
 		picl_get_propval_by_name.3picl	\
 		picl_set_propval_by_name.3picl
 
-picl_get_next_prop.3picl	= picl_get_first_prop.3picl
+picl_get_next_prop.3picl	:= LINKSRC = picl_get_first_prop.3picl
 
-picl_get_next_by_col.3picl	= picl_get_next_by_row.3picl
+picl_get_next_by_col.3picl	:= LINKSRC = picl_get_next_by_row.3picl
 
-picl_get_propval_by_name.3picl	= picl_get_propval.3picl
-picl_set_propval_by_name.3picl	= picl_set_propval.3picl
+picl_get_propval_by_name.3picl	:= LINKSRC = picl_get_propval.3picl
+picl_set_propval_by_name.3picl	:= LINKSRC = picl_set_propval.3picl
 
 .KEEP_STATE:
 

@@ -150,7 +150,7 @@ show_pool_stats(spa_t *spa)
 	nvlist_t *config, *nvroot;
 	char *name;
 
-	VERIFY(spa_get_stats(spa_name(spa), &config) == 0);
+	VERIFY(spa_get_stats(spa_name(spa), &config, NULL, 0) == 0);
 
 	VERIFY(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
 	    &nvroot) == 0);

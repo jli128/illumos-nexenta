@@ -388,7 +388,7 @@ is_whole_disk(const char *arg)
  * 	xxx		Shorthand for /dev/dsk/xxx
  */
 static nvlist_t *
-make_leaf_vdev(const char *arg, boolean_t is_log, boolean_t is_special)
+make_leaf_vdev(const char *arg, uint64_t is_log, uint64_t is_special)
 {
 	char path[MAXPATHLEN];
 	struct stat64 statbuf;
@@ -1298,8 +1298,8 @@ construct_spec(int argc, char **argv)
 				    children * sizeof (nvlist_t *));
 				if (child == NULL)
 					zpool_no_memory();
-				if ((nv = make_leaf_vdev(argv[c], B_FALSE,
-				    B_FALSE)) == NULL)
+				if ((nv = make_leaf_vdev(argv[c],
+				    (uint64_t)B_FALSE, (uint64_t)B_FALSE)) == NULL)
 					return (NULL);
 				child[children - 1] = nv;
 			}
@@ -1335,9 +1335,10 @@ construct_spec(int argc, char **argv)
 				verify(nvlist_add_string(nv, ZPOOL_CONFIG_TYPE,
 				    type) == 0);
 				verify(nvlist_add_uint64(nv,
-				    ZPOOL_CONFIG_IS_LOG, is_log) == 0);
+				    ZPOOL_CONFIG_IS_LOG, (uint64_t)is_log) == 0);
 				verify(nvlist_add_uint64(nv,
-				    ZPOOL_CONFIG_IS_SPECIAL, is_special) == 0);
+				    ZPOOL_CONFIG_IS_SPECIAL,
+				    (uint64_t)is_special) == 0);
 				if (strcmp(type, VDEV_TYPE_RAIDZ) == 0) {
 					verify(nvlist_add_uint64(nv,
 					    ZPOOL_CONFIG_NPARITY,
@@ -1356,8 +1357,8 @@ construct_spec(int argc, char **argv)
 			 * We have a device.  Pass off to make_leaf_vdev() to
 			 * construct the appropriate nvlist describing the vdev.
 			 */
-			if ((nv = make_leaf_vdev(argv[0], is_log, is_special))
-			    == NULL)
+			if ((nv = make_leaf_vdev(argv[0], (uint64_t)is_log,
+			    (uint64_t)is_special)) == NULL)
 				return (NULL);
 			if (is_log)
 				nlogs++;

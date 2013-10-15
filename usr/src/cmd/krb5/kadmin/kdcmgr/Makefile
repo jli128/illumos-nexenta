@@ -57,6 +57,6 @@ lint:
 	$(LINT.c) $(CSRCS) $(LDLIBS)
 
 clean:
-	-$(RM) $(OBJS)
+	$(RM) $(OBJS)
 
 include ../../../Makefile.targ

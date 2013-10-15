@@ -11,7 +11,7 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
 
 include		$(SRC)/Makefile.master
@@ -31,16 +31,16 @@ MANLINKS=	devid_compare.3devid		\
 		devid_str_free.3devid		\
 		devid_valid.3devid
 
-devid_compare.3devid		= devid_get.3devid
-devid_deviceid_to_nmlist.3devid = devid_get.3devid
-devid_free.3devid		= devid_get.3devid
-devid_free_nmlist.3devid	= devid_get.3devid
-devid_get_minor_name.3devid	= devid_get.3devid
-devid_sizeof.3devid		= devid_get.3devid
-devid_str_decode.3devid		= devid_get.3devid
-devid_str_encode.3devid		= devid_get.3devid
-devid_str_free.3devid		= devid_get.3devid
-devid_valid.3devid		= devid_get.3devid
+devid_compare.3devid		:= LINKSRC = devid_get.3devid
+devid_deviceid_to_nmlist.3devid := LINKSRC = devid_get.3devid
+devid_free.3devid		:= LINKSRC = devid_get.3devid
+devid_free_nmlist.3devid	:= LINKSRC = devid_get.3devid
+devid_get_minor_name.3devid	:= LINKSRC = devid_get.3devid
+devid_sizeof.3devid		:= LINKSRC = devid_get.3devid
+devid_str_decode.3devid		:= LINKSRC = devid_get.3devid
+devid_str_encode.3devid		:= LINKSRC = devid_get.3devid
+devid_str_free.3devid		:= LINKSRC = devid_get.3devid
+devid_valid.3devid		:= LINKSRC = devid_get.3devid
 
 .KEEP_STATE:
 

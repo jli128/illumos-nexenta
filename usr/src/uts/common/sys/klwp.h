@@ -26,6 +26,10 @@
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
+/*
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ */
+
 #ifndef	_SYS_KLWP_H
 #define	_SYS_KLWP_H
 
@@ -191,6 +195,7 @@ typedef struct _klwp {
 	struct contract	*lwp_ct_latest[CTT_MAXTYPE]; /* last created contract */
 
 	void	*lwp_brand;		/* per-lwp brand data */
+	struct psinfo *lwp_spymaster;	/* if an agent LWP, our spymaster */
 } klwp_t;
 
 /* lwp states */

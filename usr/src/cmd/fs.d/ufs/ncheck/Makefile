@@ -19,7 +19,6 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright (c) 1989,1996,1997 by Sun Microsystems, Inc.
 # All rights reserved.
@@ -36,6 +35,9 @@ OBJS=		$(LIBPROG).o $(ROLLOBJS)
 SRCS=		$(LIBPROG).c $(ROLLSRCS)
 POFILE=
 
+# No msg catalog here.
+POFILE=
+
 $(LIBPROG):	$(OBJS)
 		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 		$(POST_PROCESS)
@@ -43,6 +45,6 @@ $(LIBPROG):	$(OBJS)
 CPPFLAGS +=	-D_LARGEFILE64_SOURCE
 
 clean:
-		-$(RM) $(LIBPROG).o
+		$(RM) $(LIBPROG).o
 
 lint:		lint_SRCS

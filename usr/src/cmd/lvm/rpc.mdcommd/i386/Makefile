@@ -91,10 +91,10 @@ lint:
 	done
 
 clean:
-	-$(RM) $(OBJECTS) $(DERIVED_FILES) *.o a.out core
+	$(RM) $(OBJECTS) $(DERIVED_FILES) *.o
 
 clobber: clean
-	-$(RM) $(PROG)
+	$(RM) $(PROG) $(CLOBBERFILES)
 
 $(DERIVED_FILES): $(SRC)/uts/common/sys/lvm/mdmn_commd.x
 	$(RPCGEN) -c $(SRC)/uts/common/sys/lvm/mdmn_commd.x -o $@

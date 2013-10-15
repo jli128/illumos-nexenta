@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
 #ifndef	_STMF_H
@@ -391,8 +392,6 @@ stmf_status_t stmf_task_poll_lu(scsi_task_t *task, uint32_t timeout);
 stmf_status_t stmf_task_poll_lport(scsi_task_t *task, uint32_t timeout);
 stmf_status_t stmf_ctl(int cmd, void *obj, void *arg);
 stmf_status_t stmf_register_itl_handle(struct stmf_lu *lu, uint8_t *lun,
-    struct stmf_scsi_session *ss, uint64_t session_id, void *itl_handle);
-stmf_status_t stmf_deregister_itl_handle(struct stmf_lu *lu, uint8_t *lun,
     struct stmf_scsi_session *ss, uint64_t session_id, void *itl_handle);
 stmf_status_t stmf_deregister_all_lu_itl_handles(struct stmf_lu *lu);
 stmf_status_t stmf_get_itl_handle(struct stmf_lu *lu, uint8_t *lun,

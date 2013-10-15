@@ -22,7 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-
 #
 # Makefile for logical volume management
 #
@@ -56,10 +55,10 @@ all:    $(SUBDIRS)
 catalog:	$(POFILE)
 
 $(POFILE): $(POFILES)
-	-$(RM) $@
+	$(RM) $@
 	cat $(POFILES) > $(POFILE)
 
-CLOBBERFILES = $(POFILE) $(POFILES) metad_svc.c
+CLOBBERFILES += metad_svc.c
 
 clean clobber lint:	$(SUBDIRS)
 

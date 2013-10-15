@@ -22,6 +22,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <stdio.h>
@@ -60,9 +61,9 @@ static const topo_modops_t zfs_ops =
 static const topo_modinfo_t zfs_info =
 	{ ZFS, FM_FMRI_SCHEME_ZFS, ZFS_VERSION, &zfs_ops };
 
-static libzfs_handle_t *g_zfs;
+static libzfs_handle_t *g_zfs = NULL;
 static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
-static int g_refcount;
+static int g_refcount = 0;
 
 int
 zfs_init(topo_mod_t *mod, topo_version_t version)
@@ -88,7 +89,7 @@ zfs_init(topo_mod_t *mod, topo_version_t version)
 	if (g_refcount == 0) {
 		if ((g_zfs = libzfs_init()) == NULL) {
 			(void) pthread_mutex_unlock(&g_lock);
-			topo_mod_dprintf(mod, "failed to get handle from libzfs_init()");
+			topo_mod_dprintf(mod, "libzfs_init() failed");
 			topo_mod_unregister(mod);
 			return (topo_mod_seterrno(mod, EMOD_UNKNOWN));
 		}

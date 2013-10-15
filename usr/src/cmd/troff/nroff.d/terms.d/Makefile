@@ -1,4 +1,5 @@
 #
+#
 # Copyright (c) 1989 by Sun Microsystems, Inc.
 #
 # cmd/troff/nroff.d/terms.d/Makefile
@@ -52,4 +53,4 @@ $(ROOTLNKFILES) :	$$(ROOTLNKDEST)
 clean lint strip :
 
 clobber:
-	-$(RM) $(FILES)
+	$(RM) $(FILES)

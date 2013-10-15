@@ -238,6 +238,17 @@ add_comdat(Ofl_desc *ofl, Os_desc *osp, Is_desc *isp)
 	Isd_node	isd, *isdp;
 	avl_tree_t	*avlt;
 	avl_index_t	where;
+	Group_desc	*gr;
+
+	/*
+	 * Sections to which COMDAT groups apply are FLG_IS_COMDAT but are
+	 * discarded separately by the group logic so should never be
+	 * discarded here.
+	 */
+	if ((isp->is_shdr->sh_flags & SHF_GROUP) &&
+	    ((gr = ld_get_group(ofl, isp)) != NULL) &&
+	    (gr->gd_data[0] & GRP_COMDAT))
+		return (1);
 
 	/*
 	 * Create a COMDAT avl tree for this output section if required.
@@ -325,7 +336,7 @@ gnu_comdat_sym(Ifl_desc *ifl, Is_desc *gisp)
 		 * link-edits.  For now, size the section name dynamically.
 		 */
 		ssize = strlen(isp->is_name);
-		if ((strncmp(isp->is_name, gisp->is_name, ssize) != 0) &&
+		if ((strncmp(isp->is_name, gisp->is_name, ssize) == 0) &&
 		    (gisp->is_name[ssize] == '.'))
 			return ((char *)&gisp->is_name[ssize]);
 	}
@@ -851,6 +862,13 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, Place_path_info *path_info,
 	}
 
 	/*
+	 * When building relocatable objects, we must not redirect COMDAT
+	 * section names into their outputs, such that our output object may
+	 * be successfully used as an input object also requiring COMDAT
+	 * processing
+	 */
+
+	/*
 	 * GNU section names may follow the convention:
 	 *
 	 *	.gnu.linkonce.*
@@ -863,13 +881,15 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, Place_path_info *path_info,
 	 * because we know the name is not NULL, and therefore must have
 	 * at least one character plus a NULL termination.
 	 */
-	if (((ofl->ofl_flags & FLG_OF_RELOBJ) == 0) &&
-	    (isp->is_name == oname) && (isp->is_name[1] == 'g') &&
+	if ((isp->is_name == oname) && (isp->is_name[1] == 'g') &&
 	    (strncmp(MSG_ORIG(MSG_SCN_GNU_LINKONCE), isp->is_name,
 	    MSG_SCN_GNU_LINKONCE_SIZE) == 0)) {
-		if ((oname =
-		    (char *)gnu_linkonce_sec(isp->is_name)) != isp->is_name) {
-			DBG_CALL(Dbg_sec_redirected(ofl->ofl_lml, isp, oname));
+		if ((ofl->ofl_flags & FLG_OF_RELOBJ) == 0) {
+			if ((oname = (char *)gnu_linkonce_sec(isp->is_name)) !=
+			    isp->is_name) {
+				DBG_CALL(Dbg_sec_redirected(ofl->ofl_lml, isp,
+				    oname));
+			}
 		}
 
 		/*
@@ -894,16 +914,17 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, Place_path_info *path_info,
 	 * sections, and this identification can be triggered by a pattern
 	 * match section names.
 	 */
-	if (((ofl->ofl_flags & FLG_OF_RELOBJ) == 0) &&
-	    (isp->is_name == oname) && (isp->is_flags & FLG_IS_COMDAT) &&
+	if ((isp->is_name == oname) && (isp->is_flags & FLG_IS_COMDAT) &&
 	    ((sname = gnu_comdat_sym(ifl, isp)) != NULL)) {
 		size_t	size = sname - isp->is_name;
 
-		if ((oname = libld_malloc(size + 1)) == NULL)
-			return ((Os_desc *)S_ERROR);
-		(void) strncpy(oname, isp->is_name, size);
-		oname[size] = '\0';
-		DBG_CALL(Dbg_sec_redirected(ofl->ofl_lml, isp, oname));
+		if ((ofl->ofl_flags & FLG_OF_RELOBJ) == 0) {
+			if ((oname = libld_malloc(size + 1)) == NULL)
+				return ((Os_desc *)S_ERROR);
+			(void) strncpy(oname, isp->is_name, size);
+			oname[size] = '\0';
+			DBG_CALL(Dbg_sec_redirected(ofl->ofl_lml, isp, oname));
+		}
 
 		/*
 		 * Enable relaxed relocation processing, as this is
@@ -1199,6 +1220,7 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, Place_path_info *path_info,
 	 * so that they can be updated as a group later.
 	 */
 	if ((shdr->sh_type == SHT_GROUP) &&
+	    ((isp->is_flags & FLG_IS_DISCARD) == 0) &&
 	    (aplist_append(&ofl->ofl_osgroups, osp,
 	    AL_CNT_OFL_OSGROUPS) == NULL))
 		return ((Os_desc *)S_ERROR);

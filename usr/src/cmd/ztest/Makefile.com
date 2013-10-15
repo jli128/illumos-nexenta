@@ -48,6 +48,12 @@ LINTFLAGS64 += -xerroff=E_NAME_DEF_NOT_USED2
 
 CERRWARN += -_gcc=-Wno-switch
 
+# uncomment these for dbx/gdb debugging
+#COPTFLAG = -g
+#CTF_FLAGS =
+#CTFCONVERT_O=
+#CTFMERGE_LIB=
+
 .KEEP_STATE:
 
 all: $(PROG)
@@ -55,9 +61,12 @@ all: $(PROG)
 $(PROG): $(OBJS)
 	$(LINK.c) -o $(PROG) $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
+# replace with this for gdb/dbg debugging
+#	$(LINK.c) -g -o $(PROG) $(OBJS) $(LDLIBS)
+#	$(POST_PROCESS)
 
 clean:
-	-$(RM) $(OBJS)
+	$(RM) $(OBJS)
 
 lint:	lint_SRCS
 
@@ -66,3 +75,6 @@ include ../../Makefile.targ
 %.o: ../%.c
 	$(COMPILE.c) $<
 	$(POST_PROCESS_O)
+# replace with this for gdb/dbg debugging
+#	$(COMPILE.c) -g $<
+#	$(POST_PROCESS_O)

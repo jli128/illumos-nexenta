@@ -23,7 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-
 #
 # Makefile definitions for volume management
 #
@@ -58,7 +57,7 @@ _msg :=		TARGET= catalog
 all install clean cstyle lint: $(SUBDIRS)
 
 clobber: $(SUBDIRS)
-	-$(RM) $(POFILE) $(POFILES)
+	$(RM) $(CLOBBERFILES)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

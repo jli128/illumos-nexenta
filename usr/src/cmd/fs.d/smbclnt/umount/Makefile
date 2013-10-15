@@ -36,27 +36,30 @@ include		../../Makefile.fstype
 COMMON=		$(FSLIB)
 OBJS=		$(LIBPROG).o $(COMMON)
 SRCS=		$(LIBPROG).c $(FSLIBSRC)
-POFILE=		$(LIBPROG).po
-CLOBBERFILES	+= $(LIBPROG)
 
 $(ROOTLIBFSTYPE)/umount := FILEMODE= 04555
 
 CPPFLAGS += -I../.. -I../lib
 CFLAGS += $(CCVERBOSE)
 
-.KEEP_STATE:
-
-all:	$(ROOTFS_PROG)
-
-$(LIBPROG):	$(OBJS)
-		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
-		$(POST_PROCESS)
-
+#
+# Message catalog
+#
+POFILE=	$(LIBPROG).po
 catalog: $(POFILE)
 
-install:	$(ROOTLIBFSTYPEPROG)
+$(POFILE):      $(SRCS)
+	$(RM) $@
+	$(COMPILE.cpp) $(SRCS)   > $(POFILE).i
+	$(XGETTEXT) $(XGETFLAGS)        $(POFILE).i
+	sed "/^domain/d"        messages.po     > $@
+	$(RM) messages.po $(POFILE).i
+
+$(LIBPROG):	$(OBJS)
+		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
+		$(POST_PROCESS)
 
 lint:	lint_SRCS
 
 clean:     
-	$(RM) $(LIBPROG).o $(POFILE)
+	$(RM) $(LIBPROG).o

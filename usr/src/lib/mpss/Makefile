@@ -41,7 +41,7 @@ lint :=		TARGET= lint
 
 all install clean lint: $(SUBDIRS)
 clobber: $(SUBDIRS)
-	-$(RM) $(POFILE)
+	$(RM) $(POFILE)
 
 $(POFILE):	pofile_MSGFILES
 

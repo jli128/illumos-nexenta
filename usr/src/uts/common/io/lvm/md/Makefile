@@ -22,8 +22,10 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Path to the base of the uts directory tree (usually /usr/src/uts).
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
+
+# Path to the base of the uts directory tree (usually /usr/src/uts).
 UTSBASE	= ../../../..
 
 #
@@ -42,9 +44,9 @@ all_h install_h : $(DERIVED_FILES)
 check:
 
 clean:
+	$(RM) $(DERIVED_FILES)
 
-clobber:
-	-$(RM) $(DERIVED_FILES)
+clobber: clean
 
 %_xdr.c:	$(MD_XDR_XSRC)/%.x
 	$(RPCGEN) $(RPCGENFLAGS) -c -i 100 $(MD_XDR_XSRC)/$*.x | \

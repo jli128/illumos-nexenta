@@ -23,6 +23,10 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
+ */
 
 #include <assert.h>
 #include <dlfcn.h>
@@ -228,23 +232,7 @@ Pbrandname(struct ps_prochandle *P, char *buf, size_t buflen)
 char *
 Pzonename(struct ps_prochandle *P, char *s, size_t n)
 {
-	if (P->state == PS_IDLE) {
-		errno = ENODATA;
-		return (NULL);
-	}
-
-	if (P->state == PS_DEAD) {
-		if (P->core->core_zonename == NULL) {
-			errno = ENODATA;
-			return (NULL);
-		}
-		(void) strlcpy(s, P->core->core_zonename, n);
-	} else {
-		if (getzonenamebyid(P->status.pr_zoneid, s, n) < 0)
-			return (NULL);
-		s[n - 1] = '\0';
-	}
-	return (s);
+	return (P->ops.pop_zonename(P, s, n, P->data));
 }
 
 char *
@@ -792,9 +780,10 @@ Pfindmap(struct ps_prochandle *P, map_info_t *mptr, char *s, size_t n)
 	    (strcmp(mptr->map_pmap.pr_mapname, "a.out") == 0) ||
 	    ((fptr != NULL) && (fptr->file_lname != NULL) &&
 	    (strcmp(fptr->file_lname, "a.out") == 0))) {
-		(void) Pexecname(P, buf, sizeof (buf));
-		(void) strlcpy(s, buf, n);
-		return (s);
+		if (Pexecname(P, buf, sizeof (buf)) != NULL) {
+			(void) strlcpy(s, buf, n);
+			return (s);
+		}
 	}
 
 	/* Try /proc first to get the real object name */

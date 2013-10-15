@@ -138,6 +138,7 @@ COMMON_HDRDIRS= common/avs \
 		common/fs \
 		common/gssapi \
 		common/idmap \
+		common/klm \
 		common/inet \
 		common/inet/ipf/netinet \
 		common/inet/kssl \
@@ -166,15 +167,16 @@ $(CLOSED_BUILD)COMMON_HDRDIRS += $(CLOSED)/uts/common/sys
 
 #
 # Subset of COMMON_HDRDIRS in which at least one header is generated
-# at runtime (e.g., rpcgen).  (This is a partial list; there are
-# other directories that should be included and do not yet have the
-# necessary Makefile support.  See 6414855.)
+# at runtime (e.g., rpcgen), and in which "make clean" should run.
+# Other directories should be included here, but do not yet have the
+# necessary Makefile support (make clean).  See 6414855.
 #
 DYNHDRDIRS =	common/avs \
 		common/gssapi \
 		common/idmap \
 		common/io/fibre-channel/fca/qlc \
 		common/io/lvm/md \
+		common/klm \
 		common/rpc \
 		common/rpcsvc \
 		common/sys
@@ -197,6 +199,7 @@ all_h: FRC
 	@cd common/rpcsvc; pwd; $(MAKE) $@
 	@cd common/gssapi; pwd; $(MAKE) $@
 	@cd common/idmap; pwd; $(MAKE) $@
+	@cd common/klm; pwd; $(MAKE) $@
 
 clean clobber: $($(MACH)_ARCHITECTURES) $(DYNHDRDIRS)
 	@if [ '$(PATCH_BUILD)' != '#' ] ; then \
@@ -205,19 +208,10 @@ clean clobber: $($(MACH)_ARCHITECTURES) $(DYNHDRDIRS)
 	fi
 
 # Undo install_h without going through everything under uts.
+# For testing convenience.
 clobber_h: $(DYNHDRDIRS)
 
 clean.lint modlist: $($(MACH)_ARCHITECTURES)
-
-ONC_FILES=	common/io/timod.c \
-		common/os/sig.c \
-		common/os/flock.c \
-		common/os/sysent.c \
-		common/os/swapgeneric.c \
-		common/syscall/fcntl.c 
-
-# edit onc plus source files. 
-ONC_PLUS:	$(ONC_FILES:%=%_onc_plus) 
 
 #
 # Cross-reference customization: build a cross-reference over all of

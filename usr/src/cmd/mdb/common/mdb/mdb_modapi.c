@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
 #include <mdb/mdb_modapi.h>
@@ -67,6 +68,23 @@ ssize_t
 mdb_vwrite(const void *buf, size_t nbytes, uintptr_t addr)
 {
 	return (mdb_tgt_vwrite(mdb.m_target, buf, nbytes, addr));
+}
+
+ssize_t
+mdb_aread(void *buf, size_t nbytes, uintptr_t addr, void *as)
+{
+	ssize_t rbytes = mdb_tgt_aread(mdb.m_target, as, buf, nbytes, addr);
+
+	if (rbytes > 0 && rbytes < nbytes)
+		return (set_errbytes(rbytes, nbytes));
+
+	return (rbytes);
+}
+
+ssize_t
+mdb_awrite(const void *buf, size_t nbytes, uintptr_t addr, void *as)
+{
+	return (mdb_tgt_awrite(mdb.m_target, as, buf, nbytes, addr));
 }
 
 ssize_t
@@ -120,7 +138,7 @@ ssize_t
 mdb_readsym(void *buf, size_t nbytes, const char *name)
 {
 	ssize_t rbytes = mdb_tgt_readsym(mdb.m_target, MDB_TGT_AS_VIRT,
-	    buf, nbytes, MDB_TGT_OBJ_EXEC, name);
+	    buf, nbytes, MDB_TGT_OBJ_EVERY, name);
 
 	if (rbytes > 0 && rbytes < nbytes)
 		return (set_errbytes(rbytes, nbytes));
@@ -132,7 +150,7 @@ ssize_t
 mdb_writesym(const void *buf, size_t nbytes, const char *name)
 {
 	return (mdb_tgt_writesym(mdb.m_target, MDB_TGT_AS_VIRT,
-	    buf, nbytes, MDB_TGT_OBJ_EXEC, name));
+	    buf, nbytes, MDB_TGT_OBJ_EVERY, name));
 }
 
 ssize_t
@@ -140,7 +158,7 @@ mdb_readvar(void *buf, const char *name)
 {
 	GElf_Sym sym;
 
-	if (mdb_tgt_lookup_by_name(mdb.m_target, MDB_TGT_OBJ_EXEC,
+	if (mdb_tgt_lookup_by_name(mdb.m_target, MDB_TGT_OBJ_EVERY,
 	    name, &sym, NULL))
 		return (-1);
 
@@ -156,7 +174,7 @@ mdb_writevar(const void *buf, const char *name)
 {
 	GElf_Sym sym;
 
-	if (mdb_tgt_lookup_by_name(mdb.m_target, MDB_TGT_OBJ_EXEC,
+	if (mdb_tgt_lookup_by_name(mdb.m_target, MDB_TGT_OBJ_EVERY,
 	    name, &sym, NULL))
 		return (-1);
 
@@ -170,7 +188,7 @@ mdb_writevar(const void *buf, const char *name)
 int
 mdb_lookup_by_name(const char *name, GElf_Sym *sym)
 {
-	return (mdb_lookup_by_obj(MDB_TGT_OBJ_EXEC, name, sym));
+	return (mdb_lookup_by_obj(MDB_TGT_OBJ_EVERY, name, sym));
 }
 
 int
@@ -510,16 +528,44 @@ done:
 	return (rval);
 }
 
+typedef struct pwalk_step {
+	mdb_walk_cb_t ps_cb;
+	void *ps_private;
+} pwalk_step_t;
+
+static int
+pwalk_step(uintptr_t addr, const void *data, void *private)
+{
+	pwalk_step_t *psp = private;
+	int ret;
+
+	mdb.m_frame->f_cbactive = B_TRUE;
+	ret = psp->ps_cb(addr, data, psp->ps_private);
+	mdb.m_frame->f_cbactive = B_FALSE;
+
+	return (ret);
+}
+
 int
-mdb_pwalk(const char *name, mdb_walk_cb_t func, void *data, uintptr_t addr)
+mdb_pwalk(const char *name, mdb_walk_cb_t func, void *private, uintptr_t addr)
 {
 	mdb_iwalker_t *iwp = mdb_walker_lookup(name);
+	pwalk_step_t p;
 
 	if (func == NULL)
 		return (set_errno(EINVAL));
 
-	if (iwp != NULL)
-		return (walk_common(mdb_wcb_create(iwp, func, data, addr)));
+	p.ps_cb = func;
+	p.ps_private = private;
+
+	if (iwp != NULL) {
+		int ret;
+		int cbactive = mdb.m_frame->f_cbactive;
+		mdb.m_frame->f_cbactive = B_FALSE;
+		ret = walk_common(mdb_wcb_create(iwp, pwalk_step, &p, addr));
+		mdb.m_frame->f_cbactive = cbactive;
+		return (ret);
+	}
 
 	return (-1); /* errno is set for us */
 }

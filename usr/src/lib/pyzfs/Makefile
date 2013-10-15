@@ -45,7 +45,7 @@ POFILE =	pyzfs.po
 
 all install clean lint: $(SUBDIRS)
 clobber: $(SUBDIRS)
-	-$(RM) $(POFILE) $(PYCFILES)
+	$(RM) $(POFILE) $(PYCFILES)
 
 $(POFILE):	pofile_MSGFILES
 

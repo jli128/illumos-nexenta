@@ -79,7 +79,7 @@ $(ETCFLASHPOSTC)/% : %
 	$(INS.file)
 
 clean:
-	-$(RM) $(FLASHPREPROG)
+	$(RM) $(FLASHPREPROG)
 
 clobber: clean
-	-$(RM) $(ETCFLASHPREPROG)
+	$(RM) $(ETCFLASHPREPROG)

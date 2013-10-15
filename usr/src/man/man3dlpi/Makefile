@@ -11,7 +11,7 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
 
 include		$(SRC)/Makefile.master
@@ -43,9 +43,9 @@ MANFILES= 	dlpi_arptype.3dlpi	\
 MANLINKS=	dlpi_disabmulti.3dlpi	\
 		dlpi_promiscoff.3dlpi
 
-dlpi_disabmulti.3dlpi	= dlpi_enabmulti.3dlpi
+dlpi_disabmulti.3dlpi	:= LINKSRC = dlpi_enabmulti.3dlpi
 
-dlpi_promiscoff.3dlpi	= dlpi_promiscon.3dlpi
+dlpi_promiscoff.3dlpi	:= LINKSRC = dlpi_promiscon.3dlpi
 
 .KEEP_STATE:
 

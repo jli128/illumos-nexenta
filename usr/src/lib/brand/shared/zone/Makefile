@@ -50,7 +50,6 @@ $(POFILE): $(POFILES)
 	$(CAT) $(POFILES) > $@
 
 clean:
-	-$(RM) $(PROG) $(POFILES)
 
 lint:
 

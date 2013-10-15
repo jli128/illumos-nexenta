@@ -64,6 +64,3 @@ $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)
 
 FRC:
-
-# don't want clobber: clean dependency here
-# include ../../Makefile.targ

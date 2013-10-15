@@ -142,11 +142,11 @@ ROOTDEMOFILES = $(DEMOFILES:%=$(ROOTDEMODIR)/%)
 
 all:	$(DEMOFILES)
 
-clobber: clean
-	-$(RM) $(CLOBBERFILES)
-
 clean:
-	-$(RM) $(CLEANFILES)
+	$(RM) $(CLEANFILES)
+
+clobber: clean
+	$(RM) $(CLOBBERFILES)
 
 clean.lint install_h lint:
 

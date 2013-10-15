@@ -11,7 +11,7 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
 
 include		$(SRC)/Makefile.master
@@ -37,9 +37,9 @@ MANFILES=	lgrp_affinity_get.3lgrp		\
 MANLINKS=	lgrp_affinity_set.3lgrp		\
 		lgrp_latency_cookie.3lgrp
 
-lgrp_affinity_set.3lgrp		= lgrp_affinity_get.3lgrp
+lgrp_affinity_set.3lgrp		:= LINKSRC = lgrp_affinity_get.3lgrp
 
-lgrp_latency_cookie.3lgrp	= lgrp_latency.3lgrp
+lgrp_latency_cookie.3lgrp	:= LINKSRC = lgrp_latency.3lgrp
 
 .KEEP_STATE:
 

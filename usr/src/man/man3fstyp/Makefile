@@ -11,7 +11,7 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
 
 include		$(SRC)/Makefile.master
@@ -30,12 +30,12 @@ MANLINKS=	fstyp_fini.3fstyp		\
 	 	fstyp_mod_get_attr.3fstyp	\
 	 	fstyp_mod_ident.3fstyp
 
-fstyp_fini.3fstyp		= fstyp_init.3fstyp
+fstyp_fini.3fstyp		:= LINKSRC = fstyp_init.3fstyp
 
-fstyp_mod_dump.3fstyp		= fstyp_mod_init.3fstyp
-fstyp_mod_fini.3fstyp		= fstyp_mod_init.3fstyp
-fstyp_mod_get_attr.3fstyp	= fstyp_mod_init.3fstyp
-fstyp_mod_ident.3fstyp		= fstyp_mod_init.3fstyp
+fstyp_mod_dump.3fstyp		:= LINKSRC = fstyp_mod_init.3fstyp
+fstyp_mod_fini.3fstyp		:= LINKSRC = fstyp_mod_init.3fstyp
+fstyp_mod_get_attr.3fstyp	:= LINKSRC = fstyp_mod_init.3fstyp
+fstyp_mod_ident.3fstyp		:= LINKSRC = fstyp_mod_init.3fstyp
 
 .KEEP_STATE:
 

@@ -242,7 +242,7 @@ $(SUBDIRS): FRC
 clean: $(SUBDIRS)
 clobber: $(SUBDIRS) etc clobber_local
 clobber_local:
-	-$(RM) $(CLOBBERFILES)
+	$(RM) $(CLOBBERFILES)
 
 lint: $(SUBDIRS)
 

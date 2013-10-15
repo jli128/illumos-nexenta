@@ -20,8 +20,8 @@
  */
 
 /*
- * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
 #ifndef	_LIBZFS_CORE_H
@@ -51,14 +51,16 @@ int lzc_destroy_snaps(nvlist_t *snaps, boolean_t defer, nvlist_t **errlist);
 int lzc_snaprange_space(const char *firstsnap, const char *lastsnap,
     uint64_t *usedp);
 
+int lzc_hold(nvlist_t *holds, int cleanup_fd, nvlist_t **errlist);
+int lzc_release(nvlist_t *holds, nvlist_t **errlist);
+int lzc_get_holds(const char *snapname, nvlist_t **holdsp);
+
 int lzc_send(const char *snapname, const char *fromsnap, int fd);
 int lzc_receive(const char *snapname, nvlist_t *props, const char *origin,
     boolean_t force, int fd);
 int lzc_send_space(const char *snapname, const char *fromsnap,
     uint64_t *result);
 
-int lzc_dataset_list_next(const char *data, uint64_t *offset, char **nextds,
-    nvlist_t **stats, nvlist_t **props);
 int lzc_snapshot_list_next(const char *data, uint64_t *offset, char **nextsnap,
     nvlist_t **stats, nvlist_t **props);
 int lzc_objset_stats(const char *dataset, dmu_objset_type_t *type,
@@ -66,6 +68,7 @@ int lzc_objset_stats(const char *dataset, dmu_objset_type_t *type,
 
 boolean_t lzc_exists(const char *dataset);
 boolean_t lzc_has_snaps(const char *dataset);
+int lzc_rollback(const char *fsname, char *snapnamebuf, int snapnamelen);
 
 #ifdef	__cplusplus
 }

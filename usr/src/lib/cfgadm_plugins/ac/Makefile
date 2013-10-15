@@ -28,7 +28,7 @@
 include		$(SRC)/Makefile.master
 
 SUBDIRS=
-$(SPARC_BLD) SUBDIRS=	$(MACH) $(BUILD64) $(MACH64)
+$(SPARC_BLD)SUBDIRS=	$(MACH) $(BUILD64) $(MACH64)
 
 all :=		TARGET= all
 clean :=	TARGET= clean
@@ -51,9 +51,8 @@ GREP=	grep
 .KEEP_STATE:
 
 all clean delete install lint catalog package: $(SUBDIRS)
-clobber: $(SUBDIRS) clobber_local
-clobber_local:
-	-$(RM) $(POFILE) $(POFILES)
+clobber: $(SUBDIRS)
+	$(RM) $(POFILE) $(POFILES)
 
 $(MACH) $(MACH64):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

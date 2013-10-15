@@ -78,9 +78,8 @@ $(PROG): $(SUBDIRS) .WAIT $(OBJS_ALL)
 
 install: all $(ROOTCMD) $(SUBDIRS)
 
-clean: $(SUBDIRS) clean_local
-clean_local:
-	-$(RM) $(OBJS) $(OBJS_SOL)
+clean: $(SUBDIRS)
+	$(RM) $(OBJS) $(OBJS_SOL)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

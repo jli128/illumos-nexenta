@@ -11,7 +11,7 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
 
 include		$(SRC)/Makefile.master
@@ -36,17 +36,17 @@ MANLINKS=	Nblock.9p		\
 	 	inquiry-serial-no.9p	\
 	 	inquiry-vendor-id.9p
 
-ddi-no-autodetach.9p	= ddi-forceattach.9p
+ddi-no-autodetach.9p	:= LINKSRC = ddi-forceattach.9p
 
-inquiry-product-id.9p	= inquiry-device-type.9p
-inquiry-revision-id.9p	= inquiry-device-type.9p
-inquiry-serial-no.9p	= inquiry-device-type.9p
-inquiry-vendor-id.9p	= inquiry-device-type.9p
+inquiry-product-id.9p	:= LINKSRC = inquiry-device-type.9p
+inquiry-revision-id.9p	:= LINKSRC = inquiry-device-type.9p
+inquiry-serial-no.9p	:= LINKSRC = inquiry-device-type.9p
+inquiry-vendor-id.9p	:= LINKSRC = inquiry-device-type.9p
 
-Nblock.9p		= size.9p
-blksize.9p		= size.9p
-device-blksize.9p	= size.9p
-device-nblocks.9p	= size.9p
+Nblock.9p		:= LINKSRC = size.9p
+blksize.9p		:= LINKSRC = size.9p
+device-blksize.9p	:= LINKSRC = size.9p
+device-nblocks.9p	:= LINKSRC = size.9p
 
 .KEEP_STATE:
 

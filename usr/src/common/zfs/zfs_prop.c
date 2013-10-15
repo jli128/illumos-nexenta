@@ -20,8 +20,10 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011 by Delphix. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 /* Portions Copyright 2010 Robert Milkowski */
@@ -70,6 +72,7 @@ zfs_prop_init(void)
 		{ "fletcher4",	ZIO_CHECKSUM_FLETCHER_4 },
 		{ "sha256",	ZIO_CHECKSUM_SHA256 },
 		{ "sha1crc32",	ZIO_CHECKSUM_SHA1CRC32 },
+		{ "noparity",	ZIO_CHECKSUM_NOPARITY },
 		{ NULL }
 	};
 
@@ -101,6 +104,7 @@ zfs_prop_init(void)
 		{ "gzip-8",	ZIO_COMPRESS_GZIP_8 },
 		{ "gzip-9",	ZIO_COMPRESS_GZIP_9 },
 		{ "zle",	ZIO_COMPRESS_ZLE },
+		{ "lz4",	ZIO_COMPRESS_LZ4 },
 		{ NULL }
 	};
 
@@ -114,6 +118,7 @@ zfs_prop_init(void)
 		{ "discard",	ZFS_ACL_DISCARD },
 		{ "groupmask",	ZFS_ACL_GROUPMASK },
 		{ "passthrough", ZFS_ACL_PASSTHROUGH },
+		{ "restricted", ZFS_ACL_RESTRICTED },
 		{ NULL }
 	};
 
@@ -215,14 +220,15 @@ zfs_prop_init(void)
 	zprop_register_index(ZFS_PROP_COMPRESSION, "compression",
 	    ZIO_COMPRESS_DEFAULT, PROP_INHERIT,
 	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
-	    "on | off | lzjb | gzip | gzip-[1-9] | zle", "COMPRESS",
-	    compress_table);
+	    "on | off | lzjb | gzip | gzip-[1-9] | zle | lz4",
+	    "COMPRESS", compress_table);
 	zprop_register_index(ZFS_PROP_SNAPDIR, "snapdir", ZFS_SNAPDIR_HIDDEN,
 	    PROP_INHERIT, ZFS_TYPE_FILESYSTEM,
 	    "hidden | visible", "SNAPDIR", snapdir_table);
 	zprop_register_index(ZFS_PROP_ACLMODE, "aclmode", ZFS_ACL_DISCARD,
 	    PROP_INHERIT, ZFS_TYPE_FILESYSTEM,
-	    "discard | groupmask | passthrough", "ACLMODE", acl_mode_table);
+	    "discard | groupmask | passthrough | restricted", "ACLMODE",
+	    acl_mode_table);
 	zprop_register_index(ZFS_PROP_ACLINHERIT, "aclinherit",
 	    ZFS_ACL_RESTRICTED, PROP_INHERIT, ZFS_TYPE_FILESYSTEM,
 	    "discard | noallow | restricted | passthrough | passthrough-x",
@@ -351,6 +357,10 @@ zfs_prop_init(void)
 	    ZFS_TYPE_SNAPSHOT, "<count>", "USERREFS");
 	zprop_register_number(ZFS_PROP_WRITTEN, "written", 0, PROP_READONLY,
 	    ZFS_TYPE_DATASET, "<size>", "WRITTEN");
+	zprop_register_number(ZFS_PROP_LOGICALUSED, "logicalused", 0,
+	    PROP_READONLY, ZFS_TYPE_DATASET, "<size>", "LUSED");
+	zprop_register_number(ZFS_PROP_LOGICALREFERENCED, "logicalreferenced",
+	    0, PROP_READONLY, ZFS_TYPE_DATASET, "<size>", "LREFER");
 
 	/* default number properties */
 	zprop_register_number(ZFS_PROP_QUOTA, "quota", 0, PROP_DEFAULT,
@@ -394,12 +404,20 @@ zfs_prop_init(void)
 	    PROP_READONLY, ZFS_TYPE_DATASET, "OBJSETID");
 	zprop_register_hidden(ZFS_PROP_LSTXG, "lstxg", PROP_TYPE_NUMBER,
 	    PROP_READONLY, ZFS_TYPE_DATASET, "LSTXG");
-
+	zprop_register_hidden(ZFS_PROP_INCONSISTENT, "inconsistent",
+	    PROP_TYPE_NUMBER, PROP_READONLY, ZFS_TYPE_DATASET, "INCONSISTENT");
 
 	/* oddball properties */
 	zprop_register_impl(ZFS_PROP_CREATION, "creation", PROP_TYPE_NUMBER, 0,
 	    NULL, PROP_READONLY, ZFS_TYPE_DATASET,
 	    "<date>", "CREATION", B_FALSE, B_TRUE, NULL);
+#if 0
+        /* special class */
+        zprop_register_index(ZFS_PROP_SPECIALCLASS, "specialclass",
+            SPA_SPECIALCLASS_ZIL, PROP_INHERIT,
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT | ZFS_TYPE_VOLUME,
+	    "zil | meta", "SPECIALCLASS", specialclass_table);
+#endif
 }
 
 boolean_t

@@ -101,14 +101,12 @@ all:	$(PROG) $(JAVA_SUBDIRS) $(JARFILE) \
 		    .WAIT $(SUBDIRS)
 
 clean :	$(JAVA_SUBDIRS) $(SUBDIRS) clean_local
-
 clean_local:
-	-$(RM) $(OBJS)
+	$(RM) $(OBJS)
 
 clobber : $(JAVA_SUBDIRS) $(SUBDIRS) clobber_local
-
-clobber_local:
-	-$(RM) $(POFILES)
+clobber_local: clean_local
+	$(RM) $(CLOBBERFILES)
 
 lint: $(SUBDIRS)
 

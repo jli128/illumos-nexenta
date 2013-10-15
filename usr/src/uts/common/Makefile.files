@@ -21,7 +21,8 @@
 
 #
 # Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
 
@@ -145,7 +146,7 @@ GENUNIX_OBJS +=	\
 		ddi_intr_impl.o	\
 		ddi_intr_irm.o	\
 		ddi_nodeid.o	\
-		ddi_timer.o	\
+		ddi_periodic.o	\
 		devcfg.o	\
 		devcache.o	\
 		device.o	\
@@ -1349,17 +1350,22 @@ ZFS_COMMON_OBJS +=		\
 	dsl_dir.o		\
 	dsl_dataset.o		\
 	dsl_deadlist.o		\
+	dsl_destroy.o		\
 	dsl_pool.o		\
 	dsl_synctask.o		\
+	dsl_userhold.o		\
 	dmu_zfetch.o		\
 	dsl_deleg.o		\
 	dsl_prop.o		\
 	dsl_scan.o		\
 	zfeature.o		\
 	gzip.o			\
+	lz4.o			\
 	lzjb.o			\
 	metaslab.o		\
+	range_tree.o		\
 	refcount.o		\
+	rrwlock.o		\
 	sa.o			\
 	sha256.o		\
 	spa.o			\
@@ -1368,6 +1374,7 @@ ZFS_COMMON_OBJS +=		\
 	spa_history.o		\
 	spa_misc.o		\
 	space_map.o		\
+	space_reftree.o		\
 	txg.o			\
 	uberblock.o		\
 	unique.o		\
@@ -1419,7 +1426,6 @@ ZFS_OBJS +=			\
 	zfs_onexit.o		\
 	zfs_replay.o		\
 	zfs_rlock.o		\
-	rrwlock.o		\
 	zfs_vfsops.o		\
 	zfs_vnops.o		\
 	zvol.o
@@ -1466,6 +1472,23 @@ RPCMOD_OBJS +=	rpcmod.o	clnt_cots.o	clnt_clts.o \
 		svc.o		svc_clts.o	svc_gen.o	svc_cots.o \
 		rpcsys.o	xdr_sizeof.o	clnt_rdma.o	svc_rdma.o \
 		xdr_rdma.o	rdma_subr.o	xdrrdma_sizeof.o
+
+KLMMOD_OBJS +=	klmmod.o \
+		nlm_impl.o \
+		nlm_rpc_handle.o \
+		nlm_dispatch.o \
+		nlm_rpc_svc.o \
+		nlm_client.o \
+		nlm_service.o \
+		nlm_prot_clnt.o \
+		nlm_prot_xdr.o \
+		nlm_rpc_clnt.o \
+		nsm_addr_clnt.o \
+		nsm_addr_xdr.o \
+		sm_inter_clnt.o \
+		sm_inter_xdr.o
+
+KLMOPS_OBJS +=	klmops.o
 
 TLIMOD_OBJS +=	tlimod.o	t_kalloc.o	t_kbind.o	t_kclose.o \
 		t_kconnect.o	t_kfree.o	t_kgtstate.o	t_kopen.o \
@@ -1646,10 +1669,7 @@ K5_KRB= kfree.o copy_key.o \
 K5_OS=  timeofday.o toffset.o \
 	init_os_ctx.o c_ustime.o
 
-SEAL=
-# EXPORT DELETE START
 SEAL=	seal.o unseal.o
-# EXPORT DELETE END
 
 MECH=	delete_sec_context.o \
 	import_sec_context.o \
@@ -1707,14 +1727,6 @@ PCMCIA_OBJS += pcmcia.o cs.o cis.o cis_callout.o cis_handlers.o cis_params.o
 BUSRA_OBJS += busra.o
 
 PCS_OBJS += pcs.o
-
-PCAN_OBJS += pcan.o
-
-PCATA_OBJS += pcide.o pcdisk.o pclabel.o pcata.o
-
-PCSER_OBJS += pcser.o pcser_cis.o
-
-PCWL_OBJS += pcwl.o
 
 PSET_OBJS +=	pset.o
 
@@ -1882,6 +1894,19 @@ CH_COM_OBJS =	ch_mac.o ch_subr.o cspi.o espi.o ixf1010.o mc3.o mc4.o mc5.o \
 		vsc7321.o vsc7326.o xpak.o
 
 #
+#	Chelsio Terminator 4 10G NIC nexus driver module
+#
+CXGBE_FW_OBJS  =	t4_fw.o t4_cfg.o
+CXGBE_COM_OBJS =	t4_hw.o common.o
+CXGBE_NEX_OBJS =	t4_nexus.o t4_sge.o t4_mac.o t4_ioctl.o shared.o \
+			t4_l2t.o adapter.o osdep.o
+
+#
+#	Chelsio Terminator 4 10G NIC driver module
+#
+CXGBE_OBJS =	cxgbe.o
+
+#
 #	PCI strings file
 #
 PCI_STRING_OBJS = pci_strings.o
@@ -1898,21 +1923,31 @@ XGE_HAL_OBJS =  xgehal-channel.o xgehal-fifo.o xgehal-ring.o  xgehal-config.o \
 		xge-queue.o  xgehal-mgmt.o xgehal-mgmtaux.o
 
 #
+#	e1000/igb common objs
+#
+#	Historically e1000g and igb had separate copies of all of the common
+#	code. At this time while they are now sharing the same copy of it, they
+#	are building it into their own modules which is due to the differences
+#	in the osdep and debug portions of their code.
+#
+E1000API_OBJS += e1000_80003es2lan.o e1000_82540.o e1000_82541.o e1000_82542.o \
+		e1000_82543.o e1000_82571.o e1000_api.o e1000_ich8lan.o \
+		e1000_mac.o e1000_manage.o e1000_nvm.o e1000_phy.o \
+		e1000_82575.o e1000_i210.o e1000_mbx.o e1000_vf.o
+
+#
 #	e1000g module
 #
-E1000G_OBJS +=	e1000_80003es2lan.o e1000_82540.o e1000_82541.o e1000_82542.o \
-		e1000_82543.o e1000_82571.o e1000_api.o e1000_ich8lan.o \
-		e1000_mac.o e1000_manage.o e1000_nvm.o e1000_osdep.o \
-		e1000_phy.o e1000g_debug.o e1000g_main.o e1000g_alloc.o \
-		e1000g_tx.o e1000g_rx.o e1000g_stat.o
+E1000G_OBJS +=	e1000g_debug.o e1000g_main.o e1000g_alloc.o \
+		e1000g_tx.o e1000g_rx.o e1000g_stat.o \
+		e1000g_osdep.o e1000g_workarounds.o
+		
 
 #
 #	Intel 82575 1G NIC driver module
 #
-IGB_OBJS =	igb_82575.o igb_api.o igb_mac.o igb_manage.o \
-		igb_nvm.o igb_osdep.o igb_phy.o igb_buf.o \
-		igb_debug.o igb_gld.o igb_log.o igb_main.o \
-		igb_rx.o igb_stat.o igb_tx.o
+IGB_OBJS =	igb_buf.o igb_debug.o igb_gld.o igb_log.o igb_main.o \
+		igb_rx.o igb_stat.o igb_tx.o igb_osdep.o
 
 #
 #	Intel Pro/100 NIC driver module
@@ -2005,6 +2040,14 @@ MEGA_SAS_OBJS = megaraid_sas.o
 #	MR_SAS module
 #
 MR_SAS_OBJS = ld_pd_map.o mr_sas.o mr_sas_tbolt.o mr_sas_list.o
+
+#
+#	CPQARY3 module
+#
+CPQARY3_OBJS =	cpqary3.o cpqary3_noe.o cpqary3_talk2ctlr.o	\
+		cpqary3_isr.o cpqary3_transport.o cpqary3_mem.o	\
+		cpqary3_scsi.o cpqary3_util.o cpqary3_ioctl.o	\
+		cpqary3_bd.o
 
 #
 #	ISCSI_INITIATOR module

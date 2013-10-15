@@ -75,8 +75,6 @@ def:		$(DEF_DEPS) $(FWOBJ)
 all:		$(ALL_DEPS)
 
 clean:		$(CLEAN_DEPS)
-		$(RM) $(BINDEST)/$(FWBINCOPY)
-		$(RM) $(BINDEST)/$(BOOTBINCOPY)
 
 clobber:	$(CLOBBER_DEPS)
 

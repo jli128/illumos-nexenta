@@ -93,10 +93,10 @@ $(libaudio): $(COBJS) $(CCOBJS)
 	test ! -f $(RANLIB) || $(RANLIB) $@
 
 clean:
-	-$(RM) $(COBJS) $(CCOBJS)
+	$(RM) $(COBJS) $(CCOBJS)
 
 clobber: clean
-	-$(RM) $(libaudio)
+	$(RM) $(libaudio)
 
 lint:
 	$(LINT.c) $(LIBCSRCS) $(LDLIBS)

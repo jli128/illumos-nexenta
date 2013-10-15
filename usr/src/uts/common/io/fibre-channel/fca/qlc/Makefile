@@ -22,8 +22,10 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Path to the base of the uts directory tree (usually /usr/src/uts).
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
+
+# Path to the base of the uts directory tree (usually /usr/src/uts).
 UTSBASE	= ../../../../..
 
 #
@@ -46,12 +48,12 @@ all_h install_h : $(FWTABLE)
 check:
 
 clean:
+	$(RM) $(FWTABLE)
 
-clobber:
-	-$(RM) $(FWTABLE)
+clobber: clean
 
 $(FWTABLE): $(FWMODULES_SRC)
-	/usr/bin/rm -f $@
+	$(RM) $@
 	echo '#include <ql_apps.h>'             >> $@
 	echo '#include <ql_api.h>'              >> $@
 	echo 'struct fw_table fw_table[] = {'   >> $@

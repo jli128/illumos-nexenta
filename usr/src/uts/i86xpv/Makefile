@@ -22,6 +22,8 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 #	This makefile drives the production of all implementation architecture
 #	dependent modules for the i86xpv architecture.
 #
@@ -46,10 +48,7 @@ LINT_LIBS	 = \
 		   $(CLOSED_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln) \
 		   $(INTEL_LINTS:%=$(INTEL_LIB_DIR)/llib-l%.ln)
 
-CLEANFILES +=	$(LINT_LIBS)
-
-I86XPV_LINTS =	xdb xnb xnbe xnbo xnbu xpvtab
-CLEANFILES +=	$(I86XPV_LINTS:%=lint-libs/$(OBJS_DIR)/llib-l%.ln)
+I86XPV_LINTS =	xdb xnb xnbe xnbo xnbu xpvtap
 
 #
 #
@@ -74,13 +73,17 @@ check		:=	TARGET= check
 
 INITIAL_TARGETS = \
 	genassym \
-	unix
+	unix \
+	cpu/scripts
 
 def all clean clobber clean.lint: setup genassym unix .WAIT \
 	$(KMODS) $(CLOSED_KMODS) $(XMODS) $(CLOSED_XMODS)
 
 install: install_platforms setup genassym unix .WAIT \
 	$(KMODS) $(CLOSED_KMODS) $(XMODS) $(CLOSED_XMODS)
+
+# Need to clean in here too because of lint.
+clean: $(I86XPV_LINTS)
 
 # list the modules under i86xpv.
 modlist: unix $(KMODS) $(CLOSED_KMODS) $(XMODS) $(CLOSED_XMODS)
@@ -99,6 +102,7 @@ genassym unix $(KMODS):	FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
 
 setup: FRC
+	@cd cpu/scripts; pwd; $(MAKE) $(TARGET)
 
 $(XMODS):	FRC
 	@if [ -f $@/Makefile  ]; then \

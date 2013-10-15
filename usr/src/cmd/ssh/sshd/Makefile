@@ -108,7 +108,7 @@ $(DIRS):
 	$(INS.dir)
 
 clean:
-	-$(RM) -f $(OBJS) $(EXTOBJS)
+	$(RM) $(OBJS) $(EXTOBJS)
 
 lint:	lint_SRCS
 

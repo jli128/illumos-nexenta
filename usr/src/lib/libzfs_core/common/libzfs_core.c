@@ -20,8 +20,9 @@
  */
 
 /*
- * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright (c) 2013 Steven Hartland. All rights reserved.
  */
 
 /*
@@ -263,7 +264,7 @@ lzc_clone(const char *fsname, const char *origin,
  * The value will be the (int32) error code.
  *
  * The return value will be 0 if all snapshots were created, otherwise it will
- * be the errno of a (undetermined) snapshot that failed.
+ * be the errno of a (unspecified) snapshot that failed.
  */
 int
 lzc_snapshot(nvlist_t *snaps, nvlist_t *props, nvlist_t **errlist)
@@ -312,7 +313,7 @@ lzc_snapshot(nvlist_t *snaps, nvlist_t *props, nvlist_t **errlist)
  * The return value will be 0 if all snapshots were destroyed (or marked for
  * later destruction if 'defer' is set) or didn't exist to begin with.
  *
- * Otherwise the return value will be the errno of a (undetermined) snapshot
+ * Otherwise the return value will be the errno of a (unspecified) snapshot
  * that failed, no snapshots will be destroyed, and the errlist will have an
  * entry for each snapshot that failed.  The value in the errlist will be
  * the (int32) error code.
@@ -341,7 +342,6 @@ lzc_destroy_snaps(nvlist_t *snaps, boolean_t defer, nvlist_t **errlist)
 	nvlist_free(args);
 
 	return (error);
-
 }
 
 int
@@ -391,44 +391,6 @@ lzc_extract_name(nvlist_t *nvl, const char *propname, char **name)
 	errno = 0;
 	if ((*name = strdup(p)) == NULL)
 		ret = errno;
-
-	return (ret);
-}
-
-/*
- * We have to know our dataset and offset and optionally accept the name of the
- * next dataset and its stats and props.
- */
-int
-lzc_dataset_list_next(const char *dataset, uint64_t *offset, char **nextds,
-    nvlist_t **stats, nvlist_t **props)
-{
-	int ret;
-	nvlist_t *args, *result;
-
-	if (dataset == NULL || offset == NULL)
-		return (EINVAL);
-
-	args = fnvlist_alloc();
-	fnvlist_add_uint64(args, "offset", *offset);
-	if ((ret = lzc_ioctl(ZFS_IOC_DATASET_LIST_NEXT_NVL, dataset, args,
-	    &result)) == 0) {
-		if (nextds != NULL) {
-			if ((ret = lzc_extract_name(result, "nextds", nextds))
-			    != 0)
-				goto out;
-		}
-		if (stats != NULL)
-			*stats = lzc_extract_nvl(result, "stats");
-		if (props != NULL)
-			*props = lzc_extract_nvl(result, "props");
-		*offset = fnvlist_lookup_uint64(result, "offset");
-	}
-
-out:
-	if (result != NULL)
-		nvlist_free(result);
-	nvlist_free(args);
 
 	return (ret);
 }
@@ -521,6 +483,113 @@ lzc_has_snaps(const char *dataset)
 {
 	uint64_t offset = 0;
 	return (lzc_snapshot_list_next(dataset, &offset, NULL, NULL, NULL));
+}
+
+/*
+ * Create "user holds" on snapshots.  If there is a hold on a snapshot,
+ * the snapshot can not be destroyed.  (However, it can be marked for deletion
+ * by lzc_destroy_snaps(defer=B_TRUE).)
+ *
+ * The keys in the nvlist are snapshot names.
+ * The snapshots must all be in the same pool.
+ * The value is the name of the hold (string type).
+ *
+ * If cleanup_fd is not -1, it must be the result of open("/dev/zfs", O_EXCL).
+ * In this case, when the cleanup_fd is closed (including on process
+ * termination), the holds will be released.  If the system is shut down
+ * uncleanly, the holds will be released when the pool is next opened
+ * or imported.
+ *
+ * Holds for snapshots which don't exist will be skipped and have an entry
+ * added to errlist, but will not cause an overall failure.
+ *
+ * The return value will be 0 if all holds, for snapshots that existed,
+ * were succesfully created.
+ *
+ * Otherwise the return value will be the errno of a (unspecified) hold that
+ * failed and no holds will be created.
+ *
+ * In all cases the errlist will have an entry for each hold that failed
+ * (name = snapshot), with its value being the error code (int32).
+ */
+int
+lzc_hold(nvlist_t *holds, int cleanup_fd, nvlist_t **errlist)
+{
+	char pool[MAXNAMELEN];
+	nvlist_t *args;
+	nvpair_t *elem;
+	int error;
+
+	/* determine the pool name */
+	elem = nvlist_next_nvpair(holds, NULL);
+	if (elem == NULL)
+		return (0);
+	(void) strlcpy(pool, nvpair_name(elem), sizeof (pool));
+	pool[strcspn(pool, "/@")] = '\0';
+
+	args = fnvlist_alloc();
+	fnvlist_add_nvlist(args, "holds", holds);
+	if (cleanup_fd != -1)
+		fnvlist_add_int32(args, "cleanup_fd", cleanup_fd);
+
+	error = lzc_ioctl(ZFS_IOC_HOLD, pool, args, errlist);
+	nvlist_free(args);
+	return (error);
+}
+
+/*
+ * Release "user holds" on snapshots.  If the snapshot has been marked for
+ * deferred destroy (by lzc_destroy_snaps(defer=B_TRUE)), it does not have
+ * any clones, and all the user holds are removed, then the snapshot will be
+ * destroyed.
+ *
+ * The keys in the nvlist are snapshot names.
+ * The snapshots must all be in the same pool.
+ * The value is a nvlist whose keys are the holds to remove.
+ *
+ * Holds which failed to release because they didn't exist will have an entry
+ * added to errlist, but will not cause an overall failure.
+ *
+ * The return value will be 0 if the nvl holds was empty or all holds that
+ * existed, were successfully removed.
+ *
+ * Otherwise the return value will be the errno of a (unspecified) hold that
+ * failed to release and no holds will be released.
+ *
+ * In all cases the errlist will have an entry for each hold that failed to
+ * to release.
+ */
+int
+lzc_release(nvlist_t *holds, nvlist_t **errlist)
+{
+	char pool[MAXNAMELEN];
+	nvpair_t *elem;
+
+	/* determine the pool name */
+	elem = nvlist_next_nvpair(holds, NULL);
+	if (elem == NULL)
+		return (0);
+	(void) strlcpy(pool, nvpair_name(elem), sizeof (pool));
+	pool[strcspn(pool, "/@")] = '\0';
+
+	return (lzc_ioctl(ZFS_IOC_RELEASE, pool, holds, errlist));
+}
+
+/*
+ * Retrieve list of user holds on the specified snapshot.
+ *
+ * On success, *holdsp will be set to a nvlist which the caller must free.
+ * The keys are the names of the holds, and the value is the creation time
+ * of the hold (uint64) in seconds since the epoch.
+ */
+int
+lzc_get_holds(const char *snapname, nvlist_t **holdsp)
+{
+	int error;
+	nvlist_t *innvl = fnvlist_alloc();
+	error = lzc_ioctl(ZFS_IOC_GET_HOLDS, snapname, innvl, holdsp);
+	fnvlist_free(innvl);
+	return (error);
 }
 
 /*
@@ -665,4 +734,28 @@ out:
 		fnvlist_pack_free(packed, size);
 	free((void*)(uintptr_t)zc.zc_nvlist_dst);
 	return (error);
+}
+
+/*
+ * Roll back this filesystem or volume to its most recent snapshot.
+ * If snapnamebuf is not NULL, it will be filled in with the name
+ * of the most recent snapshot.
+ *
+ * Return 0 on success or an errno on failure.
+ */
+int
+lzc_rollback(const char *fsname, char *snapnamebuf, int snapnamelen)
+{
+	nvlist_t *args;
+	nvlist_t *result;
+	int err;
+
+	args = fnvlist_alloc();
+	err = lzc_ioctl(ZFS_IOC_ROLLBACK, fsname, args, &result);
+	nvlist_free(args);
+	if (err == 0 && snapnamebuf != NULL) {
+		const char *snapname = fnvlist_lookup_string(result, "target");
+		(void) strlcpy(snapnamebuf, snapname, snapnamelen);
+	}
+	return (err);
 }

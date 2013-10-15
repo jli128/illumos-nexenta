@@ -174,11 +174,11 @@ FRC:
 
 clean: $(SUBDIRS) clean_local
 clean_local:
-	-$(RM) $(CLEANFILES)
+	$(RM) $(CLEANFILES)
 
 clobber: $(SUBDIRS) clobber_local
 clobber_local: clean_local
-	-$(RM) $(CLOBBERFILES) 
+	$(RM) $(CLOBBERFILES) 
 
 LINTLOCALS=	$(LINTCLEAN:%.c=lint-%)
 

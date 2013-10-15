@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
- * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
@@ -61,6 +61,8 @@ extern "C" {
 #include <dirent.h>
 #include <time.h>
 #include <procfs.h>
+#include <pthread.h>
+#include <sys/debug.h>
 #include <libsysevent.h>
 #include <sys/note.h>
 #include <sys/types.h>
@@ -79,6 +81,7 @@ extern "C" {
 #include <sys/sysevent/dev.h>
 #include <sys/sunddi.h>
 #include <sys/debug.h>
+#include "zfs.h"
 
 /*
  * Debugging
@@ -119,33 +122,50 @@ extern int aok;
 
 #ifdef DTRACE_PROBE
 #undef	DTRACE_PROBE
-#define	DTRACE_PROBE(a)	((void)0)
 #endif	/* DTRACE_PROBE */
+#define	DTRACE_PROBE(a) \
+	ZFS_PROBE0(#a)
 
 #ifdef DTRACE_PROBE1
 #undef	DTRACE_PROBE1
-#define	DTRACE_PROBE1(a, b, c)	((void)0)
 #endif	/* DTRACE_PROBE1 */
+#define	DTRACE_PROBE1(a, b, c) \
+	ZFS_PROBE1(#a, (unsigned long)c)
 
 #ifdef DTRACE_PROBE2
 #undef	DTRACE_PROBE2
-#define	DTRACE_PROBE2(a, b, c, d, e)	((void)0)
 #endif	/* DTRACE_PROBE2 */
+#define	DTRACE_PROBE2(a, b, c, d, e) \
+	ZFS_PROBE2(#a, (unsigned long)c, (unsigned long)e)
 
 #ifdef DTRACE_PROBE3
 #undef	DTRACE_PROBE3
-#define	DTRACE_PROBE3(a, b, c, d, e, f, g)	((void)0)
 #endif	/* DTRACE_PROBE3 */
+#define	DTRACE_PROBE3(a, b, c, d, e, f, g) \
+	ZFS_PROBE3(#a, (unsigned long)c, (unsigned long)e, (unsigned long)g)
 
 #ifdef DTRACE_PROBE4
 #undef	DTRACE_PROBE4
-#define	DTRACE_PROBE4(a, b, c, d, e, f, g, h, i)	((void)0)
 #endif	/* DTRACE_PROBE4 */
+#define	DTRACE_PROBE4(a, b, c, d, e, f, g, h, i) \
+	ZFS_PROBE4(#a, (unsigned long)c, (unsigned long)e, (unsigned long)g, \
+	(unsigned long)i)
+
+/*
+ * We use the comma operator so that this macro can be used without much
+ * additional code.  For example, "return (EINVAL);" becomes
+ * "return (SET_ERROR(EINVAL));".  Note that the argument will be evaluated
+ * twice, so it should not have side effects (e.g. something like:
+ * "return (SET_ERROR(log_error(EINVAL, info)));" would log the error twice).
+ */
+#define	SET_ERROR(err) (ZFS_SET_ERROR(err), err)
 
 /*
  * Threads
  */
 #define	curthread	((void *)(uintptr_t)thr_self())
+
+#define	kpreempt(x)	yield()
 
 typedef struct kthread kthread_t;
 
@@ -224,6 +244,9 @@ typedef int krw_t;
 #undef RW_WRITE_HELD
 #define	RW_WRITE_HELD(x)	_rw_write_held(&(x)->rw_lock)
 
+#undef RW_LOCK_HELD
+#define	RW_LOCK_HELD(x)		(RW_READ_HELD(x) || RW_WRITE_HELD(x))
+
 extern void rw_init(krwlock_t *rwlp, char *name, int type, void *arg);
 extern void rw_destroy(krwlock_t *rwlp);
 extern void rw_enter(krwlock_t *rwlp, krw_t rw);
@@ -249,16 +272,32 @@ extern void cv_init(kcondvar_t *cv, char *name, int type, void *arg);
 extern void cv_destroy(kcondvar_t *cv);
 extern void cv_wait(kcondvar_t *cv, kmutex_t *mp);
 extern clock_t cv_timedwait(kcondvar_t *cv, kmutex_t *mp, clock_t abstime);
+extern clock_t cv_timedwait_hires(kcondvar_t *cvp, kmutex_t *mp, hrtime_t tim,
+    hrtime_t res, int flag);
 extern void cv_signal(kcondvar_t *cv);
 extern void cv_broadcast(kcondvar_t *cv);
 
 /*
+ * Thread-specific data
+ */
+#define	tsd_get(k) pthread_getspecific(k)
+#define	tsd_set(k, v) pthread_setspecific(k, v)
+#define	tsd_create(kp, d) pthread_key_create(kp, d)
+#define	tsd_destroy(kp) /* nothing */
+
+/*
  * kstat creation, installation and deletion
  */
-extern kstat_t *kstat_create(char *, int,
-    char *, char *, uchar_t, ulong_t, uchar_t);
+extern kstat_t *kstat_create(const char *, int,
+    const char *, const char *, uchar_t, ulong_t, uchar_t);
 extern void kstat_install(kstat_t *);
 extern void kstat_delete(kstat_t *);
+extern void kstat_waitq_enter(kstat_io_t *);
+extern void kstat_waitq_exit(kstat_io_t *);
+extern void kstat_runq_enter(kstat_io_t *);
+extern void kstat_runq_exit(kstat_io_t *);
+extern void kstat_waitq_to_runq(kstat_io_t *);
+extern void kstat_runq_back_to_waitq(kstat_io_t *);
 
 /*
  * Kernel memory
@@ -515,7 +554,7 @@ typedef struct callb_cpr {
 #define	INGLOBALZONE(z)			(1)
 
 extern char *kmem_asprintf(const char *fmt, ...);
-#define	strfree(str) kmem_free((str), strlen(str)+1)
+#define	strfree(str) kmem_free((str), strlen(str) + 1)
 
 /*
  * Hostname information
@@ -576,6 +615,64 @@ void ksiddomain_rele(ksiddomain_t *);
 #define	DDI_SLEEP	KM_SLEEP
 #define	ddi_log_sysevent(_a, _b, _c, _d, _e, _f, _g) \
 	sysevent_post_event(_c, _d, _b, "libzpool", _e, _f)
+
+/*
+ * Cyclic information
+ */
+extern kmutex_t cpu_lock;
+
+typedef uintptr_t cyclic_id_t;
+typedef uint16_t cyc_level_t;
+typedef void (*cyc_func_t)(void *);
+
+#define	CY_LOW_LEVEL	0
+#define	CY_INFINITY	INT64_MAX
+#define	CYCLIC_NONE	((cyclic_id_t)0)
+
+typedef struct cyc_time {
+	hrtime_t cyt_when;
+	hrtime_t cyt_interval;
+} cyc_time_t;
+
+typedef struct cyc_handler {
+	cyc_func_t cyh_func;
+	void *cyh_arg;
+	cyc_level_t cyh_level;
+} cyc_handler_t;
+
+extern cyclic_id_t cyclic_add(cyc_handler_t *, cyc_time_t *);
+extern void cyclic_remove(cyclic_id_t);
+extern int cyclic_reprogram(cyclic_id_t, hrtime_t);
+
+/*
+ * Buf structure
+ */
+#define	B_BUSY		0x0001
+#define	B_DONE		0x0002
+#define	B_ERROR		0x0004
+#define	B_READ		0x0040	/* read when I/O occurs */
+#define	B_WRITE		0x0100	/* non-read pseudo-flag */
+
+typedef struct buf {
+	int	b_flags;
+	size_t b_bcount;
+	union {
+		caddr_t b_addr;
+	} b_un;
+
+	lldaddr_t	_b_blkno;
+#define	b_lblkno	_b_blkno._f
+	size_t	b_resid;
+	size_t	b_bufsize;
+	int	(*b_iodone)(struct buf *);
+	int	b_error;
+	void	*b_private;
+} buf_t;
+
+extern void bioinit(buf_t *);
+extern void biodone(buf_t *);
+extern void bioerror(buf_t *, int);
+extern int geterror(buf_t *);
 
 #ifdef	__cplusplus
 }

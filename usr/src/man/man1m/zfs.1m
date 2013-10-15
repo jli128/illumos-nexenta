@@ -23,10 +23,11 @@
 .\" Copyright (c) 2009 Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2011 Joshua M. Clulow <josh@sysmgr.org>
 .\" Copyright (c) 2012 by Delphix. All rights reserved.
-.\" Copyright (c) 2012, Joyent, Inc. All rights reserved.
-.\" Copyright 2012 Nexenta Systems, Inc. All Rights Reserved.
+.\" Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
+.\" Copyright 2013 Nexenta Systems, Inc.  All Rights Reserved.
+.\" Copyright (c) 2013, Joyent, Inc. All rights reserved.
 .\"
-.TH ZFS 1M "Sep 16, 2012"
+.TH ZFS 1M "Jan 26, 2013"
 .SH NAME
 zfs \- configures ZFS file systems
 .SH SYNOPSIS
@@ -37,12 +38,12 @@ zfs \- configures ZFS file systems
 
 .LP
 .nf
-\fBzfs\fR \fBcreate\fR [\fB-p\fR] [\fB-o\fR \fIproperty\fR=\fIvalue\fR] ... \fIfilesystem\fR
+\fBzfs\fR \fBcreate\fR [\fB-p\fR] [\fB-o\fR \fIproperty\fR=\fIvalue\fR]... \fIfilesystem\fR
 .fi
 
 .LP
 .nf
-\fBzfs\fR \fBcreate\fR [\fB-ps\fR] [\fB-b\fR \fIblocksize\fR] [\fB-o\fR \fIproperty\fR=\fIvalue\fR] ... \fB-V\fR \fIsize\fR \fIvolume\fR
+\fBzfs\fR \fBcreate\fR [\fB-ps\fR] [\fB-b\fR \fIblocksize\fR] [\fB-o\fR \fIproperty\fR=\fIvalue\fR]... \fB-V\fR \fIsize\fR \fIvolume\fR
 .fi
 
 .LP
@@ -52,7 +53,7 @@ zfs \- configures ZFS file systems
 
 .LP
 .nf
-\fBzfs\fR \fBdestroy\fR [\fB-dnpRrv\fR] \fIfilesystem\fR|\fIvolume\fR@\fIsnap\fR[%\fIsnap\fR][,...]
+\fBzfs\fR \fBdestroy\fR [\fB-dnpRrv\fR] \fIfilesystem\fR|\fIvolume\fR@\fIsnap\fR[%\fIsnap\fR][,\fIsnap\fR[%\fIsnap\fR]]...
 .fi
 
 .LP
@@ -68,7 +69,7 @@ zfs \- configures ZFS file systems
 
 .LP
 .nf
-\fBzfs\fR \fBclone\fR [\fB-p\fR] [\fB-o\fR \fIproperty\fR=\fIvalue\fR] ... \fIsnapshot\fR \fIfilesystem\fR|\fIvolume\fR
+\fBzfs\fR \fBclone\fR [\fB-p\fR] [\fB-o\fR \fIproperty\fR=\fIvalue\fR]... \fIsnapshot\fR \fIfilesystem\fR|\fIvolume\fR
 .fi
 
 .LP
@@ -94,24 +95,25 @@ zfs \- configures ZFS file systems
 
 .LP
 .nf
-\fBzfs\fR \fBlist\fR [\fB-r\fR|\fB-d\fR \fIdepth\fR][\fB-H\fR][\fB-o\fR \fIproperty\fR[,...]] [\fB-t\fR \fItype\fR[,...]]
-     [\fB-s\fR \fIproperty\fR] ... [\fB-S\fR \fIproperty\fR] ... [\fIfilesystem\fR|\fIvolume\fR|\fIsnapshot\fR] ...
+\fBzfs\fR \fBlist\fR [\fB-r\fR|\fB-d\fR \fIdepth\fR][\fB-H\fR][\fB-o\fR \fIproperty\fR[,\fIproperty\fR]...] [\fB-t\fR \fItype\fR[,\fItype\fR]...]
+     [\fB-s\fR \fIproperty\fR]... [\fB-S\fR \fIproperty\fR]... [\fIfilesystem\fR|\fIvolume\fR|\fIsnapshot\fR]...
 .fi
 
 .LP
 .nf
-\fBzfs\fR \fBset\fR \fIproperty\fR=\fIvalue\fR \fIfilesystem\fR|\fIvolume\fR|\fIsnapshot\fR ...
+\fBzfs\fR \fBset\fR \fIproperty\fR=\fIvalue\fR \fIfilesystem\fR|\fIvolume\fR|\fIsnapshot\fR...
 .fi
 
 .LP
 .nf
-\fBzfs\fR \fBget\fR [\fB-r\fR|\fB-d\fR \fIdepth\fR][\fB-Hp\fR][\fB-o\fR \fIfield\fR[,...]] [\fB-t\fR \fItype\fR[,...]]
-    [\fB-s\fR \fIsource\fR[,...]] "\fIall\fR" | \fIproperty\fR[,...] \fIfilesystem\fR|\fIvolume\fR|\fIsnapshot\fR ...
+\fBzfs\fR \fBget\fR [\fB-r\fR|\fB-d\fR \fIdepth\fR][\fB-Hp\fR][\fB-o\fR \fIfield\fR[,\fIfield\fR]...] [\fB-t\fR \fItype\fR[,\fItype\fR]...]
+    [\fB-s\fR \fIsource\fR[,\fIsource\fR]...] \fBall\fR | \fIproperty\fR[,\fIproperty\fR]...
+    \fIfilesystem\fR|\fIvolume\fR|\fIsnapshot\fR...
 .fi
 
 .LP
 .nf
-\fBzfs\fR \fBinherit\fR [\fB-r\fR] \fIproperty\fR \fIfilesystem\fR|\fIvolume|snapshot\fR ...
+\fBzfs\fR \fBinherit\fR [\fB-r\fR] \fIproperty\fR \fIfilesystem\fR|\fIvolume|snapshot\fR...
 .fi
 
 .LP
@@ -126,14 +128,14 @@ zfs \- configures ZFS file systems
 
 .LP
 .nf
-\fBzfs\fR \fBuserspace\fR [\fB-Hinp\fR] [\fB-o\fR \fIfield\fR[,...]] [\fB-s\fR \fIfield\fR] ...
-    [\fB-S\fR \fIfield\fR] ... [\fB-t\fR \fItype\fR[,...]] \fIfilesystem\fR|\fIsnapshot\fR
+\fBzfs\fR \fBuserspace\fR [\fB-Hinp\fR] [\fB-o\fR \fIfield\fR[,\fIfield\fR]...] [\fB-s\fR \fIfield\fR]...
+    [\fB-S\fR \fIfield\fR]... [\fB-t\fR \fItype\fR[,\fItype\fR]...] \fIfilesystem\fR|\fIsnapshot\fR
 .fi
 
 .LP
 .nf
-\fBzfs\fR \fBgroupspace\fR [\fB-Hinp\fR] [\fB-o\fR \fIfield\fR[,...]] [\fB-s\fR \fIfield\fR] ...
-    [\fB-S\fR \fIfield\fR] ... [\fB-t\fR \fItype\fR[,...]] \fIfilesystem\fR|\fIsnapshot\fR
+\fBzfs\fR \fBgroupspace\fR [\fB-Hinp\fR] [\fB-o\fR \fIfield\fR[,\fIfield\fR]...] [\fB-s\fR \fIfield\fR]...
+    [\fB-S\fR \fIfield\fR]... [\fB-t\fR \fItype\fR[,\fItype\fR]...] \fIfilesystem\fR|\fIsnapshot\fR
 .fi
 
 .LP
@@ -183,44 +185,47 @@ zfs \- configures ZFS file systems
 
 .LP
 .nf
-\fBzfs\fR \fBallow\fR [\fB-ldug\fR] "\fIeveryone\fR"|\fIuser\fR|\fIgroup\fR[,...] \fIperm\fR|\fI@setname\fR[,...]
+\fBzfs\fR \fBallow\fR [\fB-ldug\fR] \fIuser\fR|\fIgroup\fR[,\fIuser\fR|\fIgroup\fR]...
+     \fIperm\fR|\fI@setname\fR[,\fIperm\fR|\fI@setname\fR]... \fIfilesystem\fR|\fIvolume\fR
+.fi
+
+.LP
+.nf
+\fBzfs\fR \fBallow\fR [\fB-ld\fR] \fB-e\fR|\fBeveryone\fR \fIperm\fR|@\fIsetname\fR[,\fIperm\fR|\fI@setname\fR]...
      \fIfilesystem\fR|\fIvolume\fR
 .fi
 
 .LP
 .nf
-\fBzfs\fR \fBallow\fR [\fB-ld\fR] \fB-e\fR \fIperm\fR|@\fIsetname\fR[,...] \fIfilesystem\fR|\fIvolume\fR
+\fBzfs\fR \fBallow\fR \fB-c\fR \fIperm\fR|@\fIsetname\fR[,\fIperm\fR|\fI@setname\fR]... \fIfilesystem\fR|\fIvolume\fR
 .fi
 
 .LP
 .nf
-\fBzfs\fR \fBallow\fR \fB-c\fR \fIperm\fR|@\fIsetname\fR[,...] \fIfilesystem\fR|\fIvolume\fR
+\fBzfs\fR \fBallow\fR \fB-s\fR @\fIsetname\fR \fIperm\fR|@\fIsetname\fR[,\fIperm\fR|\fI@setname\fR]... \fIfilesystem\fR|\fIvolume\fR
 .fi
 
 .LP
 .nf
-\fBzfs\fR \fBallow\fR \fB-s\fR @\fIsetname\fR \fIperm\fR|@\fIsetname\fR[,...] \fIfilesystem\fR|\fIvolume\fR
+\fBzfs\fR \fBunallow\fR [\fB-rldug\fR] \fIuser\fR|\fIgroup\fR[,\fIuser\fR|\fIgroup\fR]...
+     [\fIperm\fR|@\fIsetname\fR[,\fIperm\fR|\fI@setname\fR]...] \fIfilesystem\fR|\fIvolume\fR
 .fi
 
 .LP
 .nf
-\fBzfs\fR \fBunallow\fR [\fB-rldug\fR] "\fIeveryone\fR"|\fIuser\fR|\fIgroup\fR[,...] [\fIperm\fR|@\fIsetname\fR[,... ]]
+\fBzfs\fR \fBunallow\fR [\fB-rld\fR] \fB-e\fR|\fBeveryone\fR [\fIperm\fR|@\fIsetname\fR[,\fIperm\fR|\fI@setname\fR]...]
      \fIfilesystem\fR|\fIvolume\fR
 .fi
 
 .LP
 .nf
-\fBzfs\fR \fBunallow\fR [\fB-rld\fR] \fB-e\fR [\fIperm\fR|@\fIsetname\fR[,... ]] \fIfilesystem\fR|\fIvolume\fR
+\fBzfs\fR \fBunallow\fR [\fB-r\fR] \fB-c\fR [\fIperm\fR|@\fIsetname\fR[,\fIperm\fR|\fI@setname\fR]...] \fIfilesystem\fR|\fIvolume\fR
 .fi
 
 .LP
 .nf
-\fBzfs\fR \fBunallow\fR [\fB-r\fR] \fB-c\fR [\fIperm\fR|@\fIsetname\fR[ ... ]] \fIfilesystem\fR|\fIvolume\fR
-.fi
-
-.LP
-.nf
-\fBzfs\fR \fBunallow\fR [\fB-r\fR] \fB-s\fR @\fIsetname\fR [\fIperm\fR|@\fIsetname\fR[,... ]] \fIfilesystem\fR|\fIvolume\fR
+\fBzfs\fR \fBunallow\fR [\fB-r\fR] \fB-s\fR @\fIsetname\fR [\fIperm\fR|@\fIsetname\fR[,\fIperm\fR|\fI@setname\fR]...]
+     \fIfilesystem\fR|\fIvolume\fR
 .fi
 
 .LP
@@ -530,6 +535,40 @@ by using the \fBzfs destroy\fR \fB-d\fR command. Otherwise, the property is
 .sp
 .ne 2
 .na
+\fB\fBlogicalreferenced\fR\fR
+.ad
+.sp .6
+.RS 4n
+The amount of space that is "logically" accessible by this dataset.  See
+the \fBreferenced\fR property.  The logical space ignores the effect of
+the \fBcompression\fR and \fBcopies\fR properties, giving a quantity
+closer to the amount of data that applications see.  However, it does
+include space consumed by metadata.
+.sp
+This property can also be referred to by its shortened column name,
+\fBlrefer\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBlogicalused\fR\fR
+.ad
+.sp .6
+.RS 4n
+The amount of space that is "logically" consumed by this dataset and all
+its descendents.  See the \fBused\fR property.  The logical space
+ignores the effect of the \fBcompression\fR and \fBcopies\fR properties,
+giving a quantity closer to the amount of data that applications see.
+However, it does include space consumed by metadata.
+.sp
+This property can also be referred to by its shortened column name,
+\fBlused\fR.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fBmounted\fR\fR
 .ad
 .sp .6
@@ -830,7 +869,7 @@ mode from the application.
 .sp
 .ne 2
 .na
-\fB\fBaclmode\fR=\fBdiscard\fR | \fBgroupmask\fR | \fBpassthrough\fR\fR
+\fB\fBaclmode\fR=\fBdiscard\fR | \fBgroupmask\fR | \fBpassthrough\fR\fR | \fBrestricted\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -839,10 +878,18 @@ an \fBaclmode\fR property of \fBdiscard\fR (the default) deletes all \fBACL\fR
 entries that do not represent the mode of the file. An \fBaclmode\fR property
 of \fBgroupmask\fR reduces permissions granted in all \fBALLOW\fR entries found
 in the \fBACL\fR such that they are no greater than the group permissions
-specified by \fBchmod\fR.  A file system with an \fBaclmode\fR property of
+specified by \fBchmod\fR(2).  A file system with an \fBaclmode\fR property of
 \fBpassthrough\fR indicates that no changes are made to the \fBACL\fR other
-than creating or updating the necessary \fBACL\fR entries to
-represent the new mode of the file or directory.
+than creating or updating the necessary \fBACL\fR entries to represent the new
+mode of the file or directory. An \fBaclmode\fR property of \fBrestricted\fR
+will cause the \fBchmod\fR(2) operation to return an error when used on any
+file or directory which has a non-trivial \fBACL\fR whose entries can not be
+represented by a mode. \fBchmod\fR(2) is required to change the set user ID,
+set group ID, or sticky bits on a file or directory, as they do not have
+equivalent \fBACL\fR entries. In order to use \fBchmod\fR(2) on a file or
+directory with a non-trivial \fBACL\fR when \fBaclmode\fR is set to
+\fBrestricted\fR, you must first remove all \fBACL\fR entries which do not
+represent the current mode.
 .RE
 
 .sp
@@ -887,15 +934,18 @@ This property is not inherited.
 .ne 2
 .na
 \fB\fBchecksum\fR=\fBon\fR | \fBoff\fR | \fBfletcher2\fR | \fBfletcher4\fR |
-\fBsha256\fR\fR
+\fBsha256\fR | \fBnoparity\fR \fR
 .ad
 .sp .6
 .RS 4n
 Controls the checksum used to verify data integrity. The default value is
 \fBon\fR, which automatically selects an appropriate algorithm (currently,
 \fBfletcher4\fR, but this may change in future releases). The value \fBoff\fR
-disables integrity checking on user data. Disabling checksums is \fBNOT\fR a
-recommended practice.
+disables integrity checking on user data. The value \fBnoparity\fR not only
+disables integrity but also disables maintaining parity for user data.  This
+setting is used internally by a dump device residing on a RAID-Z pool and should
+not be used by any other dataset. Disabling checksums is \fBNOT\fR a recommended
+practice.
 .sp
 Changing this property affects only newly-written data.
 .RE
@@ -904,7 +954,7 @@ Changing this property affects only newly-written data.
 .ne 2
 .na
 \fB\fBcompression\fR=\fBon\fR | \fBoff\fR | \fBlzjb\fR | \fBgzip\fR |
-\fBgzip-\fR\fIN\fR | \fBzle\fR\fR
+\fBgzip-\fR\fIN\fR | \fBzle\fR\fR | \fBlz4\fR
 .ad
 .sp .6
 .RS 4n
@@ -917,6 +967,14 @@ value \fBgzip-\fR\fIN\fR where \fIN\fR is an integer from 1 (fastest) to 9
 (best compression ratio). Currently, \fBgzip\fR is equivalent to \fBgzip-6\fR
 (which is also the default for \fBgzip\fR(1)). The \fBzle\fR compression
 algorithm compresses runs of zeros.
+.sp
+The \fBlz4\fR compression algorithm is a high-performance replacement
+for the \fBlzjb\fR algorithm. It features significantly faster
+compression and decompression, as well as a moderately higher
+compression ratio than \fBlzjb\fR, but can only be used on pools with
+the \fBlz4_compress\fR feature set to \fIenabled\fR. See
+\fBzpool-features\fR(5) for details on ZFS feature flags and the
+\fBlz4_compress\fR feature.
 .sp
 This property can also be referred to by its shortened column name
 \fBcompress\fR. Changing this property affects only newly-written data.
@@ -1573,7 +1631,7 @@ Displays a help message.
 .sp
 .ne 2
 .na
-\fB\fBzfs create\fR [\fB-p\fR] [\fB-o\fR \fIproperty\fR=\fIvalue\fR] ...
+\fB\fBzfs create\fR [\fB-p\fR] [\fB-o\fR \fIproperty\fR=\fIvalue\fR]...
 \fIfilesystem\fR\fR
 .ad
 .sp .6
@@ -1614,7 +1672,7 @@ property is specified in multiple \fB-o\fR options.
 .ne 2
 .na
 \fB\fBzfs create\fR [\fB-ps\fR] [\fB-b\fR \fIblocksize\fR] [\fB-o\fR
-\fIproperty\fR=\fIvalue\fR] ... \fB-V\fR \fIsize\fR \fIvolume\fR\fR
+\fIproperty\fR=\fIvalue\fR]... \fB-V\fR \fIsize\fR \fIvolume\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -1761,7 +1819,7 @@ behavior for mounted file systems in use.
 .sp
 .ne 2
 .na
-\fBzfs destroy\fR [\fB-dnpRrv\fR] \fIfilesystem\fR|\fIvolume\fR@\fIsnap\fR[%\fIsnap\fR][,...]
+\fBzfs destroy\fR [\fB-dnpRrv\fR] \fIfilesystem\fR|\fIvolume\fR@\fIsnap\fR[%\fIsnap\fR][,\fIsnap\fR[%\fIsnap\fR]]...
 .ad
 .sp .6
 .RS 4n
@@ -1813,7 +1871,9 @@ descendent file systems.
 .ad
 .sp .6
 .RS 4n
-Recursively destroy all dependents.
+Recursively destroy all clones of these snapshots, including the clones,
+snapshots, and children.  If this flag is specified, the \fB-d\fR flag will
+have no effect.
 .RE
 
 .sp
@@ -1849,7 +1909,7 @@ Print verbose information about the deleted data.
 .RE
 
 .sp
-Extreme care should be taken when applying either the \fB-r\fR or the \fB-f\fR
+Extreme care should be taken when applying either the \fB-r\fR or the \fB-R\fR
 options, as they can destroy large portions of a pool and cause unexpected
 behavior for mounted file systems in use.
 .RE
@@ -1857,7 +1917,7 @@ behavior for mounted file systems in use.
 .sp
 .ne 2
 .na
-\fB\fBzfs snapshot\fR [\fB-r\fR] [\fB-o\fR \fIproperty\fR=\fIvalue\fR] ...
+\fB\fBzfs snapshot\fR [\fB-r\fR] [\fB-o\fR \fIproperty\fR=\fIvalue\fR]...
 \fIfilesystem@snapname\fR|\fIvolume@snapname\fR\fR...
 .ad
 .sp .6
@@ -1943,7 +2003,7 @@ that are to be destroyed.
 .sp
 .ne 2
 .na
-\fB\fBzfs clone\fR [\fB-p\fR] [\fB-o\fR \fIproperty\fR=\fIvalue\fR] ...
+\fB\fBzfs clone\fR [\fB-p\fR] [\fB-o\fR \fIproperty\fR=\fIvalue\fR]...
 \fIsnapshot\fR \fIfilesystem\fR|\fIvolume\fR\fR
 .ad
 .sp .6
@@ -2058,9 +2118,9 @@ only dataset that can be renamed recursively.
 .ne 2
 .na
 \fB\fBzfs\fR \fBlist\fR [\fB-r\fR|\fB-d\fR \fIdepth\fR] [\fB-H\fR] [\fB-o\fR
-\fIproperty\fR[,\fI\&...\fR]] [ \fB-t\fR \fItype\fR[,\fI\&...\fR]] [ \fB-s\fR
-\fIproperty\fR ] ... [ \fB-S\fR \fIproperty\fR ] ...
-[\fIfilesystem\fR|\fIvolume\fR|\fIsnapshot\fR] ...\fR
+\fIproperty\fR[,\fIproperty\fR]...] [ \fB-t\fR \fItype\fR[,\fItype\fR]...] [ \fB-s\fR
+\fIproperty\fR ]... [ \fB-S\fR \fIproperty\fR ]...
+[\fIfilesystem\fR|\fIvolume\fR|\fIsnapshot\fR]...\fR
 .ad
 .sp .6
 .RS 4n
@@ -2211,7 +2271,7 @@ specifying \fB-t snapshot\fR displays only snapshots.
 .ne 2
 .na
 \fB\fBzfs set\fR \fIproperty\fR=\fIvalue\fR
-\fIfilesystem\fR|\fIvolume\fR|\fIsnapshot\fR ...\fR
+\fIfilesystem\fR|\fIvolume\fR|\fIsnapshot\fR...\fR
 .ad
 .sp .6
 .RS 4n
@@ -2229,8 +2289,8 @@ Properties" section.
 .ne 2
 .na
 \fB\fBzfs get\fR [\fB-r\fR|\fB-d\fR \fIdepth\fR] [\fB-Hp\fR] [\fB-o\fR
-\fIfield\fR[,...] [\fB-t\fR \fItype\fR[,...]] [\fB-s\fR \fIsource\fR[,...] "\fIall\fR" |
-\fIproperty\fR[,...] \fIfilesystem\fR|\fIvolume\fR|\fIsnapshot\fR ...\fR
+\fIfield\fR[,\fIfield\fR]... [\fB-t\fR \fItype\fR[,\fItype\fR]...] [\fB-s\fR \fIsource\fR[,\fIsource\fR]... \fBall\fR |
+\fIproperty\fR[,\fIproperty\fR]... \fIfilesystem\fR|\fIvolume\fR|\fIsnapshot\fR...\fR
 .ad
 .sp .6
 .RS 4n
@@ -2329,7 +2389,7 @@ Display numbers in parseable (exact) values.
 .ne 2
 .na
 \fB\fBzfs inherit\fR [\fB-r\fR] \fIproperty\fR
-\fIfilesystem\fR|\fIvolume\fR|\fIsnapshot\fR ...\fR
+\fIfilesystem\fR|\fIvolume\fR|\fIsnapshot\fR...\fR
 .ad
 .sp .6
 .RS 4n
@@ -2426,10 +2486,10 @@ supported by this software.
 .sp
 .ne 2
 .na
-\fBzfs\fR \fBuserspace\fR [\fB-Hinp\fR] [\fB-o\fR \fIfield\fR[,...]]
-[\fB-s\fR \fIfield\fR] ...
-[\fB-S\fR \fIfield\fR] ...
-[\fB-t\fR \fItype\fR[,...]] \fIfilesystem\fR|\fIsnapshot\fR
+\fBzfs\fR \fBuserspace\fR [\fB-Hinp\fR] [\fB-o\fR \fIfield\fR[,\fIfield\fR]...]
+[\fB-s\fR \fIfield\fR]...
+[\fB-S\fR \fIfield\fR]...
+[\fB-t\fR \fItype\fR[,\fItype\fR]...] \fIfilesystem\fR|\fIsnapshot\fR
 .ad
 .sp .6
 .RS 4n
@@ -2469,7 +2529,7 @@ Use exact (parsable) numeric output.
 .sp
 .ne 2
 .na
-\fB\fB-o\fR \fIfield\fR[,...]\fR
+\fB\fB-o\fR \fIfield\fR[,\fIfield\fR]...\fR
 .ad
 .sp .6
 .RS 4n
@@ -2502,7 +2562,7 @@ Sort by this field in reverse order. See \fB-s\fR.
 .sp
 .ne 2
 .na
-\fB\fB-t\fR \fItype\fR[,...]\fR
+\fB\fB-t\fR \fItype\fR[,\fItype\fR]...\fR
 .ad
 .sp .6
 .RS 4n
@@ -2534,10 +2594,10 @@ will report that the POSIX entity has the total usage and quota for both.
 .sp
 .ne 2
 .na
-\fBzfs\fR \fBgroupspace\fR [\fB-Hinp\fR] [\fB-o\fR \fIfield\fR[,...]]
-[\fB-s\fR \fIfield\fR] ...
-[\fB-S\fR \fIfield\fR] ...
-[\fB-t\fR \fItype\fR[,...]] \fIfilesystem\fR|\fIsnapshot\fR
+\fBzfs\fR \fBgroupspace\fR [\fB-Hinp\fR] [\fB-o\fR \fIfield\fR[,\fIfield\fR]...]
+[\fB-s\fR \fIfield\fR]...
+[\fB-S\fR \fIfield\fR]...
+[\fB-t\fR \fItype\fR[,\fItype\fR]...] \fIfilesystem\fR|\fIsnapshot\fR
 .ad
 .sp .6
 .RS 4n
@@ -2999,13 +3059,13 @@ volume. See the other forms of \fBzfs allow\fR for more information.
 .sp
 .ne 2
 .na
-\fB\fBzfs allow\fR [\fB-ldug\fR] "\fIeveryone\fR"|\fIuser\fR|\fIgroup\fR[,...]
-\fIperm\fR|@\fIsetname\fR[,...] \fIfilesystem\fR| \fIvolume\fR\fR
+\fB\fBzfs allow\fR [\fB-ldug\fR] \fIuser\fR|\fIgroup\fR[,\fIuser\fR|\fIgroup\fR]...
+\fIperm\fR|@\fIsetname\fR[,\fIperm\fR|@\fIsetname\fR]... \fIfilesystem\fR|\fIvolume\fR\fR
 .ad
 .br
 .na
-\fB\fBzfs allow\fR [\fB-ld\fR] \fB-e\fR \fIperm\fR|@\fIsetname\fR[,...]
-\fIfilesystem\fR | \fIvolume\fR\fR
+\fB\fBzfs allow\fR [\fB-ld\fR] \fB-e\fR|\fBeveryone\fR \fIperm\fR|@\fIsetname\fR[,\fIperm\fR|@\fIsetname\fR]...
+\fIfilesystem\fR|\fIvolume\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -3014,14 +3074,14 @@ non-privileged users.
 .sp
 .ne 2
 .na
-\fB[\fB-ug\fR] "\fIeveryone\fR"|\fIuser\fR|\fIgroup\fR[,...]\fR
+[\fB-ug\fR] \fIuser\fR|\fIgroup\fR[,\fIuser\fR|\fIgroup\fR]...
 .ad
 .sp .6
 .RS 4n
 Specifies to whom the permissions are delegated. Multiple entities can be
 specified as a comma-separated list. If neither of the \fB-ug\fR options are
 specified, then the argument is interpreted preferentially as the keyword
-"everyone", then as a user name, and lastly as a group name. To specify a user
+\fBeveryone,\fR then as a user name, and lastly as a group name. To specify a user
 or group named "everyone", use the \fB-u\fR or \fB-g\fR options. To specify a
 group with the same name as a user, use the \fB-g\fR options.
 .RE
@@ -3029,11 +3089,21 @@ group with the same name as a user, use the \fB-g\fR options.
 .sp
 .ne 2
 .na
-\fB[\fB-e\fR] \fIperm\fR|@\fIsetname\fR[,...]\fR
+\fB-e\fR|\fBeveryone\fR
 .ad
 .sp .6
 .RS 4n
-Specifies that the permissions be delegated to "everyone." Multiple permissions
+Specifies that the permissions be delegated to everyone.
+.RE
+
+.sp
+.ne 2
+.na
+\fIperm\fR|@\fIsetname\fR[,\fIperm\fR|@\fIsetname\fR]...
+.ad
+.sp .6
+.RS 4n
+The permissions to delegate. Multiple permissions
 may be specified as a comma-separated list. Permission names are the same as
 \fBZFS\fR subcommand and property names. See the property list below. Property
 set names, which begin with an at sign (\fB@\fR) , may be specified. See the
@@ -3043,7 +3113,7 @@ set names, which begin with an at sign (\fB@\fR) , may be specified. See the
 .sp
 .ne 2
 .na
-\fB[\fB-ld\fR] \fIfilesystem\fR|\fIvolume\fR\fR
+[\fB-ld\fR] \fIfilesystem\fR|\fIvolume\fR
 .ad
 .sp .6
 .RS 4n
@@ -3131,7 +3201,7 @@ zoned            property
 .sp
 .ne 2
 .na
-\fB\fBzfs allow\fR \fB-c\fR \fIperm\fR|@\fIsetname\fR[,...]
+\fB\fBzfs allow\fR \fB-c\fR \fIperm\fR|@\fIsetname\fR[,\fIperm\fR|@\fIsetname\fR]...
 \fIfilesystem\fR|\fIvolume\fR\fR
 .ad
 .sp .6
@@ -3143,7 +3213,7 @@ creator of any newly-created descendent file system.
 .sp
 .ne 2
 .na
-\fB\fBzfs allow\fR \fB-s\fR @\fIsetname\fR \fIperm\fR|@\fIsetname\fR[,...]
+\fB\fBzfs allow\fR \fB-s\fR @\fIsetname\fR \fIperm\fR|@\fIsetname\fR[,\fIperm\fR|@\fIsetname\fR]...
 \fIfilesystem\fR|\fIvolume\fR\fR
 .ad
 .sp .6
@@ -3159,18 +3229,17 @@ characters long.
 .sp
 .ne 2
 .na
-\fB\fBzfs unallow\fR [\fB-rldug\fR]
-"\fIeveryone\fR"|\fIuser\fR|\fIgroup\fR[,...]
-[\fIperm\fR|@\fIsetname\fR[, ...]] \fIfilesystem\fR|\fIvolume\fR\fR
+\fB\fBzfs unallow\fR [\fB-rldug\fR] \fIuser\fR|\fIgroup\fR[,\fIuser\fR|\fIgroup\fR]...
+[\fIperm\fR|@\fIsetname\fR[,\fIperm\fR|@\fIsetname\fR]...] \fIfilesystem\fR|\fIvolume\fR\fR
 .ad
 .br
 .na
-\fB\fBzfs unallow\fR [\fB-rld\fR] \fB-e\fR [\fIperm\fR|@\fIsetname\fR [,...]]
+\fB\fBzfs unallow\fR [\fB-rld\fR] \fB-e\fR|\fBeveryone\fR [\fIperm\fR|@\fIsetname\fR[,\fIperm\fR|@\fIsetname\fR]...]
 \fIfilesystem\fR|\fIvolume\fR\fR
 .ad
 .br
 .na
-\fB\fBzfs unallow\fR [\fB-r\fR] \fB-c\fR [\fIperm\fR|@\fIsetname\fR[,...]]\fR
+\fB\fBzfs unallow\fR [\fB-r\fR] \fB-c\fR [\fIperm\fR|@\fIsetname\fR[,\fIperm\fR|@\fIsetname\fR]...]\fR
 .ad
 .br
 .na
@@ -3182,8 +3251,8 @@ Removes permissions that were granted with the \fBzfs allow\fR command. No
 permissions are explicitly denied, so other permissions granted are still in
 effect. For example, if the permission is granted by an ancestor. If no
 permissions are specified, then all permissions for the specified \fIuser\fR,
-\fIgroup\fR, or \fIeveryone\fR are removed. Specifying "everyone" (or using the
-\fB-e\fR option) only removes the permissions that were granted to "everyone",
+\fIgroup\fR, or everyone are removed. Specifying \fBeveryone\fR (or using the
+\fB-e\fR option) only removes the permissions that were granted to everyone,
 not all permissions for every user and group. See the \fBzfs allow\fR command
 for a description of the \fB-ldugec\fR options.
 .sp
@@ -3202,7 +3271,7 @@ Recursively remove the permissions from this file system and all descendents.
 .ne 2
 .na
 \fB\fBzfs unallow\fR [\fB-r\fR] \fB-s\fR @\fIsetname\fR
-[\fIperm\fR|@\fIsetname\fR[,...]]\fR
+[\fIperm\fR|@\fIsetname\fR[,\fIperm\fR|@\fIsetname\fR]...]\fR
 .ad
 .br
 .na
@@ -3952,7 +4021,7 @@ Interface Stability	Committed
 \fBssh\fR(1), \fBiscsitadm\fR(1M), \fBmount\fR(1M), \fBshare\fR(1M),
 \fBsharemgr\fR(1M), \fBunshare\fR(1M), \fBzonecfg\fR(1M), \fBzpool\fR(1M),
 \fBchmod\fR(2), \fBstat\fR(2), \fBwrite\fR(2), \fBfsync\fR(3C),
-\fBdfstab\fR(4), \fBattributes\fR(5)
+\fBdfstab\fR(4), \fBacl\fR(5), \fBattributes\fR(5)
 .sp
 .LP
 See the \fBgzip\fR(1) man page, which is not part of the SunOS man page

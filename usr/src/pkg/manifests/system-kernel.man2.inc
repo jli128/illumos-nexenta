@@ -12,6 +12,7 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2013, OmniTI Computer Consulting, Inc.
 #
 
 file path=usr/share/man/man2/Intro.2
@@ -205,6 +206,7 @@ link path=usr/share/man/man2/lchown.2 target=chown.2
 link path=usr/share/man/man2/lstat.2 target=stat.2
 link path=usr/share/man/man2/openat.2 target=open.2
 link path=usr/share/man/man2/pathconf.2 target=fpathconf.2
+link path=usr/share/man/man2/pipe2.2 target=pipe.2
 link path=usr/share/man/man2/pread.2 target=read.2
 link path=usr/share/man/man2/pset_assign.2 target=pset_create.2
 link path=usr/share/man/man2/pset_destroy.2 target=pset_create.2

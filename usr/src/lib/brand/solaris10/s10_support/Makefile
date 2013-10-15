@@ -46,7 +46,7 @@ LDLIBS +=	-lzonecfg
 install:	all $(ROOTPROGS)
 
 clean:
-		-$(RM) $(OBJS)
+		$(RM) $(OBJS)
 
 lint:		lint_PROG
 

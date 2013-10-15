@@ -11,7 +11,7 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
 
 include		$(SRC)/Makefile.master
@@ -37,9 +37,9 @@ MANLINKS=	stderr.7fs	\
 		stdin.7fs	\
 		stdout.7fs
 
-stderr.7fs	= fd.7fs
-stdin.7fs	= fd.7fs
-stdout.7fs	= fd.7fs
+stderr.7fs	:= LINKSRC = fd.7fs
+stdin.7fs	:= LINKSRC = fd.7fs
+stdout.7fs	:= LINKSRC = fd.7fs
 
 .KEEP_STATE:
 

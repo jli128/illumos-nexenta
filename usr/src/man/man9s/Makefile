@@ -11,7 +11,7 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
 
 include		$(SRC)/Makefile.master
@@ -96,13 +96,13 @@ MANLINKS=	dblk.9s		\
 		intro.9s	\
 		mblk.9s
 
-intro.9s	= Intro.9s
+intro.9s	:= LINKSRC = Intro.9s
 
-dblk.9s		= datab.9s
+dblk.9s		:= LINKSRC = datab.9s
 
-ddi_dma_lim.9s	= ddi_dma_lim_sparc.9s
+ddi_dma_lim.9s	:= LINKSRC = ddi_dma_lim_sparc.9s
 
-mblk.9s		= msgb.9s
+mblk.9s		:= LINKSRC = msgb.9s
 
 .KEEP_STATE:
 

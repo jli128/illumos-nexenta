@@ -89,7 +89,7 @@ $(PROG):	$(OBJECTS)
 	$(POST_PROCESS)
 
 clean:
-	-$(RM) $(OBJECTS)
+	$(RM) $(OBJECTS)
 
 lint:
 

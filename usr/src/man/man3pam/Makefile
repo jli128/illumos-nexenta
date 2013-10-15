@@ -11,7 +11,7 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
 
 include		$(SRC)/Makefile.master
@@ -45,15 +45,15 @@ MANLINKS=	pam_close_session.3pam		\
 		pam_get_item.3pam		\
 		pam_sm_close_session.3pam
 
-pam_close_session.3pam		= pam_open_session.3pam
+pam_close_session.3pam		:= LINKSRC = pam_open_session.3pam
 
-pam_get_data.3pam		= pam_set_data.3pam
+pam_get_data.3pam		:= LINKSRC = pam_set_data.3pam
 
-pam_get_item.3pam		= pam_set_item.3pam
+pam_get_item.3pam		:= LINKSRC = pam_set_item.3pam
 
-pam_sm_close_session.3pam	= pam_sm_open_session.3pam
+pam_sm_close_session.3pam	:= LINKSRC = pam_sm_open_session.3pam
 
-pam_end.3pam			= pam_start.3pam
+pam_end.3pam			:= LINKSRC = pam_start.3pam
 
 .KEEP_STATE:
 

@@ -11,7 +11,7 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
 
 include		$(SRC)/Makefile.master
@@ -63,9 +63,9 @@ MANFILES=	stmfAddToHostGroup.3stmf		\
 MANLINKS=	stmfGetLuProp.3stmf			\
 		stmfModifyLuByFname.3stmf
 
-stmfModifyLuByFname.3stmf	= stmfModifyLu.3stmf
+stmfModifyLuByFname.3stmf	:= LINKSRC = stmfModifyLu.3stmf
 
-stmfGetLuProp.3stmf		= stmfSetLuProp.3stmf
+stmfGetLuProp.3stmf		:= LINKSRC = stmfSetLuProp.3stmf
 
 .KEEP_STATE:
 

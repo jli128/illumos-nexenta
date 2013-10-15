@@ -420,7 +420,8 @@ typedef enum spa_import_type {
 extern int spa_open(const char *pool, spa_t **, void *tag);
 extern int spa_open_rewind(const char *pool, spa_t **, void *tag,
     nvlist_t *policy, nvlist_t **config);
-extern int spa_get_stats(const char *pool, nvlist_t **config);
+extern int spa_get_stats(const char *name, nvlist_t **config,
+    char *altroot, size_t buflen);
 extern int spa_create(const char *pool, nvlist_t *config, nvlist_t *props,
     nvlist_t *zplprops);
 extern int spa_import_rootpool(char *devpath, char *devid);
@@ -491,14 +492,6 @@ extern int spa_scan_stop(spa_t *spa);
 /* spa syncing */
 extern void spa_sync(spa_t *spa, uint64_t txg); /* only for DMU use */
 extern void spa_sync_allpools(void);
-
-/*
- * DEFERRED_FREE must be large enough that regular blocks are not
- * deferred.  XXX so can't we change it back to 1?
- */
-#define	SYNC_PASS_DEFERRED_FREE	2	/* defer frees after this pass */
-#define	SYNC_PASS_DONT_COMPRESS	4	/* don't compress after this pass */
-#define	SYNC_PASS_REWRITE	1	/* rewrite new bps after this pass */
 
 /* spa namespace global mutex */
 extern kmutex_t spa_namespace_lock;
@@ -612,6 +605,7 @@ extern boolean_t spa_suspended(spa_t *spa);
 extern uint64_t spa_bootfs(spa_t *spa);
 extern uint64_t spa_delegation(spa_t *spa);
 extern objset_t *spa_meta_objset(spa_t *spa);
+extern uint64_t spa_deadman_synctime(spa_t *spa);
 
 /* Miscellaneous support routines */
 extern void spa_activate_mos_feature(spa_t *spa, const char *feature);

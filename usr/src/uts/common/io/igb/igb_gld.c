@@ -1405,6 +1405,7 @@ igb_set_priv_prop(igb_t *igb, const char *pr_name,
 			hw->dev_spec._82575.eee_disable = !result;
 			if (e1000_set_eee_i350(hw) != E1000_SUCCESS)
 				err = EIO;
+			break;
 		default:
 			err = EINVAL;
 			/* FALLTHRU */

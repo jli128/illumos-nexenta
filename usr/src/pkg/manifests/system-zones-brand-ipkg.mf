@@ -21,7 +21,10 @@
 # Copyright (c) 2010, 2011, Oracle and/or its affiliates. All rights reserved.
 #
 
-set name=pkg.fmri value=pkg:/system/zones/brand/ipkg@$(PKGVERS)
+# We're not maintaining our own ipkg-incorporation right now, so
+# we want to remain compatible with the one in OpenIndiana.org.
+# The easiest way is to make this package OLDER.  NOT $(PKGVERS)!
+set name=pkg.fmri value=pkg:/system/zones/brand/ipkg@0.5.11,5.11-0.151
 set name=pkg.description \
     value="A branded zone whose software is managed using the Image Packaging System"
 set name=pkg.summary value="Image Packaging System branded zone"

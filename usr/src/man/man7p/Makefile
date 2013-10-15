@@ -11,7 +11,7 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
 
 include		$(SRC)/Makefile.master
@@ -41,35 +41,35 @@ MANFILES= 	arp.7p		\
 	 	udp.7p
 
 MANLINKS=	AH.7p		\
-	 	ARP.7p		\
-	 	ESP.7p		\
-	 	ICMP.7p		\
-	 	IP.7p		\
-	 	RARP.7p		\
-	 	SCTP.7p		\
-	 	TCP.7p		\
-	 	UDP.7p		\
+		ARP.7p		\
+		ESP.7p		\
+		ICMP.7p		\
+		IP.7p		\
+		RARP.7p		\
+		SCTP.7p		\
+		TCP.7p		\
+		UDP.7p		\
 	 	if.7p
 
-ARP.7p		= arp.7p
+ARP.7p		:= LINKSRC = arp.7p
 
-ICMP.7p		= icmp.7p
+ICMP.7p		:= LINKSRC = icmp.7p
 
-if.7p		= if_tcp.7p
+if.7p		:= LINKSRC = if_tcp.7p
 
-IP.7p		= ip.7p
+IP.7p		:= LINKSRC = ip.7p
 
-AH.7p		= ipsecah.7p
+AH.7p		:= LINKSRC = ipsecah.7p
 
-ESP.7p		= ipsecesp.7p
+ESP.7p		:= LINKSRC = ipsecesp.7p
 
-RARP.7p 	= rarp.7p
+RARP.7p 	:= LINKSRC = rarp.7p
 
-SCTP.7p 	= sctp.7p
+SCTP.7p 	:= LINKSRC = sctp.7p
 
-TCP.7p		= tcp.7p
+TCP.7p		:= LINKSRC = tcp.7p
 
-UDP.7p		= udp.7p
+UDP.7p		:= LINKSRC = udp.7p
 
 .KEEP_STATE:
 

@@ -35,6 +35,9 @@ OBJS=           $(LIBPROG).o $(ROLLOBJS)
 SRCS=           $(LIBPROG).c $(ROLLSRCS)
 POFILE=
 
+# No msg catalog here.
+POFILE=
+
 CPPFLAGS +=	-D_LARGEFILE64_SOURCE
 
 CERRWARN +=	-_gcc=-Wno-uninitialized
@@ -44,6 +47,6 @@ $(LIBPROG):	$(OBJS)
 		$(POST_PROCESS)
 
 clean:
-		-$(RM) $(LIBPROG).o
+		$(RM) $(LIBPROG).o
 
 lint:		lint_SRCS

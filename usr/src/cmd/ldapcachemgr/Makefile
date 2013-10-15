@@ -102,10 +102,10 @@ install: all $(ROOTLDAPLIB) $(ROOTLDAPPROG) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
 check:	$(CHKMANIFEST)
 
 clean:
-	-${RM} ${OBJS} $(LINTOUT)
+	$(RM) $(OBJS) $(LINTOUT)
 
 $(POFILE): $(POFILES)
-	-$(RM) $@
+	$(RM) $@
 	cat $(POFILES) > $@
 
 include $(SRC)/cmd/Makefile.targ

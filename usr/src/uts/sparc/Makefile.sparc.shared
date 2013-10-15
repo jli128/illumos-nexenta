@@ -21,6 +21,7 @@
 
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+# Copyright (c) 2013 Andrew Stormont.  All rights reserved.
 
 
 #
@@ -132,7 +133,7 @@ CFLAGS		+= $(INLINES) -D_ASM_INLINES
 CFLAGS		+= $(CCMODE)
 CFLAGS		+= $(SPACEFLAG)
 CFLAGS		+= $(CERRWARN)
-CFLAGS		+= $(CTF_FLAGS)
+CFLAGS		+= $(CTF_FLAGS_$(CLASS))
 CFLAGS		+= $(C99MODE)
 CFLAGS		+= $(CCUNBOUND)
 CFLAGS		+= $(CCSTATICSYM)
@@ -142,6 +143,8 @@ CFLAGS		+= $(IROPTFLAG)
 CFLAGS		+= $(CGLOBALSTATIC)
 CFLAGS		+= -xregs=no%float
 CFLAGS		+= -xstrconst
+CFLAGS		+= $(CSOURCEDEBUGFLAGS)
+CFLAGS		+= $(CUSERFLAGS)
 
 ASFLAGS		+= $(XARCH)
 
@@ -177,9 +180,9 @@ DEBUG_DEFS_OBJ64	=
 DEBUG_DEFS_DBG64	= -DDEBUG
 DEBUG_DEFS		= $(DEBUG_DEFS_$(BUILD_TYPE))
 
-DEBUG_COND_OBJ32	:sh = echo \\043
+DEBUG_COND_OBJ32	= $(POUND_SIGN)
 DEBUG_COND_DBG32	=
-DEBUG_COND_OBJ64	:sh = echo \\043
+DEBUG_COND_OBJ64	= $(POUND_SIGN)
 DEBUG_COND_DBG64	=
 IF_DEBUG_OBJ		= $(DEBUG_COND_$(BUILD_TYPE))$(OBJS_DIR)/
 
@@ -255,8 +258,6 @@ DRV_KMODS	+= e1000g
 DRV_KMODS	+= efe
 DRV_KMODS	+= hxge
 DRV_KMODS	+= mxfe
-DRV_KMODS	+= pcan
-DRV_KMODS	+= pcwl
 DRV_KMODS	+= rge
 DRV_KMODS	+= rtls
 DRV_KMODS	+= sfe
@@ -340,10 +341,7 @@ DRV_KMODS	+= emul64
 #
 DRV_KMODS	+= pcs
 MISC_KMODS	+= busra cardbus dada pcmcia
-DRV_KMODS	+= pcata
 DRV_KMODS	+= pcic
-
-$(CLOSED_BUILD)CLOSED_DRV_KMODS	+= pcser
 
 # Add lvm
 #
@@ -434,7 +432,8 @@ MISC_KMODS	+= spuni
 MISC_KMODS	+= hwa1480_fw uwba
 MISC_KMODS	+= mii
 
-$(CLOSED_BUILD)CLOSED_MISC_KMODS	+= klmmod klmops
+MISC_KMODS	+= klmmod klmops
+
 $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= scsi_vhci_f_asym_lsi
 $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= scsi_vhci_f_asym_emc
 $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= scsi_vhci_f_sym_emc

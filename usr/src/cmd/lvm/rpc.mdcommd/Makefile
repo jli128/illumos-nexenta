@@ -50,10 +50,8 @@ all:    $(SUBDIRS)
 catalog:	$(POFILE)
 
 $(POFILE): $(POFILES)
-	-$(RM) $@
+	$(RM) $@
 	cat $(POFILES) > $(POFILE)
-
-CLOBBERFILES = $(POFILE) $(POFILES)
 
 clean clobber lint:	$(SUBDIRS)
 

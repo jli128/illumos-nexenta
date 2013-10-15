@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -213,6 +214,7 @@ typedef	struct mptsas_target {
 		uint32_t		m_tgt_unconfigured;
 		uint32_t		m_timeout_interval;
 		uint8_t			m_timeout_count;
+		uint8_t			m_led_status;
 
 } mptsas_target_t;
 

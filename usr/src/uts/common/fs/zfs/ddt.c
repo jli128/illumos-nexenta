@@ -21,8 +21,8 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -169,7 +169,7 @@ ddt_object_lookup(ddt_t *ddt, enum ddt_type type, enum ddt_class class,
     ddt_entry_t *dde)
 {
 	if (!ddt_object_exists(ddt, type, class))
-		return (ENOENT);
+		return (SET_ERROR(ENOENT));
 
 	return (ddt_ops[type]->ddt_op_lookup(ddt->ddt_os,
 	    ddt->ddt_object[type][class], dde));
@@ -231,7 +231,7 @@ ddt_object_info(ddt_t *ddt, enum ddt_type type, enum ddt_class class,
     dmu_object_info_t *doi)
 {
 	if (!ddt_object_exists(ddt, type, class))
-		return (ENOENT);
+		return (SET_ERROR(ENOENT));
 
 	return (dmu_object_info(ddt->ddt_os, ddt->ddt_object[type][class],
 	    doi));
@@ -1266,5 +1266,5 @@ ddt_walk(spa_t *spa, ddt_bookmark_t *ddb, ddt_entry_t *dde)
 		ddb->ddb_type = 0;
 	} while (++ddb->ddb_class < DDT_CLASSES);
 
-	return (ENOENT);
+	return (SET_ERROR(ENOENT));
 }

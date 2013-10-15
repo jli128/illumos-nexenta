@@ -44,7 +44,7 @@ lint	:=	TARGET= lint
 all clean lint _msg:	$(SUBDIRS)
 
 clobber: $(SUBDIRS)
-	-$(RM) sharectl.po
+	$(RM) sharectl.po
 
 install: $(SUBDIRS) $(ROOTETCDEFAULTFILES)
 

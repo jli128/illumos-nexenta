@@ -46,7 +46,7 @@ install: all
 lint:	lint_PROG
 
 clean:
-	-$(RM) $(OBJS)
+	$(RM) $(OBJS)
 
 $(PROG):	$(OBJS)
 	$(NATIVECC) $(CFLAGS) $(OBJS) -o $@

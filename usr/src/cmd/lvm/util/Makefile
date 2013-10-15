@@ -22,7 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-
 #
 # Makefile for logical volume management
 #
@@ -66,7 +65,7 @@ ROOTMANIFESTDIR=	$(ROOTSVCSYSTEM)
 SCRIPTS = \
 	$(GROWFSSCRIPT)
 
-CLOBBERFILES = growfs
+CLOBBERFILES += growfs
 
 SRCS = $(PROGS:%=%.c)
 
@@ -100,14 +99,12 @@ lint: $(SUBDIRS)
 
 check:	$(CHKMANIFEST)
 
-clobber: $(SUBDIRS) clobber_local
-
-clobber_local:
-	-$(RM) $(POFILE) $(MSGFILES)
+clobber: $(SUBDIRS)
 
 clean: $(SUBDIRS)
 
-install:	$(SCRIPTS) $(GROWFSFILE) $(ROOTSVCMETHOD) $(ROOTMANIFEST) $(SUBDIRS)
+install:	$(SCRIPTS) $(GROWFSFILE) $(ROOTSVCMETHOD) $(ROOTMANIFEST) \
+		$(SUBDIRS)
 
 $(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

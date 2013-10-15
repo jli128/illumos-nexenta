@@ -45,12 +45,12 @@ all clean install lint: $(SUBDIRS)
 clobber:	$(SUBDIRS) local_clobber
 
 local_clobber:
-	-$(RM) $(CLOBBERFILES)
+	$(RM) $(CLOBBERFILES)
 
 _msg: $(MSGSUBDIRS)
-	-$(RM) $(POFILE)
+	$(RM) $(POFILE)
 	$(CAT) $(POFILES) > $(POFILE)
-	-$(RM)  $(MSGDOMAIN)/$(POFILE)
+	$(RM)  $(MSGDOMAIN)/$(POFILE)
 	$(CP) $(POFILE) $(MSGDOMAIN)
 
 $(SUBDIRS): FRC

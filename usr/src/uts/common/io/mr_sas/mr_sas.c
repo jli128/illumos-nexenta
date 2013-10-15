@@ -5369,7 +5369,6 @@ build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 	return (cmd);
 }
 
-#ifndef __sparc
 /*
  * wait_for_outstanding -	Wait for all outstanding cmds
  * @instance:				Adapter soft state
@@ -5398,7 +5397,6 @@ wait_for_outstanding(struct mrsas_instance *instance)
 
 	return (0);
 }
-#endif	/* __sparc */
 
 /*
  * issue_mfi_pthru

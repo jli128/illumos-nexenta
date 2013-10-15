@@ -11,7 +11,7 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
 
 include		$(SRC)/Makefile.master
@@ -20,13 +20,13 @@ MANSECT= 	7
 
 
 MANFILES= 	FSS.7	\
-	 	Intro.7	\
-	 	cpr.7	\
-	 	ibmf.7
+		Intro.7	\
+		cpr.7	\
+		ibmf.7
 
 MANLINKS=	intro.7
 
-intro.7		= Intro.7
+intro.7		:= LINKSRC = Intro.7
 
 .KEEP_STATE:
 

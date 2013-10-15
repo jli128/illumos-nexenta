@@ -241,11 +241,23 @@ typedef struct zinject_record {
 	uint32_t	zi_iotype;
 	int32_t		zi_duration;
 	uint64_t	zi_timer;
+	uint32_t	zi_cmd;
+	uint32_t	zi_pad;
 } zinject_record_t;
 
 #define	ZINJECT_NULL		0x1
 #define	ZINJECT_FLUSH_ARC	0x2
 #define	ZINJECT_UNLOAD_SPA	0x4
+
+typedef enum zinject_type {
+	ZINJECT_UNINITIALIZED,
+	ZINJECT_DATA_FAULT,
+	ZINJECT_DEVICE_FAULT,
+	ZINJECT_LABEL_FAULT,
+	ZINJECT_IGNORED_WRITES,
+	ZINJECT_PANIC,
+	ZINJECT_DELAY_IO,
+} zinject_type_t;
 
 typedef struct zfs_share {
 	uint64_t	z_exportdata;
@@ -282,7 +294,6 @@ typedef struct zfs_cmd {
 	uint64_t	zc_history;		/* really (char *) */
 	char		zc_value[MAXPATHLEN * 2];
 	char		zc_string[MAXNAMELEN];
-	char		zc_top_ds[MAXPATHLEN];
 	uint64_t	zc_guid;
 	uint64_t	zc_nvlist_conf;		/* really (char *) */
 	uint64_t	zc_nvlist_conf_size;
@@ -336,7 +347,8 @@ extern int zfs_secpolicy_rename_perms(const char *from,
     const char *to, cred_t *cr);
 extern int zfs_secpolicy_destroy_perms(const char *name, cred_t *cr);
 extern int zfs_busy(void);
-extern int zfs_unmount_snap(const char *, void *);
+extern int zfs_unmount_snap(const char *);
+extern void zfs_destroy_unmount_origin(const char *);
 
 /*
  * ZFS minor numbers can refer to either a control device instance or

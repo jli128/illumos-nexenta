@@ -26,6 +26,10 @@
  * Copyright (c) 2010, Intel Corporation.
  * All rights reserved.
  */
+/*
+ * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #include <sys/types.h>
 #include <sys/thread.h>
@@ -74,6 +78,7 @@
 #include <sys/hypervisor.h>
 #endif
 #include <sys/cpu_module.h>
+#include <sys/ontrap.h>
 
 struct cpu	cpus[1];			/* CPU data */
 struct cpu	*cpu[NCPU] = {&cpus[0]};	/* pointers to all CPUs */
@@ -1183,7 +1188,13 @@ workaround_errata(struct cpu *cpu)
 
 	if (cpuid_opteron_erratum(cpu, 721) > 0) {
 #if defined(OPTERON_ERRATUM_721)
-		wrmsr(MSR_AMD_DE_CFG, rdmsr(MSR_AMD_DE_CFG) | AMD_DE_CFG_E721);
+		on_trap_data_t otd;
+
+		if (!on_trap(&otd, OT_DATA_ACCESS))
+			wrmsr(MSR_AMD_DE_CFG,
+			    rdmsr(MSR_AMD_DE_CFG) | AMD_DE_CFG_E721);
+		no_trap();
+
 		opteron_erratum_721++;
 #else
 		workaround_warning(cpu, 721);
@@ -1737,7 +1748,7 @@ mp_startup_common(boolean_t boot)
 
 	cpuid_pass2(cp);
 	cpuid_pass3(cp);
-	(void) cpuid_pass4(cp);
+	cpuid_pass4(cp, NULL);
 
 	/*
 	 * Correct cpu_idstr and cpu_brandstr on target CPU after
