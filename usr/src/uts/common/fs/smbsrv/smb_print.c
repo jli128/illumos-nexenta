@@ -104,12 +104,11 @@ smb_post_open_print_file(smb_request_t *sr)
 smb_sdrc_t
 smb_com_open_print_file(smb_request_t *sr)
 {
+#ifdef	ENABLE_SPOOLSS
 	int 		rc;
 	smb_kspooldoc_t *sp;
 	smb_kshare_t 	*si;
 	struct open_param *op = &sr->arg.open;
-
-#ifdef	ENABLE_SPOOLSS
 
 	if (!STYPE_ISPRN(sr->tid_tree->t_res_type)) {
 		cmn_err(CE_WARN, "smb_com_open_print_file: bad device");
