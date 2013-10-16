@@ -279,7 +279,7 @@ zfs_prop_init(void)
 	/* temporarily disable wrcache */
 	/* special class */
 	zprop_register_index(ZFS_PROP_SPECIALCLASS, "specialclass",
-	    SPA_SPECIALCLASS_ZIL, PROP_DEFAULT, 
+	    SPA_SPECIALCLASS_ZIL, PROP_INHERIT, 
 	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT | ZFS_TYPE_VOLUME,
 	    "zil | meta | wrcache", "SPECIALCLASS", specialclass_table);
 #else

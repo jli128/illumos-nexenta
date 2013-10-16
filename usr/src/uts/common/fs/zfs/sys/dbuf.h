@@ -341,10 +341,10 @@ boolean_t dbuf_meta_is_l2cacheable(dmu_buf_impl_t *db);
 
 
 /*
- * Next macro checks wheter we need to cache dbuf into l2arc.
+ * Checks whether we need to cache dbuf in l2arc.
  * Metadata is l2cacheable if it is not placed on special device
- * ot it is placed on special device in "dual" mode. We need to check
- * ddt in ZFS_CACHE_ELL and ZFS_CACHE_METADATA due to it's MOS related.
+ * or it is placed on special device in "dual" mode. We need to check
+ * for ddt in ZFS_CACHE_ALL and ZFS_CACHE_METADATA because it is in MOS.
  * ZFS_CACHE_DATA mode actually means to cache both data and cacheable 
  * metadata.
  */

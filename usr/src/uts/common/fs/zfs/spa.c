@@ -3703,20 +3703,29 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	spa->spa_autoexpand = zpool_prop_default_numeric(ZPOOL_PROP_AUTOEXPAND);
 	spa->spa_hiwat = zpool_prop_default_numeric(ZPOOL_PROP_HIWATERMARK);
 	spa->spa_lowat = zpool_prop_default_numeric(ZPOOL_PROP_LOWATERMARK);
-	spa->spa_ddt_meta_copies = zpool_prop_default_numeric(
-	    ZPOOL_PROP_DEDUPMETA_DITTO);
-	spa->spa_dedup_best_effort = zpool_prop_default_numeric(ZPOOL_PROP_DEDUP_BEST_EFFORT);
-	spa->spa_dedup_lo_best_effort = zpool_prop_default_numeric(ZPOOL_PROP_DEDUP_LO_BEST_EFFORT);
-	spa->spa_dedup_hi_best_effort = zpool_prop_default_numeric(ZPOOL_PROP_DEDUP_HI_BEST_EFFORT);
+	spa->spa_ddt_meta_copies =
+	    zpool_prop_default_numeric(ZPOOL_PROP_DEDUPMETA_DITTO);
+	spa->spa_dedup_best_effort =
+	    zpool_prop_default_numeric(ZPOOL_PROP_DEDUP_BEST_EFFORT);
+	spa->spa_dedup_lo_best_effort =
+	    zpool_prop_default_numeric(ZPOOL_PROP_DEDUP_LO_BEST_EFFORT);
+	spa->spa_dedup_hi_best_effort =
+	    zpool_prop_default_numeric(ZPOOL_PROP_DEDUP_HI_BEST_EFFORT);
 
-	mp->spa_enable_meta_placement_selection = zpool_prop_default_numeric(ZPOOL_PROP_META_PLACEMENT);
-	mp->spa_ddt_to_special = zpool_prop_default_numeric(ZPOOL_PROP_DDT_TO_METADEV);
-	mp->spa_general_meta_to_special = zpool_prop_default_numeric(ZPOOL_PROP_GENERAL_META_TO_METADEV);
-	mp->spa_other_meta_to_special = zpool_prop_default_numeric(ZPOOL_PROP_OTHER_META_TO_METADEV);
+	mp->spa_enable_meta_placement_selection =
+	    zpool_prop_default_numeric(ZPOOL_PROP_META_PLACEMENT);
+	mp->spa_ddt_to_special =
+	    zpool_prop_default_numeric(ZPOOL_PROP_DDT_TO_METADEV);
+	mp->spa_general_meta_to_special =
+	    zpool_prop_default_numeric(ZPOOL_PROP_GENERAL_META_TO_METADEV);
+	mp->spa_other_meta_to_special =
+	    zpool_prop_default_numeric(ZPOOL_PROP_OTHER_META_TO_METADEV);
 
 	if (spa_has_special(spa)) {
-		(void) nvlist_remove(props, FEATURE_META_DEVICES, DATA_TYPE_STRING);
-		nvlist_add_string(props, FEATURE_META_DEVICES, "enabled");
+		(void) nvlist_remove(props, FEATURE_META_DEVICES,
+		    DATA_TYPE_STRING);
+		(void) nvlist_add_string(props, FEATURE_META_DEVICES,
+		    "enabled");
 	}
 
 	spa_set_ddt_classes(spa, 0);
@@ -3726,7 +3735,8 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 		spa_sync_props(props, tx);
 	}
 
-	if (spa_has_special(spa))
+	if (spa_has_special(spa) &&
+	    spa_feature_is_enabled(spa, SPA_FEATURE_META_DEVICES))
 		spa_feature_incr(spa, SPA_FEATURE_META_DEVICES, tx);
 
 	dmu_tx_commit(tx);
@@ -3764,16 +3774,17 @@ spa_check_special_feature(spa_t *spa)
 
 		if (!spa_feature_is_enabled(spa, SPA_FEATURE_META_DEVICES))
 		{
-			nvlist_alloc(&props, NV_UNIQUE_NAME, 0);
-			nvlist_add_uint64(props, FEATURE_META_DEVICES, 0);
-			spa_prop_set(spa, props);
+			VERIFY(nvlist_alloc(&props, NV_UNIQUE_NAME, 0) == 0);
+			VERIFY(nvlist_add_uint64(props,
+				FEATURE_META_DEVICES, 0) == 0);
+			VERIFY(spa_prop_set(spa, props) == 0);
 			nvlist_free(props);
 		}
 
 		if (!spa_feature_is_active(spa, SPA_FEATURE_META_DEVICES))
 		{
 			tx = dmu_tx_create_dd(spa->spa_dsl_pool->dp_mos_dir);
-			dmu_tx_assign(tx, TXG_WAIT);
+			VERIFY(dmu_tx_assign(tx, TXG_WAIT) == 0);
 			spa_feature_incr(spa, SPA_FEATURE_META_DEVICES, tx);
 			dmu_tx_commit(tx);
 		}

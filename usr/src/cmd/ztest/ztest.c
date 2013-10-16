@@ -198,12 +198,6 @@ typedef struct ztest_shared_ds {
 static ztest_shared_ds_t *ztest_shared_ds;
 #define	ZTEST_GET_SHARED_DS(d) (&ztest_shared_ds[d])
 
-/* special vdev config */
-static uint64_t zopt_special_class = SPA_SPECIALCLASS_META;
-static int zopt_special_vdevs = 2;
-static size_t zopt_special_size = SPA_MINDEVSIZE;
-static int zopt_special_mirrors = 2;
-
 #define	BT_MAGIC	0x123456789abcdefULL
 #define	MAXFAULTS() \
 	(MAX(zs->zs_mirrors, 1) * (ztest_opts.zo_raidz_parity + 1) - 1)
@@ -584,9 +578,6 @@ usage(boolean_t requested)
 	    "\t[-F freezeloops (default: %llu)] max loops in spa_freeze()\n"
 	    "\t[-P passtime (default: %llu sec)] time per pass\n"
 	    "\t[-B alt_ztest (default: <none>)] alternate ztest path\n"
-	    "\t[-N special vdevs per mirror (default: %d)]\n"
-	    "\t[-S special vdev size (default: %llu)]\n"
-	    "\t[-M special vdev mirrors (default: %d)]\n"
 	    "\t[-h] (print help)\n"
 	    "",
 	    zo->zo_pool,
@@ -605,10 +596,7 @@ usage(boolean_t requested)
 	    zo->zo_dir,					/* -f */
 	    (u_longlong_t)zo->zo_time,			/* -T */
 	    (u_longlong_t)zo->zo_maxloops,		/* -F */
-	    (u_longlong_t)zo->zo_passtime,		/* -P */
-	    zopt_special_vdevs,				/* -N */
-	    (u_longlong_t)zopt_special_size,		/* -S */
-	    zopt_special_mirrors);			/* -M */
+	    (u_longlong_t)zo->zo_passtime);
 	exit(requested ? 0 : 1);
 }
 
@@ -642,9 +630,6 @@ process_options(int argc, char **argv)
 		case 'T':
 		case 'P':
 		case 'F':
-		case 'N':
-		case 'S':
-		case 'M':
 			value = nicenumtoull(optarg);
 		}
 		switch (opt) {
@@ -714,15 +699,6 @@ process_options(int argc, char **argv)
 			break;
 		case 'B':
 			(void) strlcpy(altdir, optarg, sizeof (altdir));
-			break;
-		case 'N':
-			zopt_special_vdevs = MAX(0, value);
-			break;
-		case 'S':
-			zopt_special_size = MAX(SPA_MINDEVSIZE, value);
-			break;
-		case 'M':
-			zopt_special_mirrors = MAX(0, value);
 			break;
 		case 'h':
 			usage(B_TRUE);
@@ -890,9 +866,6 @@ make_vdev_raidz(char *path, char *aux, char *pool, size_t size,
 	nvlist_t *raidz, **child;
 	int c;
 
-	/* do not support raid-z special devices, only mirrors or leaves */
-	VERIFY((r < 2) || (is_special == B_FALSE));
-
 	if (r < 2)
 		return (make_vdev_file(path, aux, pool, size, ashift,
 		    is_special));
@@ -925,9 +898,6 @@ make_vdev_mirror(char *path, char *aux, char *pool, size_t size,
 	nvlist_t *mirror, **child;
 	int c;
 
-	/* do not support raid-z special devices, only mirrors or leaves */
-	VERIFY((r < 2) || (is_special == B_FALSE));
-
 	if (m < 1)
 		return (make_vdev_raidz(path, aux, pool, size, ashift, r,
 		    is_special));
@@ -956,13 +926,10 @@ make_vdev_mirror(char *path, char *aux, char *pool, size_t size,
 
 static nvlist_t *
 make_vdev_root(char *path, char *aux, char *pool, size_t size, uint64_t ashift,
-    int log, int r, int m, int t)
+    int log, int r, int m, int t, boolean_t special)
 {
 	nvlist_t *root, **child;
 	int c;
-
-	/* all vdevs are "regular", not "special" */
-	boolean_t special = B_FALSE;
 
 	ASSERT(t > 0);
 
@@ -992,7 +959,7 @@ make_vdev_root(char *path, char *aux, char *pool, size_t size, uint64_t ashift,
  * Add special top-level vdev(s) to the vdev tree
  */
 static void
-add_special_vdevs(nvlist_t *root, size_t size, int m, int t)
+add_special_vdevs(nvlist_t *root, size_t size, int r, int m, int t)
 {
 	nvlist_t **child = NULL, **prev_child = NULL, **new_child = NULL;
 	int c = 0, new = 0;
@@ -1007,7 +974,7 @@ add_special_vdevs(nvlist_t *root, size_t size, int m, int t)
 	 * special flag that is added to the top-level vdevs
 	 */
 	for (c = 0; c < t; c++) {
-		child[c] = make_vdev_mirror(NULL, NULL, NULL, size, 0, 0, m,
+		child[c] = make_vdev_mirror(NULL, NULL, NULL, size, 0, r, m,
 		    B_TRUE);
 	}
 
@@ -1091,8 +1058,7 @@ ztest_random_vdev_top(spa_t *spa, boolean_t log_ok)
 	do {
 		top = ztest_random(rvd->vdev_children);
 		tvd = rvd->vdev_child[top];
-	} while (tvd->vdev_ishole || tvd->vdev_isspecial ||
-	    (tvd->vdev_islog && !log_ok) ||
+	} while (tvd->vdev_ishole || (tvd->vdev_islog && !log_ok) ||
 	    tvd->vdev_mg == NULL || tvd->vdev_mg->mg_class == NULL);
 
 	return (top);
@@ -2440,7 +2406,8 @@ ztest_spa_create_destroy(ztest_ds_t *zd, uint64_t id)
 	/*
 	 * Attempt to create using a bad file.
 	 */
-	nvroot = make_vdev_root("/dev/bogus", NULL, NULL, 0, 0, 0, 0, 0, 1);
+	nvroot = make_vdev_root("/dev/bogus", NULL, NULL, 0, 0, 0, 0, 0, 1,
+	    B_FALSE);
 	VERIFY3U(ENOENT, ==,
 	    spa_create("ztest_bad_file", nvroot, NULL, NULL));
 	nvlist_free(nvroot);
@@ -2448,7 +2415,8 @@ ztest_spa_create_destroy(ztest_ds_t *zd, uint64_t id)
 	/*
 	 * Attempt to create using a bad mirror.
 	 */
-	nvroot = make_vdev_root("/dev/bogus", NULL, NULL, 0, 0, 0, 0, 2, 1);
+	nvroot = make_vdev_root("/dev/bogus", NULL, NULL, 0, 0, 0, 0, 2, 1,
+	    B_FALSE);
 	VERIFY3U(ENOENT, ==,
 	    spa_create("ztest_bad_mirror", nvroot, NULL, NULL));
 	nvlist_free(nvroot);
@@ -2458,7 +2426,8 @@ ztest_spa_create_destroy(ztest_ds_t *zd, uint64_t id)
 	 * what's in the nvroot; we should fail with EEXIST.
 	 */
 	(void) rw_rdlock(&ztest_name_lock);
-	nvroot = make_vdev_root("/dev/bogus", NULL, NULL, 0, 0, 0, 0, 0, 1);
+	nvroot = make_vdev_root("/dev/bogus", NULL, NULL, 0, 0, 0, 0, 0, 1,
+	    B_FALSE);
 	VERIFY3U(EEXIST, ==, spa_create(zo->zo_pool, nvroot, NULL, NULL));
 	nvlist_free(nvroot);
 	VERIFY3U(0, ==, spa_open(zo->zo_pool, &spa, FTAG));
@@ -2487,7 +2456,7 @@ ztest_spa_upgrade(ztest_ds_t *zd, uint64_t id)
 	(void) spa_destroy(name);
 
 	nvroot = make_vdev_root(NULL, NULL, name, ztest_opts.zo_vdev_size, 0,
-	    0, ztest_opts.zo_raidz, ztest_opts.zo_mirrors, 1);
+	    0, ztest_opts.zo_raidz, ztest_opts.zo_mirrors, 1, B_FALSE);
 
 	/*
 	 * If we're configuring a RAIDZ device then make sure that the
@@ -2631,7 +2600,7 @@ ztest_vdev_add_remove(ztest_ds_t *zd, uint64_t id)
 		nvroot = make_vdev_root(NULL, NULL, NULL,
 		    ztest_opts.zo_vdev_size, 0,
 		    ztest_random(4) == 0, ztest_opts.zo_raidz,
-		    zs->zs_mirrors, 1);
+		    zs->zs_mirrors, 1, B_FALSE);
 
 		error = spa_vdev_add(spa, nvroot);
 		nvlist_free(nvroot);
@@ -2706,7 +2675,7 @@ ztest_vdev_aux_add_remove(ztest_ds_t *zd, uint64_t id)
 		 * Add a new device.
 		 */
 		nvlist_t *nvroot = make_vdev_root(NULL, aux, NULL,
-		    (ztest_opts.zo_vdev_size * 5) / 4, 0, 0, 0, 0, 1);
+		    (ztest_opts.zo_vdev_size * 5) / 4, 0, 0, 0, 0, 1, B_FALSE);
 		error = spa_vdev_add(spa, nvroot);
 		if (error != 0)
 			fatal(0, "spa_vdev_add(%p) = %d", nvroot, error);
@@ -2848,7 +2817,6 @@ ztest_vdev_attach_detach(ztest_ds_t *zd, uint64_t id)
 	int newvd_is_spare = B_FALSE;
 	int oldvd_is_log;
 	int error, expected_error;
-	boolean_t vdev_isspecial = B_FALSE;
 
 	VERIFY(mutex_lock(&ztest_vdev_lock) == 0);
 	leaves = MAX(zs->zs_mirrors, 1) * ztest_opts.zo_raidz;
@@ -2873,15 +2841,13 @@ ztest_vdev_attach_detach(ztest_ds_t *zd, uint64_t id)
 	/*
 	 * Locate this vdev.
 	 */
-	oldvd = rvd->vdev_child[top];	
-	vdev_isspecial = oldvd->vdev_isspecial;
-
+	oldvd = rvd->vdev_child[top];
 	if (zs->zs_mirrors >= 1) {
 		ASSERT(oldvd->vdev_ops == &vdev_mirror_ops);
 		ASSERT(oldvd->vdev_children >= zs->zs_mirrors);
 		oldvd = oldvd->vdev_child[leaf / ztest_opts.zo_raidz];
 	}
-	if (ztest_opts.zo_raidz > 1 && !vdev_isspecial) {
+	if (ztest_opts.zo_raidz > 1) {
 		ASSERT(oldvd->vdev_ops == &vdev_raidz_ops);
 		ASSERT(oldvd->vdev_children == ztest_opts.zo_raidz);
 		oldvd = oldvd->vdev_child[leaf % ztest_opts.zo_raidz];
@@ -2978,7 +2944,7 @@ ztest_vdev_attach_detach(ztest_ds_t *zd, uint64_t id)
 	 * Build the nvlist describing newpath.
 	 */
 	root = make_vdev_root(newpath, NULL, NULL, newvd == NULL ? newsize : 0,
-	    ashift, 0, 0, 0, 1);
+	    ashift, 0, 0, 0, 1, replacing ? oldvd->vdev_isspecial : B_FALSE);
 
 	error = spa_vdev_attach(spa, oldguid, root, replacing);
 
@@ -5937,16 +5903,13 @@ set_random_ds_props(char *dsname)
 	/*
 	 * Set special class randomly
 	 */
-	if (ztest_random(100) < 50)
-		zopt_special_class = SPA_SPECIALCLASS_META;
-	else
-		zopt_special_class = SPA_SPECIALCLASS_ZIL;
+	spa_specialclass_id_t special_class = SPA_SPECIALCLASS_META;
 
-	VERIFY(nvlist_add_uint64(props, "specialclass",
-	    zopt_special_class) == 0);
+	if (ztest_random(100) < 50)
+		special_class = SPA_SPECIALCLASS_ZIL;
 
 	VERIFY(ztest_dsl_prop_set_uint64(dsname, ZFS_PROP_SPECIALCLASS,
-		zopt_special_class, B_TRUE) == 0);
+		special_class, B_TRUE) == 0);
 }
 
 /*
@@ -5972,12 +5935,13 @@ ztest_init(ztest_shared_t *zs)
 	zs->zs_splits = 0;
 	zs->zs_mirrors = ztest_opts.zo_mirrors;
 	nvroot = make_vdev_root(NULL, NULL, NULL, ztest_opts.zo_vdev_size, 0,
-	    0, ztest_opts.zo_raidz, zs->zs_mirrors, 1);
+	    0, ztest_opts.zo_raidz, zs->zs_mirrors, 1, B_FALSE);
 	/*
 	 * Add special vdevs
 	 */
-	add_special_vdevs(nvroot, zopt_special_size, zopt_special_vdevs,
-	    zopt_special_mirrors);
+	add_special_vdevs(nvroot, ztest_opts.zo_vdev_size, ztest_opts.zo_raidz,
+	    zs->zs_mirrors, 1);
+
 	props = make_random_props();
 	for (int i = 0; i < SPA_FEATURES; i++) {
 		char buf[1024];

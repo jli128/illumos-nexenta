@@ -217,12 +217,11 @@ dump_packed_nvlist(objset_t *os, uint64_t object, void *data, size_t size)
 static void
 dump_vdev_props(objset_t *os, uint64_t object, void *data, size_t size_dummy)
 {
-	nvlist_t *nv;
 	size_t size = *(uint64_t *)data;
 	char *buf;
 	char *pbuf;
 	char *bufend;
-	vdev_props_phys_hdr_t *vpph;
+	vdev_props_phys_hdr_t vpph;
 
 	if (size == 0)
 		return;
@@ -232,16 +231,29 @@ dump_vdev_props(objset_t *os, uint64_t object, void *data, size_t size_dummy)
 
 	VERIFY(0 == dmu_read(os, object, 0, size, buf, DMU_READ_PREFETCH));
 
-	for (pbuf = buf; pbuf < bufend; pbuf += vpph->vpph_size) {
-		vpph = (vdev_props_phys_hdr_t *)pbuf;
-		char *packed = pbuf + sizeof (*vpph);
-		uint64_t nvsize = vpph->vpph_nvsize;
-		vdev_t *vdev = spa_lookup_by_guid(os->os_spa, vpph->vpph_guid, 1);
+	for (pbuf = buf; pbuf < bufend; pbuf += vpph.vpph_size) {
+		nvlist_t *nv;
+		char *packed;
+		uint64_t nvsize;
+		vdev_t *vdev;
 
+		if ((pbuf + sizeof(vdev_props_phys_hdr_t)) >= bufend) {
+			(void) printf("invalid vdev prop header\n");
+			return;
+		}
+		(void) memcpy((void*)&vpph, pbuf, sizeof(vdev_props_phys_hdr_t));
+		packed = pbuf + sizeof(vdev_props_phys_hdr_t);
+		nvsize = vpph.vpph_nvsize;
+		if ((packed + nvsize) >= bufend) {
+			(void) printf("invalid vdev props\n");
+			return;
+		} 
+
+		vdev = spa_lookup_by_guid(os->os_spa, vpph.vpph_guid, 1);
 		if (vdev == NULL)
 			continue;
 
-		printf("device %s:\n", vdev->vdev_path);
+		(void) printf("device %s:\n", vdev->vdev_path);
 
 		VERIFY(nvlist_unpack(packed, nvsize, &nv, 0) == 0);
 
