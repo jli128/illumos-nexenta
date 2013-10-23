@@ -5928,6 +5928,12 @@ make_random_props()
 	VERIFY(nvlist_add_uint64(props, "autoreplace", 1) == 0);
 	VERIFY(nvlist_add_uint64(props, "enablespecial", 1) == 0);
 
+	return (props);
+}
+
+static void
+set_random_ds_props(char *dsname)
+{
 	/*
 	 * Set special class randomly
 	 */
@@ -5939,7 +5945,8 @@ make_random_props()
 	VERIFY(nvlist_add_uint64(props, "specialclass",
 	    zopt_special_class) == 0);
 
-	return (props);
+	VERIFY(ztest_dsl_prop_set_uint64(dsname, ZFS_PROP_SPECIALCLASS,
+		zopt_special_class, B_TRUE) == 0);
 }
 
 /*
@@ -5985,6 +5992,9 @@ ztest_init(ztest_shared_t *zs)
 	VERIFY3U(0, ==, spa_open(ztest_opts.zo_pool, &spa, FTAG));
 	zs->zs_metaslab_sz =
 	    1ULL << spa->spa_root_vdev->vdev_child[0]->vdev_ms_shift;
+
+	/* set props on the root dataset */
+	set_random_ds_props(ztest_opts.zo_pool);
 
 	spa_close(spa, FTAG);
 
