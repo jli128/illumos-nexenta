@@ -45,6 +45,7 @@
 #include <sys/zio_checksum.h>
 #include <sys/zio_compress.h>
 #include <sys/sa.h>
+#include <sys/spa_impl.h>
 #ifdef _KERNEL
 #include <sys/vmsystm.h>
 #include <sys/zfs_znode.h>
@@ -1586,6 +1587,7 @@ dmu_write_policy(objset_t *os, dnode_t *dn, int level, int wp, zio_prop_t *zp)
 	boolean_t nopwrite = B_FALSE;
 	boolean_t dedup_verify = os->os_dedup_verify;
 	int copies = os->os_copies;
+	spa_t *spa = os->os_spa;
 
 	/*
 	 * We maintain different write policies for each of the following
@@ -1666,6 +1668,11 @@ dmu_write_policy(objset_t *os, dnode_t *dn, int level, int wp, zio_prop_t *zp)
 	zp->zp_dedup_verify = dedup && dedup_verify;
 	zp->zp_metadata = ismd;
 	zp->zp_nopwrite = nopwrite;
+
+	/* explicitly control the number for copies for DDT */
+	if (DMU_OT_IS_DDT_META(type) && (spa->spa_ddt_meta_copies > 0))
+		zp->zp_copies =
+		    MIN(spa->spa_ddt_meta_copies, spa_max_replication(spa));
 
 	DTRACE_PROBE2(dmu_wp, boolean_t, zp->zp_metadata,
 	    boolean_t, zp->zp_usesc);

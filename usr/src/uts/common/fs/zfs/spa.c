@@ -214,6 +214,8 @@ spa_prop_get_config(spa_t *spa, nvlist_t **nvp)
 		    spa->spa_hiwat, src);
 		spa_prop_add_list(*nvp, ZPOOL_PROP_LOWATERMARK, NULL,
 		    spa->spa_lowat, src);
+		spa_prop_add_list(*nvp, ZPOOL_PROP_DEDUPMETA_DITTO, NULL,
+		    spa->spa_ddt_meta_copies, src);
 
 		space = 0;
 		for (int c = 0; c < rvd->vdev_children; c++) {
@@ -604,6 +606,11 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 			if (!error && (intval > 100))
 				error = EINVAL;
 			hiwat = intval;
+			break;
+		case ZPOOL_PROP_DEDUPMETA_DITTO:
+			error = nvpair_value_uint64(elem, &intval);
+			if (!error && (intval > SPA_DVAS_PER_BP))
+				error = EINVAL;
 			break;
 		}
 
@@ -2557,6 +2564,8 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 		    ZPOOL_PROP_LOWATERMARK);
 		spa_prop_find(spa, ZPOOL_PROP_HIWATERMARK, &spa->spa_hiwat);
 		spa_prop_find(spa, ZPOOL_PROP_LOWATERMARK, &spa->spa_lowat);
+		spa_prop_find(spa, ZPOOL_PROP_DEDUPMETA_DITTO,
+		    &spa->spa_ddt_meta_copies);
 
 		spa->spa_autoreplace = (autoreplace != 0);
 	}
@@ -3621,6 +3630,8 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	spa_set_specialclass(spa, (spa_specialclass_id_t)val);
 	spa->spa_hiwat = zpool_prop_default_numeric(ZPOOL_PROP_HIWATERMARK);
 	spa->spa_lowat = zpool_prop_default_numeric(ZPOOL_PROP_LOWATERMARK);
+	spa->spa_ddt_meta_copies = zpool_prop_default_numeric(
+	    ZPOOL_PROP_DEDUPMETA_DITTO);
 
 	if (props != NULL) {
 		spa_configfile_set(spa, props, B_FALSE);
@@ -6122,6 +6133,9 @@ spa_sync_props(void *arg, dmu_tx_t *tx)
 				break;
 			case ZPOOL_PROP_HIWATERMARK:
 				spa->spa_hiwat = intval;
+				break;
+			case ZPOOL_PROP_DEDUPMETA_DITTO:
+				spa->spa_ddt_meta_copies = intval;
 				break;
 			default:
 				break;

@@ -111,6 +111,8 @@ zpool_prop_init(void)
 	    PROP_DEFAULT, ZFS_TYPE_POOL, "<version>", "VERSION");
 	zprop_register_number(ZPOOL_PROP_DEDUPDITTO, "dedupditto", 0,
 	    PROP_DEFAULT, ZFS_TYPE_POOL, "<threshold (min 100)>", "DEDUPDITTO");
+	zprop_register_number(ZPOOL_PROP_DEDUPMETA_DITTO, "dedup_meta_ditto", 0,
+	    PROP_DEFAULT, ZFS_TYPE_POOL, "<number of copies>", "DEDUP_META_DITTO");
 
 	/* default index (boolean) properties */
 	zprop_register_index(ZPOOL_PROP_DELEGATION, "delegation", 1,

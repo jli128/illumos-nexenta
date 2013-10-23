@@ -354,6 +354,8 @@ struct spa {
 	 */
 	spa_config_lock_t spa_config_lock[SCL_LOCKS]; /* config changes */
 	refcount_t	spa_refcount;		/* number of opens */
+
+	uint64_t spa_ddt_meta_copies; /* amount of ddt-metadata copies */
 };
 
 extern const char *spa_config_path;
