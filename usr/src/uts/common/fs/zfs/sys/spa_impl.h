@@ -162,6 +162,13 @@ typedef struct spa_perfmon_data {
 	kcondvar_t		perfmon_cv;
 } spa_perfmon_data_t;
 
+typedef struct spa_meta_placement {
+	uint64_t spa_enable_meta_placement_selection;
+	uint64_t spa_ddt_to_special; 
+	uint64_t spa_general_meta_to_special;
+	uint64_t spa_other_meta_to_special;
+} spa_meta_placement_t;
+
 struct spa {
 	/*
 	 * Fields protected by spa_namespace_lock.
@@ -366,6 +373,8 @@ struct spa {
 	 */
 	enum ddt_class spa_ddt_class_min;
 	enum ddt_class spa_ddt_class_max;
+
+	spa_meta_placement_t spa_meta_policy;
 };
 
 extern const char *spa_config_path;

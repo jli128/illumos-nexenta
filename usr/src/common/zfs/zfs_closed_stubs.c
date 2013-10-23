@@ -193,7 +193,7 @@ spa_cos_fini(spa_t *dummy)
 
 /* ARGSUSED */
 spa_specialclass_id_t
-spa_specialclass_id(spa_t *dummy)
+spa_specialclass_id(objset_t *dummy)
 {
 	return (SPA_SPECIALCLASS_ZIL);
 }
@@ -206,7 +206,7 @@ spa_check_special(spa_t *dummy)
 
 /* ARGSUSED */
 void
-spa_set_specialclass(spa_t *dummy, spa_specialclass_id_t dummy2)
+spa_set_specialclass(spa_t *dummy, objset_t *dummy2, spa_specialclass_id_t dummy3)
 {
 }
 
@@ -226,7 +226,7 @@ spa_load_cos_props(spa_t *dummy)
 
 /* ARGSUSED */
 boolean_t
-spa_write_data_to_special(spa_t *dummy)
+spa_write_data_to_special(spa_t *dummy, objset_t *dummy2)
 {
 	return (B_FALSE);
 }

@@ -65,16 +65,6 @@ zpool_prop_init(void)
 		{ NULL }
 	};
 
-	static zprop_index_t specialclass_table[] = {
-		{ "zil",	SPA_SPECIALCLASS_ZIL },
-		{ "meta",	SPA_SPECIALCLASS_META },
-#if 0
-		/* temporarily disable wrcache */
-		{ "wrcache",	SPA_SPECIALCLASS_WRCACHE },
-#endif
-		{ NULL }
-	};
-
 	/* string properties */
 	zprop_register_string(ZPOOL_PROP_ALTROOT, "altroot", NULL, PROP_DEFAULT,
 	    ZFS_TYPE_POOL, "<path>", "ALTROOT");
@@ -130,6 +120,15 @@ zpool_prop_init(void)
 	zprop_register_index(ZPOOL_PROP_DDT_DESEGREGATION, "ddt_desegregation", 0,
 	    PROP_DEFAULT, ZFS_TYPE_POOL, "on | off", "DDT_DESEG", boolean_table);
 
+	zprop_register_index(ZPOOL_PROP_META_PLACEMENT, "meta_placement", 1,
+	    PROP_DEFAULT, ZFS_TYPE_POOL, "on | off", "META_PLCMNT", boolean_table);
+	zprop_register_index(ZPOOL_PROP_DDT_TO_METADEV, "ddt_to_metadev", 1,
+	    PROP_DEFAULT, ZFS_TYPE_POOL, "on | off", "DDT_TO_MD", boolean_table);
+	zprop_register_index(ZPOOL_PROP_GENERAL_META_TO_METADEV, "gen_meta_to_metadev", 1,
+	    PROP_DEFAULT, ZFS_TYPE_POOL, "on | off", "GENMETA_TO_MD", boolean_table);
+	zprop_register_index(ZPOOL_PROP_OTHER_META_TO_METADEV, "other_meta_to_metadev", 0,
+	    PROP_DEFAULT, ZFS_TYPE_POOL, "on | off", "OTHERMETA_TO_MD", boolean_table);
+
 	/* default index properties */
 	zprop_register_index(ZPOOL_PROP_FAILUREMODE, "failmode",
 	    ZIO_FAILURE_MODE_WAIT, PROP_DEFAULT, ZFS_TYPE_POOL,
@@ -139,18 +138,6 @@ zpool_prop_init(void)
 	zprop_register_index(ZPOOL_PROP_ENABLESPECIAL, "enablespecial", 0,
 	    PROP_READONLY, ZFS_TYPE_POOL, "on | off", "ENABLESPECIAL",
 	    boolean_table);
-#if 0
-	/* temporarily disable wrcache */
-	/* special class */
-	zprop_register_index(ZPOOL_PROP_SPECIALCLASS, "specialclass",
-	    SPA_SPECIALCLASS_ZIL, PROP_DEFAULT, ZFS_TYPE_POOL,
-	    "zil | meta | wrcache", "SPECIALCLASS", specialclass_table);
-#else
-	/* special class */
-	zprop_register_index(ZPOOL_PROP_SPECIALCLASS, "specialclass",
-	    SPA_SPECIALCLASS_ZIL, PROP_DEFAULT, ZFS_TYPE_POOL,
-	    "zil | meta", "SPECIALCLASS", specialclass_table);
-#endif
 
 	/* pool's low watermark in percents (for write cache) */
 	zprop_register_number(ZPOOL_PROP_LOWATERMARK, "low-watermark",

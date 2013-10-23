@@ -1429,7 +1429,7 @@ dmu_sync(zio_t *pio, uint64_t txg, dmu_sync_cb_t *done, zgd_t *zgd)
 	    db->db.db_object, db->db_level, db->db_blkid);
 
 	/* write to special only if proper conditions hold */
-	if (dmu_write_to_special && spa_write_data_to_special(os->os_spa)) {
+	if (dmu_write_to_special && spa_write_data_to_special(os->os_spa, os)) {
 		WP_SET_SPECIALCLASS(flags, B_TRUE);
 	}
 	DB_DNODE_ENTER(db);
@@ -1668,6 +1668,8 @@ dmu_write_policy(objset_t *os, dnode_t *dn, int level, int wp, zio_prop_t *zp)
 	zp->zp_dedup_verify = dedup && dedup_verify;
 	zp->zp_metadata = ismd;
 	zp->zp_nopwrite = nopwrite;
+	zp->zp_specflags = spa_specialclass_flags(os);
+	zp->zp_zpl_meta_to_special = os->os_zpl_meta_to_special;
 
 	/* explicitly control the number for copies for DDT */
 	if (DMU_OT_IS_DDT_META(type) && (spa->spa_ddt_meta_copies > 0))

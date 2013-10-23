@@ -30,6 +30,7 @@
 
 #include <sys/zio.h>
 #include <sys/spa.h>
+#include <sys/special.h>
 #include <sys/u8_textprep.h>
 #include <sys/zfs_acl.h>
 #include <sys/zfs_ioctl.h>
@@ -211,6 +212,16 @@ zfs_prop_init(void)
 		{ NULL }
 	};
 
+	static zprop_index_t specialclass_table[] = {
+		{ "zil",	SPA_SPECIALCLASS_ZIL },
+		{ "meta",	SPA_SPECIALCLASS_META },
+#if 0
+		/* temporarily disable wrcache */
+		{ "wrcache",	SPA_SPECIALCLASS_WRCACHE },
+#endif
+		{ NULL }
+	};
+
 	/* inherit index properties */
 	zprop_register_index(ZFS_PROP_SYNC, "sync", ZFS_SYNC_STANDARD,
 	    PROP_INHERIT, ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
@@ -256,6 +267,26 @@ zfs_prop_init(void)
 	zprop_register_index(ZFS_PROP_LOGBIAS, "logbias", ZFS_LOGBIAS_LATENCY,
 	    PROP_INHERIT, ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
 	    "latency | throughput", "LOGBIAS", logbias_table);
+
+#if 0
+	/* temporarily disable wrcache */
+	/* special class */
+	zprop_register_index(ZFS_PROP_SPECIALCLASS, "specialclass",
+	    SPA_SPECIALCLASS_ZIL, PROP_DEFAULT, 
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT | ZFS_TYPE_VOLUME,
+	    "zil | meta | wrcache", "SPECIALCLASS", specialclass_table);
+#else
+	/* special class */
+	zprop_register_index(ZFS_PROP_SPECIALCLASS, "specialclass",
+	    SPA_SPECIALCLASS_ZIL, PROP_INHERIT,
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT | ZFS_TYPE_VOLUME,
+	    "zil | meta", "SPECIALCLASS", specialclass_table);
+#endif
+
+	zprop_register_index(ZFS_PROP_ZPL_TO_METADEV, "zpl_to_metadev", 1,
+	    PROP_INHERIT,
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT | ZFS_TYPE_VOLUME,
+	    "on | off", "ZPL_TO_MD", boolean_table);
 
 	/* inherit index (boolean) properties */
 	zprop_register_index(ZFS_PROP_ATIME, "atime", 1, PROP_INHERIT,

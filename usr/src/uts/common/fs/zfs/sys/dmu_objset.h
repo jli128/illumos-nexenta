@@ -30,6 +30,7 @@
 #define	_SYS_DMU_OBJSET_H
 
 #include <sys/spa.h>
+#include <sys/special_impl.h>
 #include <sys/arc.h>
 #include <sys/txg.h>
 #include <sys/zfs_context.h>
@@ -93,6 +94,8 @@ struct objset {
 	uint8_t os_logbias;
 	uint8_t os_primary_cache;
 	uint8_t os_secondary_cache;
+	spa_specialclass_t os_special_class;
+	uint64_t os_zpl_meta_to_special;
 	uint8_t os_sync;
 
 	/* no lock needed: */

@@ -308,6 +308,8 @@ typedef struct zio_prop {
 	boolean_t               zp_nopwrite;
 	boolean_t		zp_metadata;
 	boolean_t		zp_usesc;
+	uint64_t		zp_specflags;
+	uint64_t		zp_zpl_meta_to_special;
 } zio_prop_t;
 
 typedef struct zio_cksum_report zio_cksum_report_t;

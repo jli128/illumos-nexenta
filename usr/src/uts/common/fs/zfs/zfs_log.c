@@ -495,7 +495,7 @@ zfs_log_write(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	    (zilog->zl_logbias == ZFS_LOGBIAS_LATENCY);
 
 	if (immediate_write_sz && !slogging && zfs_wrcache_write_once &&
-	    spa_write_data_to_special(zilog->zl_spa))
+	    spa_write_data_to_special(zilog->zl_spa, zilog->zl_os))
 		immediate_write_sz = 0;
 
 	if (resid > immediate_write_sz && !slogging && resid <= zp->z_blksz)
