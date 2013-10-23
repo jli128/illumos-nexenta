@@ -1,3 +1,9 @@
+sunwsmbskr (5.11.134-31-13070-701) nexenta; urgency=low
+
+  * Issue SUS-172: Excel warning dialog when re-saving a file
+  * Issue SUS-173: Open fails if the client does not ask for read_attribute permission
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 23 Oct 2013 21:26:04 -0400
 sunwsmbskr (5.11.134-31-13069-599) nexenta; urgency=high
 
   * Issue SUP-599: smb_oplock_acquire thread deadlock
