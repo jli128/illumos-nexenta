@@ -175,4 +175,7 @@ zpool_feature_init(void)
 	zfeature_register(SPA_FEATURE_COS_ATTR,
 	    "com.nexenta:class_of_storages", "class_of_storages",
 	    "Diverging storages.", B_TRUE, B_FALSE, cos_deps);
+	zfeature_register(SPA_FEATURE_SHA1CRC32,
+	    "com.nexenta:checksum_sha1crc32", "checksum_sha1crc32",
+	    "Allows usage of the sha1crc32 checksum.", B_TRUE, B_FALSE, NULL);
 }

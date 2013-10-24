@@ -3503,7 +3503,6 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	uint_t nspares, nl2cache;
 	uint64_t version, obj;
 	boolean_t has_features;
-	uint64_t val;
 	spa_meta_placement_t *mp;
 
 	/*
