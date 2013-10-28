@@ -475,7 +475,14 @@ lzc_objset_stats(const char *dataset, dmu_objset_type_t *type, nvlist_t **stats,
 boolean_t
 lzc_exists(const char *dataset)
 {
-	return (lzc_objset_stats(dataset, NULL, NULL, NULL));
+	/*
+	 * The objset_stats ioctl is still legacy, so we need to construct our
+	 * own zfs_cmd_t rather than using zfsc_ioctl().
+	 */
+	zfs_cmd_t zc = { 0 };
+
+	(void) strlcpy(zc.zc_name, dataset, sizeof (zc.zc_name));
+	return (ioctl(g_fd, ZFS_IOC_OBJSET_STATS, &zc) == 0);
 }
 
 boolean_t
