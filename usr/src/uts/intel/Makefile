@@ -37,16 +37,8 @@ LINT_KMODS_X1	= $(LINT_KMODS:nsmb=)
 LINT_KMODS_X2	= $(LINT_KMODS_X1:smbfs=)
 LINT_KMODLIBS	= $(LINT_KMODS_X2:e1000g=)
 LINT_LIBS	= $(LINT_LIB) $(GEN_LINT_LIB) \
-		  $(LINT_KMODLIBS:%=$(LINT_LIB_DIR)/llib-l%.ln) \
 		  $(NZA_LINT_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln) \
-		  $(CLOSED_LINT_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln) 
-
-$(CLOSED_BUILD)LINT_LIBS	+= $(SVVS_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln)
-$(CLOSED_BUILD)LINT_CLOSED_XMOD4	= $(CLOSED_XMODS:bnx=)
-$(CLOSED_BUILD)LINT_CLOSED_XMOD3	= $(LINT_CLOSED_XMOD4:bnxe=)
-$(CLOSED_BUILD)LINT_CLOSED_XMOD2	= $(LINT_CLOSED_XMOD3:lsimega=)
-$(CLOSED_BUILD)LINT_CLOSED_XMOD1	= $(LINT_CLOSED_XMOD2:adpu320=)
-$(CLOSED_BUILD)LINT_LIBS	+= $(LINT_XMODLIBS:%=$(LINT_LIB_DIR)/llib-l%.ln)
+		  $(LINT_KMODLIBS:%=$(LINT_LIB_DIR)/llib-l%.ln)
 
 #
 # dprov is delivered in the SUNWcryptoint package.
@@ -75,11 +67,9 @@ install_h.prereq	:=	TARGET= install_h
 
 .KEEP_STATE:
 
-.PARALLEL:	$(PARALLEL_KMODS) $(CLOSED_KMODS) $(SVVS) $(XMODS) \
-		$(NZA_KMODS) $(CLOSED_XMODS) config $(LINT_DEPS)
+.PARALLEL:	$(PARALLEL_KMODS) $(XMODS) $(NZA_KMODS) config $(LINT_DEPS)
 
-def all install clean clobber modlist: $(KMODS) $(CLOSED_KMODS) \
-	$(SVVS) $(XMODS) $(NZA_KMODS) $(CLOSED_XMODS) config
+def all install clean clobber modlist: $(KMODS) $(XMODS) $(NZA_KMODS) config
 
 clobber: clobber.targ
 
@@ -137,14 +127,10 @@ lint.prereq: FRC
 
 genunix: $(PRIVS_C)
 
-modlintlib clean.lint: $(LINT_KMODS) $(CLOSED_LINT_KMODS) $(SVVS) \
-	$(NZA_LINT_KMODS) $(XMODS) $(CLOSED_XMODS)
+modlintlib clean.lint: $(LINT_KMODS) $(XMODS) $(NZA_LINT_KMODS)
 
 $(KMODS) $(SUBDIRS) config:	FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
-
-$(CLOSED_KMODS):	FRC
-	cd $(CLOSED)/uts/intel/$@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
 
 $(NZA_KMODS):	FRC
 	cd $(NZA_UTS)/intel/$@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
@@ -152,14 +138,6 @@ $(NZA_KMODS):	FRC
 $(XMODS):	FRC
 	@if [ -f $@/Makefile  ]; then \
 		cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET); \
-	else \
-		true; \
-	fi
-
-$(SVVS) $(CLOSED_XMODS):	FRC
-	@if [ -f $(CLOSED)/uts/intel/$@/Makefile  ]; then \
-		cd $(CLOSED)/uts/intel/$@; pwd; \
-		    $(MAKE) $(NO_STATE) $(TARGET); \
 	else \
 		true; \
 	fi

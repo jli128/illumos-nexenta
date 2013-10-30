@@ -39,14 +39,9 @@ LINT_KMODS_X1	= $(LINT_KMODS:nsmb=)
 LINT_KMODS_X2	= $(LINT_KMODS_X1:smbfs=)
 LINT_KMODLIBS	= $(LINT_KMODS_X2:e1000g=)
 LINT_LIBS	= $(LINT_LIB) $(GEN_LINT_LIB) \
-		  $(LINT_KMODLIBS:%=$(LINT_LIB_DIR)/llib-l%.ln)
-
-$(CLOSED_BUILD)LINT_LIBS += $(CLOSED_LINT_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln)
+		  $(LINT_KMODLIBS:%=$(LINT_LIB_DIR)/llib-l%.ln) \
+		  $(LINT_XMODLIBS:%=$(LINT_LIB_DIR)/llib-l%.ln)
 $(NZA_MODS)LINT_LIBS += $(NZA_LINT_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln)
-
-$(CLOSED_BUILD)LINT_LIBS	+= $(SVVS_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln)
-LINT_LIBS	+= $(LINT_XMODLIBS:%=$(LINT_LIB_DIR)/llib-l%.ln)
-$(CLOSED_BUILD)LINT_LIBS += $(CLOSED_XMODS:%=$(LINT_LIB_DIR)/llib-l%.ln)
 
 DRV_KMODS	+= dprov
 
@@ -65,20 +60,14 @@ install_h	:=	TARGET= install_h
 
 .KEEP_STATE:
 
-.PARALLEL:	$(PARALLEL_KMODS) $(CLOSED_KMODS) $(SVVS) $(XMODS) \
-		%(NZA_KMODS) $(CLOSED_XMODS) config $(LINT_DEPS)
+.PARALLEL:	$(PARALLEL_KMODS) $(XMODS) $(NZA_KMODS) config $(LINT_DEPS)
 
-def all install clean clobber modlist: $(KMODS) $(CLOSED_KMODS) $(SVVS) \
-	$(XMODS) $(NZA_KMODS) $(CLOSED_XMODS) config
+def all install clean clobber modlist: $(KMODS) $(XMODS) config
 
-modlintlib clean.lint: $(LINT_KMODS) $(CLOSED_LINT_KMODS) $(SVVS) \
-	$(NZA_LINT_KMODS) $(XMODS) $(CLOSED_XMODS)
+modlintlib clean.lint: $(LINT_KMODS) $(XMODS) $(NZA_LINT_KMODS)
 
 $(KMODS) config:	FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
-
-$(CLOSED_KMODS):	FRC
-	cd $(CLOSED)/uts/sparc/$@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
 
 $(NZA_KMODS):	FRC
 	cd $(NZA_UTS)/sparc/$@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
@@ -86,14 +75,6 @@ $(NZA_KMODS):	FRC
 $(XMODS):	FRC
 	@if [ -f $@/Makefile  ]; then \
 		cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET); \
-	else \
-		true; \
-	fi
-
-$(SVVS) $(CLOSED_XMODS):	FRC
-	@if [ -f $(CLOSED)/uts/sparc/$@/Makefile  ]; then \
-		cd $(CLOSED)/uts/sparc/$@; pwd; \
-		    $(MAKE) $(NO_STATE) $(TARGET); \
 	else \
 		true; \
 	fi

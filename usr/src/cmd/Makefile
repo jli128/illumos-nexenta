@@ -481,19 +481,6 @@ COMMON_SUBDIRS=		\
 
 $(NZA_KMODS)COMMON_SUBDIRS += $(NZA_CLOSED_CMD)
 
-$(CLOSED_BUILD)COMMON_SUBDIRS += \
-	$(CLOSED)/cmd/iconv	\
-	$(CLOSED)/cmd/ksh	\
-	$(CLOSED)/cmd/localedef	\
-	$(CLOSED)/cmd/more_xpg4	\
-	$(CLOSED)/cmd/mtst	\
-	$(CLOSED)/cmd/od	\
-	$(CLOSED)/cmd/patch	\
-	$(CLOSED)/cmd/pax	\
-	$(CLOSED)/cmd/printf	\
-	$(CLOSED)/cmd/sed	\
-	$(CLOSED)/cmd/sed_xpg4
-
 i386_SUBDIRS=		\
 	acpihpd		\
 	addbadsec	\
@@ -765,18 +752,6 @@ MSGSUBDIRS=		\
 	zpool		\
 	zonestat
 
-$(CLOSED_BUILD)MSGSUBDIRS += \
-	$(CLOSED)/cmd/iconv	\
-	$(CLOSED)/cmd/ksh	\
-	$(CLOSED)/cmd/localedef	\
-	$(CLOSED)/cmd/more_xpg4	\
-	$(CLOSED)/cmd/od	\
-	$(CLOSED)/cmd/patch	\
-	$(CLOSED)/cmd/pax	\
-	$(CLOSED)/cmd/printf	\
-	$(CLOSED)/cmd/sed	\
-	$(CLOSED)/cmd/sed_xpg4
-
 sparc_MSGSUBDIRS=	\
 	fruadm		\
 	prtdscp		\
@@ -802,9 +777,6 @@ DCSUBDIRS=		\
 	who		\
 	whodo		\
 	write
-
-$(CLOSED_BUILD)DCSUBDIRS += \
-	$(CLOSED)/cmd/pax
 
 #
 # commands that belong only to audit.
