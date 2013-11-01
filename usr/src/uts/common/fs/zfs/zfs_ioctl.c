@@ -2533,7 +2533,6 @@ retry:
 			set_worm = B_TRUE;
 		}
 
-		cmn_err(CE_NOTE, "The property is %s\n", propname);
 		/* decode the property value */
 		propval = pair;
 		if (nvpair_type(pair) == DATA_TYPE_NVLIST) {
@@ -3127,7 +3126,7 @@ zfs_fill_zplprops_impl(objset_t *os, uint64_t zplver,
 
 	if (os) {
 		if (zfs_is_wormed_ds(dmu_objset_ds(os)))
-			return (EPERM);
+			return (SET_ERROR(EPERM));
 	}
 
 	/*
@@ -3625,7 +3624,7 @@ zfs_ioc_rollback(const char *fsname, nvlist_t *args, nvlist_t *outnvl)
 	zfsvfs_t *zfsvfs;
 
 	if (zfs_is_wormed(fsname))
-		return (EPERM);
+		return (SET_ERROR(EPERM));
 
 	if (getzfsvfs(fsname, &zfsvfs) == 0) {
 		error = zfs_suspend_fs(zfsvfs);
@@ -3668,7 +3667,7 @@ zfs_ioc_rename(zfs_cmd_t *zc)
 	char *at;
 
 	if (zfs_is_wormed(zc->zc_name))
-		return (EPERM);
+		return (SET_ERROR(EPERM));
 
 	zc->zc_value[sizeof (zc->zc_value) - 1] = '\0';
 	if (dataset_namecheck(zc->zc_value, NULL, NULL) != 0 ||
@@ -4308,14 +4307,17 @@ zfs_ioc_send(zfs_cmd_t *zc)
 		dsl_dataset_rele(tosnap, FTAG);
 		dsl_pool_rele(dp, FTAG);
 	} else {
+		offset_t off_starting;
 		file_t *fp = getf(zc->zc_cookie);
 		if (fp == NULL)
 			return (SET_ERROR(EBADF));
 
-		off = fp->f_offset;
-		error = dmu_send_obj(zc->zc_name, zc->zc_sendobj,
-		    zc->zc_fromobj, zc->zc_cookie, fp->f_vnode, &off);
+		off_starting = off = fp->f_offset;
+		error = dmu_send_obj_ss(zc->zc_name, zc->zc_sendobj,
+		    zc->zc_fromobj, zc->zc_cookie, fp->f_vnode, &off,
+		    zc->zc_sendsize);
 
+		zc->zc_sendcounter = off - off_starting;
 		if (VOP_SEEK(fp->f_vnode, fp->f_offset, &off, NULL) == 0)
 			fp->f_offset = off;
 		releasef(zc->zc_cookie);
@@ -5366,10 +5368,12 @@ zfs_ioc_cos_set_props(zfs_cmd_t *zc)
 		cos = spa_lookup_cos_by_id(spa, zc->zc_guid);
 		if (cos != NULL)
 			cosname = cos->cos_name;
+		else
+			error = SET_ERROR(ENOENT);
 		spa_cos_exit(spa);
 	}
 
-	if (cosname && error == 0)
+	if (error == 0)
 		error = spa_cos_prop_set(spa, cosname, props);
 
 	spa_close(spa, FTAG);
@@ -5447,7 +5451,7 @@ zfs_ioc_send_new(const char *snapname, nvlist_t *innvl, nvlist_t *outnvl)
 		return (SET_ERROR(EBADF));
 
 	off = fp->f_offset;
-	error = dmu_send(snapname, fromname, fd, fp->f_vnode, &off, B_FALSE);
+	error = dmu_send(snapname, fromname, fd, fp->f_vnode, &off);
 
 	if (VOP_SEEK(fp->f_vnode, fp->f_offset, &off, NULL) == 0)
 		fp->f_offset = off;

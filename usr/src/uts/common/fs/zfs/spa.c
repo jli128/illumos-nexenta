@@ -65,8 +65,8 @@
 #include <sys/zfs_ioctl.h>
 #include <sys/dsl_scan.h>
 #include <sys/zfeature.h>
-#include <sys/special.h>
 #include <sys/dsl_destroy.h>
+#include <sys/special.h>
 
 #ifdef	_KERNEL
 #include <sys/bootprops.h>
@@ -152,12 +152,6 @@ uint_t		zio_taskq_basedc = 80;		/* base duty cycle */
 
 boolean_t	spa_create_process = B_TRUE;	/* no process ==> no sysdc */
 extern int	zfs_sync_pass_deferred_free;
-
-/*
- * This (illegal) pool name is used when temporarily importing a spa_t in order
- * to get the vdev stats associated with the imported devices.
- */
-#define		TRYIMPORT_NAME  "$import"
 
 /*
  * ==========================================================================
@@ -1850,8 +1844,7 @@ spa_load_verify_done(zio_t *zio)
 	int error = zio->io_error;
 
 	if (error) {
-		if ((BP_GET_LEVEL(bp) != 0 || DMU_OT_IS_METADATA(type)) &&
-		    type != DMU_OT_INTENT_LOG)
+		if (BP_IS_METADATA(bp) && type != DMU_OT_INTENT_LOG)
 			atomic_add_64(&sle->sle_meta_count, 1);
 		else
 			atomic_add_64(&sle->sle_data_count, 1);
@@ -2576,7 +2569,6 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 	    &spa->spa_vdev_props_object);
 	if (error == 0)
 		(void) vdev_load_props(spa);
-
 
 	/*
 	 * If the 'autoreplace' property is set, then post a resource notifying

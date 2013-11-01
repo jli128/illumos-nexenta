@@ -162,12 +162,6 @@ typedef struct dsl_dataset {
 	zbookmark_t ds_lszb;
 
 	/*
-	 * ds_owner is protected by the ds_rwlock and the ds_lock
-	 */
-	krwlock_t ds_rwlock;
-	kcondvar_t ds_exclusive_cv;
-
-	/*
 	 * Long holds prevent the ds from being destroyed; they allow the
 	 * ds to remain held even after dropping the dp_config_rwlock.
 	 * Owning counts as a long hold.  See the comments above

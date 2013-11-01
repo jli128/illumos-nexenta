@@ -199,9 +199,7 @@ static ztest_shared_ds_t *ztest_shared_ds;
 #define	ZTEST_GET_SHARED_DS(d) (&ztest_shared_ds[d])
 
 /* special vdev config */
-#if 0
 static uint64_t zopt_special_class = SPA_SPECIALCLASS_META;
-#endif
 static int zopt_special_vdevs = 2;
 static size_t zopt_special_size = SPA_MINDEVSIZE;
 static int zopt_special_mirrors = 2;
@@ -990,7 +988,6 @@ make_vdev_root(char *path, char *aux, char *pool, size_t size, uint64_t ashift,
 	return (root);
 }
 
-#if 0
 /*
  * Add special top-level vdev(s) to the vdev tree
  */
@@ -1046,7 +1043,6 @@ add_special_vdevs(nvlist_t *root, size_t size, int m, int t)
 
 	umem_free(new_child, new * sizeof (nvlist_t *));
 }
-#endif
 
 /*
  * Find a random spa version. Returns back a random spa version in the
@@ -5932,30 +5928,19 @@ make_random_props()
 	VERIFY(nvlist_add_uint64(props, "autoreplace", 1) == 0);
 	VERIFY(nvlist_add_uint64(props, "enablespecial", 1) == 0);
 
-	return (props);
-}
-
-#if 0
-static void
-set_random_ds_props(char *dsname)
-{
 	/*
-	 * Set special class randomly;
-	 * for now only use ZIL and META 
+	 * Set special class randomly
 	 */
-
 	if (ztest_random(100) < 50)
 		zopt_special_class = SPA_SPECIALCLASS_META;
 	else
 		zopt_special_class = SPA_SPECIALCLASS_ZIL;
 
-	//if (ztest_random(2) == 0)
-	//	return;
+	VERIFY(nvlist_add_uint64(props, "specialclass",
+	    zopt_special_class) == 0);
 
-	VERIFY(ztest_spa_prop_set_uint64(ZPOOL_PROP_SPECIALCLASS,
-		zopt_special_class) == 0);
+	return (props);
 }
-#endif
 
 /*
  * Create a storage pool with the given name and initial vdev size.
@@ -5984,10 +5969,8 @@ ztest_init(ztest_shared_t *zs)
 	/*
 	 * Add special vdevs
 	 */
-#if 0
 	add_special_vdevs(nvroot, zopt_special_size, zopt_special_vdevs,
 	    zopt_special_mirrors);
-#endif
 	props = make_random_props();
 	for (int i = 0; i < SPA_FEATURES; i++) {
 		char buf[1024];
@@ -6002,9 +5985,6 @@ ztest_init(ztest_shared_t *zs)
 	VERIFY3U(0, ==, spa_open(ztest_opts.zo_pool, &spa, FTAG));
 	zs->zs_metaslab_sz =
 	    1ULL << spa->spa_root_vdev->vdev_child[0]->vdev_ms_shift;
-
-	/* set props on the root dataset */
-	// set_random_ds_props(ztest_opts.zo_pool);
 
 	spa_close(spa, FTAG);
 

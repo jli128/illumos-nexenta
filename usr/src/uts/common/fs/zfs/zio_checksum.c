@@ -94,7 +94,7 @@ zio_checksum_info_t zio_checksum_table[ZIO_CHECKSUM_FUNCTIONS] = {
 	{{zio_checksum_SHA256,	zio_checksum_SHA256},	1, 0, 1, "sha256"},
 	{{fletcher_4_native,	fletcher_4_byteswap},	0, 1, 0, "zilog2"},
 	{{zio_checksum_SHA1CRC32,	zio_checksum_SHA1CRC32},	0, 0, 1,
-		"sha1crc32"},
+	    "sha1crc32"},
 	{{zio_checksum_off,	zio_checksum_off},	0, 0, 0, "noparity"},
 };
 

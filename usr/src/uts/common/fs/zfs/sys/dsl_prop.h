@@ -81,9 +81,6 @@ void dsl_props_set_sync_impl(struct dsl_dataset *ds, zprop_source_t source,
 void dsl_prop_set_sync_impl(struct dsl_dataset *ds, const char *propname,
     zprop_source_t source, int intsz, int numints, const void *value,
     dmu_tx_t *tx);
-dsl_syncfunc_t dsl_prop_set_sync;
-int dsl_prop_set(const char *ddname, const char *propname,
-    zprop_source_t source, int intsz, int numints, const void *buf);
 int dsl_props_set(const char *dsname, zprop_source_t source, nvlist_t *nvl);
 int dsl_prop_set_int(const char *dsname, const char *propname,
     zprop_source_t source, uint64_t value);

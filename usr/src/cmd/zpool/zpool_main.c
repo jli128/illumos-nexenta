@@ -1813,11 +1813,9 @@ show_import(nvlist_t *config)
 			    "the '-f' flag.\n"));
 	}
 
-#if 0	/* Sun.com is gone gone gone */
 	if (msgid != NULL)
 		(void) printf(gettext("   see: http://illumos.org/msg/%s\n"),
 		    msgid);
-#endif
 
 	(void) printf(gettext(" config:\n\n"));
 

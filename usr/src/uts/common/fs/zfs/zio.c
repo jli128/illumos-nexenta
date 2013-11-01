@@ -40,10 +40,6 @@
 #include <sys/special.h>
 
 extern int zil_use_sdev;
-
-/*
- * Default minimum timeout is a multiple of txg synctime or txg timeout.
- */
 extern int zfs_txg_timeout;
 
 
@@ -213,8 +209,6 @@ zio_init(void)
 
 	/*
 	 * Initialize minimum timeout if not set.
-	 * Must be greater than the txg synctime, but it would be unreasonable
-	 * to exceed the maximum duration of a txg.
 	 */
 	if (zio_min_timeout_ms == -1) {
 		zio_min_timeout_ms = zfs_txg_timeout * MILLISEC;
@@ -681,9 +675,7 @@ zio_write(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
 	    DMU_OT_IS_VALID(zp->zp_type) &&
 	    zp->zp_level < 32 &&
 	    zp->zp_copies > 0 &&
-	    zp->zp_copies <= spa_max_replication(spa) &&
-	    zp->zp_dedup <= 1 &&
-	    zp->zp_dedup_verify <= 1);
+	    zp->zp_copies <= spa_max_replication(spa));
 
 	zio = zio_create(pio, spa, txg, bp, data, size, done, private,
 	    ZIO_TYPE_WRITE, priority, flags, NULL, 0, zb,
@@ -1493,7 +1485,6 @@ zio_resume_wait(spa_t *spa)
 		cv_wait(&spa->spa_suspend_cv, &spa->spa_suspend_lock);
 	mutex_exit(&spa->spa_suspend_lock);
 }
-
 
 /*
  * Tunables: consider several types of metadata: ddt-related, 'general'
@@ -2575,6 +2566,7 @@ zio_vdev_io_start(zio_t *zio)
 	spa_t *spa = zio->io_spa;
 	zio_type_t type = zio->io_type;
 	zio->io_vd_timestamp = gethrtime();
+
 	ASSERT(zio->io_error == 0);
 	ASSERT(zio->io_child_error[ZIO_CHILD_VDEV] == 0);
 

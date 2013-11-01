@@ -439,45 +439,13 @@ backup_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
 	ASSERT(err == 0 || err == EINTR);
 	return (err);
 }
-#if 0
-static boolean_t
-is_before(dsl_dataset_t *later, dsl_dataset_t *earlier)
-{
-	dsl_pool_t *dp = later->ds_dir->dd_pool;
-	int error;
-	boolean_t ret;
-	dsl_dataset_t *origin;
 
-	if (earlier->ds_phys->ds_creation_txg >=
-	    later->ds_phys->ds_creation_txg)
-		return (B_FALSE);
 
-	if (later->ds_dir == earlier->ds_dir)
-		return (B_TRUE);
-	if (!dsl_dir_is_clone(later->ds_dir))
-		return (B_FALSE);
-
-	rw_enter(&dp->dp_config_rwlock, RW_READER);
-	if (later->ds_dir->dd_phys->dd_origin_obj == earlier->ds_object) {
-		rw_exit(&dp->dp_config_rwlock);
-		return (B_TRUE);
-	}
-	error = dsl_dataset_hold_obj(dp,
-	    later->ds_dir->dd_phys->dd_origin_obj, FTAG, &origin);
-	rw_exit(&dp->dp_config_rwlock);
-	if (error != 0)
-		return (B_FALSE);
-	ret = is_before(origin, earlier);
-	dsl_dataset_rele(origin, FTAG);
-	return (ret);
-}
-#endif
 /*
  * Releases dp, ds, and fromds, using the specified tag.
  */
-/* ARGSUSED */
 static int
-dmu_send_impl(void *tag, dsl_pool_t *dp, dsl_dataset_t *ds,
+dmu_send_impl_ss(void *tag, dsl_pool_t *dp, dsl_dataset_t *ds,
     dsl_dataset_t *fromds, int outfd, vnode_t *vp, offset_t *off,
     boolean_t sendsize)
 {
@@ -559,6 +527,7 @@ dmu_send_impl(void *tag, dsl_pool_t *dp, dsl_dataset_t *ds,
 	ZIO_SET_CHECKSUM(&dsp->dsa_zc, 0, 0, 0, 0);
 	dsp->dsa_pending_op = PENDING_NONE;
 	dsp->dsa_incremental = (fromtxg != 0);
+	dsp->sendsize = sendsize;
 
 	mutex_enter(&ds->ds_sendstream_lock);
 	list_insert_head(&ds->ds_sendstreams, dsp);
@@ -615,10 +584,16 @@ out:
 
 	return (err);
 }
+static int
+dmu_send_impl(void *tag, dsl_pool_t *dp, dsl_dataset_t *ds,
+    dsl_dataset_t *fromds, int outfd, vnode_t *vp, offset_t *off)
+{
+	return (dmu_send_impl_ss(tag, dp, ds, fromds, outfd, vp, off, B_FALSE));
+}
 
 int
-dmu_send_obj(const char *pool, uint64_t tosnap, uint64_t fromsnap,
-    int outfd, vnode_t *vp, offset_t *off)
+dmu_send_obj_ss(const char *pool, uint64_t tosnap, uint64_t fromsnap,
+    int outfd, vnode_t *vp, offset_t *off, boolean_t sendsize)
 {
 	dsl_pool_t *dp;
 	dsl_dataset_t *ds;
@@ -644,12 +619,21 @@ dmu_send_obj(const char *pool, uint64_t tosnap, uint64_t fromsnap,
 		}
 	}
 
-	return (dmu_send_impl(FTAG, dp, ds, fromds, outfd, vp, off, B_FALSE));
+	return (dmu_send_impl_ss(FTAG, dp, ds, fromds, outfd, vp, off,
+	    sendsize));
+}
+
+int
+dmu_send_obj(const char *pool, uint64_t tosnap, uint64_t fromsnap,
+    int outfd, vnode_t *vp, offset_t *off)
+{
+	return (dmu_send_obj_ss(pool, tosnap, fromsnap, outfd, vp, off,
+	    B_FALSE));
 }
 
 int
 dmu_send(const char *tosnap, const char *fromsnap,
-    int outfd, vnode_t *vp, offset_t *off, boolean_t sendsize)
+    int outfd, vnode_t *vp, offset_t *off)
 {
 	dsl_pool_t *dp;
 	dsl_dataset_t *ds;
@@ -679,7 +663,7 @@ dmu_send(const char *tosnap, const char *fromsnap,
 			return (err);
 		}
 	}
-	return (dmu_send_impl(FTAG, dp, ds, fromds, outfd, vp, off, sendsize));
+	return (dmu_send_impl(FTAG, dp, ds, fromds, outfd, vp, off));
 }
 
 int

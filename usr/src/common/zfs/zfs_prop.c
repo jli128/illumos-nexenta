@@ -71,8 +71,8 @@ zfs_prop_init(void)
 		{ "fletcher2",	ZIO_CHECKSUM_FLETCHER_2 },
 		{ "fletcher4",	ZIO_CHECKSUM_FLETCHER_4 },
 		{ "sha256",	ZIO_CHECKSUM_SHA256 },
-		{ "sha1crc32",	ZIO_CHECKSUM_SHA1CRC32 },
 		{ "noparity",	ZIO_CHECKSUM_NOPARITY },
+		{ "sha1crc32",	ZIO_CHECKSUM_SHA1CRC32 },
 		{ NULL }
 	};
 
@@ -402,22 +402,15 @@ zfs_prop_init(void)
 	    PROP_READONLY, ZFS_TYPE_DATASET, "UNIQUE");
 	zprop_register_hidden(ZFS_PROP_OBJSETID, "objsetid", PROP_TYPE_NUMBER,
 	    PROP_READONLY, ZFS_TYPE_DATASET, "OBJSETID");
-	zprop_register_hidden(ZFS_PROP_LSTXG, "lstxg", PROP_TYPE_NUMBER,
-	    PROP_READONLY, ZFS_TYPE_DATASET, "LSTXG");
 	zprop_register_hidden(ZFS_PROP_INCONSISTENT, "inconsistent",
 	    PROP_TYPE_NUMBER, PROP_READONLY, ZFS_TYPE_DATASET, "INCONSISTENT");
+	zprop_register_hidden(ZFS_PROP_LSTXG, "lstxg", PROP_TYPE_NUMBER,
+	    PROP_READONLY, ZFS_TYPE_DATASET, "LSTXG");
 
 	/* oddball properties */
 	zprop_register_impl(ZFS_PROP_CREATION, "creation", PROP_TYPE_NUMBER, 0,
 	    NULL, PROP_READONLY, ZFS_TYPE_DATASET,
 	    "<date>", "CREATION", B_FALSE, B_TRUE, NULL);
-#if 0
-        /* special class */
-        zprop_register_index(ZFS_PROP_SPECIALCLASS, "specialclass",
-            SPA_SPECIALCLASS_ZIL, PROP_INHERIT,
-	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT | ZFS_TYPE_VOLUME,
-	    "zil | meta", "SPECIALCLASS", specialclass_table);
-#endif
 }
 
 boolean_t

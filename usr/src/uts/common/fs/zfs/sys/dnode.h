@@ -270,8 +270,7 @@ int dnode_hold_impl(struct objset *dd, uint64_t object, int flag,
 boolean_t dnode_add_ref(dnode_t *dn, void *ref);
 void dnode_rele(dnode_t *dn, void *ref);
 void dnode_setdirty(dnode_t *dn, dmu_tx_t *tx);
-void dnode_setdirty_sc(dnode_t *dn, dmu_tx_t *tx,
-    boolean_t usesc);
+void dnode_setdirty_sc(dnode_t *dn, dmu_tx_t *tx, boolean_t usesc);
 void dnode_sync(dnode_t *dn, dmu_tx_t *tx);
 void dnode_allocate(dnode_t *dn, dmu_object_type_t ot, int blocksize, int ibs,
     dmu_object_type_t bonustype, int bonuslen, dmu_tx_t *tx);

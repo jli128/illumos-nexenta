@@ -52,9 +52,6 @@
 #include <sys/wrcache.h>
 #include <sys/time.h>
 
-uint64_t zfs_write_limit_min = 32 << 20;        /* min write limit is 32MB */
-
-
 /*
  * ZFS Write Throttle
  * ------------------
@@ -168,6 +165,9 @@ dsl_pool_open_impl(spa_t *spa, uint64_t txg)
 	dp->dp_spa = spa;
 	dp->dp_meta_rootbp = *bp;
 	rrw_init(&dp->dp_config_rwlock, B_TRUE);
+
+	dp->dp_sync_history[0] = dp->dp_sync_history[1] = 0;
+
 	txg_init(dp, txg);
 
 	txg_list_create(&dp->dp_dirty_datasets,

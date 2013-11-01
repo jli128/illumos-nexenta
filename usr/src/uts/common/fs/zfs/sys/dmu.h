@@ -417,18 +417,6 @@ void dmu_object_set_compress(objset_t *os, uint64_t object, uint8_t compress,
 #define	WP_GET_SPECIALCLASS(flags) \
 	((flags & WP_SPECIALCLASS_MASK)	>> WP_SPECIALCLASS_SHIFT)
 
-#define	WP_SPECIALCLASS_SHIFT	(16)
-#define	WP_SPECIALCLASS_BITS	(1) /* 1 bits per storage class */
-#define	WP_SPECIALCLASS_MASK	(((1 << WP_SPECIALCLASS_BITS) - 1) \
-	<< WP_SPECIALCLASS_SHIFT)
-
-#define	WP_SET_SPECIALCLASS(flags, sclass)	{ \
-	flags |= ((sclass << WP_SPECIALCLASS_SHIFT) & WP_SPECIALCLASS_MASK); \
-}
-
-#define	WP_GET_SPECIALCLASS(flags) \
-	((flags & WP_SPECIALCLASS_MASK)	>> WP_SPECIALCLASS_SHIFT)
-
 void dmu_write_policy(objset_t *os, struct dnode *dn, int level, int wp,
     struct zio_prop *zp);
 /*

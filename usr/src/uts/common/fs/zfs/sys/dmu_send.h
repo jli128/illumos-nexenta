@@ -38,11 +38,13 @@ struct drr_begin;
 struct avl_tree;
 
 int dmu_send(const char *tosnap, const char *fromsnap, int outfd,
-    struct vnode *vp, offset_t *off, boolean_t sendsize);
+    struct vnode *vp, offset_t *off);
 int dmu_send_estimate(struct dsl_dataset *ds, struct dsl_dataset *fromds,
     uint64_t *sizep);
 int dmu_send_obj(const char *pool, uint64_t tosnap, uint64_t fromsnap,
     int outfd, struct vnode *vp, offset_t *off);
+int dmu_send_obj_ss(const char *pool, uint64_t tosnap, uint64_t fromsnap,
+    int outfd, struct vnode *vp, offset_t *off, boolean_t sendsize);
 
 typedef struct dmu_recv_cookie {
 	struct dsl_dataset *drc_ds;

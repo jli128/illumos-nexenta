@@ -668,7 +668,7 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 		if (!(zp->z_pflags & ZFS_IMMUTABLE) ||
 		    !zp->z_zfsvfs->z_isworm) {
 			ZFS_EXIT(zfsvfs);
-			return (EPERM);
+			return (SET_ERROR(EPERM));
 		}
 	}
 
@@ -1672,7 +1672,7 @@ top:
 	vp = ZTOV(zp);
 
 	if (zp->z_zfsvfs->z_isworm) {
-		error = EPERM;
+		error = SET_ERROR(EPERM);
 		goto out;
 	}
 
@@ -2090,7 +2090,7 @@ top:
 	vp = ZTOV(zp);
 
 	if (dzp->z_zfsvfs->z_isworm) {
-		error = EPERM;
+		error = SET_ERROR(EPERM);
 		goto out;
 	}
 
@@ -2790,7 +2790,7 @@ zfs_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	    XVA_ISSET_REQ(xvap, XAT_IMMUTABLE) &&
 	    zp->z_zfsvfs->z_isworm) {
 		ZFS_EXIT(zfsvfs);
-		return (EPERM);
+		return (SET_ERROR(EPERM));
 	}
 
 	/*
@@ -2801,7 +2801,7 @@ zfs_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	    ((mask & AT_XVATTR) && XVA_ISSET_REQ(xvap, XAT_CREATETIME)))) {
 		if (!zp->z_zfsvfs->z_isworm || !zfs_worm_in_trans(zp)) {
 			ZFS_EXIT(zfsvfs);
-			return (EPERM);
+			return (SET_ERROR(EPERM));
 		}
 	}
 
