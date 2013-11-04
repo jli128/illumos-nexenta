@@ -45,31 +45,40 @@
 #
 export NIGHTLY_OPTIONS='-FCDlnprt'
 
-# CODEMGR_WS - where is your workspace (or what should nightly name it)
-export CODEMGR_WS=`git rev-parse --show-toplevel`
+#
+# -- PLEASE READ THIS --
+#
+# The variables  GATE and CODEMGR_WS must always be customised to
+# match your workspace/gate location!!
+#
+# -- PLEASE READ THIS --
+#
 
 # This is a variable for the rest of the script - GATE doesn't matter to
-# nightly itself.
-GATE=`basename ${CODEMGR_WS}`
+# nightly itself (Jenkins variable here)
+GATE=${JOB_NAME}
+
+# CODEMGR_WS - where is your workspace (Jenkins variable)
+export CODEMGR_WS=${WORKSPACE}
 
 # For builds without nza-closed
-export NZA_MAKEDEFS="$CODEMGR_WS/usr/src/Makefile.nza"
+# export NZA_MAKEDEFS="$CODEMGR_WS/usr/src/Makefile.nza"
 
 # For builds with nza-closed
-# export NZA_MAKEDEFS="$CODEMGR_WS/usr/nza-closed/Makefile.nza"
+export NZA_MAKEDEFS="$CODEMGR_WS/usr/nza-closed/Makefile.nza"
 
 # Maximum number of dmake jobs.  The recommended number is 2 + NCPUS,
 # where NCPUS is the number of logical CPUs on your build system.
-# export DMAKE_MAX_JOBS=4  (use default from $HOME/.make.machines)
+# export DMAKE_MAX_JOBS=8 (use default from $HOME/.make.machines)
 
 # PARENT_WS is used to determine the parent of this workspace. This is
 # for the options that deal with the parent workspace (such as where the
 # proto area will go).
-export PARENT_WS=''
+export PARENT_WS=/nonesuch
 
 # CLONE_WS is the workspace nightly should do a bringover from.
-# NZA:  This will be Nexenta's Illumos child, or a child of that.
-export CLONE_WS=''
+# NZA:  This may be Nexenta's Illumos child, or a child of that.
+# export CLONE_WS=''
 
 # The bringover, if any, is done as STAFFER.
 # Set STAFFER to your own login as gatekeeper or developer
@@ -126,17 +135,16 @@ export MULTI_PROTO="no"
 #
 # Build environment variables, including version info for mcs, motd,
 # motd, uname and boot messages. Mostly you shouldn't change this except
-# when a release name changes, etc.
+# when the release slips (nah) or you move an environment file to a new
+# release
 #
-# With modern SCM systems like git, one typically wants the
-# change set ID (hash) in the version sring.
-GIT_REV=`git rev-parse --short=10 HEAD`
-export VERSION="${GATE}:${GIT_REV}"
+export VERSION="$GATE"
 export ONNV_BUILDNUM=152
 
 #
 # the RELEASE and RELEASE_DATE variables are set in Makefile.master;
-# there might be special reasons to override them here.
+# there might be special reasons to override them here, but that
+# should not be the case in general
 #
 # export RELEASE='5.11'
 # export RELEASE_DATE='October 2007'
@@ -200,7 +208,7 @@ ONBLD_BIN="${ONBLD_TOOLS}/bin"
 
 # POST_NIGHTLY can be any command to be run at the end of nightly.  See
 # nightly(1) for interactions between environment variables and this command.
-#POST_NIGHTLY=
+POST_NIGHTLY=${WORKSPACE}/../nightly-post-hook.sh
 
 # Uncomment this to disable support for SMB printing.
-# export ENABLE_SMB_PRINTING='#'
+export ENABLE_SMB_PRINTING='#'
