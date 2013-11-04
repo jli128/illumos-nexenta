@@ -26,11 +26,10 @@
 # Configuration variables for the runtime environment of the nightly
 # build script and other tools for construction and packaging of
 # releases.
-# This example is suitable for building an illumos workspace, which
-# will contain the resulting archives. It is based off the onnv
-# release. It sets NIGHTLY_OPTIONS to make nightly do:
-#       DEBUG build only (-D, -F)
-#       do not bringover from the parent (-n)
+# This example is for building an nza-kernel workspace under Jenkins.
+# It sets NIGHTLY_OPTIONS to make nightly do:
+#	DEBUG and non-DEBUG builds (-D)
+#       do not bringover from the parent (-n)  (Jenkins does that)
 #       runs 'make check' (-C)
 #       runs lint in usr/src (-l plus the LINTDIRS variable)
 #       sends mail on completion (-m and the MAILTO variable)
@@ -43,23 +42,14 @@
 # - This script is only interpreted by ksh93 and explicitly allows the
 #   use of ksh93 language extensions.
 #
-export NIGHTLY_OPTIONS='-FCDlnprt'
-
-#
-# -- PLEASE READ THIS --
-#
-# The variables  GATE and CODEMGR_WS must always be customised to
-# match your workspace/gate location!!
-#
-# -- PLEASE READ THIS --
-#
-
-# This is a variable for the rest of the script - GATE doesn't matter to
-# nightly itself (Jenkins variable here)
-GATE=${JOB_NAME}
+export NIGHTLY_OPTIONS='-CDlnprt'
 
 # CODEMGR_WS - where is your workspace (Jenkins variable)
 export CODEMGR_WS=${WORKSPACE}
+
+# This is a variable for the rest of the script - GATE doesn't matter to
+# nightly itself (Jenkins variable)
+GATE=${JOB_NAME}
 
 # For builds without nza-closed
 # export NZA_MAKEDEFS="$CODEMGR_WS/usr/src/Makefile.nza"
@@ -130,21 +120,22 @@ export REF_PROTO_LIST="$PARENT_WS/usr/src/proto_list_${MACH}"
 
 export ROOT="$CODEMGR_WS/proto/root_${MACH}"
 export SRC="$CODEMGR_WS/usr/src"
-export MULTI_PROTO="no"
+export MULTI_PROTO="yes"
 
 #
 # Build environment variables, including version info for mcs, motd,
 # motd, uname and boot messages. Mostly you shouldn't change this except
-# when the release slips (nah) or you move an environment file to a new
-# release
+# when a release name changes, etc.
 #
-export VERSION="$GATE"
+# With modern SCM systems like git, one typically wants the
+# change set ID (hash) in the version sring.
+GIT_REV=`git rev-parse --short=10 HEAD`
+export VERSION="${GATE}:${GIT_REV}"
 export ONNV_BUILDNUM=152
 
 #
 # the RELEASE and RELEASE_DATE variables are set in Makefile.master;
-# there might be special reasons to override them here, but that
-# should not be the case in general
+# there might be special reasons to override them here.
 #
 # export RELEASE='5.11'
 # export RELEASE_DATE='October 2007'
@@ -191,6 +182,18 @@ export SPRO_VROOT="$SPRO_ROOT"
 # path to onbld tool binaries
 ONBLD_BIN="${ONBLD_TOOLS}/bin"
 
+# help lint find the proper note.h file
+export ONLY_LINT_DEFS=-I${SPRO_ROOT}/sunstudio12.1/prod/include/lint
+
+# Causes GCC to be used as the main compiler
+export __GNUC=""
+
+# We _want_ the shadow builds on our jenkins server so we know
+# if/when we have lost our "compiler neutrality".  This is
+# normally uncommented for developer builds to save time.
+# Turns off shadow compiler when set to 1
+# export CW_NO_SHADOW=1
+
 # This goes along with lint - it is a series of the form "A [y|n]" which
 # means "go to directory A and run 'make lint'" Then mail me (y) the
 # difference in the lint output. 'y' should only be used if the area you're
@@ -208,7 +211,7 @@ ONBLD_BIN="${ONBLD_TOOLS}/bin"
 
 # POST_NIGHTLY can be any command to be run at the end of nightly.  See
 # nightly(1) for interactions between environment variables and this command.
-POST_NIGHTLY=${WORKSPACE}/../nightly-post-hook.sh
+POST_NIGHTLY=${WORKSPACE}/usr/src/tools/scripts/check_mail_msg
 
 # Uncomment this to disable support for SMB printing.
 export ENABLE_SMB_PRINTING='#'

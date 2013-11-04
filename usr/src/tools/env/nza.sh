@@ -26,9 +26,8 @@
 # Configuration variables for the runtime environment of the nightly
 # build script and other tools for construction and packaging of
 # releases.
-# This example is suitable for building an illumos workspace, which
-# will contain the resulting archives. It is based off the onnv
-# release. It sets NIGHTLY_OPTIONS to make nightly do:
+# This example is suitable for building an nza-kernel workspace.
+# It sets NIGHTLY_OPTIONS to make nightly do:
 #       DEBUG build only (-D, -F)
 #       do not bringover from the parent (-n)
 #       runs 'make check' (-C)
@@ -182,6 +181,15 @@ export SPRO_VROOT="$SPRO_ROOT"
 
 # path to onbld tool binaries
 ONBLD_BIN="${ONBLD_TOOLS}/bin"
+
+# help lint find the proper note.h file
+export ONLY_LINT_DEFS=-I${SPRO_ROOT}/sunstudio12.1/prod/include/lint
+
+# Causes GCC to be used as the main compiler
+export __GNUC=""
+
+# Turns off shadow compiler when set to 1
+export CW_NO_SHADOW=1
 
 # This goes along with lint - it is a series of the form "A [y|n]" which
 # means "go to directory A and run 'make lint'" Then mail me (y) the
