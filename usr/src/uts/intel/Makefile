@@ -37,8 +37,8 @@ LINT_KMODS_X1	= $(LINT_KMODS:nsmb=)
 LINT_KMODS_X2	= $(LINT_KMODS_X1:smbfs=)
 LINT_KMODLIBS	= $(LINT_KMODS_X2:e1000g=)
 LINT_LIBS	= $(LINT_LIB) $(GEN_LINT_LIB) \
-		  $(NZA_LINT_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln) \
-		  $(LINT_KMODLIBS:%=$(LINT_LIB_DIR)/llib-l%.ln)
+		  $(LINT_KMODLIBS:%=$(LINT_LIB_DIR)/llib-l%.ln) \
+		  $(NZA_LINT_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln)
 
 #
 # dprov is delivered in the SUNWcryptoint package.
@@ -67,9 +67,11 @@ install_h.prereq	:=	TARGET= install_h
 
 .KEEP_STATE:
 
-.PARALLEL:	$(PARALLEL_KMODS) $(XMODS) $(NZA_KMODS) config $(LINT_DEPS)
+.PARALLEL:	$(PARALLEL_KMODS) $(XMODS) \
+		$(NZA_KMODS) config $(LINT_DEPS)
 
-def all install clean clobber modlist: $(KMODS) $(XMODS) $(NZA_KMODS) config
+def all install clean clobber modlist: $(KMODS) \
+	$(XMODS) $(NZA_KMODS) config
 
 clobber: clobber.targ
 
@@ -127,7 +129,8 @@ lint.prereq: FRC
 
 genunix: $(PRIVS_C)
 
-modlintlib clean.lint: $(LINT_KMODS) $(XMODS) $(NZA_LINT_KMODS)
+modlintlib clean.lint: $(LINT_KMODS) \
+	$(NZA_LINT_KMODS) $(XMODS)
 
 $(KMODS) $(SUBDIRS) config:	FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)

@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
@@ -5791,9 +5791,8 @@ handle_topo_change:
 		 */
 		if (!mpt->m_in_reset)
 			mptsas_handle_topo_change(topo_node, parent);
-		else {
+		else
 			NDBG20(("skipping topo change received during reset"));
-		}
 		save_node = topo_node;
 		topo_node = topo_node->next;
 		ASSERT(save_node);
@@ -8533,7 +8532,6 @@ mptsas_flush_target(mptsas_t *mpt, ushort_t target, int lun, uint8_t tasktype)
 					reason = CMD_TIMEOUT;
 					stat |= STAT_TIMEOUT;
 				}
-				
 				NDBG25(("mptsas_flush_target discovered non-"
 				    "NULL cmd in slot %d, tasktype 0x%x", slot,
 				    tasktype));
@@ -15457,14 +15455,14 @@ static void
 mptsas_hash_add(mptsas_hash_table_t *hashtab, void *data)
 {
 	uint64_t key1 = ((mptsas_hash_data_t *)data)->key1;
+	mptsas_phymask_t key2 = ((mptsas_hash_data_t *)data)->key2;
 	mptsas_hash_node_t **head = NULL;
 	mptsas_hash_node_t *node = NULL;
 
 	if (hashtab == NULL) {
 		return;
 	}
-	ASSERT(mptsas_hash_search(
-	    hashtab, key1, ((mptsas_hash_data_t *)data)->key2) == NULL);
+	ASSERT(mptsas_hash_search(hashtab, key1, key2) == NULL);
 	node = kmem_zalloc(sizeof (mptsas_hash_node_t), KM_NOSLEEP);
 	node->data = data;
 

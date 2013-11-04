@@ -932,10 +932,8 @@ rnd_handler(void *arg)
 	int len = 0;
 
 	if (!rng_prov_found && rng_ok_to_log) {
-#if 0
 		cmn_err(CE_WARN, "No randomness provider enabled for "
 		    "/dev/random. Use cryptoadm(1M) to enable a provider.");
-#endif
 		rng_ok_to_log = B_FALSE;
 	}
 

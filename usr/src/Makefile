@@ -86,8 +86,6 @@ clean :=		TARGET= clean
 clobber :=		TARGET= clobber
 check :=		TARGET= check
 
-clean clobber :=		MAKEFLAGS += -k
-
 .KEEP_STATE:
 
 #
@@ -150,7 +148,8 @@ closedbins: bldtools $(ROOTDIRS) FRC
 	    (cd $(ROOT); $(TAR) xBpf -); \
 	( cd $(ROOT); $(CTFSTRIP) $$(cd $$CLOSED_ROOT; $(FIND) \
 	    ./kernel ./usr/kernel ./platform/*/kernel -type f -a -perm -u+x | \
-	    $(EGREP) -vf $(CODEMGR_WS)/exception_lists/closed-bins) )
+	    $(EGREP) -vf $(CODEMGR_WS)/exception_lists/closed-bins) ); \
+	( cd $(ROOT); $(SED) -i -e "/^#mtu=/s/^#//" ./kernel/drv/bnx.conf )
 
 #
 # Declare what parts can be built in parallel

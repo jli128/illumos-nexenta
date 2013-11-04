@@ -146,7 +146,7 @@ lint:
 	done
 
 clean:
-	-$(RM) $(OBJECTS) $(PROG)
+	$(RM) $(OBJECTS) $(PROG)
 
 include ../../../Makefile.targ
 

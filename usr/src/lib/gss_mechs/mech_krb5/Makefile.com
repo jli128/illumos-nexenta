@@ -542,26 +542,26 @@ SOURCES= \
 	$(SUPPORT_OBJS:%.o= $(SRC)/lib/gss_mechs/mech_krb5/support/%.c)
 
 kwarnd.h:	$(SRC)/cmd/krb5/kwarn/kwarnd.x
-	-$(RM) $@
+	$(RM) $@
 	$(RPCGEN) -M -h $(SRC)/cmd/krb5/kwarn/kwarnd.x | \
 	$(SED) -e 's!$(SRC)/cmd/krb5/kwarn/kwarnd.h!kwarnd.h!' > $@
 
 kwarnd_xdr.c:	kwarnd.h $(SRC)/cmd/krb5/kwarn/kwarnd.x
-	-$(RM) $@
+	$(RM) $@
 	$(RPCGEN) -M -c $(SRC)/cmd/krb5/kwarn/kwarnd.x | \
 	$(SED) -e 's!$(SRC)/cmd/krb5/kwarn/kwarnd.h!kwarnd.h!' > $@
 
 kwarnd_clnt.c:   kwarnd.h $(SRC)/cmd/krb5/kwarn/kwarnd.x
-	-$(RM) $@
+	$(RM) $@
 	$(RPCGEN) -M -l $(SRC)/cmd/krb5/kwarn/kwarnd.x | \
 	$(SED) -e 's!$(SRC)/cmd/krb5/kwarn/kwarnd.h!kwarnd.h!' > $@
 
 kwarnd_clnt_stubs.c: kwarnd.h $(SRC)/cmd/krb5/kwarn/kwarnd_clnt_stubs.c
-	-$(RM) $@
+	$(RM) $@
 	$(CP) $(SRC)/cmd/krb5/kwarn/kwarnd_clnt_stubs.c $@
 
 kwarnd_handle.c: $(SRC)/cmd/krb5/kwarn/kwarnd_handle.c
-	-$(RM) $@
+	$(RM) $@
 	$(CP) $(SRC)/cmd/krb5/kwarn/kwarnd_handle.c $@
 
 CLOBBERFILES += kwarnd.h \

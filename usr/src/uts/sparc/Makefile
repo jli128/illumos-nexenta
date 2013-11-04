@@ -20,9 +20,9 @@
 #
 
 #
+# Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
 #
 # uts/sparc/Makefile
 #
@@ -41,6 +41,7 @@ LINT_KMODLIBS	= $(LINT_KMODS_X2:e1000g=)
 LINT_LIBS	= $(LINT_LIB) $(GEN_LINT_LIB) \
 		  $(LINT_KMODLIBS:%=$(LINT_LIB_DIR)/llib-l%.ln) \
 		  $(LINT_XMODLIBS:%=$(LINT_LIB_DIR)/llib-l%.ln)
+
 $(NZA_MODS)LINT_LIBS += $(NZA_LINT_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln)
 
 DRV_KMODS	+= dprov
@@ -60,11 +61,14 @@ install_h	:=	TARGET= install_h
 
 .KEEP_STATE:
 
-.PARALLEL:	$(PARALLEL_KMODS) $(XMODS) $(NZA_KMODS) config $(LINT_DEPS)
+.PARALLEL:	$(PARALLEL_KMODS) $(XMODS) \
+		%(NZA_KMODS) config $(LINT_DEPS)
 
-def all install clean clobber modlist: $(KMODS) $(XMODS) config
+def all install clean clobber modlist: $(KMODS) \
+	$(XMODS) $(NZA_KMODS) config
 
-modlintlib clean.lint: $(LINT_KMODS) $(XMODS) $(NZA_LINT_KMODS)
+modlintlib clean.lint: $(LINT_KMODS) \
+	$(NZA_LINT_KMODS) $(XMODS)
 
 $(KMODS) config:	FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)

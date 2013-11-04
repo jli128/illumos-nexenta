@@ -20,8 +20,8 @@
 
 #
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2013 Nexenta Systems, Inc. All rights reserved.
 # Copyright (c) 2013 Andrew Stormont.  All rights reserved.
+# Copyright 2013 Nexenta Systems, Inc. All rights reserved.
 #
 
 #
@@ -398,16 +398,10 @@ DRV_KMODS	+= ixgbe
 DRV_KMODS	+= vr
 
 #
-# Virtio drivers
+#	Virtio drivers
 #
-
-# Virtio core
 DRV_KMODS	+= virtio
-
-# Virtio block driver
 DRV_KMODS	+= vioblk
-
-# Virtio interface
 DRV_KMODS	+= vioif
 
 #

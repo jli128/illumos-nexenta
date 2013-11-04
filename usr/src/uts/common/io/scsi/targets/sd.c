@@ -13667,7 +13667,6 @@ sd_init_cdb_limits(struct sd_lun *un)
 
 	un->un_status_len = (int)((un->un_f_arq_enabled == TRUE)
 	    ? sizeof (struct scsi_arq_status) : 1);
-
 	if (!ISCD(un))
 		un->un_cmd_timeout = (ushort_t)sd_io_time;
 	un->un_uscsi_timeout = ((ISCD(un)) ? 2 : 1) * un->un_cmd_timeout;

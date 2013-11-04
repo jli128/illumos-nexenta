@@ -36,7 +36,6 @@ include		../Makefile.roll
 
 OBJS=		$(LIBPROG).o $(ROLLOBJS)
 SRCS=		$(LIBPROG).c $(ROLLSRCS)
-POFILE=
 
 # No msg catalog here.
 POFILE=

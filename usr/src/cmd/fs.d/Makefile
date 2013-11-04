@@ -191,7 +191,7 @@ clean_local:
 
 clobber: $(SUBDIRS) .WAIT clobber_local
 clobber_local:	clean_local
-	-$(RM) $(PROG) $(ROOTFS_PROG) $(SPPROG) $(MNTTAB) $(DEFAULTFILES) \
+	$(RM) $(PROG) $(ROOTFS_PROG) $(SPPROG) $(MNTTAB) $(DEFAULTFILES) \
 	$(CLOBBERFILES)
 
 lint:

@@ -70,7 +70,6 @@ CERRWARN +=	-_gcc=-Wno-unused-variable
 LINTOUT=	lint.out
 CLEANFILES=	$(OBJECTS) $(LINTOUT) $(LINTLIB) $(DEBUGS) *.ln \
 		$(YSRC) $(LIBRARY)
-CLOBBERFILES +=	$(POFILE) $(POFILES)
 LINTFLAGS +=	-y
 
 # support for -g library

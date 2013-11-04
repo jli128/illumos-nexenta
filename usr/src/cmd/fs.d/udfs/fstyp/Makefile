@@ -48,7 +48,6 @@ LINTFLAGS64 += -erroff=E_STATIC_UNUSED -erroff=E_NAME_DEF_NOT_USED2
 # Override PMAP dependency
 #
 PMAP=
-POFILE=
 
 # No msg catalog here.
 POFILE=

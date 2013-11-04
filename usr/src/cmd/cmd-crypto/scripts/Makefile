@@ -22,6 +22,8 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
 
 CLASS_ACTION_SCRIPTS = \
 	i.kcfconf \
@@ -49,7 +51,5 @@ $(CLASS_SCR_DIR)/%: %
 install: $(CLASS_SCR_FILES) $(ROOTMANIFEST)
 
 check: $(CHKMANIFEST)
-
-clean:
 
 include ../../Makefile.targ

@@ -81,12 +81,6 @@ CERRWARN +=	-_gcc=-Wno-empty-body
 CERRWARN +=	-_gcc=-Wno-unused-function
 CERRWARN +=	-_gcc=-Wno-unused-label
 
-# uncomment these for gdb/dbx debugging
-#COPTFLAG = -g
-#CTF_FLAGS =
-#CTFCONVERT_O=
-#CTFMERGE_LIB=
-
 .KEEP_STATE:
 
 all: $(LIBS)

@@ -102,6 +102,7 @@ check:	$(CHKMANIFEST)
 clobber: $(SUBDIRS)
 
 clean: $(SUBDIRS)
+	$(RM) $(MSGFILES)
 
 install:	$(SCRIPTS) $(GROWFSFILE) $(ROOTSVCMETHOD) $(ROOTMANIFEST) \
 		$(SUBDIRS)

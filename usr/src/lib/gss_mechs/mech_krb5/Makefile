@@ -71,7 +71,7 @@ install_dir:	$(ROOTLIBDIR) $(BUILD64)
 install_h:
 
 clobber: $(SUBDIRS)
-	-$(RM) $(POFILE) $(POFILES)
+	$(RM) $(POFILE) $(POFILES)
 
 check: $(CHECKHDRS)
 
