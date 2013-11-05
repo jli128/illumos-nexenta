@@ -2342,7 +2342,7 @@ userspace_cb(void *arg, const char *domain, uid_t rid, uint64_t space)
 				else
 					stat = idmap_getwinnamebygid(rid, flag,
 					    &name, NULL);
-				if (name == NULL)
+				if (stat != IDMAP_SUCCESS || name == NULL)
 					name = sid;
 			}
 		}
