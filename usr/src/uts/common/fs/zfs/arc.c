@@ -3747,6 +3747,9 @@ arc_tempreserve_space(uint64_t reserve, uint64_t txg)
 	return (0);
 }
 
+/* Tuneable, default is 64, which is essentially arbitrary */
+int zfs_flush_ntasks = 64;
+
 void
 arc_init(void)
 {
@@ -3851,7 +3854,7 @@ arc_init(void)
 	    sizeof (arc_buf_hdr_t), offsetof(arc_buf_hdr_t, b_arc_node));
 
 	arc_flush_taskq = taskq_create("arc_flush_tq",
-	    max_ncpus, minclsyspri, 1, 4, TASKQ_DYNAMIC);
+	    max_ncpus, minclsyspri, 1, zfs_flush_ntasks, TASKQ_DYNAMIC);
 	buf_init();
 
 	arc_thread_exit = 0;
