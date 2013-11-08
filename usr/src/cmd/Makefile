@@ -133,6 +133,7 @@ COMMON_SUBDIRS=		\
 	diskmgtd	\
 	dispadmin	\
 	disk-dmc	\
+	diskfltinj	\
 	dladm		\
 	dlstat		\
 	dmesg		\
