@@ -1518,7 +1518,6 @@ zprop_iter(zprop_func func, void *cb, boolean_t show_all, boolean_t ordered,
 	return (zprop_iter_common(func, cb, show_all, ordered, type));
 }
 
-#ifdef	NZA_CLOSED
 int
 vdev_get_proplist(libzfs_handle_t *hdl, char *props, zprop_list_t **listp)
 {
@@ -1940,33 +1939,3 @@ cos_print_one_property(const char *poolname, const char *cosname,
 
 	(void) printf("\n");
 }
-#else
-/* ARGSUSED */
-int
-vdev_get_proplist(libzfs_handle_t *hdl, char *props, zprop_list_t **listp)
-{
-	return (ENOTSUP);
-}
-
-/* ARGSUSED */
-int
-cos_get_proplist(libzfs_handle_t *hdl, char *props, zprop_list_t **listp)
-{
-	return (ENOTSUP);
-}
-
-/* ARGSUSED */
-void
-vdev_print_one_property(const char *poolname, const char *vdevname,
-    zprop_get_cbdata_t *cbp, const char *propname, const char *value)
-{
-}
-
-/* ARGSUSED */
-void
-cos_print_one_property(const char *poolname, const char *cosname,
-    zprop_get_cbdata_t *cbp, const char *propname, const char *value)
-{
-}
-
-#endif /* NZA_CLOSED */

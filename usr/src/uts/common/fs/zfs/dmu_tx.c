@@ -63,14 +63,6 @@ dmu_tx_create_dd(dsl_dir_t *dd)
 	return (tx);
 }
 
-#pragma	weak	dmu_tx_create_wrc = dmu_tx_create_impl
-/* ARGSUSED */
-dmu_tx_t *
-dmu_tx_create_impl(objset_t *os, boolean_t wrc_io)
-{
-	return (dmu_tx_create(os));
-}
-
 dmu_tx_t *
 dmu_tx_create(objset_t *os)
 {
@@ -91,15 +83,6 @@ dmu_tx_create_assigned(struct dsl_pool *dp, uint64_t txg)
 	tx->tx_anyobj = TRUE;
 
 	return (tx);
-}
-
-#pragma weak dmu_tx_is_wrcio = _dmu_tx_is_wrcio
-
-/* ARGSUSED */
-boolean_t
-_dmu_tx_is_wrcio(dmu_tx_t *dummy)
-{
-	return (FALSE);
 }
 
 int

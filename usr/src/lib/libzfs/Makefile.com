@@ -35,7 +35,9 @@ OBJS_SHARED=			\
 	zfs_namecheck.o		\
 	zfs_prop.o		\
 	zpool_prop.o		\
-	zprop_common.o
+	zprop_common.o		\
+	cos_prop.o	     	\
+	vdev_prop.o
 
 OBJS_COMMON=			\
 	libzfs_changelist.o	\

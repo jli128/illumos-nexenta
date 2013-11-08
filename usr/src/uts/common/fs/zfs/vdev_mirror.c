@@ -220,7 +220,6 @@ vdev_mirror_child_select(zio_t *zio)
 	mirror_child_t *mc;
 	uint64_t txg = zio->io_txg;
 	int i, c;
-#ifdef	NZA_CLOSED
 	/*
 	 * Look at the weights of the vdevs in the mirror; the weights help
 	 * decide which vdev to read from; the highest-weight suitable child
@@ -255,17 +254,12 @@ vdev_mirror_child_select(zio_t *zio)
 		c = mm->mm_preferred;
 	else
 		c = 0;
-#endif /* NZA_CLOSED */
 	/*
 	 * Try to find a child whose DTL doesn't contain the block to read.
 	 * If a child is known to be completely inaccessible (indicated by
 	 * vdev_readable() returning B_FALSE), don't even try.
 	 */
-#ifdef	NZA_CLOSED
 	for (i = 0; i < mm->mm_children; i++, c++)
-#else /* !NZA_CLOSED */
-	for (i = 0, c = mm->mm_preferred; i < mm->mm_children; i++, c++)
-#endif /* !NZA_CLOSED */
 	{
 		if (c >= mm->mm_children)
 			c = 0;
@@ -278,17 +272,12 @@ vdev_mirror_child_select(zio_t *zio)
 			mc->mc_skipped = 1;
 			continue;
 		}
-#ifdef	NZA_CLOSED
 		if (!vdev_dtl_contains(mc->mc_vd, DTL_MISSING, txg, 1)) {
 			if (mc->mc_vd->vdev_weight == max_weight) {
 				mc->mc_vd->vdev_weight--;
 				return (c);
 			}
 		}
-#else /* !NZA_CLOSED */
-		if (!vdev_dtl_contains(mc->mc_vd, DTL_MISSING, txg, 1))
-			return (c);
-#endif /* !NZA_CLOSED */
 		mc->mc_error = SET_ERROR(ESTALE);
 		mc->mc_skipped = 1;
 		mc->mc_speculative = 1;

@@ -1211,11 +1211,7 @@ dnode_rele(dnode_t *dn, void *tag)
 void
 dnode_setdirty(dnode_t *dn, dmu_tx_t *tx)
 {
-#ifdef	NZA_CLOSED
 	dnode_setdirty_sc(dn, tx, B_TRUE);
-#else
-	dnode_setdirty_sc(dn, tx, B_FALSE);
-#endif
 }
 
 void

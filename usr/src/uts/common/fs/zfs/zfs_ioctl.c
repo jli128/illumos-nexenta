@@ -5269,7 +5269,6 @@ zfs_ioc_space_snaps(const char *lastsnap, nvlist_t *innvl, nvlist_t *outnvl)
 	return (error);
 }
 
-#ifdef NZA_CLOSED
 static int
 zfs_ioc_vdev_set_props(zfs_cmd_t *zc)
 {
@@ -5476,7 +5475,6 @@ zfs_ioc_cos_get_props(zfs_cmd_t *zc)
 	nvlist_free(nvp);
 	return (error);
 }
-#endif	/* NZA_CLOSED */
 
 /*
  * innvl: {
@@ -6074,7 +6072,6 @@ zfs_ioctl_init(void)
 	    zfs_secpolicy_config, B_TRUE, POOL_CHECK_NONE);
 	zfs_ioctl_register_pool(ZFS_IOC_POOL_REOPEN, zfs_ioc_pool_reopen,
 	    zfs_secpolicy_config, B_TRUE, POOL_CHECK_SUSPENDED);
-#ifdef NZA_CLOSED
 	zfs_ioctl_register_pool(ZFS_IOC_VDEV_SET_PROPS, zfs_ioc_vdev_set_props,
 	    zfs_secpolicy_config, B_TRUE, POOL_CHECK_SUSPENDED);
 	zfs_ioctl_register_pool(ZFS_IOC_VDEV_GET_PROPS, zfs_ioc_vdev_get_props,
@@ -6089,7 +6086,6 @@ zfs_ioctl_init(void)
 	    zfs_secpolicy_config, B_TRUE, POOL_CHECK_SUSPENDED);
 	zfs_ioctl_register_pool(ZFS_IOC_COS_GET_PROPS, zfs_ioc_cos_get_props,
 	    zfs_secpolicy_config, B_TRUE, POOL_CHECK_SUSPENDED);
-#endif	/* NZA_CLOSED */
 	zfs_ioctl_register_dataset_read(ZFS_IOC_SPACE_WRITTEN,
 	    zfs_ioc_space_written);
 	zfs_ioctl_register_dataset_read(ZFS_IOC_OBJSET_RECVD_PROPS,

@@ -246,22 +246,6 @@ dbuf_is_metadata(dmu_buf_impl_t *db)
 	}
 }
 
-#pragma weak dbuf_meta_is_l2cacheable = dbuf_meta_is_l2cacheable_default
-/* ARGSUSED */
-boolean_t
-dbuf_meta_is_l2cacheable_default(dmu_buf_impl_t *db)
-{
-	return B_TRUE;
-}
-
-#pragma weak dbuf_ddt_is_l2cacheable = dbuf_ddt_is_l2cacheable_default
-/* ARGSUSED */
-boolean_t
-dbuf_ddt_is_l2cacheable_default(dmu_buf_impl_t *db)
-{
-	return B_TRUE;
-}
-
 void
 dbuf_evict(dmu_buf_impl_t *db)
 {

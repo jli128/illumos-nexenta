@@ -1005,13 +1005,6 @@ zio_read_bp_init(zio_t *zio)
 	return (ZIO_PIPELINE_CONTINUE);
 }
 
-#pragma weak zio_best_effort_dedup = _zio_best_effort_dedup
-/* ARGSUSED */
-void
-_zio_best_effort_dedup(zio_t *zio)
-{
-}
-
 static int
 zio_write_bp_init(zio_t *zio)
 {

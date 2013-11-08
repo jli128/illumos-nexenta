@@ -1402,7 +1402,13 @@ ZFS_COMMON_OBJS +=		\
 	zio_compress.o		\
 	zio_inject.o		\
 	zle.o			\
-	zrlock.o
+	zrlock.o		\
+	zio_parallel_checksum.o	\
+	sha1crc32.o		\
+	special.o		\
+	cos.o			\
+	vdev_props.o		\
+	wrcache.o
 
 ZFS_SHARED_OBJS +=		\
 	zfeature_common.o	\
@@ -1412,7 +1418,9 @@ ZFS_SHARED_OBJS +=		\
 	zfs_namecheck.o		\
 	zfs_prop.o		\
 	zpool_prop.o		\
-	zprop_common.o
+	zprop_common.o		\
+	cos_prop.o		\
+	vdev_prop.o		
 
 ZFS_OBJS +=			\
 	$(ZFS_COMMON_OBJS)	\

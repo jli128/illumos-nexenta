@@ -31,9 +31,7 @@
 #include <sys/zio_checksum.h>
 #include <sys/zil.h>
 #include <zfs_fletcher.h>
-#ifdef	NZA_CLOSED
 #include <sys/isal.h>
-#endif	/* NZA_CLOSED */
 
 /*
  * Tunables
@@ -97,16 +95,6 @@ zio_checksum_info_t zio_checksum_table[ZIO_CHECKSUM_FUNCTIONS] = {
 	    "sha1crc32"},
 	{{zio_checksum_off,	zio_checksum_off},	0, 0, 0, "noparity"},
 };
-
-#pragma	weak zio_parallel_checksum_fsm = _zio_parallel_checksum_fsm
-/* ARGSUSED */
-static int
-_zio_parallel_checksum_fsm(zio_t *zio, enum zio_checksum checksum,
-    void *data, uint64_t size, int can_accumulate, zio_cksum_t *result,
-    int *zio_progress)
-{
-	return (1); /* error */
-}
 
 enum zio_checksum
 zio_checksum_select(enum zio_checksum child, enum zio_checksum parent)
@@ -324,7 +312,6 @@ zio_checksum_error(zio_t *zio, zio_bad_cksum_t *info, int *zio_progress_p)
 
 		if (!cksum_ready) {
 			/* invoke standard algo because of byteswap */
-#ifdef	NZA_CLOSED
 			if (checksum == ZIO_CHECKSUM_SHA1CRC32) {
 				/*
 				 * SHA1CRC32 is special case
@@ -334,7 +321,6 @@ zio_checksum_error(zio_t *zio, zio_bad_cksum_t *info, int *zio_progress_p)
 				    &actual_cksum, B_TRUE);
 				cksum_ready = B_TRUE;
 			}
-#endif	/* NZA_CLOSED */
 			if (!cksum_ready) {
 				ci->ci_func[byteswap](data, size,
 				    &actual_cksum);

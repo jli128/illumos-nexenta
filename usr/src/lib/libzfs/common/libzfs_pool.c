@@ -689,7 +689,6 @@ zpool_set_prop(zpool_handle_t *zhp, const char *propname, const char *propval)
 	return (ret);
 }
 
-#ifdef	NZA_CLOSED
 /*
  * Set zpool properties nvlist
  */
@@ -737,18 +736,6 @@ zpool_set_proplist(zpool_handle_t *zhp, nvlist_t *nvl)
 
 	return (ret);
 }
-
-#else
-/*
- * Stubs for NZA_CLOSED functions
- */
-/* ARGSUSED */
-int
-zpool_set_proplist(zpool_handle_t *zhp, nvlist_t *nvl)
-{
-	return (ENOTSUP);
-}
-#endif /* NZA_CLOSED */
 
 int
 zpool_expand_proplist(zpool_handle_t *zhp, zprop_list_t **plp)
@@ -4135,7 +4122,6 @@ out:
 	return (ret);
 }
 
-#ifdef	NZA_CLOSED
 /*
  * Vdev props
  */
@@ -4811,60 +4797,3 @@ cos_set_proplist(zpool_handle_t *zhp, const char *cos, nvlist_t *nvl)
 
 	return (ret);
 }
-#else
-/*
- * Stubs for NZA_CLOSED functions
- */
-
-/* ARGSUSED */
-int
-vdev_set_proplist(zpool_handle_t *zhp, const char *vdev, nvlist_t *nvl)
-{
-	return (ENOTSUP);
-}
-
-/* ARGSUSED */
-int
-vdev_get_prop(zpool_handle_t *zhp,  const char *vdev, vdev_prop_t prop,
-    char *buf, size_t len, nvlist_t **nvp)
-{
-	return (ENOTSUP);
-}
-
-/* ARGSUSED */
-int
-cos_set_proplist(zpool_handle_t *zhp, const char *cos, nvlist_t *nvl)
-{
-
-	return (ENOTSUP);
-}
-
-/* ARGSUSED */
-int
-cos_get_prop(zpool_handle_t *zhp,  const char *cos, cos_prop_t prop,
-    char *buf, size_t len, nvlist_t **nvp)
-{
-	return (ENOTSUP);
-}
-
-/* ARGSUSED */
-int
-cos_alloc(zpool_handle_t *zhp, char *cosname, nvlist_t *nvl)
-{
-	return (ENOTSUP);
-}
-
-/* ARGSUSED */
-int
-cos_free(zpool_handle_t *zhp, char *cosname, uint64_t guid)
-{
-	return (ENOTSUP);
-}
-
-/* ARGSUSED */
-int
-cos_list(zpool_handle_t *zhp, nvlist_t **nvp)
-{
-	return (ENOTSUP);
-}
-#endif /* NZA_CLOSED */

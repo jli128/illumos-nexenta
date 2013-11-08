@@ -96,7 +96,6 @@ void zpool_prop_init(void);
 zprop_type_t zpool_prop_get_type(zpool_prop_t);
 zprop_desc_t *zpool_prop_get_table(void);
 
-#ifdef	NZA_CLOSED
 /*
  * vdev property functions
  */
@@ -110,7 +109,6 @@ zprop_desc_t *vdev_prop_get_table(void);
 void cos_prop_init(void);
 zprop_type_t cos_prop_get_type(cos_prop_t);
 zprop_desc_t *cos_prop_get_table(void);
-#endif /* NZA_CLOSED */
 
 /*
  * vdev property functions

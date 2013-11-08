@@ -5630,64 +5630,6 @@ spa_vdev_resilver_done(spa_t *spa)
 }
 
 /*
- * This is an open-source version of the vdev_set_common
- * The corresponding closed source is found in vdev_props.c (closed-source repo)
- */
-/*
- * Update the stored path or FRU for this vdev.
- */
-static int
-spa_vdev_set_common(spa_t *spa, uint64_t guid, const char *value,
-    boolean_t ispath)
-{
-	vdev_t *vd;
-	boolean_t sync = B_FALSE;
-
-	ASSERT(spa_writeable(spa));
-
-	spa_vdev_state_enter(spa, SCL_ALL);
-
-	if ((vd = spa_lookup_by_guid(spa, guid, B_TRUE)) == NULL)
-		return (spa_vdev_state_exit(spa, NULL, ENOENT));
-
-	if (!vd->vdev_ops->vdev_op_leaf)
-		return (spa_vdev_state_exit(spa, NULL, ENOTSUP));
-
-	if (ispath) {
-		if (strcmp(value, vd->vdev_path) != 0) {
-			spa_strfree(vd->vdev_path);
-			vd->vdev_path = spa_strdup(value);
-			sync = B_TRUE;
-		}
-	} else {
-		if (vd->vdev_fru == NULL) {
-			vd->vdev_fru = spa_strdup(value);
-			sync = B_TRUE;
-		} else if (strcmp(value, vd->vdev_fru) != 0) {
-			spa_strfree(vd->vdev_fru);
-			vd->vdev_fru = spa_strdup(value);
-			sync = B_TRUE;
-		}
-	}
-
-	return (spa_vdev_state_exit(spa, sync ? vd : NULL, 0));
-}
-
-#pragma	weak	spa_vdev_setpath = _spa_vdev_setpath
-int
-_spa_vdev_setpath(spa_t *spa, uint64_t guid, const char *newpath)
-{
-	return (spa_vdev_set_common(spa, guid, newpath, B_TRUE));
-}
-
-#pragma	weak	spa_vdev_setfru = _spa_vdev_setfru
-int
-_spa_vdev_setfru(spa_t *spa, uint64_t guid, const char *newfru)
-{
-	return (spa_vdev_set_common(spa, guid, newfru, B_FALSE));
-}
-
-/*
  * ==========================================================================
  * SPA Scanning
  * ==========================================================================
@@ -6781,19 +6723,4 @@ done:
 		sysevent_free_attr(attr);
 	sysevent_free(ev);
 #endif
-}
-
-#pragma weak spa_start_perfmon_thread = _spa_start_perfmon_thread
-/* ARGSUSED */
-void
-_spa_start_perfmon_thread(spa_t *spa)
-{
-}
-
-#pragma weak spa_stop_perfmon_thread = _spa_stop_perfmon_thread
-/* ARGSUSED */
-boolean_t
-_spa_stop_perfmon_thread(spa_t *spa)
-{
-	return (B_FALSE);
 }
