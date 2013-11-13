@@ -12,8 +12,10 @@
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
 
-#
-# fmd configuration file for the slow-io diagnosis
-#
+MODULE = disk-sense-de
+CLASS = common
+SRCS = disk-sense-de.c
 
-subscribe ereport.io.scsi.cmd.disk.slow-io
+include ../../Makefile.plugin
+
+LINTFLAGS += -L$(ROOT)/usr/lib/fm

@@ -16,12 +16,12 @@
 #include <fm/fmd_api.h>
 #include <sys/note.h>
 
-typedef struct slow_io_stat {
+typedef struct disk_sense_stat {
 	fmd_stat_t bad_fmri;
 	fmd_stat_t bad_scheme;
-} slow_io_stat_t;
+} disk_sense_stat_t;
 
-slow_io_stat_t slow_io_stats = {
+disk_sense_stat_t disk_sense_stats = {
 	{ "bad_FMRI", FMD_TYPE_UINT64,
 		"event FMRI is missing or invalid" },
 	{ "bad_scheme", FMD_TYPE_UINT64,
@@ -35,7 +35,7 @@ static const fmd_prop_t fmd_props [] = {
 };
 
 void
-slow_io_close(fmd_hdl_t *hdl, fmd_case_t *c)
+disk_sense_close(fmd_hdl_t *hdl, fmd_case_t *c)
 {
 	char *devid = fmd_case_getspecific(hdl, c);
 	if (devid != NULL) {
@@ -45,7 +45,7 @@ slow_io_close(fmd_hdl_t *hdl, fmd_case_t *c)
 }
 
 void
-slow_io_recv(fmd_hdl_t *hdl, fmd_event_t *event, nvlist_t *nvl,
+disk_sense_recv(fmd_hdl_t *hdl, fmd_event_t *event, nvlist_t *nvl,
 	const char *class)
 {
 	nvlist_t *detector = NULL;
@@ -53,12 +53,12 @@ slow_io_recv(fmd_hdl_t *hdl, fmd_event_t *event, nvlist_t *nvl,
 	_NOTE(ARGUNUSED(class));
 
 	if (nvlist_lookup_nvlist(nvl, "detector", &detector) != 0) {
-		slow_io_stats.bad_scheme.fmds_value.ui64++;
+		disk_sense_stats.bad_scheme.fmds_value.ui64++;
 		return;
 	}
 
 	if (nvlist_lookup_string(detector, "devid", &devid) != 0) {
-		slow_io_stats.bad_fmri.fmds_value.ui64++;
+		disk_sense_stats.bad_fmri.fmds_value.ui64++;
 		return;
 	}
 
@@ -82,15 +82,15 @@ slow_io_recv(fmd_hdl_t *hdl, fmd_event_t *event, nvlist_t *nvl,
 }
 
 static const fmd_hdl_ops_t fmd_ops = {
-	slow_io_recv,
+	disk_sense_recv,
 	NULL,
-	slow_io_close,
+	disk_sense_close,
 	NULL,
 	NULL,
 };
 
 static const fmd_hdl_info_t fmd_info = {
-	"slow-io-de", "0.1", &fmd_ops, fmd_props
+	"disk-sense-de", "0.1", &fmd_ops, fmd_props
 };
 
 void
@@ -101,8 +101,9 @@ _fmd_init(fmd_hdl_t *hdl)
 		return;
 	}
 
-	(void) fmd_stat_create(hdl, FMD_STAT_NOALLOC, sizeof (slow_io_stats) /
-	    sizeof (fmd_stat_t), (fmd_stat_t *)&slow_io_stats);
+	(void) fmd_stat_create(hdl, FMD_STAT_NOALLOC,
+	    sizeof (disk_sense_stats) / sizeof (fmd_stat_t),
+	    (fmd_stat_t *)&disk_sense_stats);
 }
 
 void
