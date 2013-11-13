@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/note.h>
@@ -3119,6 +3120,11 @@ scsi_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 
 	self = e_ddi_hold_devi_by_dev(dev, 0);
 	if (self == NULL) {
+		rv = ENXIO;
+		goto out;
+	}
+
+	if (DEVI(self)->devi_flags & (DEVI_RETIRED | DEVI_RETIRING)) {
 		rv = ENXIO;
 		goto out;
 	}
