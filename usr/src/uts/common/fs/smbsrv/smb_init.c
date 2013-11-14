@@ -89,8 +89,6 @@ int	smb_ssetup_timeout = (30 * 1000);
 int	smb_tcon_timeout = (30 * 1000);
 int	smb_opipe_timeout = (30 * 1000);
 
-int	smb_threshold_debug = 0;
-
 
 /*
  * *****************************************************************************

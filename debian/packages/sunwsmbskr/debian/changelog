@@ -1,3 +1,9 @@
+sunwsmbskr (5.11.134-31-13071-694) nexenta; urgency=high
+
+  * Issue SUS-694: System panic'ed on bad mutex from smb_event_wait
+
+ -- Nexenta Systems <support@nexenta.com>  Mon, 28 Oct 2013 19:33:00 -0400
+
 sunwsmbskr (5.11.134-31-13070-701) nexenta; urgency=low
 
   * Issue SUS-172: Excel warning dialog when re-saving a file
