@@ -1,3 +1,9 @@
+sunwos86r (5.11.134-31-9678-14) nexenta; urgency=medium
+
+  * Issue NEX-1569: backport OS-14 sd attach should not issue potentially slow scsi commands
+
+ -- Nexenta Systems <support@nexenta.com>  Thu, 14 Nov 2013 19:07:09 +0100
+
 sunwos86r (5.11.134-31-9677-83) nexenta; urgency=medium
 
   * Issue NEX-1571: backport OS-83 enable gcc warnings for sd
