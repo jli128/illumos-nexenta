@@ -2727,7 +2727,7 @@ zfs_check_userprops(const char *fsname, nvlist_t *nvl)
 
 		VERIFY(nvpair_value_string(pair, &valstr) == 0);
 		if (strlen(valstr) >= ZAP_MAXVALUELEN)
-			return (E2BIG);
+			return (SET_ERROR(E2BIG));
 	}
 	return (0);
 }
@@ -3314,8 +3314,6 @@ zfs_ioc_create(const char *fsname, nvlist_t *innvl, nvlist_t *outnvl)
 		    volblocksize)) != 0)
 			return (error);
 	} else if (type == DMU_OST_ZFS) {
-		int error;
-
 		/*
 		 * We have to have normalization and
 		 * case-folding flags correct when we do the
@@ -3581,7 +3579,7 @@ zfs_ioc_destroy_snaps(const char *poolname, nvlist_t *innvl, nvlist_t *outnvl)
 	boolean_t defer;
 
 	if (zfs_is_wormed(poolname))
-		return (EPERM);
+		return (SET_ERROR(EPERM));
 
 	if (nvlist_lookup_nvlist(innvl, "snaps", &snaps) != 0)
 		return (SET_ERROR(EINVAL));
@@ -3621,7 +3619,7 @@ zfs_ioc_destroy(zfs_cmd_t *zc)
 	int err;
 
 	if (zfs_is_wormed(zc->zc_name))
-		return (EPERM);
+		return (SET_ERROR(EPERM));
 
 	if (zc->zc_objset_type == DMU_OST_ZFS) {
 		err = zfs_unmount_snap(zc->zc_name);
@@ -5404,7 +5402,7 @@ zfs_ioc_cos_set_props(zfs_cmd_t *zc)
 
 	if ((zc->zc_string == NULL || zc->zc_string[0] == '\0') &&
 	    zc->zc_guid == 0)
-		return (EINVAL);
+		return (SET_ERROR(EINVAL));
 
 	if (error = get_nvlist(zc->zc_nvlist_src, zc->zc_nvlist_src_size,
 	    zc->zc_iflags, &props))
@@ -5447,7 +5445,7 @@ zfs_ioc_cos_get_props(zfs_cmd_t *zc)
 
 	if ((zc->zc_string == NULL || zc->zc_string[0] == '\0') &&
 	    zc->zc_guid == 0)
-		return (EINVAL);
+		return (SET_ERROR(EINVAL));
 
 	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
 		return (error);
@@ -5683,10 +5681,10 @@ zfs_ioc_pool_configs_nvl(const char *poolname, nvlist_t *innvl, nvlist_t *outnvl
 	uint64_t generation;
 
 	if (nvlist_lookup_uint64(innvl, "generation", &generation) != 0)
-		return (EINVAL);
-
+		return (SET_ERROR(EINVAL));
+	
 	if ((configs = spa_all_configs(&generation)) == NULL)
-		return (EEXIST);
+		return (SET_ERROR(EEXIST));
 
 	fnvlist_merge(outnvl, configs);
 	nvlist_free(configs);
@@ -5717,7 +5715,7 @@ zfs_ioc_pool_stats_nvl(const char *poolname, nvlist_t *innvl, nvlist_t *outnvl)
 		fnvlist_merge(outnvl, config);
 		nvlist_free(config);
 		if (error)
-			ret = EAGAIN;
+			ret = SET_ERROR(EAGAIN);
 	} else {
 		ret = error;
 	}
@@ -5832,6 +5830,74 @@ zfs_ioc_objset_stats_nvl(const char *data, nvlist_t *innvl, nvlist_t *outnvl)
 }
 
 /*
+ * Given a dataset name and an innvl containing a DMU cursor offset, find the
+ * next child dataset, and return its name, stats, and props and an updated
+ * cursor.
+ */
+static int
+zfs_ioc_dataset_list_next_nvl(const char *data, nvlist_t *innvl, nvlist_t *outnvl)
+{
+	objset_t *os;
+	int error;
+	uint64_t off;
+	char *p, *nextds;
+	char name[MAXNAMELEN];
+	size_t len;
+	size_t orig_len = strlen(data);
+
+	if (innvl == NULL ||
+	    nvlist_lookup_uint64(innvl, "offset", &off) != 0)
+		return (SET_ERROR(EINVAL));
+
+	(void) strlcpy(name, data, sizeof (name));
+top:
+	if (error = dmu_objset_hold(name, FTAG, &os)) {
+		if (error == ENOENT)
+			error = SET_ERROR(ESRCH);
+		return (error);
+	}
+
+	p = strrchr(name, '/');
+	if (p == NULL || p[1] != '\0') {
+		if ((len = strlcat(name, "/", sizeof (name))) >= MAXNAMELEN) {
+			dmu_objset_rele(os, FTAG);
+			return (SET_ERROR(ESRCH));
+		}
+	} else {
+		len = orig_len;
+	}
+	p = name + len;
+
+	do {
+		error = dmu_dir_list_next(os, sizeof (name) - len, p, NULL,
+		    &off);
+		if (error == ENOENT)
+			error = ESRCH;
+	} while (error == 0 && dataset_name_hidden(name));
+	dmu_objset_rele(os, FTAG);
+
+	/*
+	 * If it's an internal dataset (ie. with a '$' in its name),
+	 * don't try to get stats for it, otherwise we'll return ENOENT.
+	 */
+	if (error == 0 && strchr(name, '$') == NULL) {
+		error = zfs_ioc_objset_stats_nvl(name, NULL, outnvl);
+		if (error == ENOENT) {
+			/* We lost a race with destroy, get the next one. */
+			name[orig_len] = '\0';
+			goto top;
+		}
+		len = strlen(name) + 1;
+		nextds = kmem_alloc(len, KM_SLEEP);
+		(void) strlcpy(nextds, name, len);
+		fnvlist_add_string(outnvl, "nextds", (const char *)nextds);
+		fnvlist_add_uint64(outnvl, "offset", off);
+	}
+
+	return (error);
+}
+
+/*
  * Given a dataset name and a DMU cursor offset, find its next snapshot, and
  * return its name, props, and stats and an updated cursor offset.
  */
@@ -5846,7 +5912,7 @@ zfs_ioc_snapshot_list_next_nvl(const char *data, nvlist_t *innvl, nvlist_t *outn
 
 	if (innvl == NULL ||
 	    nvlist_lookup_uint64(innvl, "offset", &off) != 0)
-		return (EINVAL);
+		return (SET_ERROR(EINVAL));
 
 	error = dmu_objset_hold(data, FTAG, &os);
 	if (error != 0) {
@@ -5860,7 +5926,7 @@ zfs_ioc_snapshot_list_next_nvl(const char *data, nvlist_t *innvl, nvlist_t *outn
 	(void) strlcpy(name, data, sizeof (name));
 	if ((len = strlcat(name, "@", sizeof (name))) >= MAXNAMELEN) {
 		dmu_objset_rele(os, FTAG);
-		return (ESRCH);
+		return (SET_ERROR(ESRCH));
 	}
 
 	/* Rest of name buffer is passed so snap ID can be appended. */
@@ -5977,6 +6043,11 @@ zfs_ioctl_init(void)
 	zfs_ioctl_register("objset_stats_nvl", ZFS_IOC_OBJSET_STATS_NVL,
 	    zfs_ioc_objset_stats_nvl, zfs_secpolicy_read, DATASET_NAME,
 	    POOL_CHECK_SUSPENDED, B_FALSE, B_FALSE);
+
+	zfs_ioctl_register("dataset_list_next_nvl",
+	    ZFS_IOC_DATASET_LIST_NEXT_NVL, zfs_ioc_dataset_list_next_nvl,
+	    zfs_secpolicy_read, DATASET_NAME, POOL_CHECK_SUSPENDED, B_FALSE,
+	    B_FALSE);
 
 	zfs_ioctl_register("snapshot_list_next_nvl",
 	    ZFS_IOC_SNAPSHOT_LIST_NEXT_NVL, zfs_ioc_snapshot_list_next_nvl,

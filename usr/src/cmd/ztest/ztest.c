@@ -5889,10 +5889,20 @@ make_random_props()
 	nvlist_t *props;
 
 	VERIFY(nvlist_alloc(&props, NV_UNIQUE_NAME, 0) == 0);
-	if (ztest_random(2) == 0)
-		return (props);
-	VERIFY(nvlist_add_uint64(props, "autoreplace", 1) == 0);
-	VERIFY(nvlist_add_uint64(props, "enablespecial", 1) == 0);
+	switch (ztest_random(4)) {
+	case 0:
+		break;
+	case 1: 
+		VERIFY(nvlist_add_uint64(props, "autoreplace", 1) == 0);
+		break;
+	case 2: 
+		VERIFY(nvlist_add_uint64(props, "enablespecial", 1) == 0);
+		break;
+	case 3: 
+		VERIFY(nvlist_add_uint64(props, "enablespecial", 1) == 0);
+		VERIFY(nvlist_add_uint64(props, "autoreplace", 1) == 0);
+		break;
+	}
 
 	return (props);
 }

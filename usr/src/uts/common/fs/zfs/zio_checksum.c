@@ -343,7 +343,7 @@ zio_checksum_error(zio_t *zio, zio_bad_cksum_t *info, int *zio_progress_p)
 	    ZIO_CHECKSUM_EQUAL(actual_cksum, expected_cksum))) {
 		DTRACE_PROBE2(cksum_error, zio_cksum_t *, &actual_cksum,
 		    zio_cksum_t *, &expected_cksum);
-		return (ECKSUM);
+		return (SET_ERROR(ECKSUM));
 	}
 
 	if (zio_injection_enabled && !zio->io_error &&
