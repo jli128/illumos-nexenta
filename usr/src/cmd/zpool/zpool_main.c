@@ -237,11 +237,11 @@ get_usage(zpool_help_t idx) {
 	case HELP_HISTORY:
 		return (gettext("\thistory [-il] [<pool>] ...\n"));
 	case HELP_IMPORT:
-		return (gettext("\timport [-d dir] [-D]\n"
+		return (gettext("\timport [-d dir] [-D] [-t num]\n"
 		    "\timport [-d dir | -c cachefile] [-F [-n]] <pool | id>\n"
 		    "\timport [-o mntopts] [-o property=value] ... \n"
 		    "\t    [-d dir | -c cachefile] [-D] [-f] [-m] [-N] "
-		    "[-R root] [-F [-n]] -a\n"
+		    "[-R root] [-F [-n]] [-t num] -a\n"
 		    "\timport [-o mntopts] [-o property=value] ... \n"
 		    "\t    [-d dir | -c cachefile] [-D] [-f] [-m] [-N] "
 		    "[-R root] [-F [-n]]\n"
@@ -1844,7 +1844,7 @@ show_import(nvlist_t *config)
  */
 static int
 do_import(nvlist_t *config, const char *newname, const char *mntopts,
-    nvlist_t *props, int flags)
+    nvlist_t *props, int flags, int n_threads)
 {
 	zpool_handle_t *zhp;
 	char *name;
@@ -1908,7 +1908,7 @@ do_import(nvlist_t *config, const char *newname, const char *mntopts,
 
 	if (zpool_get_state(zhp) != POOL_STATE_UNAVAIL &&
 	    !(flags & ZFS_IMPORT_ONLY) &&
-	    zpool_enable_datasets(zhp, mntopts, 0) != 0) {
+	    zpool_enable_datasets_ex(zhp, mntopts, 0, n_threads) != 0) {
 		zpool_close(zhp);
 		return (1);
 	}
@@ -1919,9 +1919,9 @@ do_import(nvlist_t *config, const char *newname, const char *mntopts,
 
 /*
  * zpool import [-d dir] [-D]
- *       import [-o mntopts] [-o prop=value] ... [-R root] [-D]
+ *       import [-o mntopts] [-o prop=value] ... [-R root] [-D] [-t num]
  *              [-d dir | -c cachefile] [-f] -a
- *       import [-o mntopts] [-o prop=value] ... [-R root] [-D]
+ *       import [-o mntopts] [-o prop=value] ... [-R root] [-D] [-t num]
  *              [-d dir | -c cachefile] [-f] [-n] [-F] <pool | id> [newpool]
  *
  *	 -c	Read pool information from a cachefile instead of searching
@@ -1950,6 +1950,8 @@ do_import(nvlist_t *config, const char *newname, const char *mntopts,
  *       -n     See if rewind would work, but don't actually rewind.
  *
  *       -N     Import the pool but don't mount datasets.
+ *
+ *       -t     Use up to num threads to mount datasets in parallel.
  *
  *       -T     Specify a starting txg to use for import. This option is
  *       	intentionally undocumented option for testing purposes.
@@ -1989,10 +1991,11 @@ zpool_do_import(int argc, char **argv)
 	uint64_t pool_state, txg = -1ULL;
 	char *cachefile = NULL;
 	importargs_t idata = { 0 };
+	unsigned long n_threads = 1;
 	char *endptr;
 
 	/* check options */
-	while ((c = getopt(argc, argv, ":aCc:d:DEfFmnNo:rR:T:VX")) != -1) {
+	while ((c = getopt(argc, argv, ":aCc:d:DEfFmnNo:rR:t:T:VX")) != -1) {
 		switch (c) {
 		case 'a':
 			do_all = B_TRUE;
@@ -2053,6 +2056,14 @@ zpool_do_import(int argc, char **argv)
 			if (add_prop_list(zpool_prop_to_name(
 			    ZPOOL_PROP_CACHEFILE), "none", &props, B_TRUE))
 				goto error;
+			break;
+		case 't':
+			n_threads = strtol(optarg, &endptr, 10);
+			if (errno != 0 || *endptr != '\0') {
+				(void) fprintf(stderr,
+				    gettext("invalid num value\n"));
+				usage(B_FALSE);
+			}
 			break;
 		case 'T':
 			errno = 0;
@@ -2240,7 +2251,7 @@ zpool_do_import(int argc, char **argv)
 
 			if (do_all) {
 				err |= do_import(config, NULL, mntopts,
-				    props, flags);
+				    props, flags, n_threads);
 			} else {
 				show_import(config);
 			}
@@ -2289,7 +2300,7 @@ zpool_do_import(int argc, char **argv)
 			err = B_TRUE;
 		} else {
 			err |= do_import(found_config, argc == 1 ? NULL :
-			    argv[1], mntopts, props, flags);
+			    argv[1], mntopts, props, flags, n_threads);
 		}
 	}
 
@@ -3888,7 +3899,7 @@ zpool_do_scrub(int argc, char **argv)
 		case 's':
 			if (cb.cb_type != POOL_SCAN_SCRUB) {
 				(void) fprintf(stderr,
-				    gettext("incompatible options\n")); 
+				    gettext("incompatible options\n"));
 				usage(B_FALSE);
 			} else
 				cb.cb_type = POOL_SCAN_NONE;
@@ -3896,7 +3907,7 @@ zpool_do_scrub(int argc, char **argv)
 		case 'M':
 			if (cb.cb_type != POOL_SCAN_SCRUB) {
 				(void) fprintf(stderr,
-				    gettext("incompatible options\n")); 
+				    gettext("incompatible options\n"));
 				usage(B_FALSE);
 			} else
 				cb.cb_type = POOL_SCAN_MOS;
@@ -3904,7 +3915,7 @@ zpool_do_scrub(int argc, char **argv)
 		case 'm':
 			if (cb.cb_type != POOL_SCAN_SCRUB) {
 				(void) fprintf(stderr,
-				    gettext("incompatible options\n")); 
+				    gettext("incompatible options\n"));
 				usage(B_FALSE);
 			} else
 				cb.cb_type = POOL_SCAN_META;
@@ -4065,8 +4076,8 @@ print_scan_status(pool_scan_stat_t *ps)
 		(void) printf(gettext("    %s resilvered, %.2f%% done\n"),
 		    processed_buf, 100 * fraction_done);
 	} else if (ps->pss_func == POOL_SCAN_SCRUB ||
-	           ps->pss_func == POOL_SCAN_MOS ||
-		   ps->pss_func == POOL_SCAN_META) {
+	    ps->pss_func == POOL_SCAN_MOS ||
+	    ps->pss_func == POOL_SCAN_META) {
 		(void) printf(gettext("    %s repaired, %.2f%% done\n"),
 		    processed_buf, 100 * fraction_done);
 	}
@@ -5559,7 +5570,7 @@ cos_alloc_callback(zpool_handle_t *zhp, void *data)
 		cb->cb_any_successful = B_TRUE;
 
 	if (error == ENOTSUP) {
-		(void) printf("Error: " 
+		(void) printf("Error: "
 		    "CoS can not be allocated. Check related feature.\n");
 	}
 

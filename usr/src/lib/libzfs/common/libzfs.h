@@ -768,6 +768,7 @@ int zfs_smb_acl_rename(libzfs_handle_t *, char *, char *, char *, char *);
  * sharing/unsharing them.
  */
 extern int zpool_enable_datasets(zpool_handle_t *, const char *, int);
+extern int zpool_enable_datasets_ex(zpool_handle_t *, const char *, int, int);
 extern int zpool_disable_datasets(zpool_handle_t *, boolean_t);
 extern int zpool_disable_datasets_ex(zpool_handle_t *, boolean_t, int);
 

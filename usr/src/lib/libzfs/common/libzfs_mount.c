@@ -57,6 +57,7 @@
  * mount/unmount and share/unshare all datasets within pool:
  *
  * 	zpool_enable_datasets()
+ * 	zpool_enable_datasets_ex()
  * 	zpool_disable_datasets()
  * 	zpool_disable_datasets_ex()
  */
@@ -354,7 +355,8 @@ zfs_mount(zfs_handle_t *zhp, const char *options, int flags)
 static int
 unmount_one(libzfs_handle_t *hdl, const char *mountpoint, int flags)
 {
-	if (umount2(mountpoint, flags) != 0) {
+	int ret = umount2(mountpoint, flags);
+	if (ret != 0) {
 		zfs_error_aux(hdl, strerror(errno));
 		return (zfs_error_fmt(hdl, EZFS_UMOUNTFAILED,
 		    dgettext(TEXT_DOMAIN, "cannot unmount '%s'"),
@@ -1051,76 +1053,6 @@ libzfs_dataset_cmp(const void *a, const void *b)
 	return (strcmp(zfs_get_name(a), zfs_get_name(b)));
 }
 
-/*
- * Mount and share all datasets within the given pool.  This assumes that no
- * datasets within the pool are currently mounted.  Because users can create
- * complicated nested hierarchies of mountpoints, we first gather all the
- * datasets and mountpoints within the pool, and sort them by mountpoint.  Once
- * we have the list of all filesystems, we iterate over them in order and mount
- * and/or share each one.
- */
-#pragma weak zpool_mount_datasets = zpool_enable_datasets
-int
-zpool_enable_datasets(zpool_handle_t *zhp, const char *mntopts, int flags)
-{
-	get_all_cb_t cb = { 0 };
-	libzfs_handle_t *hdl = zhp->zpool_hdl;
-	zfs_handle_t *zfsp;
-	int i, ret = -1;
-	int *good;
-
-	/*
-	 * Gather all non-snap datasets within the pool.
-	 */
-	if ((zfsp = zfs_open(hdl, zhp->zpool_name, ZFS_TYPE_DATASET)) == NULL)
-		goto out;
-
-	libzfs_add_handle(&cb, zfsp);
-	if (zfs_iter_filesystems(zfsp, mount_cb, &cb) != 0)
-		goto out;
-	/*
-	 * Sort the datasets by mountpoint.
-	 */
-	qsort(cb.cb_handles, cb.cb_used, sizeof (void *),
-	    libzfs_dataset_cmp);
-
-	/*
-	 * And mount all the datasets, keeping track of which ones
-	 * succeeded or failed.
-	 */
-	if ((good = zfs_alloc(zhp->zpool_hdl,
-	    cb.cb_used * sizeof (int))) == NULL)
-		goto out;
-
-	ret = 0;
-	for (i = 0; i < cb.cb_used; i++) {
-		if (zfs_mount(cb.cb_handles[i], mntopts, flags) != 0)
-			ret = -1;
-		else
-			good[i] = 1;
-	}
-
-	/*
-	 * Then share all the ones that need to be shared. This needs
-	 * to be a separate pass in order to avoid excessive reloading
-	 * of the configuration. Good should never be NULL since
-	 * zfs_alloc is supposed to exit if memory isn't available.
-	 */
-	for (i = 0; i < cb.cb_used; i++) {
-		if (good[i] && zfs_share(cb.cb_handles[i]) != 0)
-			ret = -1;
-	}
-
-	free(good);
-
-out:
-	for (i = 0; i < cb.cb_used; i++)
-		zfs_close(cb.cb_handles[i]);
-	free(cb.cb_handles);
-
-	return (ret);
-}
-
 static int
 mountpoint_compare(const void *a, const void *b)
 {
@@ -1137,28 +1069,31 @@ typedef enum {
 	TASK_MAX
 } task_state_t;
 
-typedef struct umount_task {
+typedef struct mount_task {
 	const char	*mp;
+	zfs_handle_t	*zh;
 	task_state_t	state;
 	int		error;
-} umount_task_t;
+} mount_task_t;
 
-typedef struct umount_task_q {
+typedef struct mount_task_q {
 	pthread_mutex_t	q_lock;
 	libzfs_handle_t	*hdl;
+	const char	*mntopts;
 	const char	*error_mp;
+	zfs_handle_t	*error_zh;
 	int		error;
 	int		q_length;
 	int		n_tasks;
 	int		flags;
-	umount_task_t	task[1];
-} umount_task_q_t;
+	mount_task_t	task[1];
+} mount_task_q_t;
 
 static int
-umount_task_q_init(int argc, const char **argv, int flags,
-    libzfs_handle_t *hdl, umount_task_q_t **task)
+mount_task_q_init(int argc, zfs_handle_t **handles, const char *mntopts,
+    int flags, mount_task_q_t **task)
 {
-	umount_task_q_t *task_q;
+	mount_task_q_t *task_q;
 	int i, error;
 	size_t task_q_size;
 
@@ -1168,8 +1103,51 @@ umount_task_q_init(int argc, const char **argv, int flags,
 		return (EINVAL);
 
 	/* allocate and init task_q */
-	task_q_size = sizeof (umount_task_q_t) +
-	    (argc-1) * sizeof (umount_task_t);
+	task_q_size = sizeof (mount_task_q_t) +
+	    (argc - 1) * sizeof (mount_task_t);
+	task_q = malloc(task_q_size);
+	if (task_q == NULL)
+		return (ENOMEM);
+
+	if (error = pthread_mutex_init(&task_q->q_lock, NULL)) {
+		free(task_q);
+		return (error);
+	}
+	task_q->hdl = NULL;
+	task_q->error_mp = NULL;
+	task_q->error = 0;
+	task_q->q_length = argc;
+	task_q->n_tasks = argc;
+	task_q->flags = flags;
+	task_q->mntopts = mntopts;
+
+	/* we are not going to change the strings, so no need to strdup */
+	for (i = 0; i < argc; ++i) {
+		task_q->task[i].zh = handles[i];
+		task_q->task[i].state = TASK_TO_PROCESS;
+		task_q->error = 0;
+	}
+
+	*task = task_q;
+	return (0);
+}
+
+static int
+umount_task_q_init(int argc, const char **argv, int flags,
+    libzfs_handle_t *hdl, mount_task_q_t **task)
+{
+	mount_task_q_t *task_q;
+	int i, error;
+	size_t task_q_size;
+
+	*task = NULL;
+	/* nothing to do ? should not be here */
+	if (argc <= 0)
+		return (EINVAL);
+
+	/* allocate and init task_q */
+	task_q_size = sizeof (mount_task_q_t) +
+	    (argc - 1) * sizeof (mount_task_t);
 	task_q = malloc(task_q_size);
 	if (task_q == NULL)
 		return (ENOMEM);
@@ -1197,7 +1175,7 @@ umount_task_q_init(int argc, const char **argv, int flags,
 }
 
 static void
-umount_task_q_fini(umount_task_q_t *task_q)
+mount_task_q_fini(mount_task_q_t *task_q)
 {
 	assert(task_q != NULL);
 	(void) pthread_mutex_destroy(&task_q->q_lock);
@@ -1213,25 +1191,25 @@ is_child_of(const char *s1, const char *s2)
 }
 
 static boolean_t
-task_completed(int ind, umount_task_q_t *task_q)
+task_completed(int ind, mount_task_q_t *task_q)
 {
 	return (task_q->task[ind].state == TASK_DONE);
 }
 
 static boolean_t
-task_to_process(int ind, umount_task_q_t *task_q)
+task_to_process(int ind, mount_task_q_t *task_q)
 {
 	return (task_q->task[ind].state == TASK_TO_PROCESS);
 }
 
 static boolean_t
-task_in_processing(int ind, umount_task_q_t *task_q)
+task_in_processing(int ind, mount_task_q_t *task_q)
 {
 	return (task_q->task[ind].state == TASK_IN_PROCESSING);
 }
 
 static void
-task_next_stage(int ind, umount_task_q_t *task_q)
+task_next_stage(int ind, mount_task_q_t *task_q)
 {
 	/* our state machine is a pipeline */
 	task_q->task[ind].state++;
@@ -1239,14 +1217,14 @@ task_next_stage(int ind, umount_task_q_t *task_q)
 }
 
 static boolean_t
-task_state_valid(int ind, umount_task_q_t *task_q)
+task_state_valid(int ind, mount_task_q_t *task_q)
 {
 	/* our state machine is a pipeline */
 	return (task_q->task[ind].state < TASK_MAX);
 }
 
 static boolean_t
-child_umount_pending(int ind, umount_task_q_t *task_q)
+child_umount_pending(int ind, mount_task_q_t *task_q)
 {
 	int i;
 	for (i = ind-1; i >= 0; --i) {
@@ -1259,10 +1237,25 @@ child_umount_pending(int ind, umount_task_q_t *task_q)
 	return (B_FALSE);
 }
 
+static boolean_t
+parent_mount_pending(int ind, mount_task_q_t *task_q)
+{
+	int i;
+	for (i = ind-1; i >= 0; --i) {
+		assert(task_state_valid(i, task_q));
+		if ((task_q->task[i].state != TASK_DONE) &&
+		    is_child_of(task_q->task[ind].zh->zfs_name,
+		    task_q->task[i].zh->zfs_name))
+			return (B_TRUE);
+	}
+
+	return (B_FALSE);
+}
+
 static void
 unmounter(void *arg)
 {
-	umount_task_q_t *task_q = (umount_task_q_t *)arg;
+	mount_task_q_t *task_q = (mount_task_q_t *)arg;
 	int error = 0, done = 0;
 
 	assert(task_q != NULL);
@@ -1270,7 +1263,7 @@ unmounter(void *arg)
 		return;
 
 	while (!error && !done) {
-		umount_task_t *task;
+		mount_task_t *task;
 		int i, t, umount_err, flags, q_error;
 
 		if (error = pthread_mutex_lock(&task_q->q_lock))
@@ -1348,11 +1341,97 @@ unmounter(void *arg)
 	}
 }
 
+static void
+mounter(void *arg)
+{
+	mount_task_q_t *task_q = (mount_task_q_t *)arg;
+	int error = 0, done = 0;
+
+	assert(task_q != NULL);
+	if (task_q == NULL)
+		return;
+
+	while (!error && !done) {
+		mount_task_t *task;
+		int i, t, mount_err, flags, q_error;
+		const char *mntopts;
+
+		if (error = pthread_mutex_lock(&task_q->q_lock))
+			break; /* Out of while() loop */
+
+		if (task_q->error || task_q->n_tasks == 0) {
+			(void) pthread_mutex_unlock(&task_q->q_lock);
+			break; /* Out of while() loop */
+		}
+
+		/* Find task ready for processing */
+		for (i = 0, task = NULL, t = -1; i < task_q->q_length; ++i) {
+			if (task_q->error) {
+				/* Fatal error, stop processing */
+				done = 1;
+				break; /* Out of for() loop */
+			}
+
+			if (task_completed(i, task_q))
+				continue; /* for() loop */
+
+			if (task_to_process(i, task_q)) {
+				/*
+				 * Cannot mount if some parents are not
+				 * mounted yet; come back later
+				 */
+				if ((parent_mount_pending(i, task_q)))
+					continue; /* for() loop */
+				/* Should be OK to mount now */
+				task_next_stage(i, task_q);
+				task = &task_q->task[i];
+				t = i;
+				break; /* Out of for() loop */
+			}
+
+			/* Otherwise, the task is already in processing */
+			assert(task_in_processing(i, task_q));
+		}
+
+		flags = task_q->flags;
+		mntopts = task_q->mntopts;
+
+		error = pthread_mutex_unlock(&task_q->q_lock);
+
+		if (done || (task == NULL) || error || task_q->error)
+			break; /* Out of while() loop */
+
+		mount_err = zfs_mount(task->zh, mntopts, flags);
+		q_error = errno;
+
+		if (error = pthread_mutex_lock(&task_q->q_lock))
+			break; /* Out of while() loop */
+
+		/* done processing */
+		assert(t >= 0 && t < task_q->q_length);
+		task_next_stage(t, task_q);
+		assert(task_completed(t, task_q));
+		task_q->n_tasks--;
+
+		if (mount_err) {
+			task->error = q_error;
+			if (!task_q->error) {
+				task_q->error = task->error;
+				task_q->error_zh = task->zh;
+			}
+			done = 1;
+		}
+
+		if (error = pthread_mutex_unlock(&task_q->q_lock))
+			break; /* Out of while() loop */
+	}
+}
+
 #define	THREADS_HARD_LIMIT	128
 int parallel_unmount(libzfs_handle_t *hdl, int argc, const char **argv,
     int flags, int n_threads)
 {
-	umount_task_q_t *task_queue = NULL;
+	mount_task_q_t *task_queue = NULL;
 	int		i, error;
 	tpool_t		*t;
 
@@ -1391,24 +1470,123 @@ out:
 		    error ? "datasets" : task_queue->error_mp);
 	}
 	if (task_queue)
-		umount_task_q_fini(task_queue);
+		mount_task_q_fini(task_queue);
 
 	return (error);
 }
 
-/* alias for 2002/240 */
-#pragma weak zpool_unmount_datasets = zpool_disable_datasets
-/*
- * Unshare and unmount all datasets within the given pool.  We don't want to
- * rely on traversing the DSL to discover the filesystems within the pool,
- * because this may be expensive (if not all of them are mounted), and can fail
- * arbitrarily (on I/O error, for example).  Instead, we walk /etc/mnttab and
- * gather all the filesystems that are currently mounted.
- */
-int
-zpool_disable_datasets(zpool_handle_t *zhp, boolean_t force)
+int parallel_mount(get_all_cb_t *cb, int *good, const char *mntopts,
+    int flags, int n_threads)
 {
-	return (zpool_disable_datasets_ex(zhp, force, 1));
+	int		i, error = 0;
+	mount_task_q_t	*task_queue = NULL;
+	tpool_t		*t;
+
+	if (cb->cb_used == 0)
+		return (0);
+
+	if (n_threads > cb->cb_used)
+		n_threads = cb->cb_used;
+
+	if (error = mount_task_q_init(cb->cb_used, cb->cb_handles,
+	    mntopts, flags, &task_queue)) {
+		assert(task_queue == NULL);
+		task_queue = NULL; /* just in case */
+		goto out;
+	}
+
+	t = tpool_create(1, n_threads, 0, NULL);
+
+	for (i = 0; i < n_threads; ++i)
+		(void) tpool_dispatch(t, mounter, task_queue);
+
+	tpool_wait(t);
+	for (i = 0; i < cb->cb_used; ++i)
+		good[i] = !task_queue->task[i].error;
+	tpool_destroy(t);
+
+out:
+	if (error || task_queue->error) {
+		zfs_handle_t *hdl = task_queue->error_zh;
+		/*
+		 * Tell ZFS!
+		 */
+		zfs_error_aux(hdl->zfs_hdl,
+		    strerror(error ? error : task_queue->error));
+		error = zfs_error_fmt(hdl->zfs_hdl, EZFS_MOUNTFAILED,
+		    dgettext(TEXT_DOMAIN, "cannot mount '%s'"),
+		    error ? "datasets" : hdl->zfs_name);
+	}
+	if (task_queue)
+		mount_task_q_fini(task_queue);
+
+	return (error);
+}
+
+int
+zpool_enable_datasets_ex(zpool_handle_t *zhp, const char *mntopts, int flags,
+    int n_threads)
+{
+	get_all_cb_t cb = { 0 };
+	libzfs_handle_t *hdl = zhp->zpool_hdl;
+	zfs_handle_t *zfsp;
+	int i, ret = -1;
+	int *good;
+
+	/*
+	 * Gather all non-snap datasets within the pool.
+	 */
+	if ((zfsp = zfs_open(hdl, zhp->zpool_name, ZFS_TYPE_DATASET)) == NULL)
+		goto out;
+
+	libzfs_add_handle(&cb, zfsp);
+	if (zfs_iter_filesystems(zfsp, mount_cb, &cb) != 0)
+		goto out;
+	/*
+	 * Sort the datasets by mountpoint.
+	 */
+	qsort(cb.cb_handles, cb.cb_used, sizeof (void *),
+	    libzfs_dataset_cmp);
+
+	/*
+	 * And mount all the datasets, keeping track of which ones
+	 * succeeded or failed.
+	 */
+	if ((good = zfs_alloc(zhp->zpool_hdl,
+	    cb.cb_used * sizeof (int))) == NULL)
+		goto out;
+
+	ret = 0;
+	if (n_threads < 2) {
+		for (i = 0; i < cb.cb_used; i++) {
+			if (zfs_mount(cb.cb_handles[i], mntopts, flags) != 0)
+				ret = -1;
+			else
+				good[i] = 1;
+		}
+	} else {
+		ret = parallel_mount(&cb, good, mntopts, flags, n_threads);
+	}
+
+	/*
+	 * Then share all the ones that need to be shared. This needs
+	 * to be a separate pass in order to avoid excessive reloading
+	 * of the configuration. Good should never be NULL since
+	 * zfs_alloc is supposed to exit if memory isn't available.
+	 */
+	for (i = 0; i < cb.cb_used; i++) {
+		if (good[i] && zfs_share(cb.cb_handles[i]) != 0)
+			ret = -1;
+	}
+
+	free(good);
+
+out:
+	for (i = 0; i < cb.cb_used; i++)
+		zfs_close(cb.cb_handles[i]);
+	free(cb.cb_handles);
+
+	return (ret);
 }
 
 int
@@ -1507,8 +1685,8 @@ zpool_disable_datasets_ex(zpool_handle_t *zhp, boolean_t force, int n_threads)
 		for (curr_proto = share_all_proto; *curr_proto != PROTO_END;
 		    curr_proto++) {
 			if (is_shared(hdl, mountpoints[i], *curr_proto) &&
-			    unshare_one(hdl, mountpoints[i],
-			    mountpoints[i], *curr_proto) != 0)
+			    unshare_one(hdl, mountpoints[i], mountpoints[i],
+			    *curr_proto) != 0)
 				goto out;
 		}
 	}
@@ -1527,12 +1705,10 @@ zpool_disable_datasets_ex(zpool_handle_t *zhp, boolean_t force, int n_threads)
 		    flags, n_threads) != 0)
 			goto out;
 	}
-
 	for (i = 0; i < used; i++) {
 		if (datasets[i])
 			remove_mountpoint(datasets[i]);
 	}
-
 	ret = 0;
 out:
 	for (i = 0; i < used; i++) {
@@ -1544,4 +1720,34 @@ out:
 	free(mountpoints);
 
 	return (ret);
+}
+
+/*
+ * Mount and share all datasets within the given pool.  This assumes that no
+ * datasets within the pool are currently mounted.  Because users can create
+ * complicated nested hierarchies of mountpoints, we first gather all the
+ * datasets and mountpoints within the pool, and sort them by mountpoint.  Once
+ * we have the list of all filesystems, we iterate over them in order and mount
+ * and/or share each one.
+ */
+#pragma weak zpool_mount_datasets = zpool_enable_datasets
+int
+zpool_enable_datasets(zpool_handle_t *zhp, const char *mntopts, int flags)
+{
+	return (zpool_enable_datasets_ex(zhp, mntopts, flags, 1));
+}
+
+/* alias for 2002/240 */
+#pragma weak zpool_unmount_datasets = zpool_disable_datasets
+/*
+ * Unshare and unmount all datasets within the given pool.  We don't want to
+ * rely on traversing the DSL to discover the filesystems within the pool,
+ * because this may be expensive (if not all of them are mounted), and can fail
+ * arbitrarily (on I/O error, for example).  Instead, we walk /etc/mnttab and
+ * gather all the filesystems that are currently mounted.
+ */
+int
+zpool_disable_datasets(zpool_handle_t *zhp, boolean_t force)
+{
+	return (zpool_disable_datasets_ex(zhp, force, 1));
 }

@@ -173,6 +173,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zpool_disable_datasets_ex;
 	zpool_dump_ddt;
 	zpool_enable_datasets;
+	zpool_enable_datasets_ex;
 	zpool_expand_proplist;
 	zpool_explain_recover;
 	zpool_export;
