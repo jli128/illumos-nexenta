@@ -1,3 +1,9 @@
+sunwiscsitr (5.11.134-31-10220-32) nexenta; urgency=low
+
+  * OS-34 DoS possible againts NS iSCSI target - uncovered by codenomicon
+
+ -- Nexenta Systems <support@nexenta.com>  Tue, 18 Nov 2013 12:15:23 -0500
+
 sunwiscsitr (5.11.134-31-10219-0) nexenta; urgency=low
 
   * re #9822: libiscsi test panics COMSTAR
