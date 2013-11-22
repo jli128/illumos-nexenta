@@ -21,6 +21,8 @@
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
 SUBDIRS = cpumem-retire \
 	disk-lights	\
@@ -34,6 +36,7 @@ SUBDIRS = cpumem-retire \
 	ip-transport	\
 	sensor-transport \
 	ses-log-transport \
+	slow-io-de \
 	sw-diag-response \
 	sp-monitor	\
 	syslog-msgs	\

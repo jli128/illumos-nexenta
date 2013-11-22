@@ -23,6 +23,7 @@
  */
 /*
  * Copyright 2011 cyril.galibern@opensvc.com
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_SYS_SCSI_TARGETS_SDDEF_H
@@ -525,6 +526,7 @@ struct sd_lun {
 	 * sense code.
 	 */
 	uint_t		un_sonoma_failure_count;
+	hrtime_t 	un_slow_io_threshold;
 
 	/*
 	 * Support for failfast operation.
