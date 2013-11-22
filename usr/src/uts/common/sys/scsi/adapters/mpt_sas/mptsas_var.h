@@ -1154,7 +1154,7 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(mptsas::m_instance))
  */
 #define	DEFAULT_SCSI_OPTIONS	SCSI_OPTIONS_DR
 #define	DEFAULT_TAG_AGE_LIMIT	2
-#define	DEFAULT_WD_TICK		10
+#define	DEFAULT_WD_TICK		1
 
 /*
  * invalid hostid.
