@@ -45,11 +45,11 @@
 export NIGHTLY_OPTIONS='-CDlnprt'
 
 # CODEMGR_WS - where is your workspace (Jenkins variable)
-export CODEMGR_WS=${WORKSPACE}
+export CODEMGR_WS=${WORKSPACE:-`pwd`}
 
 # This is a variable for the rest of the script - GATE doesn't matter to
 # nightly itself (Jenkins variable)
-GATE=${JOB_NAME}
+GATE=${JOB_NAME:-`basename ${CODEMGR_WS}`}
 
 # For builds without nza-closed
 # export NZA_MAKEDEFS="$CODEMGR_WS/usr/src/Makefile.nza"
@@ -67,7 +67,7 @@ export NZA_MAKEDEFS="$CODEMGR_WS/usr/nza-closed/Makefile.nza"
 export PARENT_WS=/nonesuch
 
 # CLONE_WS is the workspace nightly should do a bringover from.
-# NZA:  This may be Nexenta's Illumos child, or a child of that.
+# NZA:  This will be Nexenta's Illumos child, or a child of that.
 # export CLONE_WS=''
 
 # The bringover, if any, is done as STAFFER.
@@ -87,8 +87,7 @@ export MAILTO="$STAFFER"
 # specified, the build is simply run in a new task in the current project.
 export BUILD_PROJECT=''
 
-# You should not need to change the next four lines
-export LOCKNAME="$(basename -- "$CODEMGR_WS")_nightly.lock"
+# You should not need to change the next three lines
 export ATLOG="$CODEMGR_WS/log"
 export LOGFILE="$ATLOG/nightly.log"
 export MACH="$(uname -p)"
@@ -130,7 +129,7 @@ export MULTI_PROTO="yes"
 # With modern SCM systems like git, one typically wants the
 # change set ID (hash) in the version sring.
 GIT_REV=`git rev-parse --short=10 HEAD`
-export VERSION="${GATE}:${GIT_REV}"
+export VERSION="NexentaOS_4:${GIT_REV}"
 export ONNV_BUILDNUM=152
 
 #
@@ -211,7 +210,7 @@ export __GNUC=""
 
 # POST_NIGHTLY can be any command to be run at the end of nightly.  See
 # nightly(1) for interactions between environment variables and this command.
-POST_NIGHTLY=${WORKSPACE}/usr/src/tools/scripts/check_mail_msg
+POST_NIGHTLY=${CODEMGR_WS}/usr/src/tools/scripts/check_mail_msg
 
 # Uncomment this to disable support for SMB printing.
 export ENABLE_SMB_PRINTING='#'
