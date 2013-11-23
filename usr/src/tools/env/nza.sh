@@ -139,6 +139,15 @@ export ONNV_BUILDNUM=152
 # export RELEASE='5.11'
 # export RELEASE_DATE='October 2007'
 
+# Override RELEASE_CM, DEV_CM used for mcs processing
+# For developer builds, include the WS basename & date.
+# Note that in a release build only RELEASE_CM goes in,
+# and in a developer build, BOTH comments are used.
+DATE=`date +%Y-%m-%d`;
+RELEASE_CM='"@(#)SunOS '$RELEASE' '$VERSION' '$RELEASE_DATE'"'
+DEV_CM='"@(#)SunOS Developer: '$LOGNAME' '$GATE' '$DATE'"'
+export RELEASE_CM DEV_CM
+
 # proto area in parent for optionally depositing a copy of headers and
 # libraries corresponding to the protolibs target
 # not applicable given the NIGHTLY_OPTIONS
