@@ -14,13 +14,14 @@
  */
 
 #include <fm/fmd_api.h>
+#include <sys/note.h>
 
 typedef struct slow_io_stat {
 	fmd_stat_t bad_fmri;
 	fmd_stat_t bad_scheme;
 } slow_io_stat_t;
 
-slow_io_stat_t slow_io_stats  = {
+slow_io_stat_t slow_io_stats = {
 	{ "bad_FMRI", FMD_TYPE_UINT64,
 		"event FMRI is missing or invalid" },
 	{ "bad_scheme", FMD_TYPE_UINT64,
@@ -47,6 +48,7 @@ slow_io_recv(fmd_hdl_t *hdl, fmd_event_t *event, nvlist_t *nvl,
 {
 	nvlist_t *detector = NULL;
 	char *devid = NULL;
+	_NOTE(ARGUNUSED(class));
 
 	if (nvlist_lookup_nvlist(nvl, "detector", &detector) != 0) {
 		slow_io_stats.bad_scheme.fmds_value.ui64++;
@@ -97,12 +99,12 @@ _fmd_init(fmd_hdl_t *hdl)
 		return;
 	}
 
-	fmd_stat_create(hdl, FMD_STAT_NOALLOC, sizeof (slow_io_stats) /
+	(void) fmd_stat_create(hdl, FMD_STAT_NOALLOC, sizeof (slow_io_stats) /
 	    sizeof (fmd_stat_t), (fmd_stat_t *)&slow_io_stats);
 }
 
 void
 _fmd_fini(fmd_hdl_t *hdl)
 {
-
+	_NOTE(ARGUNUSED(hdl));
 }
