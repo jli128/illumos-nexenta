@@ -25,7 +25,7 @@
  * within the heterogeneous storage volume when placing the data
  *
  * The following COS attributes are supported:
- *  - min_pending/max_pending to control queue depths of the devices
+ *  - min/max active to control queue depths of the I/O classes
  *  - preferred_read - weight for biasing reads (e.g. if vdev is a side
  *    of a mirror)
  *  - unmap_freed - whether to unmap unused space (e.g. TRIM)
@@ -36,6 +36,7 @@
 #define	_SYS_COS_IMPL_H
 
 #include <sys/cos.h>
+#include <sys/zio.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -46,35 +47,18 @@ extern "C" {
  */
 struct cos {
 	spa_t		*cos_spa;
-
+	/* properties follow */
 	uint64_t	cos_id;
-	uint64_t	cos_min_pending;
-	uint64_t	cos_max_pending;
+	uint64_t	cos_min_active[ZIO_PRIORITY_NUM_QUEUEABLE];
+	uint64_t	cos_max_active[ZIO_PRIORITY_NUM_QUEUEABLE];
 	uint64_t	cos_preferred_read;
 	boolean_t	cos_unmap_freed;
-	char		cos_name[MAXCOSNAMELEN];	/* user defined name */
-
-	kmutex_t	cos_lock;
-	uint64_t	cos_refcnt; /* simple ref count - needs atomic ops */
+	/* user defined name */
+	char		cos_name[MAXCOSNAMELEN];
+	/* modified with atomic ops */
+	uint64_t	cos_refcnt;
 	list_node_t	cos_list_node;
 };
-
-#define	COS_ID		"cos_id"
-#define	COS_MINPENDING	"cos_minpending"
-#define	COS_MAXPENDING	"cos_maxpending"
-#define	COS_PREFREAD	"cos_prefread"
-#define	COS_UNMAPFREED	"cos_unmapfreed"
-#define	COS_NAME	"cos_name"
-
-/*
- * Persist cos properties if ALL_PROPS_PERSISTENT is defined.
- * At this time, we do not want to introduce incompatible persistent
- * data formats, so ALL_PROPS_PERSISTENT is not refined, and the
- * properties are not persisted.
- */
-#ifdef	ALL_PROPS_PERSISTENT
-#define	COS_PROPS_PERSISTENT
-#endif
 
 #ifdef	__cplusplus
 }

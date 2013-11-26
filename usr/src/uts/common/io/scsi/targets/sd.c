@@ -30738,15 +30738,13 @@ sd_prefaultinjection(struct scsi_pkt *pktp)
 {
 	uint_t i;
 	struct buf *bp;
-	struct sd_xbuf *xb;
 	struct sd_lun *un;
 	struct sd_fi_tran *fi_tran;
 
 	ASSERT(pktp != NULL);
 
-	/* pull bp xb and un from pktp */
+	/* pull bp and un from pktp */
 	bp = (struct buf *)pktp->pkt_private;
-	xb = SD_GET_XBUF(bp);
 	un = SD_GET_UN(bp);
 
 	/* if injection is off return */

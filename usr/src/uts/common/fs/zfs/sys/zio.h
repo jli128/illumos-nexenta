@@ -150,6 +150,14 @@ typedef enum zio_priority {
 	ZIO_PRIORITY_NOW		/* non-queued i/os (e.g. free) */
 } zio_priority_t;
 
+/*
+ * Macro for asserting validity of the priorities obtained by conversion
+ * from CoS/vdev properties
+ */
+#define	ZIO_PRIORITY_QUEUEABLE_VALID(prio)	\
+	(((prio) >= ZIO_PRIORITY_SYNC_READ) &&	\
+	((prio) < ZIO_PRIORITY_NUM_QUEUEABLE))
+
 #define	ZIO_PIPELINE_CONTINUE		0x100
 #define	ZIO_PIPELINE_STOP		0x101
 #define	ZIO_PIPELINE_RESTART_STAGE	0x102
@@ -305,7 +313,7 @@ typedef struct zio_prop {
 	uint8_t			zp_copies;
 	uint8_t			zp_dedup;
 	uint8_t			zp_dedup_verify;
-	boolean_t               zp_nopwrite;
+	boolean_t		zp_nopwrite;
 	boolean_t		zp_metadata;
 	boolean_t		zp_usesc;
 	uint64_t		zp_specflags;

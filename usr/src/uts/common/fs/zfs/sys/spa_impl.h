@@ -164,7 +164,7 @@ typedef struct spa_perfmon_data {
 
 typedef struct spa_meta_placement {
 	uint64_t spa_enable_meta_placement_selection;
-	uint64_t spa_ddt_to_special; 
+	uint64_t spa_ddt_to_special;
 	uint64_t spa_general_meta_to_special;
 	uint64_t spa_other_meta_to_special;
 } spa_meta_placement_t;
@@ -365,8 +365,9 @@ struct spa {
 	uint64_t spa_ddt_meta_copies; /* amount of ddt-metadata copies */
 
 	/*
-	 * The following two fields are designed to restrict the distribution of the
-	 * deduplication entries. There are two possible states of these vars:
+	 * The following two fields are designed to restrict the distribution
+	 * of the deduplication entries. There are two possible states of these
+	 * vars:
 	 * 1) min=DITTO, max=DUPLICATED - it provides the old behavior
 	 * 2) min=DUPLICATED, MAX=DUPLICATED - new behavior: all entries into
 	 * the single zap.

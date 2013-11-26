@@ -243,8 +243,9 @@ vdev_mirror_child_select(zio_t *zio)
 	if (!max_weight) {
 		for (c = 0; c < mm->mm_children; c++) {
 			mc = &mm->mm_child[c];
-			mc->mc_vd->vdev_weight = vdev_get_prefread(mc->mc_vd) +
-			    1;
+			mc->mc_vd->vdev_weight =
+			    vdev_queue_get_prop_uint64(&mc->mc_vd->vdev_queue,
+			    VDEV_PROP_PREFERRED_READ) + 1;
 			if (max_weight < mc->mc_vd->vdev_weight)
 				max_weight = mc->mc_vd->vdev_weight;
 		}
@@ -259,8 +260,7 @@ vdev_mirror_child_select(zio_t *zio)
 	 * If a child is known to be completely inaccessible (indicated by
 	 * vdev_readable() returning B_FALSE), don't even try.
 	 */
-	for (i = 0; i < mm->mm_children; i++, c++)
-	{
+	for (i = 0; i < mm->mm_children; i++, c++) {
 		if (c >= mm->mm_children)
 			c = 0;
 		mc = &mm->mm_child[c];

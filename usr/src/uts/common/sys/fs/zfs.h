@@ -203,33 +203,62 @@ typedef enum {
 	ZPOOL_NUM_PROPS
 } zpool_prop_t;
 
+/*
+ * Note: it is important to keep min/max active properties together in the
+ * same order as the corresponding zio_priority_t definitions as this order
+ * is relied upon when processing in loops. See vdev_impl.h for the set of
+ * macros that rely on this dependency.
+ */
 typedef enum vdev_prop {
 	VDEV_PROP_PATH,
 	VDEV_PROP_FRU,
-	VDEV_PROP_MINPENDING,
-	VDEV_PROP_MAXPENDING,
-	VDEV_PROP_PREFREAD,
+	/* minactive props for queue classes */
+	VDEV_PROP_READ_MINACTIVE,
+	VDEV_PROP_AREAD_MINACTIVE,
+	VDEV_PROP_WRITE_MINACTIVE,
+	VDEV_PROP_AWRITE_MINACTIVE,
+	VDEV_PROP_SCRUB_MINACTIVE,
+	/* maxactive props for queue classes */
+	VDEV_PROP_READ_MAXACTIVE,
+	VDEV_PROP_AREAD_MAXACTIVE,
+	VDEV_PROP_WRITE_MAXACTIVE,
+	VDEV_PROP_AWRITE_MAXACTIVE,
+	VDEV_PROP_SCRUB_MAXACTIVE,
+	VDEV_PROP_PREFERRED_READ,
 	VDEV_PROP_COS,
 	VDEV_PROP_SPAREGROUP,
 	VDEV_NUM_PROPS
 } vdev_prop_t;
 
+/*
+ * Note: it is important to keep min/max active properties together in the
+ * same order as the corresponding zio_priority_t definitions as this order
+ * is relied upon when processing in loops. See cos.h for the set of
+ * macros that rely on this dependency.
+ */
 typedef enum cos_prop {
 	COS_PROP_ID,
-	COS_PROP_NAME,			/* user-defined cos name */
+	/* user-defined cos name */
+	COS_PROP_NAME,
 	/* IO tunables */
-	COS_PROP_UNMAP_FREED,		/* unmap freed blocks (boolean) */
-	COS_PROP_PREFERRED_READ,	/* boolean */
-	COS_PROP_MINPENDING,		/* 0-9 */
-	COS_PROP_MAXPENDING,		/* 10-100 */
+	/* minactive props for queue classes */
+	COS_PROP_READ_MINACTIVE,
+	COS_PROP_AREAD_MINACTIVE,
+	COS_PROP_WRITE_MINACTIVE,
+	COS_PROP_AWRITE_MINACTIVE,
+	COS_PROP_SCRUB_MINACTIVE,
+	/* maxactive props for queue classes */
+	COS_PROP_READ_MAXACTIVE,
+	COS_PROP_AREAD_MAXACTIVE,
+	COS_PROP_WRITE_MAXACTIVE,
+	COS_PROP_AWRITE_MAXACTIVE,
+	COS_PROP_SCRUB_MAXACTIVE,
+	/* unmap freed blocks (boolean) */
+	COS_PROP_UNMAP_FREED,
+	/* preference for read in mirror configurations */
+	COS_PROP_PREFERRED_READ,
 	COS_NUM_PROPS
 } cos_prop_t;
-
-#define	COS_NAME	"cos_name"
-#define	COS_UNMAPFREED	"cos_unmapfreed"
-#define	COS_PREFREAD	"cos_prefread"
-#define	COS_MINPEDNING	"cos_minpending"
-#define	COS_MAXPEDNING	"cos_maxpending"
 
 /* Small enough to not hog a whole line of printout in zpool(1M). */
 #define	ZPROP_MAX_COMMENT	32

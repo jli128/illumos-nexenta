@@ -220,7 +220,7 @@ special_class_changed_cb(void *arg, uint64_t newval)
 	ASSERT(newval == SPA_SPECIALCLASS_ZIL ||
 	    newval == SPA_SPECIALCLASS_META);
 
-	spa_set_specialclass(os->os_spa, os, newval);	
+	spa_set_specialclass(os->os_spa, os, newval);
 }
 
 static void
@@ -658,7 +658,7 @@ dmu_objset_evict(objset_t *os)
 		VERIFY(0 == dsl_prop_unregister(ds, "specialclass",
 		    special_class_changed_cb, os));
 		VERIFY(0 == dsl_prop_unregister(ds, "zpl_to_metadev",
-		   zpl_placement_changed_cb, os));
+		    zpl_placement_changed_cb, os));
 	}
 
 	if (os->os_sa)

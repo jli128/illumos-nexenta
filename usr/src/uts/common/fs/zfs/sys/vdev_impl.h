@@ -35,6 +35,7 @@
 #include <sys/vdev.h>
 #include <sys/dkio.h>
 #include <sys/uberblock_impl.h>
+#include <sys/fs/zfs.h>
 #include <sys/cos.h>
 
 #ifdef	__cplusplus
@@ -101,8 +102,32 @@ struct vdev_cache {
 	kmutex_t	vc_lock;
 };
 
+/*
+ * Macros for conversion between zio priorities and vdev properties.
+ * These rely on the specific corresponding order of the zio_priority_t
+ * and vdev_prop_t enum definitions to simplify the conversion.
+ */
+#define	VDEV_PROP_TO_ZIO_PRIO_MIN(prp)	((prp) - VDEV_PROP_READ_MINACTIVE)
+#define	VDEV_ZIO_PRIO_TO_PROP_MIN(pri)	((pri) + VDEV_PROP_READ_MINACTIVE)
+#define	VDEV_PROP_MIN_VALID(prp)		\
+	(((prp) >= VDEV_PROP_READ_MINACTIVE) &&	\
+	((prp) <= VDEV_PROP_SCRUB_MINACTIVE))
+#define	VDEV_PROP_TO_ZIO_PRIO_MAX(prp)	((prp) - VDEV_PROP_READ_MAXACTIVE)
+#define	VDEV_ZIO_PRIO_TO_PROP_MAX(pri)	((pri) + VDEV_PROP_READ_MAXACTIVE)
+#define	VDEV_PROP_MAX_VALID(prp)		\
+	(((prp) >= VDEV_PROP_READ_MAXACTIVE) &&	\
+	((prp) <= VDEV_PROP_SCRUB_MAXACTIVE))
+
 typedef struct vdev_queue_class {
 	uint32_t	vqc_active;
+
+	/*
+	 * If min/max active values are zero, we fall back on the global
+	 * corresponding tunables defined in vdev_queue.c; non-zero values
+	 * override the global tunables
+	 */
+	uint32_t	vqc_min_active; /* min concurently active IOs */
+	uint32_t	vqc_max_active; /* max concurently active IOs */
 
 	/*
 	 * Sorted by offset or timestamp, depending on if the queue is
@@ -113,10 +138,14 @@ typedef struct vdev_queue_class {
 
 struct vdev_queue {
 	vdev_t		*vq_vdev;
+
 	vdev_queue_class_t vq_class[ZIO_PRIORITY_NUM_QUEUEABLE];
+	cos_t		*vq_cos;		/* assigned class of storage */
+	uint64_t	vq_preferred_read;	/* property setting */
+
 	avl_tree_t	vq_active_tree;
 	uint64_t	vq_last_offset;
-	hrtime_t	vq_io_complete_ts; /* time last i/o completed */
+	hrtime_t	vq_io_complete_ts; 	/* time last i/o completed */
 	kmutex_t	vq_lock;
 };
 
@@ -193,10 +222,7 @@ struct vdev {
 	char		*vdev_devid;	/* vdev devid (if any)		*/
 	char		*vdev_physpath;	/* vdev device path (if any)	*/
 	char		*vdev_fru;	/* physical FRU location	*/
-	uint64_t	vdev_min_pending; /* min concurently pending IOs */
-	uint64_t	vdev_max_pending; /* max concurently pending IOs */
-	uint64_t	vdev_preferred_read; /* preferred for reading */
-	uint64_t	vdev_weight;	/* preferred for reading */
+	uint64_t	vdev_weight;	/* dynamic weight */
 	uint64_t	vdev_not_present; /* not present during import	*/
 	uint64_t	vdev_unspare;	/* unspare when resilvering done */
 	boolean_t	vdev_nowritecache; /* true if flushwritecache failed */
@@ -216,8 +242,6 @@ struct vdev {
 	zio_t		*vdev_probe_zio; /* root of current probe	*/
 	vdev_aux_t	vdev_label_aux;	/* on-disk aux state		*/
 
-	cos_t		*vdev_cos;	  /* assigned class of storage */
-
 	char		*vdev_spare_group; /* spare group name */
 	/*
 	 * For DTrace to work in userland (libzpool) context, these fields must
@@ -229,7 +253,6 @@ struct vdev {
 	kmutex_t	vdev_dtl_lock;	/* vdev_dtl_{map,resilver}	*/
 	kmutex_t	vdev_stat_lock;	/* vdev_stat			*/
 	kmutex_t	vdev_probe_lock; /* protects vdev_probe_zio	*/
-	kmutex_t	vdev_cos_lock; /* protects vdev_cos	*/
 };
 
 #define	VDEV_RAIDZ_MAXPARITY	3
@@ -340,6 +363,15 @@ extern uint64_t vdev_default_asize(vdev_t *vd, uint64_t psize);
 extern uint64_t vdev_get_min_asize(vdev_t *vd);
 extern void vdev_set_min_asize(vdev_t *vd);
 
+
+/*
+ * Wrapper for getting vdev-specific properties that enforces proper
+ * overriding: vdev-specific properties override CoS properties
+ *
+ * The value of 0 indicates that the property is not set (default).
+ */
+extern uint64_t vdev_queue_get_prop_uint64(vdev_queue_t *vq, vdev_prop_t prop);
+
 /*
  * Global variables
  */
@@ -353,13 +385,6 @@ typedef struct vdev_buf {
 	buf_t	vb_buf;		/* buffer that describes the io */
 	zio_t	*vb_io;		/* pointer back to the original zio_t */
 } vdev_buf_t;
-
-/*
- * Persist vdev properties if ALL_PROPS_PERSISTENT is defined
- */
-#ifdef	ALL_PROPS_PERSISTENT
-#define	VDEV_PROPS_PERSISTENT
-#endif
 
 /*
  * Deal with persisting and loading properties from persistent store

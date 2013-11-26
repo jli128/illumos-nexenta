@@ -89,7 +89,8 @@ spa_specialclass_t specialclass_desc[SPA_NUM_SPECIALCLASSES] = {
 };
 
 void
-spa_set_specialclass(spa_t *spa, objset_t *os, spa_specialclass_id_t specclassid)
+spa_set_specialclass(spa_t *spa, objset_t *os,
+    spa_specialclass_id_t specclassid)
 {
 	ASSERT(spa);
 	ASSERT(os);
@@ -275,20 +276,22 @@ spa_check_special(spa_t *spa)
 
 /* returns B_TRUE if placed on special and B_FALSE if placed elsewhere */
 static boolean_t
-spa_refine_meta_placement(spa_t *spa, uint64_t zpl_meta_to_special, dmu_object_type_t ot)
+spa_refine_meta_placement(spa_t *spa, uint64_t zpl_meta_to_special,
+    dmu_object_type_t ot)
 {
-	spa_meta_placement_t* mp = &spa->spa_meta_policy;
+	spa_meta_placement_t *mp = &spa->spa_meta_policy;
 	boolean_t isddt = DMU_OT_IS_DDT_META(ot),
 	    isgen = DMU_OT_IS_GENERAL_META(ot),
 	    iszpl = DMU_OT_IS_ZPL_META(ot);
 
 	if (isddt && (mp->spa_ddt_to_special == META_PLACEMENT_OFF))
 		return (B_FALSE);
-	else if (isgen && (mp->spa_general_meta_to_special == META_PLACEMENT_OFF))
+	else if (isgen && (mp->spa_general_meta_to_special ==
+	    META_PLACEMENT_OFF))
 		return (B_FALSE);
 	else if (iszpl && (zpl_meta_to_special == META_PLACEMENT_OFF))
 		return (B_FALSE);
-	else if (!isddt && !isgen && !iszpl && 
+	else if (!isddt && !isgen && !iszpl &&
 	    (mp->spa_other_meta_to_special == META_PLACEMENT_OFF))
 		return (B_FALSE);
 	else
@@ -299,18 +302,19 @@ spa_refine_meta_placement(spa_t *spa, uint64_t zpl_meta_to_special, dmu_object_t
 static boolean_t
 spa_meta_is_dual(spa_t *spa, uint64_t zpl_meta_to_special, dmu_object_type_t ot)
 {
-	spa_meta_placement_t* mp = &spa->spa_meta_policy;
+	spa_meta_placement_t *mp = &spa->spa_meta_policy;
 	boolean_t isddt = DMU_OT_IS_DDT_META(ot),
 	    isgen = DMU_OT_IS_GENERAL_META(ot),
 	    iszpl = DMU_OT_IS_ZPL_META(ot);
 
 	if (isddt && (mp->spa_ddt_to_special != META_PLACEMENT_DUAL))
 		return (B_FALSE);
-	else if (isgen && (mp->spa_general_meta_to_special != META_PLACEMENT_DUAL))
+	else if (isgen && (mp->spa_general_meta_to_special !=
+	    META_PLACEMENT_DUAL))
 		return (B_FALSE);
 	else if (iszpl && (zpl_meta_to_special != META_PLACEMENT_DUAL))
 		return (B_FALSE);
-	else if (!isddt && !isgen && !iszpl && 
+	else if (!isddt && !isgen && !iszpl &&
 	    (mp->spa_other_meta_to_special != META_PLACEMENT_DUAL))
 		return (B_FALSE);
 	else
@@ -378,7 +382,8 @@ spa_meta_to_special(spa_t *spa, objset_t *os, dmu_object_type_t ot)
 	} else {
 		uint64_t specflags = spa_specialclass_flags(os);
 		boolean_t match = !!(SPECIAL_FLAG_DATAMETA & specflags);
-		return (match && spa_refine_meta_placement(spa, os->os_zpl_meta_to_special, ot));
+		return (match && spa_refine_meta_placement(spa,
+		    os->os_zpl_meta_to_special, ot));
 	}
 }
 
@@ -407,7 +412,8 @@ dbuf_meta_is_l2cacheable(dmu_buf_impl_t *db)
 	if (!is_to_special)
 		return (B_TRUE);
 
-	return (spa_meta_is_dual(spa, db->db_objset->os_zpl_meta_to_special, ot));
+	return (spa_meta_is_dual(spa, db->db_objset->os_zpl_meta_to_special,
+	    ot));
 }
 
 /*
@@ -456,7 +462,8 @@ spa_select_class(spa_t *spa, zio_prop_t *zp)
 		if (zp->zp_metadata) {
 			match = !!(SPECIAL_FLAG_DATAMETA & specflags);
 			if (match && mp->spa_enable_meta_placement_selection)
-				match = spa_refine_meta_placement(spa, zp->zp_zpl_meta_to_special, zp->zp_type);
+				match = spa_refine_meta_placement(spa,
+				    zp->zp_zpl_meta_to_special, zp->zp_type);
 		} else {
 			match = !!(SPECIAL_FLAG_DATAUSER & specflags);
 			if (match && spa_enable_data_placement_selection)

@@ -388,7 +388,7 @@ zpool_is_bootable(zpool_handle_t *zhp)
  */
 static nvlist_t *
 zpool_valid_proplist(libzfs_handle_t *hdl, const char *poolname,
-    nvlist_t *props, uint64_t version, prop_flags_t flags, char *errbuf)
+    nvlist_t *props, uint64_t version, prop_flags_t flags, const char *errbuf)
 {
 	nvpair_t *elem;
 	nvlist_t *retprops;
@@ -703,6 +703,10 @@ zpool_set_proplist(zpool_handle_t *zhp, nvlist_t *nvl)
 	prop_flags_t flags = { 0 };
 
 	assert(nvl != NULL);
+
+	(void) snprintf(errbuf, sizeof (errbuf),
+	    dgettext(TEXT_DOMAIN, "cannot set property for '%s'"),
+	    zhp->zpool_name);
 
 	version = zpool_get_prop_int(zhp, ZPOOL_PROP_VERSION, NULL);
 	if ((realprops = zpool_valid_proplist(zhp->zpool_hdl,
@@ -4146,7 +4150,7 @@ vdev_get_guid(zpool_handle_t *zhp, const char *path, uint64_t *guid)
 /*ARGSUSED*/
 static nvlist_t *
 vdev_valid_proplist(libzfs_handle_t *hdl, nvlist_t *props,
-    uint64_t version, prop_flags_t flags, char *errbuf)
+    uint64_t version, prop_flags_t flags, const char *errbuf)
 {
 	nvpair_t *elem;
 	nvlist_t *retprops;
@@ -4188,7 +4192,7 @@ vdev_valid_proplist(libzfs_handle_t *hdl, nvlist_t *props,
 		 * Perform additional checking for specific properties.
 		 */
 		switch (prop) {
-		case VDEV_PROP_MINPENDING:
+		case VDEV_PROP_PREFERRED_READ:
 			if (intval > 100) {
 				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 				    "'%s' must be from 0 to 100"), propname);
@@ -4197,16 +4201,25 @@ vdev_valid_proplist(libzfs_handle_t *hdl, nvlist_t *props,
 				goto error;
 			}
 			break;
-
-		case VDEV_PROP_MAXPENDING:
-			if (intval > 100) {
+		case VDEV_PROP_READ_MINACTIVE:
+		case VDEV_PROP_READ_MAXACTIVE:
+		case VDEV_PROP_AREAD_MINACTIVE:
+		case VDEV_PROP_AREAD_MAXACTIVE:
+		case VDEV_PROP_WRITE_MINACTIVE:
+		case VDEV_PROP_WRITE_MAXACTIVE:
+		case VDEV_PROP_AWRITE_MINACTIVE:
+		case VDEV_PROP_AWRITE_MAXACTIVE:
+		case VDEV_PROP_SCRUB_MINACTIVE:
+		case VDEV_PROP_SCRUB_MAXACTIVE:
+			if (intval > 1000) {
 				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-				    "'%s' must be from 0 to 100"),
-				    propname);
+				    "'%s' must be from 0 to 1000"), propname);
 				(void) zfs_error(hdl, EZFS_BADPROP,
 				    errbuf);
 				goto error;
 			}
+			break;
+		default:
 			break;
 		}
 	}
@@ -4391,6 +4404,10 @@ vdev_set_proplist(zpool_handle_t *zhp, const char *vdev, nvlist_t *nvl)
 
 	assert(nvl != NULL);
 
+	(void) snprintf(errbuf, sizeof (errbuf),
+	    dgettext(TEXT_DOMAIN, "cannot set property for '%s'"),
+	    zhp->zpool_name);
+
 	if (vdev_get_guid(zhp, vdev, &guid) != 0) {
 		(void) fprintf(stderr, gettext("Device %s not present in the "
 		    "pool\n"), vdev);
@@ -4512,7 +4529,7 @@ get_vdev_guid_callback(vdev_cb_t *cb)
 /*ARGSUSED*/
 static nvlist_t *
 cos_valid_proplist(libzfs_handle_t *hdl, nvlist_t *props,
-    uint64_t version, prop_flags_t flags, char *errbuf)
+    uint64_t version, prop_flags_t flags, const char *errbuf)
 {
 	nvpair_t *elem;
 	nvlist_t *retprops;
@@ -4554,7 +4571,7 @@ cos_valid_proplist(libzfs_handle_t *hdl, nvlist_t *props,
 		 * Perform additional checking for specific properties.
 		 */
 		switch (prop) {
-		case COS_PROP_MINPENDING:
+		case COS_PROP_PREFERRED_READ:
 			if (intval > 100) {
 				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 				    "'%s' must be from 0 to 100"), propname);
@@ -4563,16 +4580,25 @@ cos_valid_proplist(libzfs_handle_t *hdl, nvlist_t *props,
 				goto error;
 			}
 			break;
-
-		case COS_PROP_MAXPENDING:
-			if (intval > 100) {
+		case COS_PROP_READ_MINACTIVE:
+		case COS_PROP_AREAD_MINACTIVE:
+		case COS_PROP_WRITE_MINACTIVE:
+		case COS_PROP_AWRITE_MINACTIVE:
+		case COS_PROP_SCRUB_MINACTIVE:
+		case COS_PROP_READ_MAXACTIVE:
+		case COS_PROP_AREAD_MAXACTIVE:
+		case COS_PROP_WRITE_MAXACTIVE:
+		case COS_PROP_AWRITE_MAXACTIVE:
+		case COS_PROP_SCRUB_MAXACTIVE:
+			if (intval > 1000) {
 				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-				    "'%s' must be from 0 to 100"),
-				    propname);
+				    "'%s' must be from 0 to 1000"), propname);
 				(void) zfs_error(hdl, EZFS_BADPROP,
 				    errbuf);
 				goto error;
 			}
+			break;
+		default:
 			break;
 		}
 	}
@@ -4759,6 +4785,10 @@ cos_set_proplist(zpool_handle_t *zhp, const char *cos, nvlist_t *nvl)
 	prop_flags_t flags = { 0 };
 
 	assert(nvl != NULL);
+
+	(void) snprintf(errbuf, sizeof (errbuf),
+	    dgettext(TEXT_DOMAIN, "cannot set property for '%s'"),
+	    zhp->zpool_name);
 
 	version = zpool_get_prop_int(zhp, ZPOOL_PROP_VERSION, NULL);
 	if ((realprops = cos_valid_proplist(zhp->zpool_hdl, nvl,

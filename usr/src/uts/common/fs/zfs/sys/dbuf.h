@@ -238,14 +238,15 @@ typedef struct dmu_buf_impl {
 
 /* Note: the dbuf hash table is exposed only for the mdb module */
 #define	DBUF_MUTEXES	256
-#define DBUF_LOCK_PAD	64
+#define	DBUF_LOCK_PAD	64
 typedef struct {
 	kmutex_t mtx;
 #ifdef _KERNEL
 	unsigned char pad[(DBUF_LOCK_PAD - sizeof (kmutex_t))];
 #endif
 } dbuf_mutex_t;
-#define	DBUF_HASH_MUTEX(h, idx) (&((h)->hash_mutexes[(idx) & (DBUF_MUTEXES-1)].mtx))
+#define	DBUF_HASH_MUTEX(h, idx)	\
+	(&((h)->hash_mutexes[(idx) & (DBUF_MUTEXES-1)].mtx))
 typedef struct dbuf_hash_table {
 	uint64_t hash_table_mask;
 	dmu_buf_impl_t **hash_table;
@@ -345,7 +346,7 @@ boolean_t dbuf_meta_is_l2cacheable(dmu_buf_impl_t *db);
  * Metadata is l2cacheable if it is not placed on special device
  * or it is placed on special device in "dual" mode. We need to check
  * for ddt in ZFS_CACHE_ALL and ZFS_CACHE_METADATA because it is in MOS.
- * ZFS_CACHE_DATA mode actually means to cache both data and cacheable 
+ * ZFS_CACHE_DATA mode actually means to cache both data and cacheable
  * metadata.
  */
 #define	DBUF_IS_L2CACHEABLE(_db)					\

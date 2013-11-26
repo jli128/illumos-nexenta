@@ -137,13 +137,6 @@ typedef enum vdev_config_flag {
 extern void vdev_top_config_generate(spa_t *spa, nvlist_t *config);
 extern nvlist_t *vdev_config_generate(spa_t *spa, vdev_t *vd,
     boolean_t getstats, vdev_config_flag_t flags);
-/*
- * Props accessors
- */
-extern int vdev_load_props(spa_t *spa, boolean_t load_aux);
-extern uint64_t vdev_get_minpending(vdev_t *, uint64_t);
-extern uint64_t vdev_get_maxpending(vdev_t *, uint64_t);
-extern uint64_t vdev_get_prefread(vdev_t *);
 
 /*
  * Label routines

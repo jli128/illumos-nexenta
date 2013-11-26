@@ -194,7 +194,8 @@ dsl_scan_setup_sync(void *arg, dmu_tx_t *tx)
 	scn->scn_phys.scn_state = DSS_SCANNING;
 	scn->scn_phys.scn_min_txg = 0;
 	scn->scn_phys.scn_max_txg = tx->tx_txg;
-	scn->scn_phys.scn_ddt_class_max = spa->spa_ddt_class_max;/* the entire DDT */
+	/* the entire DDT */
+	scn->scn_phys.scn_ddt_class_max = spa->spa_ddt_class_max;
 	scn->scn_phys.scn_start_time = gethrestime_sec();
 	scn->scn_phys.scn_errors = 0;
 	scn->scn_phys.scn_to_examine = spa->spa_root_vdev->vdev_stat.vs_alloc;
@@ -204,7 +205,7 @@ dsl_scan_setup_sync(void *arg, dmu_tx_t *tx)
 
 	if (DSL_SCAN_IS_SCRUB_RESILVER(scn)) {
 		scn->scn_phys.scn_ddt_class_max =
-			MIN(zfs_scrub_ddt_class_max, spa->spa_ddt_class_max);
+		    MIN(zfs_scrub_ddt_class_max, spa->spa_ddt_class_max);
 
 		/* rewrite all disk labels */
 		vdev_config_dirty(spa->spa_root_vdev);
@@ -224,7 +225,7 @@ dsl_scan_setup_sync(void *arg, dmu_tx_t *tx)
 		 */
 		if (scn->scn_phys.scn_min_txg > TXG_INITIAL)
 			scn->scn_phys.scn_ddt_class_max =
-				MIN(DDT_CLASS_DITTO, spa->spa_ddt_class_max);
+			    MIN(DDT_CLASS_DITTO, spa->spa_ddt_class_max);
 
 	}
 
@@ -1727,7 +1728,7 @@ dsl_scan_scrub_cb(dsl_pool_t *dp,
 			delay(scan_delay);
 
 		DTRACE_PROBE3(do_io, uint64_t, scn->scn_phys.scn_func,
-				boolean_t, needs_io, spa_t *, spa);
+		    boolean_t, needs_io, spa_t *, spa);
 		zio_nowait(zio_read(NULL, spa, bp, data, size,
 		    dsl_scan_scrub_done, NULL, ZIO_PRIORITY_SCRUB,
 		    zio_flags, zb));

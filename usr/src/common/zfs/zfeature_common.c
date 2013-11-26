@@ -23,6 +23,7 @@
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifdef _KERNEL
@@ -141,8 +142,7 @@ zfeature_register(spa_feature_t fid, const char *guid, const char *name,
 	feature->fi_depends = deps;
 }
 
-spa_feature_t cos_deps[] =
-    { SPA_FEATURE_VDEV_ATTR, SPA_FEATURE_NONE };
+spa_feature_t cos_deps[] = { SPA_FEATURE_VDEV_PROPS, SPA_FEATURE_NONE };
 
 void
 zpool_feature_init(void)
@@ -168,14 +168,14 @@ zpool_feature_init(void)
 	    B_FALSE, B_FALSE, NULL);
 	zfeature_register(SPA_FEATURE_META_DEVICES,
 	    "com.nexenta:meta_devices", "meta_devices",
-	    "Using dedicated devices for metadata.", B_TRUE, B_FALSE, NULL);
-	zfeature_register(SPA_FEATURE_VDEV_ATTR,
-	    "com.nexenta:vdev_attributes", "vdev_attributes",
-	    "Per vdev attributes.", B_TRUE, B_FALSE, NULL);
-	zfeature_register(SPA_FEATURE_COS_ATTR,
-	    "com.nexenta:class_of_storages", "class_of_storages",
-	    "Diverging storages.", B_TRUE, B_FALSE, cos_deps);
+	    "Dedicated devices for metadata.", B_TRUE, B_FALSE, NULL);
+	zfeature_register(SPA_FEATURE_VDEV_PROPS,
+	    "com.nexenta:vdev_properties", "vdev_properties",
+	    "Vdev-specific properties.", B_TRUE, B_FALSE, NULL);
+	zfeature_register(SPA_FEATURE_COS_PROPS,
+	    "com.nexenta:class_of_storage", "class_of_storage",
+	    "Properties for groups of vdevs.", B_TRUE, B_FALSE, cos_deps);
 	zfeature_register(SPA_FEATURE_SHA1CRC32,
 	    "com.nexenta:checksum_sha1crc32", "checksum_sha1crc32",
-	    "Allows usage of the sha1crc32 checksum.", B_TRUE, B_FALSE, NULL);
+	    "Support for sha1crc32 checksum.", B_TRUE, B_FALSE, NULL);
 }

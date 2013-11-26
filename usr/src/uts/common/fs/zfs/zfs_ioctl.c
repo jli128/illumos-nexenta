@@ -3802,16 +3802,16 @@ zfs_check_settable(const char *dsname, nvpair_t *pair, cred_t *cr)
 		    nvpair_value_uint64(pair, &intval) == 0) {
 			if (intval == ZIO_CHECKSUM_SHA1CRC32) {
 				spa_t *spa;
-				
+
 				if ((err = spa_open(dsname, &spa, FTAG)) != 0)
 					return (err);
-				
+
 				if (!spa_feature_is_enabled(spa,
-					SPA_FEATURE_SHA1CRC32)) {
+				    SPA_FEATURE_SHA1CRC32)) {
 					spa_close(spa, FTAG);
 					return (SET_ERROR(ENOTSUP));
 				}
-				
+
 				spa_close(spa, FTAG);
 			}
 		}
@@ -5675,14 +5675,15 @@ zfs_ioctl_register_dataset_modify(zfs_ioc_t ioc, zfs_ioc_legacy_func_t *func,
  */
 /* ARGSUSED */
 static int
-zfs_ioc_pool_configs_nvl(const char *poolname, nvlist_t *innvl, nvlist_t *outnvl)
+zfs_ioc_pool_configs_nvl(const char *poolname, nvlist_t *innvl,
+    nvlist_t *outnvl)
 {
 	nvlist_t *configs;
 	uint64_t generation;
 
 	if (nvlist_lookup_uint64(innvl, "generation", &generation) != 0)
 		return (SET_ERROR(EINVAL));
-	
+
 	if ((configs = spa_all_configs(&generation)) == NULL)
 		return (SET_ERROR(EEXIST));
 
@@ -5835,7 +5836,8 @@ zfs_ioc_objset_stats_nvl(const char *data, nvlist_t *innvl, nvlist_t *outnvl)
  * cursor.
  */
 static int
-zfs_ioc_dataset_list_next_nvl(const char *data, nvlist_t *innvl, nvlist_t *outnvl)
+zfs_ioc_dataset_list_next_nvl(const char *data, nvlist_t *innvl,
+    nvlist_t *outnvl)
 {
 	objset_t *os;
 	int error;
@@ -5902,7 +5904,8 @@ top:
  * return its name, props, and stats and an updated cursor offset.
  */
 static int
-zfs_ioc_snapshot_list_next_nvl(const char *data, nvlist_t *innvl, nvlist_t *outnvl)
+zfs_ioc_snapshot_list_next_nvl(const char *data, nvlist_t *innvl,
+    nvlist_t *outnvl)
 {
 	objset_t *os;
 	int error;
@@ -5963,7 +5966,8 @@ zfs_ioc_snapshot_list_next_nvl(const char *data, nvlist_t *innvl, nvlist_t *outn
 }
 
 static int
-zfs_ioc_pool_get_props_nvl(const char *poolname, nvlist_t *innvl, nvlist_t *outnvl)
+zfs_ioc_pool_get_props_nvl(const char *poolname, nvlist_t *innvl,
+    nvlist_t *outnvl)
 {
 	spa_t *spa;
 	int error;

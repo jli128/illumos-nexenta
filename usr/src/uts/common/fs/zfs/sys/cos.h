@@ -36,6 +36,22 @@ extern "C" {
  */
 
 /*
+ * Macros for conversion between zio priorities and vdev properties.
+ * These rely on the specific corresponding order of the zio_priority_t
+ * and cos_prop_t enum definitions to simplify the conversion.
+ */
+#define	COS_PROP_TO_ZIO_PRIO_MIN(prp)	((prp) - COS_PROP_READ_MINACTIVE)
+#define	COS_ZIO_PRIO_TO_PROP_MIN(pri)	((pri) + COS_PROP_READ_MINACTIVE)
+#define	COS_PROP_MIN_VALID(prp)			\
+	(((prp) >= COS_PROP_READ_MINACTIVE) &&	\
+	((prp) <= COS_PROP_SCRUB_MINACTIVE))
+#define	COS_PROP_TO_ZIO_PRIO_MAX(prp)	((prp) - COS_PROP_READ_MAXACTIVE)
+#define	COS_ZIO_PRIO_TO_PROP_MAX(pri)	((pri) + COS_PROP_READ_MAXACTIVE)
+#define	COS_PROP_MAX_VALID(prp)			\
+	(((prp) >= COS_PROP_READ_MAXACTIVE) &&	\
+	((prp) <= COS_PROP_SCRUB_MAXACTIVE))
+
+/*
  * Forward declaration
  */
 typedef struct cos cos_t;
@@ -58,6 +74,8 @@ int spa_load_cos_props(spa_t *);
 
 void cos_hold(cos_t *cos);
 void cos_rele(cos_t *cos);
+
+uint64_t cos_get_prop_uint64(cos_t *cos, cos_prop_t p);
 
 #ifdef	__cplusplus
 }

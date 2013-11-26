@@ -30,6 +30,7 @@
 
 #include <sys/zfs_context.h>
 #include <sys/vdev_impl.h>
+#include <sys/cos.h>
 #include <sys/spa_impl.h>
 #include <sys/zio.h>
 #include <sys/avl.h>
@@ -331,27 +332,42 @@ vdev_queue_agg_io_done(zio_t *aio)
 }
 
 static int
-vdev_queue_class_min_active(zio_priority_t p)
+vdev_queue_class_min_active(zio_priority_t p, vdev_queue_t *vq)
 {
+	int zfs_min_active = 0;
+	int vqc_min_active;
+	vdev_prop_t prop = VDEV_ZIO_PRIO_TO_PROP_MIN(p);
+
+	ASSERT(VDEV_PROP_MIN_VALID(prop));
+	vqc_min_active = vdev_queue_get_prop_uint64(vq, prop);
+
 	switch (p) {
 	case ZIO_PRIORITY_SYNC_READ:
-		return (zfs_vdev_sync_read_min_active);
+		zfs_min_active = zfs_vdev_sync_read_min_active;
+		break;
 	case ZIO_PRIORITY_SYNC_WRITE:
-		return (zfs_vdev_sync_write_min_active);
+		zfs_min_active = zfs_vdev_sync_write_min_active;
+		break;
 	case ZIO_PRIORITY_ASYNC_READ:
-		return (zfs_vdev_async_read_min_active);
+		zfs_min_active = zfs_vdev_async_read_min_active;
+		break;
 	case ZIO_PRIORITY_ASYNC_WRITE:
-		return (zfs_vdev_async_write_min_active);
+		zfs_min_active = zfs_vdev_async_write_min_active;
+		break;
 	case ZIO_PRIORITY_SCRUB:
-		return (zfs_vdev_scrub_min_active);
+		zfs_min_active = zfs_vdev_scrub_min_active;
+		break;
 	default:
 		panic("invalid priority %u", p);
 		return (0);
 	}
+
+	/* zero vdev-specific setting means "use zfs global setting" */
+	return ((vqc_min_active) ? vqc_min_active : zfs_min_active);
 }
 
 static int
-vdev_queue_max_async_writes(uint64_t dirty)
+vdev_queue_max_async_writes(uint64_t dirty, vdev_queue_t *vq)
 {
 	int writes;
 	uint64_t min_bytes = zfs_dirty_data_max *
@@ -359,10 +375,23 @@ vdev_queue_max_async_writes(uint64_t dirty)
 	uint64_t max_bytes = zfs_dirty_data_max *
 	    zfs_vdev_async_write_active_max_dirty_percent / 100;
 
+	/*
+	 * vdev-specific properties override global tunables
+	 * zero vdev-specific settings indicate fallback on the globals
+	 */
+	int vqc_min_active =
+	    vdev_queue_get_prop_uint64(vq, VDEV_PROP_AWRITE_MINACTIVE);
+	int min_active =
+	    (vqc_min_active) ? vqc_min_active : zfs_vdev_async_write_min_active;
+	int vqc_max_active =
+	    vdev_queue_get_prop_uint64(vq, VDEV_PROP_AWRITE_MAXACTIVE);
+	int max_active =
+	    (vqc_max_active) ? vqc_max_active : zfs_vdev_async_write_max_active;
+
 	if (dirty < min_bytes)
-		return (zfs_vdev_async_write_min_active);
+		return (min_active);
 	if (dirty > max_bytes)
-		return (zfs_vdev_async_write_max_active);
+		return (max_active);
 
 	/*
 	 * linear interpolation:
@@ -370,35 +399,49 @@ vdev_queue_max_async_writes(uint64_t dirty)
 	 * move right by min_bytes
 	 * move up by min_writes
 	 */
-	writes = (dirty - min_bytes) *
-	    (zfs_vdev_async_write_max_active -
-	    zfs_vdev_async_write_min_active) /
-	    (max_bytes - min_bytes) +
-	    zfs_vdev_async_write_min_active;
-	ASSERT3U(writes, >=, zfs_vdev_async_write_min_active);
-	ASSERT3U(writes, <=, zfs_vdev_async_write_max_active);
+	writes = (dirty - min_bytes) * (max_active - min_active) /
+	    (max_bytes - min_bytes) + min_active;
+	ASSERT3U(writes, >=, min_active);
+	ASSERT3U(writes, <=, max_active);
 	return (writes);
 }
 
 static int
-vdev_queue_class_max_active(spa_t *spa, zio_priority_t p)
+vdev_queue_class_max_active(spa_t *spa, zio_priority_t p, vdev_queue_t *vq)
 {
+	int zfs_max_active = 0;
+	int vqc_max_active;
+	vdev_prop_t prop = VDEV_ZIO_PRIO_TO_PROP_MAX(p);
+
+	ASSERT(VDEV_PROP_MAX_VALID(prop));
+	vqc_max_active = vdev_queue_get_prop_uint64(vq, prop);
+
 	switch (p) {
 	case ZIO_PRIORITY_SYNC_READ:
-		return (zfs_vdev_sync_read_max_active);
+		zfs_max_active = zfs_vdev_sync_read_max_active;
+		break;
 	case ZIO_PRIORITY_SYNC_WRITE:
-		return (zfs_vdev_sync_write_max_active);
+		zfs_max_active = zfs_vdev_sync_write_max_active;
+		break;
 	case ZIO_PRIORITY_ASYNC_READ:
-		return (zfs_vdev_async_read_max_active);
+		zfs_max_active = zfs_vdev_async_read_max_active;
+		break;
 	case ZIO_PRIORITY_ASYNC_WRITE:
-		return (vdev_queue_max_async_writes(
-		    spa->spa_dsl_pool->dp_dirty_total));
+		/* takes into account vdev-specific props internally */
+		vqc_max_active = vdev_queue_max_async_writes(
+		    spa->spa_dsl_pool->dp_dirty_total, vq);
+		ASSERT(vqc_max_active);
+		break;
 	case ZIO_PRIORITY_SCRUB:
-		return (zfs_vdev_scrub_max_active);
+		zfs_max_active = zfs_vdev_scrub_max_active;
+		break;
 	default:
 		panic("invalid priority %u", p);
 		return (0);
 	}
+
+	/* zero vdev-specific setting means "use zfs global setting" */
+	return ((vqc_max_active) ? vqc_max_active : zfs_max_active);
 }
 
 /*
@@ -418,7 +461,7 @@ vdev_queue_class_to_issue(vdev_queue_t *vq)
 	for (p = 0; p < ZIO_PRIORITY_NUM_QUEUEABLE; p++) {
 		if (avl_numnodes(&vq->vq_class[p].vqc_queued_tree) > 0 &&
 		    vq->vq_class[p].vqc_active <
-		    vdev_queue_class_min_active(p))
+		    vdev_queue_class_min_active(p, vq))
 			return (p);
 	}
 
@@ -429,7 +472,7 @@ vdev_queue_class_to_issue(vdev_queue_t *vq)
 	for (p = 0; p < ZIO_PRIORITY_NUM_QUEUEABLE; p++) {
 		if (avl_numnodes(&vq->vq_class[p].vqc_queued_tree) > 0 &&
 		    vq->vq_class[p].vqc_active <
-		    vdev_queue_class_max_active(spa, p))
+		    vdev_queue_class_max_active(spa, p, vq))
 			return (p);
 	}
 
@@ -774,4 +817,64 @@ vdev_queue_io_done(zio_t *zio)
 	}
 
 	mutex_exit(&vq->vq_lock);
+}
+
+uint64_t
+vdev_queue_get_prop_uint64(vdev_queue_t *vq, vdev_prop_t p)
+{
+	uint64_t val = 0;
+	int zprio = 0;
+	cos_t *cos = vq->vq_cos;
+
+	/*
+	 * Note: our goal as far as locking is concerned here is
+	 * to make sure that the vq_cos pointer is valid. The SCL_STATE
+	 * lock is taken on our behalf by spa_sync().
+	 */
+	switch (p) {
+	case VDEV_PROP_READ_MINACTIVE:
+	case VDEV_PROP_AREAD_MINACTIVE:
+	case VDEV_PROP_WRITE_MINACTIVE:
+	case VDEV_PROP_AWRITE_MINACTIVE:
+	case VDEV_PROP_SCRUB_MINACTIVE:
+		zprio = VDEV_PROP_TO_ZIO_PRIO_MIN(p);
+		ASSERT(ZIO_PRIORITY_QUEUEABLE_VALID(zprio));
+		if (vq->vq_cos != NULL) {
+			cos_prop_t p = COS_ZIO_PRIO_TO_PROP_MIN(zprio);
+			ASSERT(COS_PROP_MIN_VALID(p));
+			val = cos_get_prop_uint64(vq->vq_cos, p);
+		}
+		if (val == 0)
+			val = vq->vq_class[zprio].vqc_min_active;
+		break;
+	case VDEV_PROP_READ_MAXACTIVE:
+	case VDEV_PROP_AREAD_MAXACTIVE:
+	case VDEV_PROP_WRITE_MAXACTIVE:
+	case VDEV_PROP_AWRITE_MAXACTIVE:
+	case VDEV_PROP_SCRUB_MAXACTIVE:
+		zprio = VDEV_PROP_TO_ZIO_PRIO_MAX(p);
+		ASSERT(ZIO_PRIORITY_QUEUEABLE_VALID(zprio));
+		if (vq->vq_cos != NULL) {
+			cos_prop_t p = COS_ZIO_PRIO_TO_PROP_MAX(zprio);
+			ASSERT(COS_PROP_MAX_VALID(p));
+			val = cos_get_prop_uint64(vq->vq_cos, p);
+		}
+		if (val == 0)
+			val = vq->vq_class[zprio].vqc_max_active;
+		break;
+	case VDEV_PROP_PREFERRED_READ:
+		if (vq->vq_cos != NULL)
+			val = cos_get_prop_uint64(vq->vq_cos,
+			    COS_PROP_PREFERRED_READ);
+		if (val == 0)
+			val = vq->vq_preferred_read;
+		break;
+	default:
+		panic("Non-numeric property requested\n");
+		return (0);
+	}
+
+	VERIFY(cos == vq->vq_cos);
+
+	return (val);
 }

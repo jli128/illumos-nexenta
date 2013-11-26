@@ -23,6 +23,9 @@
 #include <sys/zfeature.h>
 #include "zfs_prop.h"
 
+/* Static name of the CoS property list */
+#define	COS_ARRAY	"COS_ARRAY"
+
 static int spa_alloc_cos_nosync(spa_t *spa, const char *cosname,
     uint64_t cosid);
 static int cos_set_common(cos_t *cos, const char *strval, uint64_t ival,
@@ -30,7 +33,7 @@ static int cos_set_common(cos_t *cos, const char *strval, uint64_t ival,
 static int cos_get_common(cos_t *cos, char **value, uint64_t *oval,
     cos_prop_t prop);
 
-typedef boolean_t (*cos_check_func_t)(cos_t *, void *);
+typedef boolean_t (*cos_func_t)(cos_t *, void *);
 
 void
 spa_cos_enter(spa_t *spa)
@@ -45,31 +48,27 @@ spa_cos_exit(spa_t *spa)
 }
 
 static boolean_t
-cos_check_id(cos_t *cos, void *check_data)
+cos_match_id(cos_t *cos, void *match_data)
 {
-	uint64_t id = (uint64_t)(unsigned long)check_data;
+	uint64_t id = (uint64_t)(unsigned long)match_data;
 	return (cos->cos_id == id);
 }
 
 static boolean_t
-cos_check_name(cos_t *cos, void *check_data)
+cos_match_name(cos_t *cos, void *match_data)
 {
-	const char *name = (const char *)check_data;
+	const char *name = (const char *)match_data;
 	return (strncmp(cos->cos_name, name, MAXCOSNAMELEN-1) == 0);
 }
 
 static cos_t *
-spa_lookup_cos_generic(spa_t *spa, cos_check_func_t cos_check_f,
-    void *check_data)
+spa_foreach_cos(spa_t *spa, cos_func_t cos_f, void *data)
 {
 	cos_t *cos;
 
-	ASSERT(spa);
-	ASSERT(cos_check_f);
-
 	for (cos = list_head(&spa->spa_cos_list); cos != NULL;
 	    cos = list_next(&spa->spa_cos_list, cos)) {
-		if (cos_check_f(cos, check_data))
+		if (cos_f(cos, data))
 			break;
 	}
 
@@ -79,51 +78,41 @@ spa_lookup_cos_generic(spa_t *spa, cos_check_func_t cos_check_f,
 cos_t *
 spa_lookup_cos_by_id(spa_t *spa, uint64_t id)
 {
-	ASSERT(spa);
-	return (spa_lookup_cos_generic(spa, cos_check_id,
+	return (spa_foreach_cos(spa, cos_match_id,
 	    (void *)(unsigned long)id));
 }
 
 cos_t *
 spa_lookup_cos_by_name(spa_t *spa, const char *name)
 {
-	ASSERT(spa);
 	if (name == NULL)
 		return (NULL);
-	return (spa_lookup_cos_generic(spa, cos_check_name, (void *)name));
+	return (spa_foreach_cos(spa, cos_match_name, (void *)name));
 }
 
 uint64_t
 cos_refcount(cos_t *cos)
 {
-	ASSERT(cos);
 	return (cos->cos_refcnt);
 }
 
 void
 cos_hold(cos_t *cos)
 {
-	ASSERT(cos);
-
-	mutex_enter(&cos->cos_lock);
 	atomic_inc_64(&cos->cos_refcnt);
-	mutex_exit(&cos->cos_lock);
 }
 
 void
 cos_rele(cos_t *cos)
 {
-	ASSERT(cos);
-	mutex_enter(&cos->cos_lock);
-	if (cos->cos_refcnt > 0)
-		atomic_dec_64(&cos->cos_refcnt);
-	mutex_exit(&cos->cos_lock);
+	ASSERT(cos->cos_refcnt);
+	atomic_dec_64(&cos->cos_refcnt);
 }
 
 static int
 cos_set_common(cos_t *cos, const char *strval, uint64_t ival, cos_prop_t prop)
 {
-	ASSERT(cos);
+	zio_priority_t p;
 
 	switch (prop) {
 	case COS_PROP_NAME:
@@ -139,12 +128,24 @@ cos_set_common(cos_t *cos, const char *strval, uint64_t ival, cos_prop_t prop)
 		cos->cos_preferred_read = (boolean_t)ival;
 		break;
 
-	case COS_PROP_MINPENDING:
-		cos->cos_min_pending = ival;
+	case COS_PROP_READ_MINACTIVE:
+	case COS_PROP_AREAD_MINACTIVE:
+	case COS_PROP_WRITE_MINACTIVE:
+	case COS_PROP_AWRITE_MINACTIVE:
+	case COS_PROP_SCRUB_MINACTIVE:
+		p = COS_PROP_TO_ZIO_PRIO_MIN(prop);
+		ASSERT(ZIO_PRIORITY_QUEUEABLE_VALID(p));
+		cos->cos_min_active[p] = ival;
 		break;
 
-	case COS_PROP_MAXPENDING:
-		cos->cos_max_pending = ival;
+	case COS_PROP_READ_MAXACTIVE:
+	case COS_PROP_AREAD_MAXACTIVE:
+	case COS_PROP_WRITE_MAXACTIVE:
+	case COS_PROP_AWRITE_MAXACTIVE:
+	case COS_PROP_SCRUB_MAXACTIVE:
+		p = COS_PROP_TO_ZIO_PRIO_MAX(prop);
+		ASSERT(ZIO_PRIORITY_QUEUEABLE_VALID(p));
+		cos->cos_max_active[p] = ival;
 		break;
 
 	default:
@@ -158,7 +159,7 @@ cos_set_common(cos_t *cos, const char *strval, uint64_t ival, cos_prop_t prop)
 static int
 cos_get_common(cos_t *cos, char **value, uint64_t *oval, cos_prop_t prop)
 {
-	ASSERT(cos);
+	zio_priority_t p;
 
 	switch (prop) {
 	case COS_PROP_ID:
@@ -178,12 +179,24 @@ cos_get_common(cos_t *cos, char **value, uint64_t *oval, cos_prop_t prop)
 		*oval = cos->cos_preferred_read;
 		break;
 
-	case COS_PROP_MINPENDING:
-		*oval = cos->cos_min_pending;
+	case COS_PROP_READ_MINACTIVE:
+	case COS_PROP_AREAD_MINACTIVE:
+	case COS_PROP_WRITE_MINACTIVE:
+	case COS_PROP_AWRITE_MINACTIVE:
+	case COS_PROP_SCRUB_MINACTIVE:
+		p = COS_PROP_TO_ZIO_PRIO_MIN(prop);
+		ASSERT(ZIO_PRIORITY_QUEUEABLE_VALID(p));
+		*oval = cos->cos_min_active[p];
 		break;
 
-	case COS_PROP_MAXPENDING:
-		*oval = cos->cos_max_pending;
+	case COS_PROP_READ_MAXACTIVE:
+	case COS_PROP_AREAD_MAXACTIVE:
+	case COS_PROP_WRITE_MAXACTIVE:
+	case COS_PROP_AWRITE_MAXACTIVE:
+	case COS_PROP_SCRUB_MAXACTIVE:
+		p = COS_PROP_TO_ZIO_PRIO_MAX(prop);
+		ASSERT(ZIO_PRIORITY_QUEUEABLE_VALID(p));
+		*oval = cos->cos_max_active[p];
 		break;
 
 	default:
@@ -205,7 +218,7 @@ cos_count(cos_t *cos, void *cntp)
 	(*counterp)++;
 
 	/*
-	 * The B_FALSE is an indication to spa_lookup_cos_generic()
+	 * The B_FALSE is an indication to spa_foreach_cos()
 	 * to continue iterating along the cos list
 	 */
 	return (B_FALSE);
@@ -228,39 +241,55 @@ cos_sync_classes(spa_t *spa, uint64_t obj, dmu_tx_t *tx)
 	if (list_is_empty(&spa->spa_cos_list))
 		goto empty;
 
-	(void) spa_lookup_cos_generic(spa, cos_count, &num_classes);
+	(void) spa_foreach_cos(spa, cos_count, &num_classes);
 	nvl_arr_sz = num_classes * sizeof (void *);
 
-	if ((nvl_arr = kmem_alloc(nvl_arr_sz, KM_SLEEP)) == NULL)
-		return;
+	nvl_arr = kmem_alloc(nvl_arr_sz, KM_SLEEP);
 
 	VERIFY(0 == nvlist_alloc(&nvl, NV_UNIQUE_NAME, KM_SLEEP));
 
 	for (i = 0, cos = list_head(&spa->spa_cos_list); cos != NULL;
 	    cos = list_next(&spa->spa_cos_list, cos), i++) {
+		const char *propname;
+
 		VERIFY(0 == nvlist_alloc(&nvl_arr[i], NV_UNIQUE_NAME,
 		    KM_SLEEP));
 
-		VERIFY(0 == nvlist_add_uint64(nvl_arr[i],
-		    COS_ID, cos->cos_id));
-		VERIFY(0 == nvlist_add_string(nvl_arr[i],
-		    COS_NAME, cos->cos_name));
+		propname = cos_prop_to_name(COS_PROP_ID);
+		VERIFY(0 == nvlist_add_uint64(nvl_arr[i], propname,
+		    cos->cos_id));
+		propname = cos_prop_to_name(COS_PROP_NAME);
+		VERIFY(0 == nvlist_add_string(nvl_arr[i], propname,
+		    cos->cos_name));
+		propname = cos_prop_to_name(COS_PROP_PREFERRED_READ);
+		VERIFY(0 == nvlist_add_uint64(nvl_arr[i], propname,
+		    cos->cos_preferred_read));
 
-		if (cos->cos_preferred_read > 0)
+		for (zio_priority_t p = ZIO_PRIORITY_SYNC_READ;
+		    p < ZIO_PRIORITY_NUM_QUEUEABLE; p++) {
+			uint64_t val = cos->cos_min_active[p];
+			int prop_id = COS_ZIO_PRIO_TO_PROP_MIN(p);
+
+			ASSERT(COS_PROP_MIN_VALID(prop_id));
+			propname = cos_prop_to_name(prop_id);
 			VERIFY(0 == nvlist_add_uint64(nvl_arr[i],
-			    COS_PREFREAD, cos->cos_preferred_read));
-		if (cos->cos_min_pending > 0)
+			    propname, val));
+
+			val = cos->cos_max_active[p];
+			prop_id = COS_ZIO_PRIO_TO_PROP_MAX(p);
+			ASSERT(COS_PROP_MAX_VALID(prop_id));
+			propname = cos_prop_to_name(prop_id);
+
 			VERIFY(0 == nvlist_add_uint64(nvl_arr[i],
-			    COS_MINPENDING, cos->cos_min_pending));
-		if (cos->cos_max_pending > 0)
-			VERIFY(0 == nvlist_add_uint64(nvl_arr[i],
-			    COS_MAXPENDING, cos->cos_max_pending));
-		if (cos->cos_unmap_freed)
-			VERIFY(0 == nvlist_add_boolean_value(nvl_arr[i],
-			    COS_UNMAPFREED, cos->cos_unmap_freed));
+			    propname, val));
+		}
+
+		propname = cos_prop_to_name(COS_PROP_UNMAP_FREED);
+		VERIFY(0 == nvlist_add_boolean_value(nvl_arr[i],
+		    propname, cos->cos_unmap_freed));
 	}
 
-	VERIFY(0 == nvlist_add_nvlist_array(nvl, "COS_ARRAY",
+	VERIFY(0 == nvlist_add_nvlist_array(nvl, COS_ARRAY,
 	    nvl_arr, num_classes));
 	VERIFY(0 == nvlist_size(nvl, &packedsize, NV_ENCODE_XDR));
 
@@ -286,11 +315,35 @@ empty:
 	dmu_buf_rele(db, FTAG);
 }
 
+typedef enum {
+	COS_FEATURE_NONE,
+	COS_FEATURE_INCR,
+	COS_FEATURE_DECR
+} cos_feature_action_t;
+
+typedef struct {
+	spa_t *spa;
+	cos_feature_action_t action;
+} cos_sync_arg_t;
+
 static void
 cos_sync_props(void *arg1, dmu_tx_t *tx)
 {
-	spa_t *spa = arg1;
-	objset_t *mos = spa->spa_meta_objset;
+	cos_sync_arg_t *arg = (cos_sync_arg_t *)arg1;
+	spa_t *spa = arg->spa;
+	objset_t *mos = arg->spa->spa_meta_objset;
+
+	switch (arg->action) {
+	case COS_FEATURE_INCR:
+		spa_feature_incr(spa, SPA_FEATURE_COS_PROPS, tx);
+		break;
+	case COS_FEATURE_DECR:
+		spa_feature_decr(spa, SPA_FEATURE_COS_PROPS, tx);
+		break;
+	case COS_FEATURE_NONE:
+	default:
+		break;
+	}
 
 	spa_cos_enter(spa);
 
@@ -307,6 +360,9 @@ cos_sync_props(void *arg1, dmu_tx_t *tx)
 	cos_sync_classes(spa, spa->spa_cos_props_object, tx);
 
 	spa_cos_exit(spa);
+
+	/* done with the argument */
+	kmem_free(arg, sizeof (cos_sync_arg_t));
 }
 
 int
@@ -320,8 +376,6 @@ spa_load_cos_props(spa_t *spa)
 	void *buf = NULL;
 	uint_t n;
 	int i;
-
-	ASSERT(spa);
 
 	if (spa->spa_cos_props_object == 0)
 		return (ENOENT);
@@ -343,7 +397,7 @@ spa_load_cos_props(spa_t *spa)
 	    0, packedsize, buf, DMU_READ_NO_PREFETCH));
 
 	VERIFY(0 == nvlist_unpack(buf, packedsize, &nvl, 0));
-	VERIFY(0 == nvlist_lookup_nvlist_array(nvl, "COS_ARRAY",
+	VERIFY(0 == nvlist_lookup_nvlist_array(nvl, COS_ARRAY,
 	    &nvl_arr, &n));
 
 	for (i = 0; i < n; i++) {
@@ -351,11 +405,14 @@ spa_load_cos_props(spa_t *spa)
 		char *strval;
 		uint64_t u64;
 		boolean_t bv;
+		const char *propname;
 
-		if (nvlist_lookup_uint64(nvl_arr[i], COS_ID, &u64) == 0) {
-			cos =  spa_lookup_cos_by_id(spa, u64);
+		propname = cos_prop_to_name(COS_PROP_ID);
+		if (nvlist_lookup_uint64(nvl_arr[i], propname, &u64) == 0) {
+			cos = spa_lookup_cos_by_id(spa, u64);
 			if (cos == NULL) {
-				if (nvlist_lookup_string(nvl_arr[i], COS_NAME,
+				propname = cos_prop_to_name(COS_PROP_NAME);
+				if (nvlist_lookup_string(nvl_arr[i], propname,
 				    &strval) != 0)
 					continue;
 
@@ -368,14 +425,32 @@ spa_load_cos_props(spa_t *spa)
 		if (cos == NULL)
 			continue;
 
-		if (nvlist_lookup_uint64(nvl_arr[i], COS_PREFREAD, &u64) == 0)
+		propname = cos_prop_to_name(COS_PROP_PREFERRED_READ);
+		if (nvlist_lookup_uint64(nvl_arr[i], propname, &u64) == 0)
 			cos->cos_preferred_read = u64;
-		if (nvlist_lookup_uint64(nvl_arr[i], COS_MINPENDING, &u64) == 0)
-			cos->cos_min_pending = u64;
-		if (nvlist_lookup_uint64(nvl_arr[i], COS_MAXPENDING, &u64) == 0)
-			cos->cos_max_pending = u64;
-		if (nvlist_lookup_boolean_value(nvl_arr[i], COS_UNMAPFREED, &bv)
-		    == 0)
+
+
+		for (zio_priority_t p = ZIO_PRIORITY_SYNC_READ;
+		    p < ZIO_PRIORITY_NUM_QUEUEABLE; p++) {
+			int prop_id = COS_ZIO_PRIO_TO_PROP_MIN(p);
+			const char *pname;
+
+			ASSERT(COS_PROP_MIN_VALID(prop_id));
+			pname = cos_prop_to_name(prop_id);
+
+			if (nvlist_lookup_uint64(nvl_arr[i], pname, &u64) == 0)
+				cos->cos_min_active[p] = u64;
+
+			prop_id = COS_ZIO_PRIO_TO_PROP_MAX(p);
+			ASSERT(COS_PROP_MAX_VALID(prop_id));
+			pname = cos_prop_to_name(prop_id);
+
+			if (nvlist_lookup_uint64(nvl_arr[i], pname, &u64) == 0)
+				cos->cos_max_active[p] = u64;
+		}
+
+		propname = cos_prop_to_name(COS_PROP_UNMAP_FREED);
+		if (nvlist_lookup_boolean_value(nvl_arr[i], propname, &bv) == 0)
 			cos->cos_unmap_freed = bv;
 	}
 
@@ -424,15 +499,23 @@ cos_prop_validate(spa_t *spa, uint64_t id, nvlist_t *props)
 		case COS_PROP_UNMAP_FREED:
 			break;
 		case COS_PROP_PREFERRED_READ:
-		case COS_PROP_MINPENDING:
 			error = nvpair_value_uint64(elem, &intval);
 			if (!error && intval > 100)
 				error = EINVAL;
 			break;
 
-		case COS_PROP_MAXPENDING:
+		case COS_PROP_READ_MINACTIVE:
+		case COS_PROP_AREAD_MINACTIVE:
+		case COS_PROP_WRITE_MINACTIVE:
+		case COS_PROP_AWRITE_MINACTIVE:
+		case COS_PROP_SCRUB_MINACTIVE:
+		case COS_PROP_READ_MAXACTIVE:
+		case COS_PROP_AREAD_MAXACTIVE:
+		case COS_PROP_WRITE_MAXACTIVE:
+		case COS_PROP_AWRITE_MAXACTIVE:
+		case COS_PROP_SCRUB_MAXACTIVE:
 			error = nvpair_value_uint64(elem, &intval);
-			if (!error && intval > 100)
+			if (!error && intval > 1000)
 				error = EINVAL;
 			break;
 
@@ -449,10 +532,14 @@ cos_prop_validate(spa_t *spa, uint64_t id, nvlist_t *props)
 
 /* ARGSUSED */
 int
-cos_sync_task_do(spa_t *spa)
+cos_sync_task_do(spa_t *spa, cos_feature_action_t action)
 {
 	int err = 0;
-	err = dsl_sync_task(spa->spa_name, NULL, cos_sync_props, spa, 3);
+	cos_sync_arg_t *arg = kmem_alloc(sizeof (cos_sync_arg_t), KM_SLEEP);
+	/* argument allocated and initialized here and freed in the callback */
+	arg->spa = spa;
+	arg->action = action;
+	err = dsl_sync_task(spa->spa_name, NULL, cos_sync_props, arg, 3);
 	return (err);
 }
 
@@ -506,7 +593,7 @@ spa_cos_prop_set(spa_t *spa, const char *cosname, nvlist_t *nvp)
 	spa_cos_exit(spa);
 
 	if (need_sync)
-		return (cos_sync_task_do(spa));
+		return (cos_sync_task_do(spa, COS_FEATURE_NONE));
 	return (0);
 }
 
@@ -563,12 +650,9 @@ spa_alloc_cos_nosync(spa_t *spa, const char *cosname, uint64_t cosid)
 {
 	cos_t *cos;
 
-	ASSERT(spa);
 	ASSERT(MUTEX_HELD(&spa->spa_cos_props_lock));
 
 	cos = kmem_zalloc(sizeof (cos_t), KM_SLEEP);
-	if (cos == NULL)
-		return (ENOMEM);
 
 	if (spa_lookup_cos_by_name(spa, cosname) != NULL)
 		return (EINVAL);
@@ -579,20 +663,26 @@ spa_alloc_cos_nosync(spa_t *spa, const char *cosname, uint64_t cosid)
 
 	cos->cos_spa = spa;
 	(void) strlcpy(cos->cos_name, cosname, MAXCOSNAMELEN);
-	mutex_init(&cos->cos_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	list_insert_tail(&spa->spa_cos_list, cos);
 
 	return (0);
 }
 
+/*
+ * Note: CoS objects are allocated and freed explicitly. Allocated CoS objects
+ * are placed on the list in the pool, and once they are freed, they are no
+ * longer on the list. As such, they may or may not be referenced by vdevs while
+ * allocated. The reference counting is desined to make sure that CoS objects
+ * that are referenced by some vdevs are not de-allocated.
+ */
+
 int
 spa_alloc_cos(spa_t *spa, const char *cosname, uint64_t cosid)
 {
 	int err;
-	dmu_tx_t *tx;
 
-	if (!spa_feature_is_enabled(spa, SPA_FEATURE_COS_ATTR))
+	if (!spa_feature_is_enabled(spa, SPA_FEATURE_COS_PROPS))
 		return (ENOTSUP);
 
 	spa_cos_enter(spa);
@@ -601,12 +691,7 @@ spa_alloc_cos(spa_t *spa, const char *cosname, uint64_t cosid)
 	if (err)
 		return (err);
 
-	tx = dmu_tx_create_dd(spa->spa_dsl_pool->dp_mos_dir);
-	VERIFY(0 == dmu_tx_assign(tx, TXG_WAIT));
-	spa_feature_incr(spa, SPA_FEATURE_COS_ATTR, tx);
-	dmu_tx_commit(tx);
-
-	return (cos_sync_task_do(spa));
+	return (cos_sync_task_do(spa, COS_FEATURE_INCR));
 }
 
 int
@@ -614,8 +699,6 @@ spa_free_cos(spa_t *spa, const char *cosname)
 {
 	int err = 0;
 	cos_t *cos;
-
-	ASSERT(spa);
 
 	spa_cos_enter(spa);
 
@@ -631,15 +714,8 @@ spa_free_cos(spa_t *spa, const char *cosname)
 	spa_cos_exit(spa);
 
 	if (err == 0) {
-		dmu_tx_t *tx;
-
 		kmem_free(cos, sizeof (cos_t));
-		tx = dmu_tx_create_dd(spa->spa_dsl_pool->dp_mos_dir);
-		VERIFY(0 == dmu_tx_assign(tx, TXG_WAIT));
-		spa_feature_decr(spa, SPA_FEATURE_COS_ATTR, tx);
-		dmu_tx_commit(tx);
-
-		return (cos_sync_task_do(spa));
+		return (cos_sync_task_do(spa, COS_FEATURE_DECR));
 	}
 
 	return (err);
@@ -651,13 +727,9 @@ spa_list_cos(spa_t *spa, nvlist_t *nvl)
 	cos_t *cos;
 	int err = 0;
 
-	ASSERT(spa);
-
 	spa_cos_enter(spa);
-
 	for (cos = list_head(&spa->spa_cos_list); cos != NULL;
 	    cos = list_next(&spa->spa_cos_list, cos)) {
-		/* FIXME: modify to include all props */
 		VERIFY(nvlist_add_uint64(nvl, cos->cos_name, cos->cos_id) == 0);
 	}
 	spa_cos_exit(spa);
@@ -668,8 +740,6 @@ spa_list_cos(spa_t *spa, nvlist_t *nvl)
 void
 spa_cos_init(spa_t *spa)
 {
-	ASSERT(spa);
-
 	spa_cos_enter(spa);
 	list_create(&spa->spa_cos_list, sizeof (cos_t), offsetof(cos_t,
 	    cos_list_node));
@@ -678,7 +748,7 @@ spa_cos_init(spa_t *spa)
 
 /* ARGSUSED */
 static boolean_t
-cos_remove(cos_t *cos, void *check_data)
+cos_remove(cos_t *cos, void *data)
 {
 	spa_t *spa = cos->cos_spa;
 
@@ -693,10 +763,44 @@ cos_remove(cos_t *cos, void *check_data)
 void
 spa_cos_fini(spa_t *spa)
 {
-	ASSERT(spa);
-
 	spa_cos_enter(spa);
-	(void) spa_lookup_cos_generic(spa, cos_remove, NULL);
+	(void) spa_foreach_cos(spa, cos_remove, NULL);
 	list_destroy(&spa->spa_cos_list);
 	spa_cos_exit(spa);
+}
+
+uint64_t
+cos_get_prop_uint64(cos_t *cos, cos_prop_t p)
+{
+	uint64_t val = 0;
+	zio_priority_t zprio = 0;
+
+	switch (p) {
+	case COS_PROP_READ_MINACTIVE:
+	case COS_PROP_AREAD_MINACTIVE:
+	case COS_PROP_WRITE_MINACTIVE:
+	case COS_PROP_AWRITE_MINACTIVE:
+	case COS_PROP_SCRUB_MINACTIVE:
+		zprio = COS_PROP_TO_ZIO_PRIO_MIN(p);
+		ASSERT(ZIO_PRIORITY_QUEUEABLE_VALID(zprio));
+		val = cos->cos_min_active[zprio];
+		break;
+	case COS_PROP_READ_MAXACTIVE:
+	case COS_PROP_AREAD_MAXACTIVE:
+	case COS_PROP_WRITE_MAXACTIVE:
+	case COS_PROP_AWRITE_MAXACTIVE:
+	case COS_PROP_SCRUB_MAXACTIVE:
+		zprio = COS_PROP_TO_ZIO_PRIO_MAX(p);
+		ASSERT(ZIO_PRIORITY_QUEUEABLE_VALID(zprio));
+		val = cos->cos_max_active[zprio];
+		break;
+	case COS_PROP_PREFERRED_READ:
+		val = cos->cos_preferred_read;
+		break;
+	default:
+		panic("Non-numeric property requested\n");
+		return (0);
+	}
+
+	return (val);
 }

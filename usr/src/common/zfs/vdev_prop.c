@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/zio.h>
@@ -59,14 +59,38 @@ vdev_prop_init(void)
 	    PROP_DEFAULT, ZFS_TYPE_VDEV, "<spare device group>", "SPRGRP");
 
 	/* default number properties */
-	zprop_register_number(VDEV_PROP_MINPENDING, "minpending", 0,
-	    PROP_DEFAULT, ZFS_TYPE_VDEV, "<min pending (0..100)>",
-	    "MINPENDING");
-	zprop_register_number(VDEV_PROP_MAXPENDING, "maxpending", 0,
-	    PROP_DEFAULT, ZFS_TYPE_VDEV, "<max pending (0..100)>",
-	    "MAXPENDING");
-	zprop_register_number(VDEV_PROP_PREFREAD, "prefread", 0,
-	    PROP_DEFAULT, ZFS_TYPE_VDEV, "<preferred read (0..10)>",
+	zprop_register_number(VDEV_PROP_READ_MINACTIVE, "read_minactive", 0,
+	    PROP_DEFAULT, ZFS_TYPE_VDEV, "<read min active (0..1000)>",
+	    "READ_MINACTIVE");
+	zprop_register_number(VDEV_PROP_READ_MAXACTIVE, "read_maxactive", 0,
+	    PROP_DEFAULT, ZFS_TYPE_VDEV, "<read max active (0..1000)>",
+	    "READ_MAXACTIVE");
+	zprop_register_number(VDEV_PROP_AREAD_MINACTIVE, "aread_minactive", 0,
+	    PROP_DEFAULT, ZFS_TYPE_VDEV, "<async read min active (0..1000)>",
+	    "AREAD_MINACTIVE");
+	zprop_register_number(VDEV_PROP_AREAD_MAXACTIVE, "aread_maxactive", 0,
+	    PROP_DEFAULT, ZFS_TYPE_VDEV, "<async read max active (0..1000)>",
+	    "AREAD_MAXACTIVE");
+	zprop_register_number(VDEV_PROP_WRITE_MINACTIVE, "write_minactive", 0,
+	    PROP_DEFAULT, ZFS_TYPE_VDEV, "<write min active (0..1000)>",
+	    "WRITE_MINACTIVE");
+	zprop_register_number(VDEV_PROP_WRITE_MAXACTIVE, "write_maxactive", 0,
+	    PROP_DEFAULT, ZFS_TYPE_VDEV, "<write max active (0..1000)>",
+	    "WRITE_MAXACTIVE");
+	zprop_register_number(VDEV_PROP_AWRITE_MINACTIVE, "awrite_minactive", 0,
+	    PROP_DEFAULT, ZFS_TYPE_VDEV, "<async write min active (0..1000)>",
+	    "AWRITE_MINACTIVE");
+	zprop_register_number(VDEV_PROP_AWRITE_MAXACTIVE, "awrite_maxactive", 0,
+	    PROP_DEFAULT, ZFS_TYPE_VDEV, "<async write max active (0..1000)>",
+	    "AWRITE_MAXACTIVE");
+	zprop_register_number(VDEV_PROP_SCRUB_MINACTIVE, "scrub_minactive", 0,
+	    PROP_DEFAULT, ZFS_TYPE_VDEV, "<scrub min active (0..1000)>",
+	    "SCRUB_MINACTIVE");
+	zprop_register_number(VDEV_PROP_SCRUB_MAXACTIVE, "scrub_maxactive", 0,
+	    PROP_DEFAULT, ZFS_TYPE_VDEV, "<scrub max active (0..1000)>",
+	    "SCRUB_MAXACTIVE");
+	zprop_register_number(VDEV_PROP_PREFERRED_READ, "prefread", 0,
+	    PROP_DEFAULT, ZFS_TYPE_VDEV, "<preferred read (0..100)>",
 	    "PREFREAD");
 }
 

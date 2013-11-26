@@ -1410,7 +1410,7 @@ ZFS_COMMON_OBJS +=		\
 	sha1crc32.o		\
 	special.o		\
 	cos.o			\
-	vdev_props.o		\
+	spa_vdev_props.o	\
 	wrcache.o
 
 ZFS_SHARED_OBJS +=		\

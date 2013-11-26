@@ -468,6 +468,9 @@ extern int spa_vdev_setpath(spa_t *spa, uint64_t guid, const char *newpath);
 extern int spa_vdev_setfru(spa_t *spa, uint64_t guid, const char *newfru);
 extern int spa_vdev_split_mirror(spa_t *spa, char *newname, nvlist_t *config,
     nvlist_t *props, boolean_t exp);
+
+extern int spa_load_vdev_props(spa_t *spa, boolean_t load_aux);
+
 extern int spa_vdev_prop_validate(spa_t *spa, nvlist_t *nvp);
 extern int spa_vdev_prop_set(spa_t *spa, uint64_t vdev_guid, nvlist_t *nvp);
 extern int spa_vdev_prop_get(spa_t *spa, uint64_t vdev_guid, nvlist_t **nvp);

@@ -487,7 +487,7 @@ wrc_activate_blkhdr(spa_t *spa, dsl_dataset_t *ds)
 	wrc_blkhdr_t *blkhdr = ds->ds_wrc_blkhdr = NULL;
 
 	ASSERT(MUTEX_HELD(&wrc_data->wrc_lock));
-	if (!spa_has_special(spa) || 
+	if (!spa_has_special(spa) ||
 	    dsl_dataset_is_snapshot(ds) || !ds->ds_objset ||
 	    spa_specialclass_id(ds->ds_objset) != SPA_SPECIALCLASS_WRCACHE ||
 	    wrc_data->wrc_thr_exit)
@@ -762,7 +762,7 @@ dsl_dataset_clean_special(dsl_dataset_t *ds, dmu_tx_t *tx, uint64_t curtxg,
 		 * Save lstxg to disk
 		 */
 		dsl_prop_set_sync_impl(ds, "lstxg", ZPROP_SRC_LOCAL,
-		    sizeof(uint64_t), 1, &ds->ds_lstxg, tx);
+		    sizeof (uint64_t), 1, &ds->ds_lstxg, tx);
 
 	} else if (err == ERESTART) {
 		/*

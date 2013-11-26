@@ -110,6 +110,7 @@
 #include <sys/refcount.h>
 #include <sys/zfeature.h>
 #include <sys/dsl_userhold.h>
+#include <libzfs.h>
 #include <stdio.h>
 #include <stdio_ext.h>
 #include <stdlib.h>
@@ -322,6 +323,8 @@ ztest_func_t ztest_fzap;
 ztest_func_t ztest_dmu_snapshot_create_destroy;
 ztest_func_t ztest_dsl_prop_get_set;
 ztest_func_t ztest_spa_prop_get_set;
+ztest_func_t ztest_vdev_prop_get_set;
+ztest_func_t ztest_cos_prop_get_set;
 ztest_func_t ztest_spa_create_destroy;
 ztest_func_t ztest_fault_inject;
 ztest_func_t ztest_ddt_repair;
@@ -357,6 +360,12 @@ ztest_info_t ztest_info[] = {
 	{ ztest_dmu_objset_create_destroy,	1,	&zopt_often	},
 	{ ztest_dsl_prop_get_set,		1,	&zopt_often	},
 	{ ztest_spa_prop_get_set,		1,	&zopt_sometimes	},
+	{ ztest_vdev_prop_get_set,		1,	&zopt_often	},
+	{ ztest_cos_prop_get_set,		1,	&zopt_often	},
+#if 0
+	{ ztest_vdev_prop_get_set,		1,	&zopt_often	},
+#endif
+	{ ztest_cos_prop_get_set,		1,	&zopt_often	},
 #if 0
 	{ ztest_dmu_prealloc,			1,	&zopt_sometimes	},
 #endif
@@ -4667,6 +4676,268 @@ ztest_spa_prop_get_set(ztest_ds_t *zd, uint64_t id)
 
 	(void) rw_unlock(&ztest_name_lock);
 }
+
+/* vdev and cos property tests */
+typedef enum {
+	VDEV_PROP_UINT64,
+	VDEV_PROP_STRING,
+	COS_PROP_UINT64
+} ztest_prop_t;
+
+/* common functions */
+static vdev_t *
+ztest_get_random_vdev_leaf(spa_t *spa)
+{
+	vdev_t *lvd = NULL, *tvd = NULL;
+	uint64_t top = 0;
+
+	spa_config_enter(spa, SCL_ALL, FTAG, RW_READER);
+	/* Pick first leaf of a random top-level vdev */
+	top = ztest_random_vdev_top(spa, B_TRUE);
+	tvd = spa->spa_root_vdev->vdev_child[top];
+	lvd = vdev_walk_tree(tvd, NULL, NULL);
+	ASSERT3P(lvd, !=, NULL);
+	ASSERT(lvd->vdev_ops->vdev_op_leaf);
+	spa_config_exit(spa, SCL_ALL, FTAG);
+
+	return lvd;
+}
+
+/*ARGSUSED*/
+static nvlist_t *
+ztest_props_set(const vdev_t *lvd, const char *name, const ztest_prop_t t,
+    const void *props, const size_t size)
+{
+	spa_t *spa = ztest_spa;
+	nvlist_t *sprops;
+	int error = 0;
+		
+	VERIFY(0 == nvlist_alloc(&sprops, NV_UNIQUE_NAME, 0));
+
+	for (int p = 0; p < size; p++) {
+		uint64_t ival;
+		char sval[16];
+		const char *pname =
+		    (t == VDEV_PROP_UINT64 || t == VDEV_PROP_STRING) ?
+		    vdev_prop_to_name(((vdev_prop_t *)props)[p]) :
+		    cos_prop_to_name(((cos_prop_t *)props)[p]);
+
+		switch (t) {
+		case VDEV_PROP_UINT64:
+		case COS_PROP_UINT64:
+			/* range 0...10 is valid for all properties */
+			ival = ztest_random(10) + 1;
+			VERIFY(0 == nvlist_add_uint64(sprops, pname, ival));
+			break;
+		case VDEV_PROP_STRING:
+			/* any short string will do */
+			(void) snprintf(sval, 15, "%s%d", "prop_value", p);		
+			VERIFY(0 == nvlist_add_string(sprops, pname, sval));
+			break;
+		default:
+			/* unknown property */
+			error = EINVAL;
+			break;
+		}
+	}
+	VERIFY3U(0, ==, error);
+	
+	/* set the props */
+	switch (t) {
+	case VDEV_PROP_UINT64:
+	case VDEV_PROP_STRING:
+		error = spa_vdev_prop_set(spa, lvd->vdev_guid, sprops);
+		break;
+	case COS_PROP_UINT64:
+		error = spa_cos_prop_set(spa, name, sprops);
+		break;
+	default:
+		error = EINVAL;
+		break;
+	}
+	if (error == ENOSPC) {
+		ztest_record_enospc(FTAG);
+		nvlist_free(sprops);
+		return (NULL);
+	}
+	ASSERT0(error);
+	return (sprops);
+}
+
+static nvlist_t *
+ztest_props_get(const vdev_t *lvd, const char *name)
+{
+	spa_t *spa = ztest_spa;
+	nvlist_t *gprops = NULL;
+	int error = 0;
+
+	if (lvd)
+		error = spa_vdev_prop_get(spa, lvd->vdev_guid, &gprops);
+	else
+		error = spa_cos_prop_get(spa, name, &gprops);
+	if (error == ENOSPC) {
+		ztest_record_enospc(FTAG);
+		return (NULL);
+	}
+	ASSERT0(error);
+	return (gprops);
+}
+
+static void
+ztest_props_test(const ztest_prop_t t, const void *props, const size_t size,
+    nvlist_t *sprops, nvlist_t *gprops)
+{
+	for (int p = 0; p < size; p++) {
+		const char *pname =
+		    (t == VDEV_PROP_UINT64 || t == VDEV_PROP_STRING) ?
+		    vdev_prop_to_name(((vdev_prop_t *)props)[p]) :
+		    cos_prop_to_name(((cos_prop_t *)props)[p]);
+		
+		switch (t) {
+		case VDEV_PROP_UINT64:
+		case COS_PROP_UINT64:
+		{
+			uint64_t sival, gival;
+			VERIFY3U(0, ==, nvlist_lookup_uint64(sprops, pname,
+			    &sival));
+			VERIFY3U(0, ==, nvlist_lookup_uint64(gprops, pname,
+			    &gival));
+			VERIFY3U(gival, ==, sival);
+		}
+		break;
+		case VDEV_PROP_STRING:
+		{
+			char *ssval, *gsval;
+			int err;
+			VERIFY3U(0, ==, nvlist_lookup_string(sprops, pname,
+			    &ssval));
+			err = nvlist_lookup_string(gprops, pname,
+			    &gsval);
+			if (err == 0) {
+				VERIFY3U(0, ==, strcmp(ssval, gsval));
+			} else {
+				/*
+				 * cos property will not be set because CoS
+				 * object has not been allocated
+				 */
+				VERIFY3U(t, ==, VDEV_PROP_STRING);
+				VERIFY3U(err, ==, ENOENT);
+			}
+		}
+		break;
+		default:
+			/* unknown property */
+			VERIFY(0);
+			break;
+		}
+	}
+
+	nvlist_free(sprops);
+	nvlist_free(gprops);
+}
+
+static const cos_prop_t cprops_uint64[] = {
+	COS_PROP_READ_MINACTIVE,
+	COS_PROP_AREAD_MINACTIVE,
+	COS_PROP_WRITE_MINACTIVE,
+	COS_PROP_AWRITE_MINACTIVE,
+	COS_PROP_SCRUB_MINACTIVE,
+	COS_PROP_READ_MAXACTIVE,
+	COS_PROP_AREAD_MAXACTIVE,
+	COS_PROP_WRITE_MAXACTIVE,
+	COS_PROP_AWRITE_MAXACTIVE,
+	COS_PROP_SCRUB_MAXACTIVE,
+	COS_PROP_PREFERRED_READ
+};
+
+/* ARGSUSED */
+void
+ztest_cos_prop_get_set(ztest_ds_t *zd, uint64_t id)
+{
+	spa_t *spa = ztest_spa;
+	nvlist_t *sprops = NULL, *gprops = NULL, *cos_list = NULL;
+	char cos_name[MAXCOSNAMELEN];
+	uint64_t cos_id = ztest_random(~0ULL), val = 0;
+
+	(void) snprintf(cos_name, MAXCOSNAMELEN-1, "cos_%llu", cos_id);
+
+	VERIFY3U(0, ==, spa_alloc_cos(spa, cos_name, cos_id));
+
+	sprops = ztest_props_set(NULL, cos_name,
+	    COS_PROP_UINT64, (void *)&cprops_uint64[0],
+	    sizeof (cprops_uint64) / sizeof (cprops_uint64[0]));
+	gprops = ztest_props_get(NULL, cos_name);
+	ztest_props_test(COS_PROP_UINT64, (void *)&cprops_uint64[0],
+	    sizeof (cprops_uint64) / sizeof (cprops_uint64[0]),
+	    sprops, gprops);
+
+	VERIFY3U(0, ==, nvlist_alloc(&cos_list, NV_UNIQUE_NAME, 0));
+	VERIFY3U(0, ==, spa_list_cos(spa, cos_list));
+	VERIFY3U(0, ==, nvlist_lookup_uint64(cos_list, cos_name, &val));
+	VERIFY3U(cos_id, ==, val);
+	nvlist_free(cos_list);
+
+	VERIFY3U(0, ==, spa_free_cos(spa, cos_name));
+	VERIFY3U(0, ==, nvlist_alloc(&cos_list, NV_UNIQUE_NAME, 0));
+	VERIFY3U(0, ==, spa_list_cos(spa, cos_list));
+	VERIFY3U(ENOENT, ==, nvlist_lookup_uint64(cos_list, cos_name, &val));
+	nvlist_free(cos_list);
+}
+
+/* vdev tests */
+static const vdev_prop_t vprops_uint64[] = {
+	VDEV_PROP_READ_MINACTIVE,
+	VDEV_PROP_AREAD_MINACTIVE,
+	VDEV_PROP_WRITE_MINACTIVE,
+	VDEV_PROP_AWRITE_MINACTIVE,
+	VDEV_PROP_SCRUB_MINACTIVE,
+	VDEV_PROP_READ_MAXACTIVE,
+	VDEV_PROP_AREAD_MAXACTIVE,
+	VDEV_PROP_WRITE_MAXACTIVE,
+	VDEV_PROP_AWRITE_MAXACTIVE,
+	VDEV_PROP_SCRUB_MAXACTIVE,
+	VDEV_PROP_PREFERRED_READ
+};
+static const vdev_prop_t vprops_string[] = {
+	VDEV_PROP_COS,
+	VDEV_PROP_SPAREGROUP
+};
+
+/* ARGSUSED */
+void
+ztest_vdev_prop_get_set(ztest_ds_t *zd, uint64_t id)
+{
+	spa_t *spa = ztest_spa;
+	nvlist_t *sprops = NULL, *gprops = NULL;
+	vdev_t *lvd = NULL;
+
+	/* Make sure vdevs will stay in place */
+	(void) rw_rdlock(&ztest_name_lock);
+	VERIFY(0 == mutex_lock(&ztest_vdev_lock));
+
+	lvd = ztest_get_random_vdev_leaf(spa);
+		
+	/* Test uint64 properties */
+	sprops = ztest_props_set(lvd, NULL, VDEV_PROP_UINT64,
+	    (void *)&vprops_uint64[0],
+	    sizeof (vprops_uint64) / sizeof (vprops_uint64[0]));
+	gprops = ztest_props_get(lvd, NULL);
+	ztest_props_test(VDEV_PROP_UINT64, (void *)&vprops_uint64[0],
+	    sizeof (vprops_uint64) / sizeof (vprops_uint64[0]), sprops, gprops);
+
+	/* Test string properties */
+	sprops = ztest_props_set(lvd, NULL, VDEV_PROP_STRING,
+	    (void *)&vprops_string[0],
+	    sizeof (vprops_string) / sizeof (vprops_string[0]));
+	gprops = ztest_props_get(lvd, NULL);
+	ztest_props_test(VDEV_PROP_STRING, (void *)&vprops_string[0],
+	    sizeof (vprops_string) / sizeof (vprops_string[0]), sprops, gprops);
+
+	VERIFY(0 == mutex_unlock(&ztest_vdev_lock));
+	(void) rw_unlock(&ztest_name_lock);
+}
+
+/* end vdev and cos property tests */
 
 static int
 user_release_one(const char *snapname, const char *holdname)

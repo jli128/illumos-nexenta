@@ -83,7 +83,7 @@ dbuf_dest(void *vdb, void *unused)
 /*
  * dbuf hash table routines
  */
-#pragma align 64 (dbuf_hash_table)
+#pragma align 64(dbuf_hash_table)
 static dbuf_hash_table_t dbuf_hash_table;
 
 static uint64_t dbuf_hash_count;
@@ -287,7 +287,7 @@ retry:
 	    0, dbuf_cons, dbuf_dest, NULL, NULL, NULL, 0);
 
 	for (i = 0; i < DBUF_MUTEXES; i++)
-		mutex_init(DBUF_HASH_MUTEX(h,i), NULL, MUTEX_DEFAULT, NULL);
+		mutex_init(DBUF_HASH_MUTEX(h, i), NULL, MUTEX_DEFAULT, NULL);
 }
 
 void
@@ -297,7 +297,7 @@ dbuf_fini(void)
 	int i;
 
 	for (i = 0; i < DBUF_MUTEXES; i++)
-		mutex_destroy(DBUF_HASH_MUTEX(h,i));
+		mutex_destroy(DBUF_HASH_MUTEX(h, i));
 	kmem_free(h->hash_table, (h->hash_table_mask + 1) * sizeof (void *));
 	kmem_cache_destroy(dbuf_cache);
 }

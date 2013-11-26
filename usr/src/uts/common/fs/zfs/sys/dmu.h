@@ -231,18 +231,18 @@ typedef enum txg_how {
 /*
  * Selected classes of metadata
  */
-#define DMU_OT_IS_DDT_META(type)	\
+#define	DMU_OT_IS_DDT_META(type)	\
 	((type == DMU_OT_DDT_ZAP) ||	\
 	(type == DMU_OT_DDT_STATS))
 
-#define DMU_OT_IS_ZPL_META(type)		\
+#define	DMU_OT_IS_ZPL_META(type)		\
 	((type == DMU_OT_ZNODE) ||		\
 	(type == DMU_OT_OLDACL) ||		\
 	(type == DMU_OT_DIRECTORY_CONTENTS) ||	\
 	(type == DMU_OT_MASTER_NODE) ||		\
 	(type == DMU_OT_UNLINKED_SET))
- 
-#define DMU_OT_IS_GENERAL_META(type)		\
+
+#define	DMU_OT_IS_GENERAL_META(type)		\
 	((type == DMU_OT_DNODE) ||		\
 	(type == DMU_OT_OBJSET) ||		\
 	(type == DMU_OT_OBJECT_DIRECTORY) ||	\

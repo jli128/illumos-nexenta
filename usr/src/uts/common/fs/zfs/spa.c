@@ -66,6 +66,7 @@
 #include <sys/dsl_scan.h>
 #include <sys/zfeature.h>
 #include <sys/dsl_destroy.h>
+#include <sys/cos.h>
 #include <sys/special.h>
 
 #ifdef	_KERNEL
@@ -139,6 +140,8 @@ const zio_taskq_info_t zio_taskqs[ZIO_TYPES][ZIO_TASKQ_TYPES] = {
 
 static void spa_sync_version(void *arg, dmu_tx_t *tx);
 static void spa_sync_props(void *arg, dmu_tx_t *tx);
+static void spa_vdev_sync_props(void *arg, dmu_tx_t *tx);
+static int spa_vdev_prop_set_nosync(vdev_t *, nvlist_t *, boolean_t *);
 static boolean_t spa_has_active_shared_spare(spa_t *spa);
 static int spa_load_impl(spa_t *spa, uint64_t, nvlist_t *config,
     spa_load_state_t state, spa_import_type_t type, boolean_t mosconfig,
@@ -220,8 +223,8 @@ spa_prop_get_config(spa_t *spa, nvlist_t **nvp)
 		    mp->spa_enable_meta_placement_selection, src);
 		spa_prop_add_list(*nvp, ZPOOL_PROP_DDT_TO_METADEV, NULL,
 		    mp->spa_ddt_to_special, src);
-		spa_prop_add_list(*nvp, ZPOOL_PROP_GENERAL_META_TO_METADEV, NULL,
-		    mp->spa_general_meta_to_special, src);
+		spa_prop_add_list(*nvp, ZPOOL_PROP_GENERAL_META_TO_METADEV,
+		    NULL, mp->spa_general_meta_to_special, src);
 		spa_prop_add_list(*nvp, ZPOOL_PROP_OTHER_META_TO_METADEV, NULL,
 		    mp->spa_other_meta_to_special, src);
 
@@ -2599,14 +2602,21 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 	spa->spa_delegation = zpool_prop_default_numeric(ZPOOL_PROP_DELEGATION);
 	spa->spa_hiwat = zpool_prop_default_numeric(ZPOOL_PROP_HIWATERMARK);
 	spa->spa_lowat = zpool_prop_default_numeric(ZPOOL_PROP_LOWATERMARK);
-	spa->spa_dedup_lo_best_effort = zpool_prop_default_numeric(ZPOOL_PROP_DEDUP_LO_BEST_EFFORT);
-	spa->spa_dedup_hi_best_effort = zpool_prop_default_numeric(ZPOOL_PROP_DEDUP_HI_BEST_EFFORT);
+	spa->spa_dedup_lo_best_effort =
+	    zpool_prop_default_numeric(ZPOOL_PROP_DEDUP_LO_BEST_EFFORT);
+	spa->spa_dedup_hi_best_effort =
+	    zpool_prop_default_numeric(ZPOOL_PROP_DEDUP_HI_BEST_EFFORT);
 
-	mp->spa_enable_meta_placement_selection = zpool_prop_default_numeric(ZPOOL_PROP_META_PLACEMENT);
-	mp->spa_ddt_to_special = zpool_prop_default_numeric(ZPOOL_PROP_DDT_TO_METADEV);
-	mp->spa_general_meta_to_special = zpool_prop_default_numeric(ZPOOL_PROP_GENERAL_META_TO_METADEV);
-	mp->spa_other_meta_to_special = zpool_prop_default_numeric(ZPOOL_PROP_OTHER_META_TO_METADEV);
-	spa_set_ddt_classes(spa, zpool_prop_default_numeric(ZPOOL_PROP_DDT_DESEGREGATION));
+	mp->spa_enable_meta_placement_selection =
+	    zpool_prop_default_numeric(ZPOOL_PROP_META_PLACEMENT);
+	mp->spa_ddt_to_special =
+	    zpool_prop_default_numeric(ZPOOL_PROP_DDT_TO_METADEV);
+	mp->spa_general_meta_to_special =
+	    zpool_prop_default_numeric(ZPOOL_PROP_GENERAL_META_TO_METADEV);
+	mp->spa_other_meta_to_special =
+	    zpool_prop_default_numeric(ZPOOL_PROP_OTHER_META_TO_METADEV);
+	spa_set_ddt_classes(spa,
+	    zpool_prop_default_numeric(ZPOOL_PROP_DDT_DESEGREGATION));
 
 	error = spa_dir_prop(spa, DMU_POOL_PROPS, &spa->spa_pool_props_object);
 	if (error && error != ENOENT)
@@ -2631,14 +2641,21 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 		spa_prop_find(spa, ZPOOL_PROP_DDT_DESEGREGATION, &val);
 		spa_set_ddt_classes(spa, val);
 
-		spa_prop_find(spa, ZPOOL_PROP_DEDUP_BEST_EFFORT, &spa->spa_dedup_best_effort);
-		spa_prop_find(spa, ZPOOL_PROP_DEDUP_LO_BEST_EFFORT, &spa->spa_dedup_lo_best_effort);
-		spa_prop_find(spa, ZPOOL_PROP_DEDUP_HI_BEST_EFFORT, &spa->spa_dedup_hi_best_effort);
+		spa_prop_find(spa, ZPOOL_PROP_DEDUP_BEST_EFFORT,
+		    &spa->spa_dedup_best_effort);
+		spa_prop_find(spa, ZPOOL_PROP_DEDUP_LO_BEST_EFFORT,
+		    &spa->spa_dedup_lo_best_effort);
+		spa_prop_find(spa, ZPOOL_PROP_DEDUP_HI_BEST_EFFORT,
+		    &spa->spa_dedup_hi_best_effort);
 
-		spa_prop_find(spa, ZPOOL_PROP_META_PLACEMENT, &mp->spa_enable_meta_placement_selection);
-		spa_prop_find(spa, ZPOOL_PROP_DDT_TO_METADEV, &mp->spa_ddt_to_special);
-		spa_prop_find(spa, ZPOOL_PROP_GENERAL_META_TO_METADEV, &mp->spa_general_meta_to_special);
-		spa_prop_find(spa, ZPOOL_PROP_OTHER_META_TO_METADEV, &mp->spa_other_meta_to_special);
+		spa_prop_find(spa, ZPOOL_PROP_META_PLACEMENT,
+		    &mp->spa_enable_meta_placement_selection);
+		spa_prop_find(spa, ZPOOL_PROP_DDT_TO_METADEV,
+		    &mp->spa_ddt_to_special);
+		spa_prop_find(spa, ZPOOL_PROP_GENERAL_META_TO_METADEV,
+		    &mp->spa_general_meta_to_special);
+		spa_prop_find(spa, ZPOOL_PROP_OTHER_META_TO_METADEV,
+		    &mp->spa_other_meta_to_special);
 
 		spa->spa_autoreplace = (autoreplace != 0);
 	}
@@ -2650,7 +2667,7 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 	error = spa_dir_prop(spa, DMU_POOL_VDEV_PROPS,
 	    &spa->spa_vdev_props_object);
 	if (error == 0)
-		(void) vdev_load_props(spa, B_FALSE);
+		(void) spa_load_vdev_props(spa, B_FALSE);
 
 	/*
 	 * If the 'autoreplace' property is set, then post a resource notifying
@@ -3721,13 +3738,6 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	mp->spa_other_meta_to_special =
 	    zpool_prop_default_numeric(ZPOOL_PROP_OTHER_META_TO_METADEV);
 
-	if (spa_has_special(spa)) {
-		(void) nvlist_remove(props, FEATURE_META_DEVICES,
-		    DATA_TYPE_STRING);
-		(void) nvlist_add_string(props, FEATURE_META_DEVICES,
-		    "enabled");
-	}
-
 	spa_set_ddt_classes(spa, 0);
 
 	if (props != NULL) {
@@ -3735,9 +3745,10 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 		spa_sync_props(props, tx);
 	}
 
-	if (spa_has_special(spa) &&
-	    spa_feature_is_enabled(spa, SPA_FEATURE_META_DEVICES))
+	if (spa_has_special(spa)) {
+		spa_feature_enable(spa, SPA_FEATURE_META_DEVICES, tx);
 		spa_feature_incr(spa, SPA_FEATURE_META_DEVICES, tx);
+	}
 
 	dmu_tx_commit(tx);
 
@@ -3765,28 +3776,21 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	return (0);
 }
 
+
+/*
+ * See if the pool has special tier, and if so, enable/activate
+ * the feature as needed. Activation is not reference counted.
+ */
 static void
-spa_check_special_feature(spa_t *spa)
+spa_special_feature_activate(void *arg, dmu_tx_t *tx)
 {
+	spa_t *spa = (spa_t *)arg;
+
 	if (spa_has_special(spa)) {
-		nvlist_t *props = NULL;
-		dmu_tx_t *tx = NULL;
-
-		if (!spa_feature_is_enabled(spa, SPA_FEATURE_META_DEVICES))
-		{
-			VERIFY(nvlist_alloc(&props, NV_UNIQUE_NAME, 0) == 0);
-			VERIFY(nvlist_add_uint64(props,
-				FEATURE_META_DEVICES, 0) == 0);
-			VERIFY(spa_prop_set(spa, props) == 0);
-			nvlist_free(props);
-		}
-
-		if (!spa_feature_is_active(spa, SPA_FEATURE_META_DEVICES))
-		{
-			tx = dmu_tx_create_dd(spa->spa_dsl_pool->dp_mos_dir);
-			VERIFY(dmu_tx_assign(tx, TXG_WAIT) == 0);
+		/* enable and activate as needed */
+		spa_feature_enable(spa, SPA_FEATURE_META_DEVICES, tx);
+		if (!spa_feature_is_active(spa, SPA_FEATURE_META_DEVICES)) {
 			spa_feature_incr(spa, SPA_FEATURE_META_DEVICES, tx);
-			dmu_tx_commit(tx);
 		}
 	}
 }
@@ -4151,7 +4155,7 @@ spa_import(const char *pool, nvlist_t *config, nvlist_t *props, uint64_t flags)
 	}
 
 	/* At this point, we can load spare props */
-	(void) vdev_load_props(spa, B_TRUE);
+	(void) spa_load_vdev_props(spa, B_TRUE);
 
 	/*
 	 * Check for any removed devices.
@@ -4174,11 +4178,12 @@ spa_import(const char *pool, nvlist_t *config, nvlist_t *props, uint64_t flags)
 	 */
 	spa_async_request(spa, SPA_ASYNC_AUTOEXPAND);
 
+	/* Set/activate meta feature as needed */
 	mutex_exit(&spa_namespace_lock);
-	spa_check_special_feature(spa);
 	spa_history_log_version(spa, "import");
 
-	return (0);
+	return (dsl_sync_task(spa->spa_name, NULL, spa_special_feature_activate,
+		spa, 3));
 }
 
 nvlist_t *
@@ -4445,6 +4450,7 @@ spa_vdev_add(spa_t *spa, nvlist_t *nvroot)
 	vdev_t *vd, *tvd;
 	nvlist_t **spares, **l2cache;
 	uint_t nspares, nl2cache;
+	dmu_tx_t *tx = NULL;
 
 	ASSERT(spa_writeable(spa));
 
@@ -4532,7 +4538,9 @@ spa_vdev_add(spa_t *spa, nvlist_t *nvroot)
 	spa_config_update(spa, SPA_CONFIG_UPDATE_POOL);
 	mutex_exit(&spa_namespace_lock);
 
-	spa_check_special_feature(spa);
+	tx = dmu_tx_create_assigned(spa_get_dsl(spa), txg);
+	spa_special_feature_activate(spa, tx);
+	dmu_tx_commit(tx);
 
 	return (0);
 }
@@ -6221,7 +6229,8 @@ spa_sync_props(void *arg, dmu_tx_t *tx)
 				spa->spa_ddt_meta_copies = intval;
 				break;
 			case ZPOOL_PROP_META_PLACEMENT:
-				mp->spa_enable_meta_placement_selection = intval;
+				mp->spa_enable_meta_placement_selection =
+				    intval;
 				break;
 			case ZPOOL_PROP_DDT_TO_METADEV:
 				mp->spa_ddt_to_special = intval;
