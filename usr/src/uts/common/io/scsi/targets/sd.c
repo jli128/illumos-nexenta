@@ -16934,7 +16934,7 @@ sdintr(struct scsi_pkt *pktp)
 		sd_slow_io_ereport(pktp);
 #ifdef	SDDEBUG
 	cmn_err(CE_WARN, "Slow IO detected SD: 0x%p delta in nsec: %llu",
-	    un, pktp->pkt_stop - pktp->pkt_start);
+	    (void *)un, pktp->pkt_stop - pktp->pkt_start);
 #endif
 	}
 
