@@ -4669,7 +4669,6 @@ mptsas_handle_scsi_io_success(mptsas_t *mpt,
 
 	pkt = CMD2PKT(cmd);
 	ASSERT(pkt->pkt_start != 0);
-	ASSERT(pkt->pkt_stop == 0);
 	pkt->pkt_stop = gethrtime();
 	pkt->pkt_state |= (STATE_GOT_BUS | STATE_GOT_TARGET | STATE_SENT_CMD |
 	    STATE_GOT_STATUS);
@@ -4982,7 +4981,6 @@ mptsas_check_scsi_io_error(mptsas_t *mpt, pMpi2SCSIIOReply_t reply,
 
 	pkt = CMD2PKT(cmd);
 	ASSERT(pkt->pkt_start != 0);
-	ASSERT(pkt->pkt_stop == 0);
 	pkt->pkt_stop = gethrtime();
 	*(pkt->pkt_scbp) = scsi_status;
 

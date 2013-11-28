@@ -4251,10 +4251,6 @@ sd_set_properties(struct sd_lun *un, char *name, char *value)
 		SD_INFO(SD_LOG_ATTACH_DETACH, un, "sd_set_properties: "
 		    "slow IO threshold set to %llu\n",
 		    un->un_slow_io_threshold);
-#ifdef SDDEBUG
-		cmn_err(CE_NOTE, "slow IO set to %llu",
-		    un->un_slow_io_threshold);
-#endif
 	}
 
 	if (strcasecmp(name, "retries-victim") == 0) {
@@ -16866,6 +16862,10 @@ sd_slow_io_ereport(struct scsi_pkt *pktp)
 	un = SD_GET_UN(bp);
 	ASSERT(un != NULL);
 
+	SD_ERROR(SD_LOG_IO_CORE | SD_LOG_ERROR, un,
+	    "Slow IO detected SD: 0x%p delta in nsec: %llu",
+	    (void *)un, pktp->pkt_stop - pktp->pkt_start);
+
 	devid = DEVI(un->un_sd->sd_dev)->devi_devid_str;
 	scsi_fm_ereport_post(un->un_sd, 0, NULL, "cmd.disk.slow-io",
 	    fm_ena_generate(0, FM_ENA_FMT1), devid, NULL, DDI_NOSLEEP, NULL,
@@ -16932,10 +16932,6 @@ sdintr(struct scsi_pkt *pktp)
 	SD_UPDATE_KSTATS(un, kstat_runq_exit, bp);
 	if ((pktp->pkt_stop - pktp->pkt_start) > un->un_slow_io_threshold) {
 		sd_slow_io_ereport(pktp);
-#ifdef	SDDEBUG
-	cmn_err(CE_WARN, "Slow IO detected SD: 0x%p delta in nsec: %llu",
-	    (void *)un, pktp->pkt_stop - pktp->pkt_start);
-#endif
 	}
 
 
