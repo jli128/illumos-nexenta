@@ -79,6 +79,11 @@ LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 
 #
+# Depends on scsi and cmlb
+#
+LDFLAGS         += -dy -N misc/scsi -N misc/cmlb
+
+#
 #	Default build targets.
 #
 .KEEP_STATE:
