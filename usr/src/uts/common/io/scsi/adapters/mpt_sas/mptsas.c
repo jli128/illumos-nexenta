@@ -5129,8 +5129,18 @@ mptsas_check_scsi_io_error(mptsas_t *mpt, pMpi2SCSIIOReply_t reply,
 			}
 			break;
 		case MPI2_IOCSTATUS_SCSI_TASK_TERMINATED:
-			mptsas_set_pkt_reason(mpt,
-			    cmd, CMD_RESET, STAT_BUS_RESET);
+			if (cmd->cmd_active_expiration <= gethrtime()) {
+				/*
+				 * When timeout requested, propagate
+				 * proper reason and statistics to
+				 * target drivers.
+				 */
+				mptsas_set_pkt_reason(mpt, cmd, CMD_TIMEOUT,
+				    STAT_BUS_RESET | STAT_TIMEOUT);
+			} else {
+				mptsas_set_pkt_reason(mpt, cmd, CMD_RESET,
+				    STAT_BUS_RESET);
+			}
 			break;
 		case MPI2_IOCSTATUS_SCSI_IOC_TERMINATED:
 		case MPI2_IOCSTATUS_SCSI_EXT_TERMINATED:
