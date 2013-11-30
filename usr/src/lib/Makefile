@@ -408,6 +408,7 @@ HDRSUBDIRS=		\
 	libdtrace_jni	\
 	libelfsign	\
 	libeti		\
+	libfakekernel	\
 	libfru		\
 	libfstyp	\
 	libgen		\
