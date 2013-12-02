@@ -1,3 +1,9 @@
+sunwos86r (5.11.134-31-9679-14) nexenta; urgency=medium
+
+  * Issue NEX-1569: backport OS-14 sd attach should not issue potentially slow scsi commands (ddi-forceattach=1)
+
+ -- Nexenta Systems <support@nexenta.com>  Mon, 02 Dec 2013 14:56:57 +0100
+
 sunwos86r (5.11.134-31-9678-14) nexenta; urgency=medium
 
   * Issue NEX-1569: backport OS-14 sd attach should not issue potentially slow scsi commands
