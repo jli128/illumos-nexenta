@@ -1,3 +1,9 @@
+sunwos86r (5.11.134-31-9680-92) nexenta; urgency=medium
+
+  * Issue NEX-1567: backport OS-92 NexentaStor 4.0.1-PASSIV-12022013: Cannot mount root after install
+
+ -- Nexenta Systems <support@nexenta.com>  Mon, 06 Dec 2013 01:57:53 +0100
+
 sunwos86r (5.11.134-31-9679-14) nexenta; urgency=medium
 
   * Issue NEX-1569: backport OS-14 sd attach should not issue potentially slow scsi commands (ddi-forceattach=1)
