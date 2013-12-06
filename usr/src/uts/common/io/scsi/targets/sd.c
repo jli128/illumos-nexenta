@@ -8692,8 +8692,8 @@ spinup_failed:
 	mutex_exit(SD_MUTEX(un));
 
 	devid = DEVI(devi)->devi_devid_str;
-	scsi_fm_ereport_post(un->un_sd, ssc->ssc_uscsi_cmd->uscsi_path_instance,
-	    "cmd.disk.dev.attach-failed", ssc->ssc_uscsi_info->ui_ena,
+	scsi_fm_ereport_post(un->un_sd, 0,
+	    "disk.attach-failure", ssc->ssc_uscsi_info->ui_ena,
 	    devid, NULL, DDI_NOSLEEP, NULL,
 	    FM_VERSION, DATA_TYPE_UINT8, FM_EREPORT_VERS0,
 	    DEVID_IF_KNOWN(devid));
