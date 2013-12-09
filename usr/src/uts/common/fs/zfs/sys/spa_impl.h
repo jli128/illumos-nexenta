@@ -40,6 +40,7 @@
 #include <sys/bpobj.h>
 #include <sys/special_impl.h>
 #include <sys/wrcache.h>
+#include <zfeature_common.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -307,6 +308,9 @@ struct spa {
 	uint64_t	spa_feat_for_write_obj;	/* required to write to pool */
 	uint64_t	spa_feat_for_read_obj;	/* required to read from pool */
 	uint64_t	spa_feat_desc_obj;	/* Feature descriptions */
+	uint64_t	spa_feat_enabled_txg_obj; /* Feature enabled txg */
+	/* cache feature refcounts */
+	uint64_t	spa_feat_refcount_cache[SPA_FEATURES];
 	cyclic_id_t	spa_deadman_cycid;	/* cyclic id */
 	uint64_t	spa_deadman_calls;	/* number of deadman calls */
 	hrtime_t	spa_sync_starttime;	/* starting time fo spa_sync */
