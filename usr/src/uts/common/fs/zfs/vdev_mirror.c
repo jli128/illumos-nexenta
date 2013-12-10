@@ -316,6 +316,14 @@ vdev_mirror_io_start(zio_t *zio)
 			 */
 			for (c = 0; c < mm->mm_children; c++) {
 				mc = &mm->mm_child[c];
+				if (mc->mc_vd == NULL) {
+					/*
+					 * Invalid vdev id in blkptr caused
+					 * mc_vd to be NULL here.
+					 * Just skip this vdev.
+					 */
+					continue;
+				}
 				zio_nowait(zio_vdev_child_io(zio, zio->io_bp,
 				    mc->mc_vd, mc->mc_offset,
 				    zio_buf_alloc(zio->io_size), zio->io_size,
@@ -339,13 +347,18 @@ vdev_mirror_io_start(zio_t *zio)
 		children = mm->mm_children;
 	}
 
-	while (children--) {
+	for (;children--; ++c) {
 		mc = &mm->mm_child[c];
-		zio_nowait(zio_vdev_child_io(zio, zio->io_bp,
-		    mc->mc_vd, mc->mc_offset, zio->io_data, zio->io_size,
-		    zio->io_type, zio->io_priority, 0,
-		    vdev_mirror_child_done, mc));
-		c++;
+		if (mc->mc_vd == NULL) {
+			/*
+			 * Invalid vdev in blkptr caused mc_vd to be NULL here.
+			 * Just skip this vdev.
+			 */
+			continue;
+		}
+		zio_nowait(zio_vdev_child_io(zio, zio->io_bp, mc->mc_vd,
+		    mc->mc_offset, zio->io_data, zio->io_size, zio->io_type,
+		    zio->io_priority, 0, vdev_mirror_child_done, mc));
 	}
 
 	return (ZIO_PIPELINE_CONTINUE);
