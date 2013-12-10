@@ -2953,12 +2953,25 @@ sd_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op, int mod_flags,
 	struct sd_lun	*un;
 
 	if ((un = ddi_get_soft_state(sd_state, ddi_get_instance(dip))) == NULL)
-		return (ddi_prop_op(dev, dip, prop_op, mod_flags,
-		    name, valuep, lengthp));
+		goto fallback;
+
+	mutex_enter(SD_MUTEX(un));
+	while ((un->un_state == SD_STATE_ATTACHING))
+		cv_wait(&un->un_suspend_cv, SD_MUTEX(un));
+
+	if (un->un_state == SD_STATE_ATTACH_FAILED) {
+		mutex_exit(SD_MUTEX(un));
+		goto fallback;
+	}
+	mutex_exit(SD_MUTEX(un));
 
 	return (cmlb_prop_op(un->un_cmlbhandle,
 	    dev, dip, prop_op, mod_flags, name, valuep, lengthp,
 	    SDPART(dev), (void *)SD_PATH_DIRECT));
+
+fallback:
+	return (ddi_prop_op(dev, dip, prop_op, mod_flags, name, valuep,
+	    lengthp));
 }
 
 /*
@@ -8672,6 +8685,12 @@ devid_failed:
 	}
 
 spinup_failed:
+	/* attach failed, switch to SD_STATE_ATTACH_FAILED */
+	mutex_enter(SD_MUTEX(un));
+	New_state(un, SD_STATE_ATTACH_FAILED);
+	cv_broadcast(&un->un_suspend_cv);
+	mutex_exit(SD_MUTEX(un));
+
 	devid = DEVI(devi)->devi_devid_str;
 	scsi_fm_ereport_post(un->un_sd, ssc->ssc_uscsi_cmd->uscsi_path_instance,
 	    "cmd.disk.dev.attach-failed", ssc->ssc_uscsi_info->ui_ena,
@@ -8683,18 +8702,6 @@ spinup_failed:
 	sd_ssc_fini(ssc);
 	SD_ERROR(SD_LOG_ATTACH_DETACH, un, "sd_unit_attach failed: un: %p",
 	    (void *)un);
-
-	cmlb_detach(un->un_cmlbhandle, (void *)SD_PATH_DIRECT);
-	cmlb_free_handle(&un->un_cmlbhandle);
-
-	ddi_remove_minor_node(devi, NULL);
-	(void) devfs_clean(devi, NULL, DV_CLEAN_FORCE);
-
-	/* attach failed, switch to SD_STATE_ATTACH_FAILED */
-	mutex_enter(SD_MUTEX(un));
-	New_state(un, SD_STATE_ATTACH_FAILED);
-	cv_broadcast(&un->un_suspend_cv);
-	mutex_exit(SD_MUTEX(un));
 }
 
 
@@ -9060,10 +9067,10 @@ sd_unit_detach(dev_info_t *devi)
 	/* Do not free the softstate if the callback routine is active */
 	sd_sync_with_callback(un);
 
+no_attach_cleanup:
 	cmlb_detach(un->un_cmlbhandle, (void *)SD_PATH_DIRECT);
 	cmlb_free_handle(&un->un_cmlbhandle);
 
-no_attach_cleanup:
 	/*
 	 * Hold the detach mutex here, to make sure that no other threads ever
 	 * can access a (partially) freed soft state structure.
@@ -15149,9 +15156,13 @@ sd_start_cmds(struct sd_lun *un, struct buf *immed_bp)
 		 * not be put back to normal. Doing so would would
 		 * allow new commands to proceed when they shouldn't,
 		 * the device may be going off.
+		 *
+		 * Similarly, if the state is SD_STATE_ATTACHING we should
+		 * not set it to SD_STATE_NORMAL to avoid corruption.
 		 */
 		if ((un->un_state != SD_STATE_SUSPENDED) &&
-		    (un->un_state != SD_STATE_PM_CHANGING)) {
+		    (un->un_state != SD_STATE_PM_CHANGING) &&
+		    (un->un_state != SD_STATE_ATTACHING)) {
 			New_state(un, SD_STATE_NORMAL);
 		}
 
@@ -26011,6 +26022,8 @@ sddump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 
 	instance = SDUNIT(dev);
 	if (((un = ddi_get_soft_state(sd_state, instance)) == NULL) ||
+	    (un->un_state == SD_STATE_ATTACHING) ||
+	    (un->un_state == SD_STATE_ATTACH_FAILED) ||
 	    !SD_IS_VALID_LABEL(un) || ISCD(un)) {
 		return (ENXIO);
 	}
