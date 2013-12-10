@@ -48,11 +48,10 @@ extern "C" {
 struct cos {
 	spa_t		*cos_spa;
 	/* properties follow */
-	uint64_t	cos_id;
+	uint64_t	cos_guid;
 	uint64_t	cos_min_active[ZIO_PRIORITY_NUM_QUEUEABLE];
 	uint64_t	cos_max_active[ZIO_PRIORITY_NUM_QUEUEABLE];
 	uint64_t	cos_preferred_read;
-	boolean_t	cos_unmap_freed;
 	/* user defined name */
 	char		cos_name[MAXCOSNAMELEN];
 	/* modified with atomic ops */

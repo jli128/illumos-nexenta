@@ -79,8 +79,8 @@ vdev_store_props(vdev_t *vdev, objset_t *mos, uint64_t obj, uint64_t offset,
 
 	if (vdev->vdev_queue.vq_cos) {
 		propname = vdev_prop_to_name(VDEV_PROP_COS);
-		VERIFY(0 == nvlist_add_string(nvl, propname,
-		    vdev->vdev_queue.vq_cos->cos_name));
+		VERIFY(0 == nvlist_add_uint64(nvl, propname,
+		    vdev->vdev_queue.vq_cos->cos_guid));
 	}
 
 	if (vdev->vdev_spare_group) {
@@ -155,21 +155,21 @@ vdev_parse_props(vdev_t *vdev, char *packed, uint64_t nvsize)
 	if (nvlist_lookup_uint64(nvl, propname, &ival) == 0)
 		vdev->vdev_queue.vq_preferred_read = ival;
 	propname = vdev_prop_to_name(VDEV_PROP_COS);
-	if (nvlist_lookup_string(nvl, propname, &sval) == 0) {
+	if (nvlist_lookup_uint64(nvl, propname, &ival) == 0) {
 		/*
 		 * At this time, all CoS properties have been loaded.
-		 * Lookup CoS by name and take it if found.
+		 * Lookup CoS by guid and take it if found.
 		 */
 		cos_t *cos = NULL;
 		spa_t *spa = vdev->vdev_spa;
 		spa_cos_enter(spa);
-		cos = spa_lookup_cos_by_name(vdev->vdev_spa, sval);
+		cos = spa_lookup_cos_by_guid(vdev->vdev_spa, ival);
 		if (cos) {
 			cos_hold(cos);
 			vdev->vdev_queue.vq_cos = cos;
 		} else {
 			cmn_err(CE_WARN, "vdev %s refers to non-existent "
-			    "CoS %s\n", vdev->vdev_path, sval);
+			    "CoS %" PRIu64 "\n", vdev->vdev_path, ival);
 			vdev->vdev_queue.vq_cos = NULL;
 		}
 		spa_cos_exit(spa);
@@ -334,7 +334,7 @@ spa_vdev_set_common(vdev_t *vd, const char *value,
 			reset_cos = B_TRUE;
 		} else {
 			if (ival != 0)
-				cos = spa_lookup_cos_by_id(spa, ival);
+				cos = spa_lookup_cos_by_guid(spa, ival);
 			else
 				cos = spa_lookup_cos_by_name(spa, value);
 		}

@@ -290,17 +290,17 @@ get_usage(zpool_help_t idx) {
 		return (gettext("\tvdev-set <property=value> <pool>"
 		    "<vdev name | GUID>\n"));
 	case HELP_COS_ALLOC:
-		return (gettext("\tcos-alloc <pool> <cos name | ID>\n"));
+		return (gettext("\tcos-alloc <pool> <cos name | GUID>\n"));
 	case HELP_COS_FREE:
-		return (gettext("\tcos-free <pool> <cos name | ID>\n"));
+		return (gettext("\tcos-free <pool> <cos name | GUID>\n"));
 	case HELP_COS_LIST:
 		return (gettext("\tcos-list <pool>\n"));
 	case HELP_COS_GET:
 		return (gettext("\tcos-get <property | all> <pool>"
-		    "<cos name | ID>\n"));
+		    "<cos name | GUID>\n"));
 	case HELP_COS_SET:
 		return (gettext("\tcos-set <property=value> <pool>"
-		    "<cos name | ID>\n"));
+		    "<cos name | GUID>\n"));
 	}
 
 	abort();
@@ -5570,8 +5570,8 @@ cos_alloc_callback(zpool_handle_t *zhp, void *data)
 		cb->cb_any_successful = B_TRUE;
 
 	if (error == ENOTSUP) {
-		(void) printf("Error: "
-		    "CoS can not be allocated. Check related feature.\n");
+		(void) fprintf(stderr, gettext("operation failed: "
+		    "CoS feature is disabled.\n"));
 	}
 
 	return (error);
@@ -5650,7 +5650,6 @@ zpool_do_cos_free(int argc, char **argv)
 static int
 cos_list_callback(zpool_handle_t *zhp, void *data)
 {
-#define	MAXCOSNAMELEN	(30)
 	int err, i;
 	nvlist_t *nvl = (nvlist_t *)data;
 	nvpair_t *nvp;

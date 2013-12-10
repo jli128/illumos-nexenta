@@ -362,9 +362,7 @@ ztest_info_t ztest_info[] = {
 	{ ztest_spa_prop_get_set,		1,	&zopt_sometimes	},
 	{ ztest_vdev_prop_get_set,		1,	&zopt_often	},
 	{ ztest_cos_prop_get_set,		1,	&zopt_often	},
-#if 0
 	{ ztest_vdev_prop_get_set,		1,	&zopt_often	},
-#endif
 	{ ztest_cos_prop_get_set,		1,	&zopt_often	},
 #if 0
 	{ ztest_dmu_prealloc,			1,	&zopt_sometimes	},
@@ -4700,7 +4698,7 @@ ztest_get_random_vdev_leaf(spa_t *spa)
 	ASSERT(lvd->vdev_ops->vdev_op_leaf);
 	spa_config_exit(spa, SCL_ALL, FTAG);
 
-	return lvd;
+	return (lvd);
 }
 
 /*ARGSUSED*/
@@ -4711,7 +4709,7 @@ ztest_props_set(const vdev_t *lvd, const char *name, const ztest_prop_t t,
 	spa_t *spa = ztest_spa;
 	nvlist_t *sprops;
 	int error = 0;
-		
+
 	VERIFY(0 == nvlist_alloc(&sprops, NV_UNIQUE_NAME, 0));
 
 	for (int p = 0; p < size; p++) {
@@ -4731,7 +4729,7 @@ ztest_props_set(const vdev_t *lvd, const char *name, const ztest_prop_t t,
 			break;
 		case VDEV_PROP_STRING:
 			/* any short string will do */
-			(void) snprintf(sval, 15, "%s%d", "prop_value", p);		
+			(void) snprintf(sval, 15, "%s%d", "prop_value", p);
 			VERIFY(0 == nvlist_add_string(sprops, pname, sval));
 			break;
 		default:
@@ -4741,7 +4739,7 @@ ztest_props_set(const vdev_t *lvd, const char *name, const ztest_prop_t t,
 		}
 	}
 	VERIFY3U(0, ==, error);
-	
+
 	/* set the props */
 	switch (t) {
 	case VDEV_PROP_UINT64:
@@ -4792,7 +4790,7 @@ ztest_props_test(const ztest_prop_t t, const void *props, const size_t size,
 		    (t == VDEV_PROP_UINT64 || t == VDEV_PROP_STRING) ?
 		    vdev_prop_to_name(((vdev_prop_t *)props)[p]) :
 		    cos_prop_to_name(((cos_prop_t *)props)[p]);
-		
+
 		switch (t) {
 		case VDEV_PROP_UINT64:
 		case COS_PROP_UINT64:
@@ -4916,7 +4914,7 @@ ztest_vdev_prop_get_set(ztest_ds_t *zd, uint64_t id)
 	VERIFY(0 == mutex_lock(&ztest_vdev_lock));
 
 	lvd = ztest_get_random_vdev_leaf(spa);
-		
+
 	/* Test uint64 properties */
 	sprops = ztest_props_set(lvd, NULL, VDEV_PROP_UINT64,
 	    (void *)&vprops_uint64[0],
@@ -5585,7 +5583,8 @@ ztest_spa_import_export(char *oldname, char *newname)
 	/*
 	 * Export it.
 	 */
-	VERIFY3U(0, ==, spa_export(oldname, &config, B_FALSE, B_FALSE, B_FALSE));
+	VERIFY3U(0, ==, spa_export(oldname, &config, B_FALSE, B_FALSE,
+	    B_FALSE));
 
 	ztest_walk_pool_directory("pools after export");
 
@@ -6163,13 +6162,13 @@ make_random_props()
 	switch (ztest_random(4)) {
 	case 0:
 		break;
-	case 1: 
+	case 1:
 		VERIFY(nvlist_add_uint64(props, "autoreplace", 1) == 0);
 		break;
-	case 2: 
+	case 2:
 		VERIFY(nvlist_add_uint64(props, "enablespecial", 1) == 0);
 		break;
-	case 3: 
+	case 3:
 		VERIFY(nvlist_add_uint64(props, "enablespecial", 1) == 0);
 		VERIFY(nvlist_add_uint64(props, "autoreplace", 1) == 0);
 		break;

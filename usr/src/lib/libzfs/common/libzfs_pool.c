@@ -4250,6 +4250,8 @@ vdev_get_all_props(zpool_handle_t *zhp, uint64_t vdev_guid, nvlist_t **nvp)
 			}
 		} else {
 			zcmd_free_nvlists(&zc);
+			(void) zfs_error(hdl, EZFS_BADTARGET,
+			    "failed to get vdev properties");
 			return (-1);
 		}
 	}
@@ -4272,15 +4274,19 @@ vdev_get_prop(zpool_handle_t *zhp,  const char *vdev, vdev_prop_t prop,
 	uint64_t intval;
 	const char *strval;
 	nvlist_t *nvl;
+	char errbuf[1024];
 
 	assert(nvp != NULL);
+
+	(void) snprintf(errbuf, sizeof (errbuf),
+	    dgettext(TEXT_DOMAIN, "cannot get property for '%s'"),
+	    zhp->zpool_name);
 
 	if (zpool_get_state(zhp) == POOL_STATE_UNAVAIL)
 		return (-1);
 
 	if (vdev_get_guid(zhp, vdev, &vdev_guid) != 0) {
-		(void) fprintf(stderr, gettext("Device %s not present in %s\n"),
-		    vdev, zpool_get_name(zhp));
+		(void) zfs_error(zhp->zpool_hdl, EZFS_BADTARGET, errbuf);
 		return (-1);
 	}
 
@@ -4310,8 +4316,10 @@ vdev_get_prop(zpool_handle_t *zhp,  const char *vdev, vdev_prop_t prop,
 		if (nvlist_lookup_uint64(nvl, vdev_prop_to_name(prop),
 		    &intval) != 0)
 			intval = vdev_prop_default_numeric(prop);
-		if (vdev_prop_index_to_string(prop, intval, &strval) != 0)
+		if (vdev_prop_index_to_string(prop, intval, &strval) != 0) {
+			(void) zfs_error(zhp->zpool_hdl, EZFS_BADPROP, errbuf);
 			return (-1);
+		}
 		(void) strlcpy(buf, strval, len);
 		break;
 
@@ -4351,8 +4359,7 @@ vdev_set_prop(zpool_handle_t *zhp, const char *vdev,
 	}
 
 	if (vdev_get_guid(zhp, vdev, &guid) != 0) {
-		(void) fprintf(stderr, gettext("Device %s not present in the "
-		    "pool\n"), vdev);
+		(void) zfs_error(zhp->zpool_hdl, EZFS_BADTARGET, errbuf);
 		return (-1);
 	}
 
@@ -4401,6 +4408,7 @@ vdev_set_proplist(zpool_handle_t *zhp, const char *vdev, nvlist_t *nvl)
 	uint64_t version;
 	uint64_t guid;
 	prop_flags_t flags = { 0 };
+	libzfs_handle_t *hdl = zhp->zpool_hdl;
 
 	assert(nvl != NULL);
 
@@ -4409,8 +4417,7 @@ vdev_set_proplist(zpool_handle_t *zhp, const char *vdev, nvlist_t *nvl)
 	    zhp->zpool_name);
 
 	if (vdev_get_guid(zhp, vdev, &guid) != 0) {
-		(void) fprintf(stderr, gettext("Device %s not present in the "
-		    "pool\n"), vdev);
+		(void) zfs_error(hdl, EZFS_BADTARGET, errbuf);
 		return (-1);
 	}
 
@@ -4430,18 +4437,18 @@ vdev_set_proplist(zpool_handle_t *zhp, const char *vdev, nvlist_t *nvl)
 	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
 	zc.zc_guid = guid;
 
-	if (zcmd_write_src_nvlist(zhp->zpool_hdl, &zc, nvl) != 0) {
+	if (zcmd_write_src_nvlist(hdl, &zc, nvl) != 0) {
 		nvlist_free(nvl);
 		return (-1);
 	}
 
-	ret = zfs_ioctl(zhp->zpool_hdl, ZFS_IOC_VDEV_SET_PROPS, &zc);
+	ret = zfs_ioctl(hdl, ZFS_IOC_VDEV_SET_PROPS, &zc);
 
 	zcmd_free_nvlists(&zc);
 	nvlist_free(nvl);
 
 	if (ret)
-		(void) zpool_standard_error(zhp->zpool_hdl, errno, errbuf);
+		(void) zpool_standard_error(hdl, errno, errbuf);
 
 	return (ret);
 }
@@ -4614,6 +4621,12 @@ cos_alloc(zpool_handle_t *zhp, char *cosname, nvlist_t *nvl)
 {
 	zfs_cmd_t zc = { 0 };
 	libzfs_handle_t *hdl = zhp->zpool_hdl;
+	char errbuf[1024];
+	int error = 0;
+
+	(void) snprintf(errbuf, sizeof (errbuf),
+	    dgettext(TEXT_DOMAIN, "cannot allocate CoS descriptor for '%s'"),
+	    zhp->zpool_name);
 
 	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
 	(void) strlcpy(zc.zc_string, cosname, sizeof (zc.zc_string));
@@ -4623,9 +4636,12 @@ cos_alloc(zpool_handle_t *zhp, char *cosname, nvlist_t *nvl)
 		return (-1);
 	}
 
-	if (ioctl(hdl->libzfs_fd, ZFS_IOC_COS_ALLOC, &zc) != 0)
-		return (errno);
-	return (0);
+	error = ioctl(hdl->libzfs_fd, ZFS_IOC_COS_ALLOC, &zc);
+
+	if (error)
+		(void) zpool_standard_error(zhp->zpool_hdl, errno, errbuf);
+
+	return (error);
 }
 
 int
@@ -4633,14 +4649,23 @@ cos_free(zpool_handle_t *zhp, char *cosname, uint64_t guid)
 {
 	zfs_cmd_t zc = { 0 };
 	libzfs_handle_t *hdl = zhp->zpool_hdl;
+	char errbuf[1024];
+	int error = 0;
+
+	(void) snprintf(errbuf, sizeof (errbuf),
+	    dgettext(TEXT_DOMAIN, "cannot free CoS descriptor for '%s'"),
+	    zhp->zpool_name);
 
 	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
 	(void) strlcpy(zc.zc_string, cosname, sizeof (zc.zc_string));
 	zc.zc_guid = guid;
 
-	if (ioctl(hdl->libzfs_fd, ZFS_IOC_COS_FREE, &zc) != 0)
-		return (errno);
-	return (0);
+	error = ioctl(hdl->libzfs_fd, ZFS_IOC_COS_FREE, &zc);
+
+	if (error)
+		(void) zpool_standard_error(zhp->zpool_hdl, errno, errbuf);
+
+	return (error);
 }
 
 int
@@ -4683,6 +4708,11 @@ cos_get_all_props(zpool_handle_t *zhp, const char *cos, nvlist_t **nvp)
 	zfs_cmd_t zc = { 0 };
 	libzfs_handle_t *hdl = zhp->zpool_hdl;
 	char *endp;
+	char errbuf[1024];
+
+	(void) snprintf(errbuf, sizeof (errbuf),
+	    dgettext(TEXT_DOMAIN, "cannot set property for '%s'"),
+	    zhp->zpool_name);
 
 	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
 
@@ -4704,6 +4734,7 @@ cos_get_all_props(zpool_handle_t *zhp, const char *cos, nvlist_t **nvp)
 			}
 		} else {
 			zcmd_free_nvlists(&zc);
+			(void) zpool_standard_error(hdl, errno, errbuf);
 			return (-1);
 		}
 	}
@@ -4725,6 +4756,11 @@ cos_get_prop(zpool_handle_t *zhp,  const char *cos, cos_prop_t prop,
 	uint64_t intval;
 	const char *strval;
 	nvlist_t *nvl;
+	char errbuf[1024];
+
+	(void) snprintf(errbuf, sizeof (errbuf),
+	    dgettext(TEXT_DOMAIN, "cannot set property for '%s'"),
+	    zhp->zpool_name);
 
 	assert(nvp != NULL);
 
@@ -4757,8 +4793,10 @@ cos_get_prop(zpool_handle_t *zhp,  const char *cos, cos_prop_t prop,
 		if (nvlist_lookup_uint64(nvl, cos_prop_to_name(prop),
 		    &intval) != 0)
 			intval = cos_prop_default_numeric(prop);
-		if (cos_prop_index_to_string(prop, intval, &strval) != 0)
+		if (cos_prop_index_to_string(prop, intval, &strval) != 0) {
+			(void) zfs_error(zhp->zpool_hdl, EZFS_BADPROP, errbuf);
 			return (-1);
+		}
 		(void) strlcpy(buf, strval, len);
 		break;
 

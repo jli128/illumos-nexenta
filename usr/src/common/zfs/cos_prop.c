@@ -48,25 +48,17 @@ cos_prop_get_table(void)
 void
 cos_prop_init(void)
 {
-	static zprop_index_t boolean_table[] = {
-		{ "off",	0},
-		{ "on",		1},
-		{ NULL }
-	};
-
-	zprop_register_number(COS_PROP_ID, "cosid", 0, PROP_READONLY,
-	    ZFS_TYPE_COS, "<cos system id>", "COSID");
+	zprop_register_number(COS_PROP_GUID, "cosguid", 0, PROP_READONLY,
+	    ZFS_TYPE_COS, "<cos guid>", "COSGUID");
 
 	/* string properties */
 	zprop_register_string(COS_PROP_NAME, "cosname", NULL, PROP_DEFAULT,
 	    ZFS_TYPE_COS, "<cos user defined name>", "COSNAME");
 
-	zprop_register_index(COS_PROP_UNMAP_FREED, "unmap", 0,
-	    PROP_DEFAULT, ZFS_TYPE_COS, "on | off", "UNMAP", boolean_table);
-
 	/* default number properties */
 	zprop_register_number(COS_PROP_PREFERRED_READ, "prefread", 0,
-	    PROP_DEFAULT, ZFS_TYPE_COS, "<preferred read (0..10)>", "PREFREAD");
+	    PROP_DEFAULT, ZFS_TYPE_COS, "<preferred read (0..100)>",
+	    "PREFREAD");
 	zprop_register_number(COS_PROP_READ_MINACTIVE, "read_minactive", 0,
 	    PROP_DEFAULT, ZFS_TYPE_COS, "<read min active (0..1000)>",
 	    "READ_MINACTIVE");
@@ -95,8 +87,8 @@ cos_prop_init(void)
 	    PROP_DEFAULT, ZFS_TYPE_COS, "<scrub min active (0..1000)>",
 	    "SCRUB_MINACTIVE");
 	zprop_register_number(COS_PROP_SCRUB_MAXACTIVE, "scrub_maxactive", 0,
-	    PROP_DEFAULT, ZFS_TYPE_COS, "<scrub min active (0..1000)>",
-	    "SCRUB_MINACTIVE");
+	    PROP_DEFAULT, ZFS_TYPE_COS, "<scrub max active (0..1000)>",
+	    "SCRUB_MAXACTIVE");
 }
 
 /*

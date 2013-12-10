@@ -48,10 +48,10 @@ spa_cos_exit(spa_t *spa)
 }
 
 static boolean_t
-cos_match_id(cos_t *cos, void *match_data)
+cos_match_guid(cos_t *cos, void *match_data)
 {
-	uint64_t id = (uint64_t)(unsigned long)match_data;
-	return (cos->cos_id == id);
+	uint64_t guid = (uint64_t)(unsigned long)match_data;
+	return (cos->cos_guid == guid);
 }
 
 static boolean_t
@@ -76,10 +76,10 @@ spa_foreach_cos(spa_t *spa, cos_func_t cos_f, void *data)
 }
 
 cos_t *
-spa_lookup_cos_by_id(spa_t *spa, uint64_t id)
+spa_lookup_cos_by_guid(spa_t *spa, uint64_t guid)
 {
-	return (spa_foreach_cos(spa, cos_match_id,
-	    (void *)(unsigned long)id));
+	return (spa_foreach_cos(spa, cos_match_guid,
+	    (void *)(unsigned long)guid));
 }
 
 cos_t *
@@ -120,10 +120,6 @@ cos_set_common(cos_t *cos, const char *strval, uint64_t ival, cos_prop_t prop)
 		    "%s", strval);
 		break;
 
-	case COS_PROP_UNMAP_FREED:
-		cos->cos_unmap_freed = (boolean_t)ival;
-		break;
-
 	case COS_PROP_PREFERRED_READ:
 		cos->cos_preferred_read = (boolean_t)ival;
 		break;
@@ -162,17 +158,13 @@ cos_get_common(cos_t *cos, char **value, uint64_t *oval, cos_prop_t prop)
 	zio_priority_t p;
 
 	switch (prop) {
-	case COS_PROP_ID:
-		*oval = cos->cos_id;
+	case COS_PROP_GUID:
+		*oval = cos->cos_guid;
 		break;
 
 	case COS_PROP_NAME:
 		if (cos->cos_name[0] != '\0')
 			*value = spa_strdup(cos->cos_name);
-		break;
-
-	case COS_PROP_UNMAP_FREED:
-		*oval = cos->cos_unmap_freed;
 		break;
 
 	case COS_PROP_PREFERRED_READ:
@@ -255,9 +247,9 @@ cos_sync_classes(spa_t *spa, uint64_t obj, dmu_tx_t *tx)
 		VERIFY(0 == nvlist_alloc(&nvl_arr[i], NV_UNIQUE_NAME,
 		    KM_SLEEP));
 
-		propname = cos_prop_to_name(COS_PROP_ID);
+		propname = cos_prop_to_name(COS_PROP_GUID);
 		VERIFY(0 == nvlist_add_uint64(nvl_arr[i], propname,
-		    cos->cos_id));
+		    cos->cos_guid));
 		propname = cos_prop_to_name(COS_PROP_NAME);
 		VERIFY(0 == nvlist_add_string(nvl_arr[i], propname,
 		    cos->cos_name));
@@ -283,10 +275,6 @@ cos_sync_classes(spa_t *spa, uint64_t obj, dmu_tx_t *tx)
 			VERIFY(0 == nvlist_add_uint64(nvl_arr[i],
 			    propname, val));
 		}
-
-		propname = cos_prop_to_name(COS_PROP_UNMAP_FREED);
-		VERIFY(0 == nvlist_add_boolean_value(nvl_arr[i],
-		    propname, cos->cos_unmap_freed));
 	}
 
 	VERIFY(0 == nvlist_add_nvlist_array(nvl, COS_ARRAY,
@@ -407,9 +395,9 @@ spa_load_cos_props(spa_t *spa)
 		boolean_t bv;
 		const char *propname;
 
-		propname = cos_prop_to_name(COS_PROP_ID);
+		propname = cos_prop_to_name(COS_PROP_GUID);
 		if (nvlist_lookup_uint64(nvl_arr[i], propname, &u64) == 0) {
-			cos = spa_lookup_cos_by_id(spa, u64);
+			cos = spa_lookup_cos_by_guid(spa, u64);
 			if (cos == NULL) {
 				propname = cos_prop_to_name(COS_PROP_NAME);
 				if (nvlist_lookup_string(nvl_arr[i], propname,
@@ -448,10 +436,6 @@ spa_load_cos_props(spa_t *spa)
 			if (nvlist_lookup_uint64(nvl_arr[i], pname, &u64) == 0)
 				cos->cos_max_active[p] = u64;
 		}
-
-		propname = cos_prop_to_name(COS_PROP_UNMAP_FREED);
-		if (nvlist_lookup_boolean_value(nvl_arr[i], propname, &bv) == 0)
-			cos->cos_unmap_freed = bv;
 	}
 
 	spa_cos_exit(spa);
@@ -493,10 +477,8 @@ cos_prop_validate(spa_t *spa, uint64_t id, nvlist_t *props)
 			 */
 			if ((strnlen(strval, MAXCOSNAMELEN) == MAXCOSNAMELEN) ||
 			    (((cos = spa_lookup_cos_by_name(spa, strval)) !=
-			    NULL) && cos->cos_id != id))
+			    NULL) && cos->cos_guid != id))
 				error = EINVAL;
-			break;
-		case COS_PROP_UNMAP_FREED:
 			break;
 		case COS_PROP_PREFERRED_READ:
 			error = nvpair_value_uint64(elem, &intval);
@@ -613,7 +595,7 @@ spa_cos_prop_get(spa_t *spa, const char *cosname, nvlist_t **nvp)
 		return (ENOENT);
 	}
 
-	for (prop = COS_PROP_ID; prop < COS_NUM_PROPS; prop++) {
+	for (prop = COS_PROP_GUID; prop < COS_NUM_PROPS; prop++) {
 		uint64_t ival;
 		char *strval = NULL;
 		const char *propname = cos_prop_to_name(prop);
@@ -634,19 +616,19 @@ spa_cos_prop_get(spa_t *spa, const char *cosname, nvlist_t **nvp)
 }
 
 static uint64_t
-generate_cos_id(spa_t *spa)
+generate_cos_guid(spa_t *spa)
 {
 	uint64_t guid = 0;
 
 	do {
 		(void) random_get_pseudo_bytes((uint8_t *)&guid, sizeof (guid));
-	} while (guid != 0 && spa_lookup_cos_by_id(spa, guid) != NULL);
+	} while (guid != 0 && spa_lookup_cos_by_guid(spa, guid) != NULL);
 
 	return (guid);
 }
 
 static int
-spa_alloc_cos_nosync(spa_t *spa, const char *cosname, uint64_t cosid)
+spa_alloc_cos_nosync(spa_t *spa, const char *cosname, uint64_t cosguid)
 {
 	cos_t *cos;
 
@@ -657,8 +639,8 @@ spa_alloc_cos_nosync(spa_t *spa, const char *cosname, uint64_t cosid)
 	if (spa_lookup_cos_by_name(spa, cosname) != NULL)
 		return (EINVAL);
 
-	cos->cos_id = (cosid != 0 ? cosid : generate_cos_id(spa));
-	if (cos->cos_id == 0)
+	cos->cos_guid = (cosguid != 0 ? cosguid : generate_cos_guid(spa));
+	if (cos->cos_guid == 0)
 		return (ENOSPC);
 
 	cos->cos_spa = spa;
@@ -730,7 +712,8 @@ spa_list_cos(spa_t *spa, nvlist_t *nvl)
 	spa_cos_enter(spa);
 	for (cos = list_head(&spa->spa_cos_list); cos != NULL;
 	    cos = list_next(&spa->spa_cos_list, cos)) {
-		VERIFY(nvlist_add_uint64(nvl, cos->cos_name, cos->cos_id) == 0);
+		VERIFY(nvlist_add_uint64(nvl, cos->cos_name,
+			cos->cos_guid) == 0);
 	}
 	spa_cos_exit(spa);
 

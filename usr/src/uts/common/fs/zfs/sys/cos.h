@@ -27,9 +27,6 @@
 extern "C" {
 #endif
 
-#define	MAXCOSNAMELEN	(30)
-
-
 /*
  * This is the interface to SPA Class Of Storage related functionality.
  * For more details, see comments in cos_impl.h
@@ -67,7 +64,7 @@ int spa_list_cos(spa_t *, nvlist_t *);
 int spa_cos_prop_set(spa_t *, const char *, nvlist_t *);
 int spa_cos_prop_get(spa_t *, const char *, nvlist_t **);
 
-cos_t *spa_lookup_cos_by_id(spa_t *, uint64_t);
+cos_t *spa_lookup_cos_by_guid(spa_t *, uint64_t);
 cos_t *spa_lookup_cos_by_name(spa_t *, const char *);
 
 int spa_load_cos_props(spa_t *);

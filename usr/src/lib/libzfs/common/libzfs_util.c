@@ -1603,7 +1603,7 @@ cos_get_proplist(libzfs_handle_t *hdl, char *props, zprop_list_t **listp)
 	 */
 	if (strcmp(props, "all") == 0) {
 		cos_prop_t prop;
-		for (prop = COS_PROP_ID; prop < COS_NUM_PROPS; prop++) {
+		for (prop = COS_PROP_GUID; prop < COS_NUM_PROPS; prop++) {
 			const char *propname = cos_prop_to_name(prop);
 			if (addlist(hdl, (char *)propname, listp,
 			    ZFS_TYPE_COS))

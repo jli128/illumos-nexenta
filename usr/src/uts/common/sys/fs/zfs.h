@@ -237,7 +237,7 @@ typedef enum vdev_prop {
  * macros that rely on this dependency.
  */
 typedef enum cos_prop {
-	COS_PROP_ID,
+	COS_PROP_GUID,
 	/* user-defined cos name */
 	COS_PROP_NAME,
 	/* IO tunables */
@@ -253,8 +253,6 @@ typedef enum cos_prop {
 	COS_PROP_WRITE_MAXACTIVE,
 	COS_PROP_AWRITE_MAXACTIVE,
 	COS_PROP_SCRUB_MAXACTIVE,
-	/* unmap freed blocks (boolean) */
-	COS_PROP_UNMAP_FREED,
 	/* preference for read in mirror configurations */
 	COS_PROP_PREFERRED_READ,
 	COS_NUM_PROPS
@@ -361,6 +359,7 @@ int cos_prop_index_to_string(cos_prop_t, uint64_t, const char **);
 int cos_prop_string_to_index(cos_prop_t, const char *, uint64_t *);
 uint64_t cos_prop_random_value(cos_prop_t, uint64_t seed);
 
+#define	MAXCOSNAMELEN	(64)
 /*
  * Definitions for the Delegation.
  */

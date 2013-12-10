@@ -5417,7 +5417,7 @@ zfs_ioc_cos_set_props(zfs_cmd_t *zc)
 		cosname = zc->zc_string;
 	} else {
 		spa_cos_enter(spa);
-		cos = spa_lookup_cos_by_id(spa, zc->zc_guid);
+		cos = spa_lookup_cos_by_guid(spa, zc->zc_guid);
 		if (cos != NULL)
 			cosname = cos->cos_name;
 		else
@@ -5454,7 +5454,7 @@ zfs_ioc_cos_get_props(zfs_cmd_t *zc)
 		cosname = zc->zc_string;
 	} else {
 		spa_cos_enter(spa);
-		cos = spa_lookup_cos_by_id(spa, zc->zc_guid);
+		cos = spa_lookup_cos_by_guid(spa, zc->zc_guid);
 		if (cos != NULL)
 			cosname = cos->cos_name;
 		spa_cos_exit(spa);
