@@ -1,3 +1,9 @@
+sunwos86r (5.11.134-31-9682-101) nexenta; urgency=medium
+
+  * Issue NEX-1561: backport OS-101 sd needs to check ATTACHING state before calling SD_IS_VALID_LABEL()
+
+ -- Nexenta Systems <support@nexenta.com>  Mon, 12 Dec 2013 18:17:43 +0100
+
 sunwos86r (5.11.134-31-9681-97) nexenta; urgency=medium
 
   * Issue NEX-1565: backport OS-97 fix for OS-92 is incomplete
