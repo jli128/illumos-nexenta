@@ -18,6 +18,7 @@
 #include <sys/dsl_synctask.h>
 #include <sys/spa_impl.h>
 #include <sys/cos_impl.h>
+#include <sys/vdev_impl.h>
 #include <sys/dbuf.h>
 #include <sys/debug.h>
 #include <sys/zfeature.h>
@@ -145,7 +146,7 @@ cos_set_common(cos_t *cos, const char *strval, uint64_t ival, cos_prop_t prop)
 		break;
 
 	default:
-		return (EINVAL);
+		return (SET_ERROR(ENOTSUP));
 	}
 
 	return (0);
@@ -192,7 +193,7 @@ cos_get_common(cos_t *cos, char **value, uint64_t *oval, cos_prop_t prop)
 		break;
 
 	default:
-		return (EINVAL);
+		return (SET_ERROR(ENOTSUP));
 	}
 
 	return (0);
@@ -366,7 +367,7 @@ spa_load_cos_props(spa_t *spa)
 	int i;
 
 	if (spa->spa_cos_props_object == 0)
-		return (ENOENT);
+		return (SET_ERROR(ENOENT));
 
 	spa_cos_enter(spa);
 
@@ -392,7 +393,6 @@ spa_load_cos_props(spa_t *spa)
 		cos_t *cos = NULL;
 		char *strval;
 		uint64_t u64;
-		boolean_t bv;
 		const char *propname;
 
 		propname = cos_prop_to_name(COS_PROP_GUID);
@@ -463,7 +463,7 @@ cos_prop_validate(spa_t *spa, uint64_t id, nvlist_t *props)
 		propname = nvpair_name(elem);
 
 		if ((prop = cos_name_to_prop(propname)) == ZPROP_INVAL)
-			return (EINVAL);
+			return (SET_ERROR(EINVAL));
 
 		switch (prop) {
 		case COS_PROP_NAME:
@@ -637,7 +637,7 @@ spa_alloc_cos_nosync(spa_t *spa, const char *cosname, uint64_t cosguid)
 	cos = kmem_zalloc(sizeof (cos_t), KM_SLEEP);
 
 	if (spa_lookup_cos_by_name(spa, cosname) != NULL)
-		return (EINVAL);
+		return (EEXIST);
 
 	cos->cos_guid = (cosguid != 0 ? cosguid : generate_cos_guid(spa));
 	if (cos->cos_guid == 0)
@@ -676,28 +676,92 @@ spa_alloc_cos(spa_t *spa, const char *cosname, uint64_t cosid)
 	return (cos_sync_task_do(spa, COS_FEATURE_INCR));
 }
 
+
+/* force cos_free() implementation */
+typedef void (*cos_free_cb_t)(vdev_t *, void *);
+
+static void
+cos_free_cb(vdev_t *vd, void *arg)
+{
+	cos_t *cos = (cos_t *)arg;
+
+	ASSERT(MUTEX_HELD(&cos->cos_spa->spa_cos_props_lock));
+	ASSERT(spa_config_held(cos->cos_spa, SCL_STATE_ALL,
+	    RW_WRITER) == SCL_STATE_ALL);
+
+	if (!vd->vdev_ops->vdev_op_leaf)
+		return;
+
+	if (vd->vdev_queue.vq_cos == cos) {
+		cos_rele(cos);
+		vd->vdev_queue.vq_cos = NULL;
+	}
+}
+
+static void
+cos_vdev_walk(vdev_t *vd, cos_free_cb_t cb, void *arg)
+{
+	for (int i = 0; i < vd->vdev_children; i++)
+		cos_vdev_walk(vd->vdev_child[i], cb, arg);
+	cb(vd, arg);
+}
+
 int
-spa_free_cos(spa_t *spa, const char *cosname)
+spa_free_cos(spa_t *spa, const char *cosname, boolean_t b_force)
 {
 	int err = 0;
 	cos_t *cos;
 
+	if (b_force)
+		spa_vdev_state_enter(spa, SCL_ALL);
+
 	spa_cos_enter(spa);
 
 	if ((cos = spa_lookup_cos_by_name(spa, cosname)) != NULL) {
-		if (cos_refcount(cos) == 0)
+		if (cos_refcount(cos) == 0) {
 			list_remove(&spa->spa_cos_list, cos);
-		else
-			err = EBUSY;
+		} else {
+			if (b_force == B_TRUE) {
+				int i;
+				/*
+				 * walk the device tree and the aux devices,
+				 * check cos and remove as needed
+				 */
+				cos_vdev_walk(spa->spa_root_vdev, cos_free_cb,
+				    (void *)cos);
+				for (i = 0; i < spa->spa_l2cache.sav_count;
+				    i++) {
+					vdev_t *vd =
+					    spa->spa_l2cache.sav_vdevs[i];
+					cos_free_cb(vd, (void *)cos);
+				}
+				for (i = 0; i < spa->spa_spares.sav_count;
+				    i++) {
+					vdev_t *vd =
+					    spa->spa_spares.sav_vdevs[i];
+					cos_free_cb(vd, (void *)cos);
+				}
+				list_remove(&spa->spa_cos_list, cos);
+			} else {
+				err = SET_ERROR(EBUSY);
+			}
+		}
 	} else {
-		err = EINVAL;
+		err = ENOENT;
 	}
 
 	spa_cos_exit(spa);
 
+	if (b_force)
+		(void) spa_vdev_state_exit(spa, NULL, 0);
+
 	if (err == 0) {
 		kmem_free(cos, sizeof (cos_t));
-		return (cos_sync_task_do(spa, COS_FEATURE_DECR));
+		if (b_force)
+			return (spa_vdev_props_sync_task_do(spa) &&
+			    cos_sync_task_do(spa, COS_FEATURE_DECR));
+		else
+			return (cos_sync_task_do(spa, COS_FEATURE_DECR));
 	}
 
 	return (err);

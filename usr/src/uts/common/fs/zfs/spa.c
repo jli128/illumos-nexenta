@@ -1225,7 +1225,6 @@ spa_deactivate(spa_t *spa)
 		thread_join(spa->spa_did);
 		spa->spa_did = 0;
 	}
-
 }
 
 /*
@@ -4735,6 +4734,14 @@ spa_vdev_attach(spa_t *spa, uint64_t guid, nvlist_t *nvroot, int replacing)
 	dsl_resilver_restart(spa->spa_dsl_pool, dtl_max_txg);
 
 	/*
+	 * Check CoS property of the old vdev, add reference by new vdev
+	 */
+	if (oldvd->vdev_queue.vq_cos) {
+		cos_hold(oldvd->vdev_queue.vq_cos);
+		newvd->vdev_queue.vq_cos = oldvd->vdev_queue.vq_cos;
+	}
+
+	/*
 	 * Commit the config
 	 */
 	(void) spa_vdev_exit(spa, newrootvd, dtl_max_txg, 0);
@@ -4950,6 +4957,14 @@ spa_vdev_detach(spa_t *spa, uint64_t guid, uint64_t pguid, int replace_done)
 	vdev_dirty(tvd, VDD_DTL, vd, txg);
 
 	spa_event_notify(spa, vd, ESC_ZFS_VDEV_REMOVE);
+
+	/*
+	 * Release the references to CoS descriptors if any
+	 */
+	if (vd->vdev_queue.vq_cos) {
+		cos_rele(vd->vdev_queue.vq_cos);
+		vd->vdev_queue.vq_cos = NULL;
+	}
 
 	/* hang on to the spa before we release the lock */
 	spa_open_ref(spa, FTAG);
@@ -5441,6 +5456,15 @@ spa_vdev_remove(spa_t *spa, uint64_t guid, boolean_t unspare)
 		 * in this pool.
 		 */
 		if (vd == NULL || unspare) {
+			if (vd == NULL)
+				vd = spa_lookup_by_guid(spa, guid, B_TRUE);
+			/*
+			 * Release the references to CoS descriptors if any
+			 */
+			if (vd != NULL && vd->vdev_queue.vq_cos) {
+				cos_rele(vd->vdev_queue.vq_cos);
+				vd->vdev_queue.vq_cos = NULL;
+			}
 			spa_vdev_remove_aux(spa->spa_spares.sav_config,
 			    ZPOOL_CONFIG_SPARES, spares, nspares, nv);
 			spa_load_spares(spa);
@@ -5455,6 +5479,15 @@ spa_vdev_remove(spa_t *spa, uint64_t guid, boolean_t unspare)
 		/*
 		 * Cache devices can always be removed.
 		 */
+		if (vd == NULL)
+			vd = spa_lookup_by_guid(spa, guid, B_TRUE);
+		/*
+		 * Release the references to CoS descriptors if any
+		 */
+		if (vd != NULL && vd->vdev_queue.vq_cos) {
+			cos_rele(vd->vdev_queue.vq_cos);
+			vd->vdev_queue.vq_cos = NULL;
+		}
 		spa_vdev_remove_aux(spa->spa_l2cache.sav_config,
 		    ZPOOL_CONFIG_L2CACHE, l2cache, nl2cache, nv);
 		spa_load_l2cache(spa);
@@ -5495,6 +5528,14 @@ spa_vdev_remove(spa_t *spa, uint64_t guid, boolean_t unspare)
 		if (error) {
 			metaslab_group_activate(mg);
 			return (spa_vdev_exit(spa, NULL, txg, error));
+		}
+
+		/*
+		 * Release the references to CoS descriptors if any
+		 */
+		if (vd->vdev_queue.vq_cos) {
+			cos_rele(vd->vdev_queue.vq_cos);
+			vd->vdev_queue.vq_cos = NULL;
 		}
 
 		/*

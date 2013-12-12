@@ -826,11 +826,6 @@ vdev_queue_get_prop_uint64(vdev_queue_t *vq, vdev_prop_t p)
 	int zprio = 0;
 	cos_t *cos = vq->vq_cos;
 
-	/*
-	 * Note: our goal as far as locking is concerned here is
-	 * to make sure that the vq_cos pointer is valid. The SCL_STATE
-	 * lock is taken on our behalf by spa_sync().
-	 */
 	switch (p) {
 	case VDEV_PROP_READ_MINACTIVE:
 	case VDEV_PROP_AREAD_MINACTIVE:

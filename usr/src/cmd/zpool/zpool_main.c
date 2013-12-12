@@ -292,7 +292,7 @@ get_usage(zpool_help_t idx) {
 	case HELP_COS_ALLOC:
 		return (gettext("\tcos-alloc <pool> <cos name | GUID>\n"));
 	case HELP_COS_FREE:
-		return (gettext("\tcos-free <pool> <cos name | GUID>\n"));
+		return (gettext("\tcos-free [-f] <pool> <cos name | GUID>\n"));
 	case HELP_COS_LIST:
 		return (gettext("\tcos-list <pool>\n"));
 	case HELP_COS_GET:
@@ -5494,7 +5494,6 @@ zpool_do_vdev_get(int argc, char **argv)
 	zprop_free_list(cb->cb_proplist);
 
 	return (error);
-
 }
 
 int
@@ -5553,6 +5552,7 @@ typedef struct cos_af_cbdata {
 	uint64_t cb_guid;
 	boolean_t cb_alloc;
 	boolean_t cb_any_successful;
+	boolean_t cb_force;
 	nvlist_t *cb_nvl;
 } cos_af_cbdata_t;
 
@@ -5565,7 +5565,7 @@ cos_alloc_callback(zpool_handle_t *zhp, void *data)
 	if (cb->cb_alloc)
 		error = cos_alloc(zhp, cb->cb_cos, cb->cb_nvl);
 	else
-		error = cos_free(zhp, cb->cb_cos, cb->cb_guid);
+		error = cos_free(zhp, cb->cb_cos, cb->cb_guid, cb->cb_force);
 	if (!error)
 		cb->cb_any_successful = B_TRUE;
 
@@ -5618,6 +5618,13 @@ zpool_do_cos_free(int argc, char **argv)
 	cos_af_cbdata_t cb = { 0 };
 	char *endp;
 	int error;
+
+	if (argc > 1 && strncmp(argv[1], "-f", sizeof ("-f")) == 0) {
+		/* -f - force option */
+		cb.cb_force = B_TRUE;
+		argc--;
+		argv++;
+	}
 
 	if (argc < 2) {
 		(void) fprintf(stderr, gettext("missing pool name\n"));

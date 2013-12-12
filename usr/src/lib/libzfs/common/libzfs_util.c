@@ -228,6 +228,15 @@ libzfs_error_description(libzfs_handle_t *hdl)
 		return (dgettext(TEXT_DOMAIN, "invalid diff data"));
 	case EZFS_POOLREADONLY:
 		return (dgettext(TEXT_DOMAIN, "pool is read-only"));
+	case EZFS_PROPNOTSUP:
+		return (dgettext(TEXT_DOMAIN, "property is not supported"));
+	case EZFS_COSNOTFOUND:
+		return (dgettext(TEXT_DOMAIN, "CoS descriptor not found"));
+	case EZFS_COSEXIST:
+		return (dgettext(TEXT_DOMAIN, "CoS descriptor already exists"));
+	case EZFS_COSREF:
+		return (dgettext(TEXT_DOMAIN,
+			"CoS descriptor is still referenced"));
 	case EZFS_UNKNOWN:
 		return (dgettext(TEXT_DOMAIN, "unknown error"));
 	default:
@@ -401,6 +410,50 @@ zfs_standard_error_fmt(libzfs_handle_t *hdl, int error, const char *fmt, ...)
 }
 
 int
+zpool_vprop_standard_error(libzfs_handle_t *hdl, int error, const char *msg)
+{
+	return (zpool_vprop_standard_error_fmt(hdl, error, "%s", msg));
+}
+
+/*PRINTFLIKE3*/
+int
+zpool_vprop_standard_error_fmt(libzfs_handle_t *hdl, int error,
+    const char *fmt, ...)
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+
+	if (zfs_common_error(hdl, error, fmt, ap) != 0) {
+		va_end(ap);
+		return (-1);
+	}
+
+	switch (error) {
+	case ENOENT:
+		zfs_verror(hdl, EZFS_COSNOTFOUND, fmt, ap);
+		break;
+	case ENOTSUP:
+		zfs_verror(hdl, EZFS_PROPNOTSUP, fmt, ap);
+		break;
+
+	case EEXIST:
+		zfs_verror(hdl, EZFS_COSEXIST, fmt, ap);
+		break;
+	case EBUSY:
+		zfs_verror(hdl, EZFS_COSREF, fmt, ap);
+		break;
+	default:
+		zfs_error_aux(hdl, strerror(error));
+		zfs_verror(hdl, EZFS_UNKNOWN, fmt, ap);
+		break;
+	}
+
+	va_end(ap);
+	return (-1);
+}
+
+int
 zpool_standard_error(libzfs_handle_t *hdl, int error, const char *msg)
 {
 	return (zpool_standard_error_fmt(hdl, error, "%s", msg));
@@ -437,7 +490,8 @@ zpool_standard_error_fmt(libzfs_handle_t *hdl, int error, const char *fmt, ...)
 		break;
 
 	case EBUSY:
-		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN, "pool is busy"));
+		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+		    "pool or device is busy"));
 		zfs_verror(hdl, EZFS_BUSY, fmt, ap);
 		break;
 

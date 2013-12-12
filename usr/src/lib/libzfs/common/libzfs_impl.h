@@ -146,6 +146,8 @@ int zfs_standard_error(libzfs_handle_t *, int, const char *);
 int zfs_standard_error_fmt(libzfs_handle_t *, int, const char *, ...);
 int zpool_standard_error(libzfs_handle_t *, int, const char *);
 int zpool_standard_error_fmt(libzfs_handle_t *, int, const char *, ...);
+int zpool_vprop_standard_error(libzfs_handle_t *, int, const char *);
+int zpool_vprop_standard_error_fmt(libzfs_handle_t *, int, const char *, ...);
 
 int get_dependents(libzfs_handle_t *, boolean_t, const char *, char ***,
     size_t *);

@@ -474,6 +474,7 @@ extern int spa_load_vdev_props(spa_t *spa, boolean_t load_aux);
 extern int spa_vdev_prop_validate(spa_t *spa, nvlist_t *nvp);
 extern int spa_vdev_prop_set(spa_t *spa, uint64_t vdev_guid, nvlist_t *nvp);
 extern int spa_vdev_prop_get(spa_t *spa, uint64_t vdev_guid, nvlist_t **nvp);
+extern int spa_vdev_props_sync_task_do(spa_t *spa);
 
 /* spare state (which is global across all pools) */
 extern void spa_spare_add(vdev_t *vd);

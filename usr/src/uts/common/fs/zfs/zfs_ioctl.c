@@ -22,11 +22,11 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Portions Copyright 2011 Martin Matuska
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
  * Copyright (c) 2013 Steven Hartland. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -157,7 +157,6 @@
 #include <sys/dsl_deleg.h>
 #include <sys/dsl_synctask.h>
 #include <sys/dmu_objset.h>
-#include <sys/dmu_tx.h>
 #include <sys/dmu_impl.h>
 #include <sys/dmu_tx.h>
 #include <sys/ddi.h>
@@ -5359,7 +5358,7 @@ zfs_ioc_cos_free(zfs_cmd_t *zc)
 	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
 		return (error);
 
-	error = spa_free_cos(spa, zc->zc_string);
+	error = spa_free_cos(spa, zc->zc_string, zc->zc_cookie);
 
 	spa_close(spa, FTAG);
 
@@ -6414,6 +6413,7 @@ zfsdev_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 	case NO_NAME:
 		break;
 	}
+
 
 	if (error == 0 && !(flag & FKIOCTL))
 		error = vec->zvec_secpolicy(zc, innvl, cr);

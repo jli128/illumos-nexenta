@@ -362,8 +362,6 @@ ztest_info_t ztest_info[] = {
 	{ ztest_spa_prop_get_set,		1,	&zopt_sometimes	},
 	{ ztest_vdev_prop_get_set,		1,	&zopt_often	},
 	{ ztest_cos_prop_get_set,		1,	&zopt_often	},
-	{ ztest_vdev_prop_get_set,		1,	&zopt_often	},
-	{ ztest_cos_prop_get_set,		1,	&zopt_often	},
 #if 0
 	{ ztest_dmu_prealloc,			1,	&zopt_sometimes	},
 #endif
@@ -429,6 +427,12 @@ static spa_t *ztest_spa = NULL;
 static ztest_ds_t *ztest_ds;
 
 static mutex_t ztest_vdev_lock;
+
+/*
+ * Make sure the "set/get/test" test does not interfere with other
+ * concurrent tests on the same vdev/cos property
+ */
+static mutex_t ztest_props_lock;
 
 /*
  * The ztest_name_lock protects the pool and dataset namespace used by
@@ -4701,6 +4705,8 @@ ztest_get_random_vdev_leaf(spa_t *spa)
 	return (lvd);
 }
 
+#define	ZTEST_COS_NAME		"ztest_cos_name"
+
 /*ARGSUSED*/
 static nvlist_t *
 ztest_props_set(const vdev_t *lvd, const char *name, const ztest_prop_t t,
@@ -4728,8 +4734,13 @@ ztest_props_set(const vdev_t *lvd, const char *name, const ztest_prop_t t,
 			VERIFY(0 == nvlist_add_uint64(sprops, pname, ival));
 			break;
 		case VDEV_PROP_STRING:
-			/* any short string will do */
-			(void) snprintf(sval, 15, "%s%d", "prop_value", p);
+			/* use a well known name for cos property */
+			if (((vdev_prop_t *)props)[p] == VDEV_PROP_COS) {
+				(void) snprintf(sval, 15, "%s", ZTEST_COS_NAME);
+			} else {
+				/* any short string will do */
+				(void) snprintf(sval, 15, "prop_value%d", p);
+			}
 			VERIFY(0 == nvlist_add_string(sprops, pname, sval));
 			break;
 		default:
@@ -4806,21 +4817,11 @@ ztest_props_test(const ztest_prop_t t, const void *props, const size_t size,
 		case VDEV_PROP_STRING:
 		{
 			char *ssval, *gsval;
-			int err;
 			VERIFY3U(0, ==, nvlist_lookup_string(sprops, pname,
 			    &ssval));
-			err = nvlist_lookup_string(gprops, pname,
-			    &gsval);
-			if (err == 0) {
-				VERIFY3U(0, ==, strcmp(ssval, gsval));
-			} else {
-				/*
-				 * cos property will not be set because CoS
-				 * object has not been allocated
-				 */
-				VERIFY3U(t, ==, VDEV_PROP_STRING);
-				VERIFY3U(err, ==, ENOENT);
-			}
+			VERIFY3U(0, ==, nvlist_lookup_string(gprops, pname,
+			    &gsval));
+			VERIFY3U(0, ==, strcmp(ssval, gsval));
 		}
 		break;
 		default:
@@ -4855,9 +4856,14 @@ ztest_cos_prop_get_set(ztest_ds_t *zd, uint64_t id)
 	spa_t *spa = ztest_spa;
 	nvlist_t *sprops = NULL, *gprops = NULL, *cos_list = NULL;
 	char cos_name[MAXCOSNAMELEN];
+	const char *pname = NULL;
+	char *sval = NULL;
 	uint64_t cos_id = ztest_random(~0ULL), val = 0;
+	vdev_t *lvd = NULL;
 
 	(void) snprintf(cos_name, MAXCOSNAMELEN-1, "cos_%llu", cos_id);
+
+	VERIFY3U(0, ==, mutex_lock(&ztest_props_lock));
 
 	VERIFY3U(0, ==, spa_alloc_cos(spa, cos_name, cos_id));
 
@@ -4875,10 +4881,48 @@ ztest_cos_prop_get_set(ztest_ds_t *zd, uint64_t id)
 	VERIFY3U(cos_id, ==, val);
 	nvlist_free(cos_list);
 
-	VERIFY3U(0, ==, spa_free_cos(spa, cos_name));
+	VERIFY3U(0, ==, spa_free_cos(spa, cos_name, B_FALSE));
 	VERIFY3U(0, ==, nvlist_alloc(&cos_list, NV_UNIQUE_NAME, 0));
 	VERIFY3U(0, ==, spa_list_cos(spa, cos_list));
 	VERIFY3U(ENOENT, ==, nvlist_lookup_uint64(cos_list, cos_name, &val));
+	nvlist_free(cos_list);
+
+	/*
+	 * force spa_free_cos() test
+	 * - allocate cos property, set vdev's cos, then free cos forcefuly
+	 * - verify everything succeeds
+	 * - verify no cos property on vdev
+	 * - verify no cos descriptor remains
+	 */
+	VERIFY3U(0, ==, spa_alloc_cos(spa, cos_name, cos_id));
+
+	/* Make sure vdevs will stay in place */
+	VERIFY(0 == mutex_lock(&ztest_vdev_lock));
+
+	lvd = ztest_get_random_vdev_leaf(spa);
+
+	VERIFY(0 == nvlist_alloc(&sprops, NV_UNIQUE_NAME, 0));
+
+	pname = vdev_prop_to_name(VDEV_PROP_COS);
+	VERIFY3U(0, ==, nvlist_add_string(sprops, pname, cos_name));
+	VERIFY3U(0, ==, spa_vdev_prop_set(spa, lvd->vdev_guid, sprops));
+
+	VERIFY3U(0, ==, spa_free_cos(spa, cos_name, B_TRUE));
+
+	VERIFY3U(0, ==, spa_vdev_prop_get(spa, lvd->vdev_guid, &gprops));
+
+	VERIFY(0 == mutex_unlock(&ztest_vdev_lock));
+
+	/* verify the vdev cos prop gone */
+	VERIFY3U(ENOENT, ==, nvlist_lookup_string(gprops, cos_name, &sval));
+
+	/* verify the cos descriptor gone */
+	VERIFY3U(0, ==, nvlist_alloc(&cos_list, NV_UNIQUE_NAME, 0));
+	VERIFY3U(0, ==, spa_list_cos(spa, cos_list));
+	VERIFY3U(ENOENT, ==, nvlist_lookup_uint64(cos_list, cos_name, &val));
+
+	VERIFY3U(0, ==, mutex_unlock(&ztest_props_lock));
+
 	nvlist_free(cos_list);
 }
 
@@ -4901,6 +4945,22 @@ static const vdev_prop_t vprops_string[] = {
 	VDEV_PROP_SPAREGROUP
 };
 
+static void
+ztest_cos_free(spa_t *spa, vdev_t *lvd, const char *name)
+{
+	nvlist_t *sprops = NULL;
+	VERIFY(0 == nvlist_alloc(&sprops, NV_UNIQUE_NAME, 0));
+	VERIFY(0 == nvlist_add_string(sprops,
+	    vdev_prop_to_name(VDEV_PROP_COS), ""));
+	VERIFY3U(0, ==, spa_vdev_prop_set(spa, lvd->vdev_guid, sprops));
+	/*
+	 * this can be called in cleanup code paths when we do not know
+	 * if CoS was allocated
+	 */
+	(void) spa_free_cos(spa, name, B_FALSE);
+	nvlist_free(sprops);
+}
+
 /* ARGSUSED */
 void
 ztest_vdev_prop_get_set(ztest_ds_t *zd, uint64_t id)
@@ -4910,7 +4970,8 @@ ztest_vdev_prop_get_set(ztest_ds_t *zd, uint64_t id)
 	vdev_t *lvd = NULL;
 
 	/* Make sure vdevs will stay in place */
-	(void) rw_rdlock(&ztest_name_lock);
+	VERIFY3U(0, ==, mutex_lock(&ztest_props_lock));
+
 	VERIFY(0 == mutex_lock(&ztest_vdev_lock));
 
 	lvd = ztest_get_random_vdev_leaf(spa);
@@ -4924,6 +4985,10 @@ ztest_vdev_prop_get_set(ztest_ds_t *zd, uint64_t id)
 	    sizeof (vprops_uint64) / sizeof (vprops_uint64[0]), sprops, gprops);
 
 	/* Test string properties */
+	/* Allocate CoS descriptor to have vdev-set of cos succeed */
+	ztest_cos_free(spa, lvd, ZTEST_COS_NAME);
+	VERIFY3U(0, ==, spa_alloc_cos(spa, ZTEST_COS_NAME, 0));
+
 	sprops = ztest_props_set(lvd, NULL, VDEV_PROP_STRING,
 	    (void *)&vprops_string[0],
 	    sizeof (vprops_string) / sizeof (vprops_string[0]));
@@ -4931,8 +4996,12 @@ ztest_vdev_prop_get_set(ztest_ds_t *zd, uint64_t id)
 	ztest_props_test(VDEV_PROP_STRING, (void *)&vprops_string[0],
 	    sizeof (vprops_string) / sizeof (vprops_string[0]), sprops, gprops);
 
+	/* Done, free cos to avoid collisions with other tests */
+	ztest_cos_free(spa, lvd, ZTEST_COS_NAME);
+
 	VERIFY(0 == mutex_unlock(&ztest_vdev_lock));
-	(void) rw_unlock(&ztest_name_lock);
+
+	VERIFY3U(0, ==, mutex_unlock(&ztest_props_lock));
 }
 
 /* end vdev and cos property tests */
@@ -5891,6 +5960,7 @@ ztest_run(ztest_shared_t *zs)
 	 * Initialize parent/child shared state.
 	 */
 	VERIFY(_mutex_init(&ztest_vdev_lock, USYNC_THREAD, NULL) == 0);
+	VERIFY(_mutex_init(&ztest_props_lock, USYNC_THREAD, NULL) == 0);
 	VERIFY(rwlock_init(&ztest_name_lock, USYNC_THREAD, NULL) == 0);
 
 	zs->zs_thread_start = gethrtime();
@@ -6251,6 +6321,7 @@ ztest_init(ztest_shared_t *zs)
 	ztest_run_zdb(ztest_opts.zo_pool);
 
 	(void) rwlock_destroy(&ztest_name_lock);
+	(void) _mutex_destroy(&ztest_props_lock);
 	(void) _mutex_destroy(&ztest_vdev_lock);
 }
 

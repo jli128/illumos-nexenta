@@ -59,7 +59,7 @@ void spa_cos_init(spa_t *);
 void spa_cos_fini(spa_t *);
 
 int spa_alloc_cos(spa_t *, const char *, uint64_t);
-int spa_free_cos(spa_t *, const char *);
+int spa_free_cos(spa_t *, const char *, boolean_t);
 int spa_list_cos(spa_t *, nvlist_t *);
 int spa_cos_prop_set(spa_t *, const char *, nvlist_t *);
 int spa_cos_prop_get(spa_t *, const char *, nvlist_t **);

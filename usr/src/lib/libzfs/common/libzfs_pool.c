@@ -40,6 +40,7 @@
 #include <sys/vtoc.h>
 #include <sys/zfs_ioctl.h>
 #include <dlfcn.h>
+
 #include "zfs_namecheck.h"
 #include "zfs_prop.h"
 #include "libzfs_impl.h"
@@ -4250,7 +4251,7 @@ vdev_get_all_props(zpool_handle_t *zhp, uint64_t vdev_guid, nvlist_t **nvp)
 			}
 		} else {
 			zcmd_free_nvlists(&zc);
-			(void) zfs_error(hdl, EZFS_BADTARGET,
+			(void) zfs_error(hdl, EZFS_BADDEV,
 			    "failed to get vdev properties");
 			return (-1);
 		}
@@ -4286,7 +4287,7 @@ vdev_get_prop(zpool_handle_t *zhp,  const char *vdev, vdev_prop_t prop,
 		return (-1);
 
 	if (vdev_get_guid(zhp, vdev, &vdev_guid) != 0) {
-		(void) zfs_error(zhp->zpool_hdl, EZFS_BADTARGET, errbuf);
+		(void) zfs_error(zhp->zpool_hdl, EZFS_BADDEV, errbuf);
 		return (-1);
 	}
 
@@ -4359,7 +4360,7 @@ vdev_set_prop(zpool_handle_t *zhp, const char *vdev,
 	}
 
 	if (vdev_get_guid(zhp, vdev, &guid) != 0) {
-		(void) zfs_error(zhp->zpool_hdl, EZFS_BADTARGET, errbuf);
+		(void) zfs_error(zhp->zpool_hdl, EZFS_BADDEV, errbuf);
 		return (-1);
 	}
 
@@ -4390,7 +4391,8 @@ vdev_set_prop(zpool_handle_t *zhp, const char *vdev,
 	nvlist_free(nvl);
 
 	if (ret)
-		(void) zpool_standard_error(zhp->zpool_hdl, errno, errbuf);
+		(void) zpool_vprop_standard_error(zhp->zpool_hdl,
+		    errno, errbuf);
 
 	return (ret);
 }
@@ -4417,7 +4419,7 @@ vdev_set_proplist(zpool_handle_t *zhp, const char *vdev, nvlist_t *nvl)
 	    zhp->zpool_name);
 
 	if (vdev_get_guid(zhp, vdev, &guid) != 0) {
-		(void) zfs_error(hdl, EZFS_BADTARGET, errbuf);
+		(void) zfs_error(hdl, EZFS_BADDEV, errbuf);
 		return (-1);
 	}
 
@@ -4448,7 +4450,7 @@ vdev_set_proplist(zpool_handle_t *zhp, const char *vdev, nvlist_t *nvl)
 	nvlist_free(nvl);
 
 	if (ret)
-		(void) zpool_standard_error(hdl, errno, errbuf);
+		(void) zpool_vprop_standard_error(hdl, errno, errbuf);
 
 	return (ret);
 }
@@ -4639,13 +4641,13 @@ cos_alloc(zpool_handle_t *zhp, char *cosname, nvlist_t *nvl)
 	error = ioctl(hdl->libzfs_fd, ZFS_IOC_COS_ALLOC, &zc);
 
 	if (error)
-		(void) zpool_standard_error(zhp->zpool_hdl, errno, errbuf);
+		(void) zpool_vprop_standard_error(hdl, errno, errbuf);
 
 	return (error);
 }
 
 int
-cos_free(zpool_handle_t *zhp, char *cosname, uint64_t guid)
+cos_free(zpool_handle_t *zhp, char *cosname, uint64_t guid, boolean_t force)
 {
 	zfs_cmd_t zc = { 0 };
 	libzfs_handle_t *hdl = zhp->zpool_hdl;
@@ -4660,10 +4662,12 @@ cos_free(zpool_handle_t *zhp, char *cosname, uint64_t guid)
 	(void) strlcpy(zc.zc_string, cosname, sizeof (zc.zc_string));
 	zc.zc_guid = guid;
 
+	zc.zc_cookie = (uint64_t)force;
+
 	error = ioctl(hdl->libzfs_fd, ZFS_IOC_COS_FREE, &zc);
 
 	if (error)
-		(void) zpool_standard_error(zhp->zpool_hdl, errno, errbuf);
+		(void) zpool_vprop_standard_error(hdl, errno, errbuf);
 
 	return (error);
 }
@@ -4861,7 +4865,8 @@ cos_set_proplist(zpool_handle_t *zhp, const char *cos, nvlist_t *nvl)
 	nvlist_free(nvl);
 
 	if (ret)
-		(void) zpool_standard_error(zhp->zpool_hdl, errno, errbuf);
+		(void) zpool_vprop_standard_error_fmt(zhp->zpool_hdl,
+		    errno, errbuf);
 
 	return (ret);
 }

@@ -119,9 +119,9 @@ static void
 vdev_parse_props(vdev_t *vdev, char *packed, uint64_t nvsize)
 {
 	uint64_t ival;
-	char *sval;
 	nvlist_t *nvl;
 	const char *propname;
+	char *sval;
 	int err;
 	zio_priority_t p;
 
@@ -163,7 +163,7 @@ vdev_parse_props(vdev_t *vdev, char *packed, uint64_t nvsize)
 		cos_t *cos = NULL;
 		spa_t *spa = vdev->vdev_spa;
 		spa_cos_enter(spa);
-		cos = spa_lookup_cos_by_guid(vdev->vdev_spa, ival);
+		cos = spa_lookup_cos_by_guid(spa, ival);
 		if (cos) {
 			cos_hold(cos);
 			vdev->vdev_queue.vq_cos = cos;
@@ -195,22 +195,22 @@ spa_vdev_get_common(spa_t *spa, uint64_t guid, char **value,
 	spa_vdev_state_enter(spa, SCL_ALL);
 
 	if ((vd = spa_lookup_by_guid(spa, guid, B_TRUE)) == NULL)
-		return (spa_vdev_state_exit(spa, NULL, ENOENT));
+		return (spa_vdev_state_exit(spa, NULL, EINVAL));
 
 	if (!vd->vdev_ops->vdev_op_leaf)
-		return (spa_vdev_state_exit(spa, NULL, ENOTSUP));
+		return (spa_vdev_state_exit(spa, NULL, EINVAL));
 
 	vqc = vd->vdev_queue.vq_class;
 
 	switch (prop) {
 	case VDEV_PROP_PATH:
 		if (vd->vdev_path != NULL) {
-			*value = spa_strdup(vd->vdev_path);
+			*value = vd->vdev_path;
 		}
 		break;
 	case VDEV_PROP_FRU:
 		if (vd->vdev_fru != NULL) {
-			*value = spa_strdup(vd->vdev_fru);
+			*value = vd->vdev_fru;
 		}
 		break;
 
@@ -239,17 +239,21 @@ spa_vdev_get_common(spa_t *spa, uint64_t guid, char **value,
 		break;
 
 	case VDEV_PROP_COS:
-		if (vd->vdev_queue.vq_cos != NULL)
-			*value = spa_strdup(vd->vdev_queue.vq_cos->cos_name);
-		else
+		if (vd->vdev_queue.vq_cos != NULL) {
+			*value = vd->vdev_queue.vq_cos->cos_name;
+		} else {
 			*value = NULL;
+			return (spa_vdev_state_exit(spa, NULL, ENOENT));
+		}
 		break;
 
 	case VDEV_PROP_SPAREGROUP:
-		if (vd->vdev_spare_group != NULL)
-			*value = spa_strdup(vd->vdev_spare_group);
-		else
+		if (vd->vdev_spare_group != NULL) {
+			*value = vd->vdev_spare_group;
+		} else {
 			*value = NULL;
+			return (spa_vdev_state_exit(spa, NULL, ENOENT));
+		}
 		break;
 
 	default:
@@ -278,7 +282,7 @@ spa_vdev_set_common(vdev_t *vd, const char *value,
 	spa_vdev_state_enter(spa, SCL_ALL);
 
 	if (!vd->vdev_ops->vdev_op_leaf)
-		return (spa_vdev_state_exit(spa, NULL, ENOTSUP));
+		return (spa_vdev_state_exit(spa, NULL, EINVAL));
 
 	switch (prop) {
 	case VDEV_PROP_PATH:
@@ -504,6 +508,13 @@ spa_vdev_sync_props(void *arg1, dmu_tx_t *tx)
 	mutex_exit(&spa->spa_vdev_props_lock);
 }
 
+int
+spa_vdev_props_sync_task_do(spa_t *spa)
+{
+	return (dsl_sync_task(spa->spa_name, NULL, spa_vdev_sync_props,
+	    spa, 3));
+}
+
 /*
  * Load vdev properties from the vdev_props_object in the MOS
  */
@@ -652,8 +663,7 @@ spa_vdev_prop_set(spa_t *spa, uint64_t vdev_guid, nvlist_t *nvp)
 		return (error);
 
 	if (need_sync)
-		return (dsl_sync_task(spa->spa_name, NULL,
-		    spa_vdev_sync_props, spa, 3));
+		return (spa_vdev_props_sync_task_do(spa));
 
 	return (error);
 }
@@ -675,13 +685,12 @@ spa_vdev_prop_get(spa_t *spa, uint64_t vdev_guid, nvlist_t **nvp)
 		const char *propname = vdev_prop_to_name(prop);
 
 		if ((err = spa_vdev_get_common(spa, vdev_guid, &strval,
-		    &ival, prop)) != 0)
+		    &ival, prop)) != 0 && (err != ENOENT))
 			return (err);
 
 		if (strval != NULL) {
 			VERIFY(nvlist_add_string(*nvp, propname, strval) == 0);
-			spa_strfree(strval);
-		} else {
+		} else if (err != ENOENT) {
 			VERIFY(nvlist_add_uint64(*nvp, propname, ival) == 0);
 		}
 	}
