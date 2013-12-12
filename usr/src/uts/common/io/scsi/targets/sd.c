@@ -15418,15 +15418,15 @@ got_pkt:
 			break;	/* Success; try the next cmd (if any) */
 
 		case TRAN_BUSY:
+			un->un_ncmds_in_transport--;
+			ASSERT(un->un_ncmds_in_transport >= 0);
+
 #ifdef SD_FAULT_INJECTION
 			/*
 			 * If the packet was rejected during active fault
 			 * injection session, move to the next fault slot
 			 * and reset packet flag related to rejection.
 			 */
-			un->un_ncmds_in_transport--;
-			ASSERT(un->un_ncmds_in_transport >= 0);
-
 			if (sd_fault_injection_on) {
 				uint_t i = un->sd_fi_fifo_start;
 
