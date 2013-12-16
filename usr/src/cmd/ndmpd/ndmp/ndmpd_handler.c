@@ -351,9 +351,9 @@ ndmp_handler_t ndmp_msghdl_tab[] = {
 				NDMP_TAPE_WRITE,
 				AUTH_REQUIRED,
 				{
-					HANDL(tape_write, 2, 2),
-					HANDL(tape_write, 2, 3),
-					HANDL(tape_write, 2, 4),
+					HANDL(tape_write, 3, 2),
+					HANDL(tape_write, 3, 3),
+					HANDL(tape_write, 3, 4),
 				}
 			},
 			{
