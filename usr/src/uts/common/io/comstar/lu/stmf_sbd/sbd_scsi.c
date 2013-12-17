@@ -3866,11 +3866,20 @@ sbd_flush_data_cache(sbd_lu_t *sl, int fsync_done)
 	int r = 0;
 	int ret;
 
+	ASSERT3S(RW_LOCK_HELD(&sl->sl_access_state_lock),==,0);
+
+	rw_enter(&sl_access_state_lock, RW_READER);
+	if ((sl->sl_flags & SL_MEDIA_LOADED) == 0) {
+		ret = SBD_FILEIO_FAILURE;
+		goto flush_fail;
+	}
 	if (fsync_done)
 		goto over_fsync;
 	if ((sl->sl_data_vtype == VREG) || (sl->sl_data_vtype == VBLK)) {
-		if (VOP_FSYNC(sl->sl_data_vp, FSYNC, kcred, NULL))
-			return (SBD_FAILURE);
+		if (VOP_FSYNC(sl->sl_data_vp, FSYNC, kcred, NULL)) {
+			ret = SBD_FAILURE;
+			goto flush_fail;
+		}
 	}
 over_fsync:
 	if (((sl->sl_data_vtype == VCHR) || (sl->sl_data_vtype == VBLK)) &&
@@ -3881,12 +3890,14 @@ over_fsync:
 			mutex_enter(&sl->sl_lock);
 			sl->sl_flags |= SL_NO_DATA_DKIOFLUSH;
 			mutex_exit(&sl->sl_lock);
-		} else if (ret != 0) {
-			return (SBD_FAILURE);
+		} else {
+			ret = (ret != 0) ? SBD_FAILURE : SBD_SUCCESS;
 		}
 	}
+flush_fail:
+	rw_exit(&sl->sl_access_state_lock);
 
-	return (SBD_SUCCESS);
+	return (ret);
 }
 
 /* ARGSUSED */
