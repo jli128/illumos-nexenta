@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -78,7 +79,8 @@ mod_init()
 		return (0);
 
 	if ((mod_plp = dlopen(plname, RTLD_LOCAL | RTLD_NOW)) == NULL) {
-		syslog(LOG_ERR, "Error loading the plug-in %s", plname);
+		syslog(LOG_ERR, "Error loading the plug-in %s: %s",
+		    plname, dlerror());
 		return (0);
 	}
 

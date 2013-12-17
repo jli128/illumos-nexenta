@@ -2,6 +2,9 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ */
 
 /*
  * BSD 3 Clause License
@@ -542,9 +545,12 @@ void
 ndmpd_connect_close_v3(ndmp_connection_t *connection, void *body)
 {
 	ndmpd_session_t *session;
+	ndmp_lbr_params_t *nlp;
 	ndmp_notify_connected_request req;
 
 	if (!(session = (ndmpd_session_t *)ndmp_get_client_data(connection)))
+		return;
+	if ((nlp = ndmp_get_nlp(session)) == NULL)
 		return;
 
 	NDMP_LOG(LOG_DEBUG, "ver: %u",
@@ -561,8 +567,11 @@ ndmpd_connect_close_v3(ndmp_connection_t *connection, void *body)
 		return;
 	}
 
+	(void) mutex_lock(&nlp->nlp_mtx);
 	ndmp_close(connection);
 	session->ns_eof = TRUE;
+	(void) cond_broadcast(&nlp->nlp_cv);
+	(void) mutex_unlock(&nlp->nlp_mtx);
 }
 
 /*
@@ -1046,14 +1055,10 @@ ndmpd_connect_kill(ndmp_connection_t *connection)
 
 	switch (session->ns_protocol_version) {
 	case NDMPV2:
-		nlp_event_rv_set(session, -2);
-		nlp_event_nw(session);
 		ndmpd_connect_close_v2(connection, (void *)NULL);
 		break;
 	case NDMPV3:
 	case NDMPV4:
-		nlp_event_rv_set(session, -2);
-		nlp_event_nw(session);
 		ndmpd_connect_close_v3(connection, (void *)NULL);
 		break;
 	default:

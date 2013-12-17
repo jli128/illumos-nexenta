@@ -3211,7 +3211,6 @@ ndmpd_dar_tar_v3(ndmpd_session_t *session, ndmpd_module_params_t *params,
 			    ep->nm3_opath, ep->nm3_dpath))
 			    != 0) {
 				NDMP_LOG(LOG_ERR, "Pre-restore plug-in: %m");
-				cmds->tcs_command->tc_reader = TLM_STOP;
 				ndmp_stop_local_reader(session, cmds);
 				ndmp_wait_for_reader(cmds);
 				(void) pthread_join(rdtp, NULL);
@@ -3241,12 +3240,6 @@ ndmpd_dar_tar_v3(ndmpd_session_t *session, ndmpd_module_params_t *params,
 
 		cmds->tcs_writer_count--;
 		cmds->tcs_command->tc_ref--;
-		cmds->tcs_command->tc_reader = TLM_STOP;
-
-
-		/*
-		 * If it is a two-way restore then we stop the reader.
-		 */
 		NDMP_LOG(LOG_DEBUG, "stop local reader.");
 		ndmp_stop_local_reader(session, cmds);
 
@@ -3581,7 +3574,6 @@ ndmpd_rs_sar_tar_v3(ndmpd_session_t *session, ndmpd_module_params_t *params,
 			    nlp->nlp_nfiles))
 			    != 0) {
 				NDMP_LOG(LOG_ERR, "Pre-restore plug-in: %m");
-				cmds->tcs_command->tc_reader = TLM_STOP;
 				ndmp_stop_local_reader(session, cmds);
 				ndmp_wait_for_reader(cmds);
 				(void) pthread_join(rdtp, NULL);
@@ -3613,7 +3605,6 @@ ndmpd_rs_sar_tar_v3(ndmpd_session_t *session, ndmpd_module_params_t *params,
 
 		cmds->tcs_writer_count--;
 		cmds->tcs_command->tc_ref--;
-		cmds->tcs_command->tc_reader = TLM_STOP;
 		nlp->nlp_jstat->js_stop_time = time(NULL);
 
 		/* Send the list of un-recovered files/dirs to the client.  */
@@ -3960,7 +3951,6 @@ ndmpd_tar_restore_starter_v3(void *arg)
 
 }
 
-
 /*
  * ndmp_tar_restore_abort_v3
  *
@@ -3985,11 +3975,8 @@ ndmpd_tar_restore_abort_v3(void *module_cookie)
 			(void) close(nlp->nlp_session->ns_data.dd_sock);
 			nlp->nlp_session->ns_data.dd_sock = -1;
 		}
-		nlp_event_nw(nlp->nlp_session);
 		ndmp_stop_writer_thread(nlp->nlp_session);
 	}
 
-
 	return (0);
-
 }
