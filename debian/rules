@@ -64,15 +64,14 @@ setup-closed-stamp:
 build-on: patch setup-closed build-on-stamp
 build-on-stamp:
 	dh_testdir
-	env - GATEROOT=$(GATEROOT) \
-	  /opt/onbld/bin/nightly debian/ncp3-env.sh
+	/opt/onbld/bin/bldenv debian/ncp3-env.sh 'cd usr/src ; dmake setup'
+	usr/src/tools/proto/opt/onbld/bin/nightly debian/ncp3-env.sh
 	cat mail_msg.txt
 	touch $@
 
 # helpful rule for when your ON build fails...
 rebuild-on: patch setup-closed
-	env - GATEROOT=$(GATEROOT) \
-	  /opt/onbld/bin/nightly -i debian/ncp3-env.sh
+	usr/src/tools/proto/opt/onbld/bin/nightly -i debian/ncp3-env.sh
 
 build-packages: build-on build-packages-stamp
 build-packages-stamp:
