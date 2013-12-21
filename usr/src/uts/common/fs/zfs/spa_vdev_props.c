@@ -717,5 +717,5 @@ spa_vdev_setfru(spa_t *spa, uint64_t guid, const char *newfru)
 	if ((vdev = spa_lookup_by_guid(spa, guid, B_TRUE)) == NULL)
 		return (ENOENT);
 
-	return (spa_vdev_set_common(vdev, newfru, 0, VDEV_PROP_PATH));
+	return (spa_vdev_set_common(vdev, newfru, 0, VDEV_PROP_FRU));
 }
