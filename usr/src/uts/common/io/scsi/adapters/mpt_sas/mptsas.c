@@ -469,6 +469,13 @@ extern dev_info_t	*scsi_vhci_dip;
 int mptsas_inq83_retry_timeout = 30;
 
 /*
+ * Tunable for default SCSI pkt timeout. Defaults to 5 seconds, which should
+ * be plenty for INQUIRY and REPORT_LUNS, which are the only commands currently
+ * issued by mptsas directly.
+ */
+int mptsas_scsi_pkt_time = 5;
+
+/*
  * This is used to allocate memory for message frame storage, not for
  * data I/O DMA. All message frames must be stored in the first 4G of
  * physical memory.
@@ -12890,6 +12897,7 @@ mptsas_send_scsi_cmd(mptsas_t *mpt, struct scsi_address *ap,
 	}
 	bcopy(cdb, pktp->pkt_cdbp, cdblen);
 	pktp->pkt_flags = FLAG_NOPARITY;
+	pktp->pkt_time = mptsas_scsi_pkt_time;
 	if (scsi_poll(pktp) < 0) {
 		goto out;
 	}
