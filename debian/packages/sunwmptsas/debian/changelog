@@ -1,3 +1,9 @@
+sunwmptsas (5.11.134-31-11661-91) nexenta; urgency=low
+
+  * Issue NEX-1531: backport OS-91 mptsas does inquiry without setting pkt_time
+
+ -- support@nexenta.com <support@nexenta.com>  Tue, 23 Dec 2013 06:20:40 -0800
+
 sunwmptsas (5.11.134-31-11660-13275) nexenta; urgency=low
 
   * backport OS-66 and NEX-1052 
