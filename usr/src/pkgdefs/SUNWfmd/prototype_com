@@ -107,6 +107,10 @@ f none usr/lib/fm/fmd/plugins/zfs-monitor.conf 644 root bin
 f none usr/lib/fm/fmd/plugins/zfs-monitor.so 555 root bin
 f none usr/lib/fm/fmd/plugins/zfs-retire.conf 644 root bin
 f none usr/lib/fm/fmd/plugins/zfs-retire.so 555 root bin
+f none usr/lib/fm/fmd/plugins/slow-io-de.so 555 root bin
+f none usr/lib/fm/fmd/plugins/slow-io-de.conf 555 root bin
+f none usr/lib/fm/fmd/plugins/disk-sense-de.so 555 root bin
+f none usr/lib/fm/fmd/plugins/disk-sense-de.conf 555 root bin
 d none usr/lib/fm/fmd/schemes 755 root bin
 f none usr/lib/fm/fmd/schemes/cpu.so 555 root bin
 f none usr/lib/fm/fmd/schemes/dev.so 555 root bin

@@ -26,6 +26,7 @@
 SUBDIRS = cpumem-retire \
 	disk-monitor	\
 	disk-transport	\
+	disk-sense-de	\
 	eversholt 	\
 	ext-event-transport \
 	fabric-xlate \
@@ -33,6 +34,7 @@ SUBDIRS = cpumem-retire \
 	io-retire	\
 	ip-transport	\
 	sensor-transport \
+	slow-io-de	\
 	snmp-trapgen	\
 	sp-monitor	\
 	syslog-msgs	\

@@ -1,3 +1,9 @@
+sunwstmf (5.11.134-31-13105-14227) nexenta; urgency=low
+
+  * Isssue REL-30 IO backports
+
+ -- Nexenta systems <support@nexenata.com>  Thu, 19 Dec 2013 00:36:01 -0800
+
 sunwstmf (5.11.134-31-13105-14226) nexenta; urgency=high
 
   * Issue 14226: kernel crash dump on comstar icscit

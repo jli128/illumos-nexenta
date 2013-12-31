@@ -3093,6 +3093,8 @@ vhci_intr(struct scsi_pkt *pkt)
 	tpkt->pkt_state = pkt->pkt_state;
 	tpkt->pkt_statistics = pkt->pkt_statistics;
 	tpkt->pkt_reason = pkt->pkt_reason;
+	tpkt->pkt_start = pkt->pkt_start;
+	tpkt->pkt_stop = pkt->pkt_stop;
 
 	/* Return path_instance information back to the target driver. */
 	if (scsi_pkt_allocated_correctly(tpkt)) {

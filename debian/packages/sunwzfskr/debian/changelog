@@ -1,3 +1,9 @@
+sunwzfskr (5.11.134-31-12281-14120) nexenta; urgency=low
+
+  * Isssue REL-30 IO backports
+
+ -- Nexenta systems <support@nexenata.com>  Thu, 19 Dec 2013 00:35:55 -0800
+
 sunwzfskr (5.11.134-31-12281-14119) nexenta; urgency=high
 
   * Issue 14119: BAD-TRAP panic under load

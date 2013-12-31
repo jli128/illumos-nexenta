@@ -106,6 +106,8 @@ struct scsi_pkt {
 
 	/* stage-temporary: iff scsi_pkt_allocated_correctly() */
 	void	*pkt_stmp;		/* temporary for current pkt stage */
+	hrtime_t pkt_start;
+	hrtime_t pkt_stop;
 
 #ifdef	SCSI_SIZE_CLEAN_VERIFY
 	/*

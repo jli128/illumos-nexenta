@@ -1,3 +1,9 @@
+sunwmptsas (5.11.134-31-11660-13273) nexenta; urgency=low
+
+  * REL-30 io-backports
+
+ -- support@nexenta.com <support@nexenta.com>  Tue, 31 Dec 2013 06:46:49 -0800
+
 sunwmptsas (5.11.134-31-11660-13272) nexenta; urgency=high
 
   * Issue 13272: Stucked Inquiry commands put a pool to degraded state

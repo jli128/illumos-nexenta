@@ -1,3 +1,9 @@
+sunwckr (5.11.134-31-12271-12715) nexenta; urgency=low
+
+  * Isssue REL-30 IO backports
+
+ -- Nexenta systems <support@nexenata.com>  Thu, 19 Dec 2013 00:35:37 -0800
+
 sunwckr (5.11.134-31-12271-12714) nexenta; urgency=medium
 
   * Issue 12714: Corruption of the `xprt-ready' queue in svc_xprt_qdelete()

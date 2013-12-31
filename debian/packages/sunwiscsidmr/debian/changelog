@@ -1,3 +1,9 @@
+sunwiscsidmr (5.11.134-31-0-102) nexenta; urgency=low
+
+  * REL-30 io-backport
+
+ -- Nexenta systems <support@nexenta.com>  Sat, 28 Dec 2013 09:20:07 -0800
+
 sunwiscsidmr (5.11.134-31-0-101) nexenta; urgency=low
 
   * Issue 5439: iSCSI drop outs
