@@ -6724,38 +6724,41 @@ spa_has_active_shared_spare(spa_t *spa)
  * in the userland libzpool, as we don't want consumers to misinterpret ztest
  * or zdb as real changes.
  */
-void
-spa_event_notify(spa_t *spa, vdev_t *vd, const char *name)
+static void
+spa_event_notify_impl(void *arg)
 {
+	/* cast the argument; will need to be freed once done */
+	spa_einfo_t *evt = (spa_einfo_t *)arg;
+
 #ifdef _KERNEL
 	sysevent_t		*ev;
 	sysevent_attr_list_t	*attr = NULL;
 	sysevent_value_t	value;
 	sysevent_id_t		eid;
 
-	ev = sysevent_alloc(EC_ZFS, (char *)name, SUNW_KERN_PUB "zfs",
-	    SE_SLEEP);
+	ev = sysevent_alloc(EC_ZFS, (char *)evt->event_name,
+	    SUNW_KERN_PUB "zfs", SE_SLEEP);
 
 	value.value_type = SE_DATA_TYPE_STRING;
-	value.value.sv_string = spa_name(spa);
+	value.value.sv_string = evt->spa_name;
 	if (sysevent_add_attr(&attr, ZFS_EV_POOL_NAME, &value, SE_SLEEP) != 0)
 		goto done;
 
 	value.value_type = SE_DATA_TYPE_UINT64;
-	value.value.sv_uint64 = spa_guid(spa);
+	value.value.sv_uint64 = evt->spa_guid;
 	if (sysevent_add_attr(&attr, ZFS_EV_POOL_GUID, &value, SE_SLEEP) != 0)
 		goto done;
 
-	if (vd) {
+	if (evt->vdev_guid) {
 		value.value_type = SE_DATA_TYPE_UINT64;
-		value.value.sv_uint64 = vd->vdev_guid;
+		value.value.sv_uint64 = evt->vdev_guid;
 		if (sysevent_add_attr(&attr, ZFS_EV_VDEV_GUID, &value,
 		    SE_SLEEP) != 0)
 			goto done;
 
-		if (vd->vdev_path) {
+		if (evt->vdev_path) {
 			value.value_type = SE_DATA_TYPE_STRING;
-			value.value.sv_string = vd->vdev_path;
+			value.value.sv_string = evt->vdev_path;
 			if (sysevent_add_attr(&attr, ZFS_EV_VDEV_PATH,
 			    &value, SE_SLEEP) != 0)
 				goto done;
@@ -6773,4 +6776,42 @@ done:
 		sysevent_free_attr(attr);
 	sysevent_free(ev);
 #endif
+	kmem_free(evt, sizeof (spa_einfo_t));
+}
+
+/*
+ * Dispatch event notifications to the taskq such that the corresponding
+ * sysevents are queued with no spa locks held
+ */
+taskq_t *spa_sysevent_taskq;
+
+void
+spa_event_notify(spa_t *spa, vdev_t *vdev, const char *name)
+{
+	spa_einfo_t *spe = kmem_zalloc(sizeof (spa_einfo_t), KM_SLEEP);
+
+	spe->spa_guid = spa_guid(spa);
+	spe->spa_name = spa_strdup(spa_name(spa));
+	spe->event_name = spa_strdup(name);
+
+	if (vdev) {
+		spe->vdev_guid = vdev->vdev_guid;
+		spe->vdev_path = spa_strdup(vdev->vdev_path);
+	}
+
+	if (taskq_dispatch(spa_sysevent_taskq, spa_event_notify_impl,
+	    spe, TQ_NOSLEEP) == NULL) {
+		/*
+		 * These are management sysevents; as much as it is
+		 * unpleasant to drop these due to syseventd not being able
+		 * to keep up, perhaps due to resource shortages, we are not
+		 * going to sleep here and risk locking up the pool sync
+		 * process; notify admin of problems
+		 */
+		cmn_err(CE_NOTE, "Could not dispatch sysevent nofitication "
+		    "for %s, please check state of syseventd\n",
+		    spe->event_name);
+		kmem_free(spe, sizeof (spa_einfo_t));
+		return;
+	}
 }

@@ -1794,6 +1794,14 @@ spa_init(int mode)
 
 	spa_mode_global = mode;
 
+	/*
+	 * logevent_max_q_sz from log_sysevent.c gives us upper bound on
+	 * the number of taskq entries; queueing of sysevents is serialized,
+	 * so there is no need for more than one worker thread
+	 */
+	spa_sysevent_taskq = taskq_create("spa_sysevent_tq", 1,
+	    minclsyspri, 1, 5000, TASKQ_DYNAMIC);
+
 #ifdef _KERNEL
 	spa_arch_init();
 #else
@@ -1841,6 +1849,8 @@ spa_fini(void)
 	range_tree_fini();
 	unique_fini();
 	refcount_fini();
+
+	taskq_destroy(spa_sysevent_taskq);
 
 	avl_destroy(&spa_namespace_avl);
 	avl_destroy(&spa_spare_avl);

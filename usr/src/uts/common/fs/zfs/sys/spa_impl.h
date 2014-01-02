@@ -169,6 +169,19 @@ typedef struct spa_meta_placement {
 	uint64_t spa_other_meta_to_special;
 } spa_meta_placement_t;
 
+
+/*
+ * SPA info copied from spa_t and optionally from vdev_t that is provided
+ * with pool and vdev sysevents
+ */
+typedef struct {
+	char *event_name;
+	char *spa_name;
+	char *vdev_path;
+	uint64_t spa_guid;
+	uint64_t vdev_guid;
+} spa_einfo_t;
+
 struct spa {
 	/*
 	 * Fields protected by spa_namespace_lock.
@@ -381,6 +394,9 @@ struct spa {
 	uint64_t spa_dedup_lo_best_effort;
 	uint64_t spa_dedup_hi_best_effort;
 };
+
+/* spa sysevent taskq */
+extern taskq_t *spa_sysevent_taskq;
 
 extern const char *spa_config_path;
 
