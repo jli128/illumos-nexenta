@@ -655,6 +655,8 @@ spa_remove(spa_t *spa)
 	list_destroy(&spa->spa_config_list);
 	list_destroy(&spa->spa_wrc.wrc_blocks);
 
+	spa_cos_fini(spa);
+
 	nvlist_free(spa->spa_label_features);
 	nvlist_free(spa->spa_load_info);
 	spa_config_set(spa, NULL);

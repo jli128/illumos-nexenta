@@ -4705,7 +4705,7 @@ ztest_get_random_vdev_leaf(spa_t *spa)
 	return (lvd);
 }
 
-#define	ZTEST_COS_NAME		"ztest_cos_name"
+#define	ZTEST_COS_NAME		"ztest_cos"
 
 /*ARGSUSED*/
 static nvlist_t *
@@ -4949,6 +4949,7 @@ static void
 ztest_cos_free(spa_t *spa, vdev_t *lvd, const char *name)
 {
 	nvlist_t *sprops = NULL;
+	int error = 0;
 	VERIFY(0 == nvlist_alloc(&sprops, NV_UNIQUE_NAME, 0));
 	VERIFY(0 == nvlist_add_string(sprops,
 	    vdev_prop_to_name(VDEV_PROP_COS), ""));
@@ -4957,7 +4958,9 @@ ztest_cos_free(spa_t *spa, vdev_t *lvd, const char *name)
 	 * this can be called in cleanup code paths when we do not know
 	 * if CoS was allocated
 	 */
-	(void) spa_free_cos(spa, name, B_FALSE);
+	error = spa_free_cos(spa, name, B_FALSE);
+	if (error)
+		VERIFY3U(error, ==, ENOENT);
 	nvlist_free(sprops);
 }
 
@@ -4968,7 +4971,7 @@ ztest_vdev_prop_get_set(ztest_ds_t *zd, uint64_t id)
 	spa_t *spa = ztest_spa;
 	nvlist_t *sprops = NULL, *gprops = NULL;
 	vdev_t *lvd = NULL;
-
+	int error = 0;
 	/* Make sure vdevs will stay in place */
 	VERIFY3U(0, ==, mutex_lock(&ztest_props_lock));
 
@@ -4986,8 +4989,9 @@ ztest_vdev_prop_get_set(ztest_ds_t *zd, uint64_t id)
 
 	/* Test string properties */
 	/* Allocate CoS descriptor to have vdev-set of cos succeed */
-	ztest_cos_free(spa, lvd, ZTEST_COS_NAME);
-	VERIFY3U(0, ==, spa_alloc_cos(spa, ZTEST_COS_NAME, 0));
+	error = spa_alloc_cos(spa, ZTEST_COS_NAME, 0);
+	if (error)
+		VERIFY3U(error, ==, EEXIST);
 
 	sprops = ztest_props_set(lvd, NULL, VDEV_PROP_STRING,
 	    (void *)&vprops_string[0],

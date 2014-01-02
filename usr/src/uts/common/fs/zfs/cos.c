@@ -65,10 +65,11 @@ cos_match_name(cos_t *cos, void *match_data)
 static cos_t *
 spa_foreach_cos(spa_t *spa, cos_func_t cos_f, void *data)
 {
-	cos_t *cos;
+	cos_t *cos, *next_cos;
 
 	for (cos = list_head(&spa->spa_cos_list); cos != NULL;
-	    cos = list_next(&spa->spa_cos_list, cos)) {
+	    cos = next_cos) {
+		next_cos = list_next(&spa->spa_cos_list, cos);
 		if (cos_f(cos, data))
 			break;
 	}
