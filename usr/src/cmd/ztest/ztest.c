@@ -4958,7 +4958,7 @@ ztest_cos_free(spa_t *spa, vdev_t *lvd, const char *name)
 	 * this can be called in cleanup code paths when we do not know
 	 * if CoS was allocated
 	 */
-	error = spa_free_cos(spa, name, B_FALSE);
+	error = spa_free_cos(spa, name, B_TRUE);
 	if (error)
 		VERIFY3U(error, ==, ENOENT);
 	nvlist_free(sprops);

@@ -107,6 +107,7 @@ vdev_store_props(vdev_t *vdev, objset_t *mos, uint64_t obj, uint64_t offset,
 
 	dmu_write(mos, obj, offset, bufsize, buf, tx);
 
+	kmem_free(buf, bufsize);
 	nvlist_free(nvl);
 
 	return (bufsize);

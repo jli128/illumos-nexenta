@@ -6717,6 +6717,34 @@ spa_has_active_shared_spare(spa_t *spa)
 	return (B_FALSE);
 }
 
+static void
+spa_init_einfo(spa_t *spa, vdev_t *vdev, const char *name, spa_einfo_t *spe)
+{
+	bzero(spe, sizeof (spa_einfo_t));
+
+	spe->spa_guid = spa_guid(spa);
+	spe->spa_name = spa_strdup(spa_name(spa));
+	spe->event_name = spa_strdup(name);
+
+	if (vdev) {
+		spe->vdev_guid = vdev->vdev_guid;
+		if (vdev->vdev_path)
+			spe->vdev_path = spa_strdup(vdev->vdev_path);
+	}
+}
+
+static void
+spa_fini_einfo(spa_einfo_t *spe)
+{
+	if (spe->spa_name)
+		spa_strfree(spe->spa_name);
+	if (spe->event_name)
+		spa_strfree(spe->event_name);
+	if (spe->vdev_path)
+		spa_strfree(spe->vdev_path);
+	kmem_free(spe, sizeof (spa_einfo_t));
+}
+
 /*
  * Post a sysevent corresponding to the given event.  The 'name' must be one of
  * the event definitions in sys/sysevent/eventdefs.h.  The payload will be
@@ -6776,7 +6804,7 @@ done:
 		sysevent_free_attr(attr);
 	sysevent_free(ev);
 #endif
-	kmem_free(evt, sizeof (spa_einfo_t));
+	spa_fini_einfo(evt);
 }
 
 /*
@@ -6788,16 +6816,9 @@ taskq_t *spa_sysevent_taskq;
 void
 spa_event_notify(spa_t *spa, vdev_t *vdev, const char *name)
 {
-	spa_einfo_t *spe = kmem_zalloc(sizeof (spa_einfo_t), KM_SLEEP);
+	spa_einfo_t *spe = kmem_alloc(sizeof (spa_einfo_t), KM_SLEEP);
 
-	spe->spa_guid = spa_guid(spa);
-	spe->spa_name = spa_strdup(spa_name(spa));
-	spe->event_name = spa_strdup(name);
-
-	if (vdev) {
-		spe->vdev_guid = vdev->vdev_guid;
-		spe->vdev_path = spa_strdup(vdev->vdev_path);
-	}
+	spa_init_einfo(spa, vdev, name, spe);
 
 	if (taskq_dispatch(spa_sysevent_taskq, spa_event_notify_impl,
 	    spe, TQ_NOSLEEP) == NULL) {
@@ -6811,7 +6832,7 @@ spa_event_notify(spa_t *spa, vdev_t *vdev, const char *name)
 		cmn_err(CE_NOTE, "Could not dispatch sysevent nofitication "
 		    "for %s, please check state of syseventd\n",
 		    spe->event_name);
-		kmem_free(spe, sizeof (spa_einfo_t));
+		spa_fini_einfo(spe);
 		return;
 	}
 }

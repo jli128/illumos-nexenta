@@ -297,6 +297,7 @@ cos_sync_classes(spa_t *spa, uint64_t obj, dmu_tx_t *tx)
 	for (i = 0; i < num_classes; i++)
 		nvlist_free(nvl_arr[i]);
 	kmem_free(nvl_arr, nvl_arr_sz);
+	nvlist_free(nvl);
 
 empty:
 	VERIFY(0 == dmu_bonus_hold(spa->spa_meta_objset, obj, FTAG, &db));
