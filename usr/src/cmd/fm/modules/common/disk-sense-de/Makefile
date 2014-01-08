@@ -17,5 +17,5 @@ CLASS = common
 SRCS = disk-sense-de.c
 
 include ../../Makefile.plugin
-
+LDFLAGS += -L$(ROOT)/usr/lib/fm -ltopo
 LINTFLAGS += -L$(ROOT)/usr/lib/fm
