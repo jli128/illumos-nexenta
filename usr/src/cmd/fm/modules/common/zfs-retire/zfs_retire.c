@@ -22,7 +22,7 @@
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -285,9 +285,10 @@ replace_with_spare(fmd_hdl_t *hdl, zpool_handle_t *zhp, nvlist_t *vdev)
 
 	/* Get spare group of the vdev to be replaced, remember if none */
 	if ((vdev_get_prop(zhp, dev_name, VDEV_PROP_SPAREGROUP, dspr_group,
-	    MAXPATHLEN, &vdev_props)))
+	    MAXPATHLEN, &vdev_props))) {
 		unassigned = B_TRUE;
-	nvlist_free(vdev_props);
+		nvlist_free(vdev_props);
+	}
 
 	/*
 	 * See if any of the spares are in the sought spare group, use one,
@@ -296,11 +297,20 @@ replace_with_spare(fmd_hdl_t *hdl, zpool_handle_t *zhp, nvlist_t *vdev)
 	 */
 	for (s = 0, vdev_props = NULL;
 	    s < nspares && !done && !unassigned; s++) {
-		char *spare_name;
+		uint64_t wholedisk = 0;
+		char *spare_path;
+		char spare_name[PATH_MAX];
 
 		if (nvlist_lookup_string(spares[s], ZPOOL_CONFIG_PATH,
-		    &spare_name) != 0)
+		    &spare_path) != 0)
 			continue;
+
+		/* Chop off the 's0' for whole disks */
+		(void) nvlist_lookup_uint64(spares[s], ZPOOL_CONFIG_WHOLE_DISK,
+		    &wholedisk);
+		(void) strlcpy(spare_name, spare_path, sizeof (spare_path));
+		if (wholedisk)
+			spare_name[strlen(spare_name) - 2] = '\0';
 
 		if ((vdev_get_prop(zhp, spare_name, VDEV_PROP_SPAREGROUP,
 		    sspr_group, MAXPATHLEN, &vdev_props) == 0) &&
@@ -326,11 +336,19 @@ replace_with_spare(fmd_hdl_t *hdl, zpool_handle_t *zhp, nvlist_t *vdev)
 	 * ending when we successfully replace it.
 	 */
 	for (s = 0, vdev_props = NULL; s < nspares && !done; s++) {
-		char *spare_name;
+		uint64_t wholedisk = 0;
+		char *spare_path;
+		char spare_name[PATH_MAX];
 
 		if (nvlist_lookup_string(spares[s], ZPOOL_CONFIG_PATH,
-		    &spare_name) != 0)
+		    &spare_path) != 0)
 			continue;
+
+		(void) nvlist_lookup_uint64(spares[s], ZPOOL_CONFIG_WHOLE_DISK,
+		    &wholedisk);
+		(void) strlcpy(spare_name, spare_path, sizeof (spare_name));
+		if (wholedisk)
+			spare_name[strlen(spare_name) - 2] = '\0';
 
 		if ((vdev_get_prop(zhp, spare_name, VDEV_PROP_SPAREGROUP,
 		    sspr_group, MAXPATHLEN, &vdev_props) == 0) &&
