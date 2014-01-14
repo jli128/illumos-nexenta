@@ -233,6 +233,8 @@ vdev_mirror_child_select(zio_t *zio)
 
 	for (c = 0; c < mm->mm_children; c++) {
 		mc = &mm->mm_child[c];
+		if (mc->mc_vd == NULL)
+			continue;
 		if (max_weight < mc->mc_vd->vdev_weight)
 			max_weight = mc->mc_vd->vdev_weight;
 	}
@@ -243,9 +245,11 @@ vdev_mirror_child_select(zio_t *zio)
 	if (!max_weight) {
 		for (c = 0; c < mm->mm_children; c++) {
 			mc = &mm->mm_child[c];
+			if (mc->mc_vd == NULL)
+				continue;
 			mc->mc_vd->vdev_weight =
 			    vdev_queue_get_prop_uint64(&mc->mc_vd->vdev_queue,
-			    VDEV_PROP_PREFERRED_READ) + 1;
+				VDEV_PROP_PREFERRED_READ) + 1;
 			if (max_weight < mc->mc_vd->vdev_weight)
 				max_weight = mc->mc_vd->vdev_weight;
 		}
@@ -288,7 +292,7 @@ vdev_mirror_child_select(zio_t *zio)
 	 * Look for any child we haven't already tried before giving up.
 	 */
 	for (c = 0; c < mm->mm_children; c++)
-		if (!mm->mm_child[c].mc_tried)
+		if (!mm->mm_child[c].mc_tried && mm->mm_child[c].mc_vd != NULL)
 			return (c);
 
 	/*
