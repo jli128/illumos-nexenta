@@ -17,6 +17,7 @@
 #include <sys/note.h>
 #include <fm/libtopo.h>
 #include <sys/fm/protocol.h>
+#include <sys/fm/io/scsi.h>
 #include <strings.h>
 
 typedef struct disk_sense_stat {
@@ -47,7 +48,7 @@ void
 disk_sense_close(fmd_hdl_t *hdl, fmd_case_t *c)
 {
 	char *devid = fmd_case_getspecific(hdl, c);
-	if (devid != NULL) {
+	if (devid != NULL && (fmd_serd_exists(hdl, devid) == FMD_B_TRUE)) {
 		fmd_hdl_debug(hdl, "Destroying serd: %s", devid);
 		fmd_serd_destroy(hdl, devid);
 	}
@@ -74,8 +75,8 @@ topo_walk_cb(topo_hdl_t *thp, tnode_t *tn, void *arg) {
 		(void) topo_node_resource(tn, &resource, &err);
 
 		if (err == 0) {
-			nvlist_dup(fru, &node->fru, 0);
-			nvlist_dup(resource, &node->resource, 0);
+			(void) nvlist_dup(fru, &node->fru, 0);
+			(void) nvlist_dup(resource, &node->resource, 0);
 			return (TOPO_WALK_TERMINATE);
 		}
 	}
@@ -112,7 +113,7 @@ topo_node_lookup_by_devid(fmd_hdl_t *hdl, char *device) {
 		fmd_hdl_topo_rele(hdl, thp);
 
 	if (node->fru == NULL || node->resource == NULL) {
-		fmd_hdl_debug(hdl, "Could not find device and its FRU");
+		fmd_hdl_debug(hdl, "Could not find device with matching FRU");
 		fmd_hdl_free(hdl, node, sizeof (topo_node_info_t));
 		return (NULL);
 	} else {
@@ -122,13 +123,41 @@ topo_node_lookup_by_devid(fmd_hdl_t *hdl, char *device) {
 }
 
 void
+disk_sense_create_fault(fmd_hdl_t *hdl, const char *faultclass, fmd_case_t *c,
+    char *devid, nvlist_t *detector)
+{
+	topo_node_info_t *node;
+	char faultname[PATH_MAX];
+	nvlist_t *fault = NULL;
+
+	(void) snprintf(faultname, sizeof (faultname),
+	    "fault.io.disk.%s", faultclass);
+
+	if ((node = topo_node_lookup_by_devid(hdl, devid)) == NULL) {
+		fault = fmd_nvl_create_fault(hdl, faultname, 100,
+		    detector, NULL, NULL);
+	} else {
+		fault = fmd_nvl_create_fault(hdl, faultname, 100,
+		    detector, node->fru, node->resource);
+		nvlist_free(node->fru);
+		nvlist_free(node->resource);
+		fmd_hdl_free(hdl, node, sizeof (topo_node_info_t));
+	}
+
+	fmd_case_add_suspect(hdl, c, fault);
+	fmd_case_setspecific(hdl, c, devid);
+	fmd_case_solve(hdl, c);
+}
+
+void
 disk_sense_recv(fmd_hdl_t *hdl, fmd_event_t *event, nvlist_t *nvl,
 	const char *class)
 {
 	nvlist_t *detector = NULL;
 	char *devid = NULL;
-	nvlist_t *fault;
-	topo_node_info_t *node;
+	uint8_t key = 0;
+	uint8_t asc = 0;
+	uint8_t ascq = 0;
 	_NOTE(ARGUNUSED(class));
 
 	if (nvlist_lookup_nvlist(nvl, "detector", &detector) != 0) {
@@ -138,6 +167,18 @@ disk_sense_recv(fmd_hdl_t *hdl, fmd_event_t *event, nvlist_t *nvl,
 
 	if (nvlist_lookup_string(detector, "devid", &devid) != 0) {
 		disk_sense_stats.bad_fmri.fmds_value.ui64++;
+		return;
+	}
+
+	if ((nvlist_lookup_uint8(nvl, "key", &key) == 0) &&
+	    (nvlist_lookup_uint8(nvl, "asc", &asc) == 0) &&
+	    (nvlist_lookup_uint8(nvl, "ascq", &ascq) == 0) &&
+	    (key == 0x1 && asc == 0xb && ascq == 0x1)) {
+		/* over temp reported by drive sense data */
+		fmd_case_t *c = fmd_case_open(hdl, NULL);
+		fmd_case_add_ereport(hdl, c, event);
+		disk_sense_create_fault(hdl, FM_EREPORT_SCSI_OVERTEMP, c,
+		    devid, detector);
 		return;
 	}
 
@@ -151,30 +192,8 @@ disk_sense_recv(fmd_hdl_t *hdl, fmd_event_t *event, nvlist_t *nvl,
 	if (fmd_serd_record(hdl, devid, event) == FMD_B_TRUE) {
 		fmd_case_t *c = fmd_case_open(hdl, NULL);
 		fmd_case_add_serd(hdl, c, devid);
-		node = topo_node_lookup_by_devid(hdl, devid);
-
-		/*
-		 * If for some reason libtopo does not enumureate the device
-		 * we still want to create a fault, we will see a "bad"
-		 * FMA message however that lacks the FRU information.
-		 */
-
-		if (node == NULL) {
-			fault = fmd_nvl_create_fault(hdl,
-			    "fault.io.disk.device-errors-exceeded", 100,
-			    detector, NULL, NULL);
-		} else {
-			fault = fmd_nvl_create_fault(hdl,
-			    "fault.io.disk.device-errors-exceeded", 100,
-			    detector, node->fru, node->resource);
-			nvlist_free(node->fru);
-			nvlist_free(node->resource);
-			fmd_hdl_free(hdl, node, sizeof (topo_node_info_t));
-		}
-
-		fmd_case_add_suspect(hdl, c, fault);
-		fmd_case_setspecific(hdl, c, devid);
-		fmd_case_solve(hdl, c);
+		disk_sense_create_fault(hdl, "device-errors-exceeded", c,
+		    devid, detector);
 	}
 }
 
