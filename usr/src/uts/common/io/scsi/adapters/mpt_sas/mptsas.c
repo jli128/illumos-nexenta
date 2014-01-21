@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
@@ -77,6 +77,7 @@
 #include <sys/scsi/generic/sas.h>
 #include <sys/scsi/impl/scsi_sas.h>
 #include <sys/sdt.h>
+#include <sys/mdi_impldefs.h>
 
 #pragma pack(1)
 #include <sys/scsi/adapters/mpt_sas/mpi/mpi2_type.h>
@@ -14246,7 +14247,8 @@ mptsas_create_virt_lun(dev_info_t *pdip, struct scsi_inquiry *inq, char *guid,
 						return (DDI_FAILURE);
 					}
 				}
-				if (mdi_pi_free(*pip, 0) != MDI_SUCCESS) {
+				if (mdi_pi_free(*pip,
+				    MDI_CLIENT_FLAGS_NO_EVENT) != MDI_SUCCESS) {
 					mptsas_log(mpt, CE_WARN, "path:target:"
 					    "%x, lun:%x free failed!", target,
 					    lun);
@@ -14477,7 +14479,7 @@ mptsas_create_virt_lun(dev_info_t *pdip, struct scsi_inquiry *inq, char *guid,
 		}
 virt_create_done:
 		if (*pip && mdi_rtn != MDI_SUCCESS) {
-			(void) mdi_pi_free(*pip, 0);
+			(void) mdi_pi_free(*pip, MDI_CLIENT_FLAGS_NO_EVENT);
 			*pip = NULL;
 			*lun_dip = NULL;
 		}
