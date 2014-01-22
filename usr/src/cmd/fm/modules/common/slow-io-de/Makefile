@@ -19,4 +19,4 @@ SRCS = slow-io-de.c
 include ../../Makefile.plugin
 
 LINTFLAGS += -L$(ROOT)/usr/lib/fm
-LDFLAGS += -L$(ROOT)/usr/lib/fm
+LDFLAGS += -L$(ROOT)/usr/lib/fm -ltopo
