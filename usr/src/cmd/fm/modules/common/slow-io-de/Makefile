@@ -9,7 +9,7 @@
 # http://www.illumos.org/license/CDDL.
 
 #
-# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
 
 MODULE = slow-io-de
@@ -19,4 +19,5 @@ SRCS = slow-io-de.c
 include ../../Makefile.plugin
 
 LINTFLAGS += -L$(ROOT)/usr/lib/fm
-LDFLAGS += -L$(ROOT)/usr/lib/fm -ltopo
+LDLIBS += -ltopo
+LDFLAGS += -L$(ROOT)/usr/lib/fm -R/usr/lib/fm

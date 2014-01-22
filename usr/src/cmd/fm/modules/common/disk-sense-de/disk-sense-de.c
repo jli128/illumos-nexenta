@@ -17,7 +17,7 @@
 #include <sys/note.h>
 #include <fm/libtopo.h>
 #include <sys/fm/protocol.h>
-#include <sys/fm/io/scsi.h>
+#include <sys/fm/io/disk.h>
 #include <strings.h>
 
 typedef struct disk_sense_stat {
@@ -122,8 +122,8 @@ topo_node_lookup_by_devid(fmd_hdl_t *hdl, char *device) {
 	}
 }
 
-void
-disk_sense_create_fault(fmd_hdl_t *hdl, const char *faultclass, fmd_case_t *c,
+static void
+disk_sense_case_solve(fmd_hdl_t *hdl, const char *faultclass, fmd_case_t *c,
     char *devid, nvlist_t *detector)
 {
 	topo_node_info_t *node;
@@ -177,7 +177,7 @@ disk_sense_recv(fmd_hdl_t *hdl, fmd_event_t *event, nvlist_t *nvl,
 		/* over temp reported by drive sense data */
 		fmd_case_t *c = fmd_case_open(hdl, NULL);
 		fmd_case_add_ereport(hdl, c, event);
-		disk_sense_create_fault(hdl, FM_EREPORT_SCSI_OVERTEMP, c,
+		disk_sense_case_solve(hdl, FM_FAULT_DISK_OVERTEMP, c,
 		    devid, detector);
 		return;
 	}
@@ -192,7 +192,7 @@ disk_sense_recv(fmd_hdl_t *hdl, fmd_event_t *event, nvlist_t *nvl,
 	if (fmd_serd_record(hdl, devid, event) == FMD_B_TRUE) {
 		fmd_case_t *c = fmd_case_open(hdl, NULL);
 		fmd_case_add_serd(hdl, c, devid);
-		disk_sense_create_fault(hdl, "device-errors-exceeded", c,
+		disk_sense_case_solve(hdl, "device-errors-exceeded", c,
 		    devid, detector);
 	}
 }
