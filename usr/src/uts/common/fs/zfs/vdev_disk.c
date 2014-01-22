@@ -21,8 +21,8 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2013 Joyent, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -42,30 +42,31 @@
 
 extern ldi_ident_t zfs_li;
 
-static void vdev_disk_close(vdev_t *);
+static void vdev_disk_close_impl(vdev_t *, boolean_t);
 
 typedef struct vdev_disk_ldi_cb {
 	list_node_t		lcb_next;
 	ldi_callback_id_t	lcb_id;
 } vdev_disk_ldi_cb_t;
 
-static void
-vdev_disk_alloc(vdev_t *vd)
+static vdev_disk_t *
+vdev_disk_alloc(void)
 {
 	vdev_disk_t *dvd;
 
-	dvd = vd->vdev_tsd = kmem_zalloc(sizeof (vdev_disk_t), KM_SLEEP);
+	dvd = kmem_zalloc(sizeof (vdev_disk_t), KM_SLEEP);
 	/*
 	 * Create the LDI event callback list.
 	 */
 	list_create(&dvd->vd_ldi_cbs, sizeof (vdev_disk_ldi_cb_t),
 	    offsetof(vdev_disk_ldi_cb_t, lcb_next));
+	rw_init(&dvd->vd_lock, NULL, RW_DEFAULT, NULL);
+	return (dvd);
 }
 
 static void
-vdev_disk_free(vdev_t *vd)
+vdev_disk_free(vdev_disk_t *dvd)
 {
-	vdev_disk_t *dvd = vd->vdev_tsd;
 	vdev_disk_ldi_cb_t *lcb;
 
 	if (dvd == NULL)
@@ -80,9 +81,9 @@ vdev_disk_free(vdev_t *vd)
 		(void) ldi_ev_remove_callbacks(lcb->lcb_id);
 		kmem_free(lcb, sizeof (vdev_disk_ldi_cb_t));
 	}
+	rw_destroy(&dvd->vd_lock);
 	list_destroy(&dvd->vd_ldi_cbs);
 	kmem_free(dvd, sizeof (vdev_disk_t));
-	vd->vdev_tsd = NULL;
 }
 
 /* ARGSUSED */
@@ -107,8 +108,7 @@ vdev_disk_off_notify(ldi_handle_t lh, ldi_ev_cookie_t ecookie, void *arg,
 	 * notify context so it will defer cleanup of LDI event callbacks and
 	 * freeing of vd->vdev_tsd to the offline finalize or a reopen.
 	 */
-	dvd->vd_ldi_offline = B_TRUE;
-	vdev_disk_close(vd);
+	vdev_disk_close_impl(vd, B_TRUE);
 
 	/*
 	 * Now that the device is closed, request that the spa_async_thread
@@ -127,6 +127,7 @@ vdev_disk_off_finalize(ldi_handle_t lh, ldi_ev_cookie_t ecookie,
     int ldi_result, void *arg, void *ev_data)
 {
 	vdev_t *vd = (vdev_t *)arg;
+	vdev_disk_t *dvd = vd->vdev_tsd;
 
 	/*
 	 * Ignore events other than offline.
@@ -138,7 +139,8 @@ vdev_disk_off_finalize(ldi_handle_t lh, ldi_ev_cookie_t ecookie,
 	 * We have already closed the LDI handle in notify.
 	 * Clean up the LDI event callbacks and free vd->vdev_tsd.
 	 */
-	vdev_disk_free(vd);
+	vd->vdev_tsd = NULL;
+	vdev_disk_free(dvd);
 
 	/*
 	 * Request that the vdev be reopened if the offline state change was
@@ -250,7 +252,7 @@ vdev_disk_get_space(vdev_t *vd, uint64_t capacity, uint_t blksz)
 	dk_efi_t dk_ioc;
 	efi_gpt_t *efi;
 	uint64_t avail_space = 0;
-	int efisize = EFI_LABEL_SIZE * 2;
+	int rc = ENXIO, efisize = EFI_LABEL_SIZE * 2;
 
 	dk_ioc.dki_data = kmem_alloc(efisize, KM_SLEEP);
 	dk_ioc.dki_lba = 1;
@@ -258,8 +260,13 @@ vdev_disk_get_space(vdev_t *vd, uint64_t capacity, uint_t blksz)
 	dk_ioc.dki_data_64 = (uint64_t)(uintptr_t)dk_ioc.dki_data;
 	efi = dk_ioc.dki_data;
 
-	if (ldi_ioctl(dvd->vd_lh, DKIOCGETEFI, (intptr_t)&dk_ioc,
-	    FKIOCTL, kcred, NULL) == 0) {
+	rw_enter(&dvd->vd_lock, RW_READER);
+	if (dvd->vd_lh != NULL) {
+		rc = ldi_ioctl(dvd->vd_lh, DKIOCGETEFI, (intptr_t)&dk_ioc,
+		    FKIOCTL, kcred, NULL);
+	}
+	rw_exit(&dvd->vd_lock);
+	if (rc == 0) {
 		uint64_t efi_altern_lba = LE_64(efi->efi_gpt_AlternateLBA);
 
 		zfs_dbgmsg("vdev %s, capacity %llu, altern lba %llu",
@@ -315,24 +322,28 @@ vdev_disk_open(vdev_t *vd, uint64_t *psize, uint64_t *max_psize,
 	 * just update the physical size of the device.
 	 */
 	if (dvd != NULL) {
-		if (dvd->vd_ldi_offline && dvd->vd_lh == NULL) {
-			/*
-			 * If we are opening a device in its offline notify
-			 * context, the LDI handle was just closed. Clean
-			 * up the LDI event callbacks and free vd->vdev_tsd.
-			 */
-			vdev_disk_free(vd);
-		} else {
-			ASSERT(vd->vdev_reopening);
-			goto skip_open;
+		ASSERT(vd->vdev_reopening);
+		/*
+		 * Here we need to protect vd_lh by vd_lock
+		 * and make sure it is not NULL.
+		 */
+		rw_enter(&dvd->vd_lock, RW_READER);
+		ASSERT(dvd->vd_lh != NULL);
+		/* This should not happen, but let's be safe */
+		if (dvd->vd_lh == NULL) {
+			/* What are we going to do here??? */
+			rw_exit(&dvd->vd_lock);
+			return (SET_ERROR(ENXIO));
 		}
+		goto skip_open;
 	}
 
 	/*
-	 * Create vd->vdev_tsd.
+	 * Create dvd to be used as vd->vdev_tsd.
+	 * We do not need to protect vd_lh with vd_lock until
+	 * we actually register the callbacks.
 	 */
-	vdev_disk_alloc(vd);
-	dvd = vd->vdev_tsd;
+	vd->vdev_tsd = dvd = vdev_disk_alloc();
 
 	/*
 	 * When opening a disk device, we want to preserve the user's original
@@ -494,6 +505,12 @@ vdev_disk_open(vdev_t *vd, uint64_t *psize, uint64_t *max_psize,
 	}
 
 	/*
+	 * Here we need to protect vd_lh by vd_lock since we are about to
+	 * register callbacks that may alter it.
+	 */
+	rw_enter(&dvd->vd_lock, RW_READER);
+
+	/*
 	 * Register callbacks for the LDI offline event.
 	 */
 	if (ldi_ev_get_cookie(dvd->vd_lh, LDI_EV_OFFLINE, &ecookie) ==
@@ -515,11 +532,13 @@ vdev_disk_open(vdev_t *vd, uint64_t *psize, uint64_t *max_psize,
 		    &vdev_disk_dgrd_callb, (void *) vd, &lcb->lcb_id);
 	}
 skip_open:
+	ASSERT(dvd != NULL);
 	/*
 	 * Determine the actual size of the device.
 	 */
 	if (ldi_get_size(dvd->vd_lh, psize) != 0) {
 		vd->vdev_stat.vs_aux = VDEV_AUX_OPEN_FAILED;
+		rw_exit(&dvd->vd_lock);
 		return (SET_ERROR(EINVAL));
 	}
 
@@ -574,6 +593,10 @@ skip_open:
 		(void) ldi_ioctl(dvd->vd_lh, DKIOCSETWCE, (intptr_t)&wce,
 		    FKIOCTL, kcred, NULL);
 	}
+	/*
+	 * We are done with vd_lh, release the vd_lock
+	 */
+	rw_exit(&dvd->vd_lock);
 
 	/*
 	 * Clear the nowritecache bit, so that on a vdev_reopen() we will
@@ -585,7 +608,7 @@ skip_open:
 }
 
 static void
-vdev_disk_close(vdev_t *vd)
+vdev_disk_close_impl(vdev_t *vd, boolean_t ldi_offline)
 {
 	vdev_disk_t *dvd = vd->vdev_tsd;
 
@@ -602,10 +625,12 @@ vdev_disk_close(vdev_t *vd)
 		dvd->vd_devid = NULL;
 	}
 
+	rw_enter(&dvd->vd_lock, RW_WRITER);
 	if (dvd->vd_lh != NULL) {
 		(void) ldi_close(dvd->vd_lh, spa_mode(vd->vdev_spa), kcred);
 		dvd->vd_lh = NULL;
 	}
+	rw_exit(&dvd->vd_lock);
 
 	vd->vdev_delayed_close = B_FALSE;
 	/*
@@ -613,24 +638,36 @@ vdev_disk_close(vdev_t *vd)
 	 * don't free vd->vdev_tsd or unregister the callbacks here;
 	 * the offline finalize callback or a reopen will take care of it.
 	 */
-	if (dvd->vd_ldi_offline)
+	if (ldi_offline)
 		return;
 
-	vdev_disk_free(vd);
+	vd->vdev_tsd = NULL;
+	vdev_disk_free(dvd);
+}
+
+static void
+vdev_disk_close(vdev_t *vd)
+{
+	vdev_disk_close_impl(vd, B_FALSE);
 }
 
 int
 vdev_disk_physio(vdev_t *vd, caddr_t data,
     size_t size, uint64_t offset, int flags, boolean_t isdump)
 {
+	int rc = EIO;
 	vdev_disk_t *dvd = vd->vdev_tsd;
 
 	/*
 	 * If the vdev is closed, it's likely in the REMOVED or FAULTED state.
 	 * Nothing to be done here but return failure.
 	 */
-	if (dvd == NULL || (dvd->vd_ldi_offline && dvd->vd_lh == NULL))
-		return (EIO);
+	if (dvd == NULL)
+		return (rc);
+
+	rw_enter(&dvd->vd_lock, RW_READER);
+	if (dvd->vd_lh == NULL)
+		goto out;
 
 	ASSERT(vd->vdev_ops == &vdev_disk_ops);
 
@@ -640,11 +677,14 @@ vdev_disk_physio(vdev_t *vd, caddr_t data,
 	 */
 	if (isdump) {
 		ASSERT3P(dvd, !=, NULL);
-		return (ldi_dump(dvd->vd_lh, data, lbtodb(offset),
-		    lbtodb(size)));
+		rc = ldi_dump(dvd->vd_lh, data, lbtodb(offset), lbtodb(size));
+		goto out;
 	}
 
-	return (vdev_disk_ldi_physio(dvd->vd_lh, data, size, offset, flags));
+	rc = vdev_disk_ldi_physio(dvd->vd_lh, data, size, offset, flags);
+out:
+	rw_exit(&dvd->vd_lock);
+	return (rc);
 }
 
 int
@@ -731,8 +771,14 @@ vdev_disk_io_start(zio_t *zio)
 	 * If the vdev is closed, it's likely in the REMOVED or FAULTED state.
 	 * Nothing to be done here but return failure.
 	 */
-	if (dvd == NULL || (dvd->vd_ldi_offline && dvd->vd_lh == NULL)) {
+	if (dvd == NULL) {
 		zio->io_error = ENXIO;
+		return (ZIO_PIPELINE_CONTINUE);
+	}
+	rw_enter(&dvd->vd_lock, RW_READER);
+	if (dvd->vd_lh == NULL) {
+		zio->io_error = ENXIO;
+		rw_exit(&dvd->vd_lock);
 		return (ZIO_PIPELINE_CONTINUE);
 	}
 
@@ -740,6 +786,7 @@ vdev_disk_io_start(zio_t *zio)
 		/* XXPOLICY */
 		if (!vdev_readable(vd)) {
 			zio->io_error = SET_ERROR(ENXIO);
+			rw_exit(&dvd->vd_lock);
 			return (ZIO_PIPELINE_CONTINUE);
 		}
 
@@ -771,6 +818,7 @@ vdev_disk_io_start(zio_t *zio)
 				 * and will call vdev_disk_ioctl_done()
 				 * upon completion.
 				 */
+				rw_exit(&dvd->vd_lock);
 				return (ZIO_PIPELINE_STOP);
 			}
 
@@ -792,6 +840,7 @@ vdev_disk_io_start(zio_t *zio)
 			zio->io_error = SET_ERROR(ENOTSUP);
 		}
 
+		rw_exit(&dvd->vd_lock);
 		return (ZIO_PIPELINE_CONTINUE);
 	}
 
@@ -813,6 +862,7 @@ vdev_disk_io_start(zio_t *zio)
 
 	/* ldi_strategy() will return non-zero only on programming errors */
 	VERIFY(ldi_strategy(dvd->vd_lh, bp) == 0);
+	rw_exit(&dvd->vd_lock);
 
 	return (ZIO_PIPELINE_STOP);
 }
@@ -830,10 +880,14 @@ vdev_disk_io_done(zio_t *zio)
 	 */
 	if (zio->io_error == EIO && !vd->vdev_remove_wanted) {
 		vdev_disk_t *dvd = vd->vdev_tsd;
-		int state = DKIO_NONE;
+		int rc = EIO, state = DKIO_NONE;
 
-		if (ldi_ioctl(dvd->vd_lh, DKIOCSTATE, (intptr_t)&state,
-		    FKIOCTL, kcred, NULL) == 0 && state != DKIO_INSERTED) {
+		rw_enter(&dvd->vd_lock, RW_READER);
+		if (dvd->vd_lh != NULL)
+			rc = ldi_ioctl(dvd->vd_lh, DKIOCSTATE,
+			    (intptr_t)&state, FKIOCTL, kcred, NULL);
+		rw_exit(&dvd->vd_lock);
+		if (rc == 0 && state != DKIO_INSERTED) {
 			/*
 			 * We post the resource as soon as possible, instead of
 			 * when the async removal actually happens, because the

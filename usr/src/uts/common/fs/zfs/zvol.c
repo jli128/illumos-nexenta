@@ -23,9 +23,9 @@
  *
  * Portions Copyright 2010 Robert Milkowski
  *
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -1111,7 +1111,7 @@ zvol_dumpio_vdev(vdev_t *vd, void *addr, uint64_t offset, uint64_t origoffset,
     uint64_t size, boolean_t doread, boolean_t isdump)
 {
 	vdev_disk_t *dvd;
-	int c;
+	int c, rc = ENXIO;
 	int numerrors = 0;
 
 	if (vd->vdev_ops == &vdev_mirror_ops ||
@@ -1149,13 +1149,26 @@ zvol_dumpio_vdev(vdev_t *vd, void *addr, uint64_t offset, uint64_t origoffset,
 			return (SET_ERROR(EIO));
 		dvd = vd->vdev_tsd;
 		ASSERT3P(dvd, !=, NULL);
-		return (ldi_dump(dvd->vd_lh, addr, lbtodb(offset),
-		    lbtodb(size)));
+
+		rw_enter(&dvd->vd_lock, RW_READER);
+		if (dvd->vd_lh != NULL) {
+			rc = ldi_dump(dvd->vd_lh, addr, lbtodb(offset),
+			    lbtodb(size));
+		}
+		rw_exit(&dvd->vd_lock);
+		return (rc);
 	} else {
+		int  rc = ENXIO;
 		dvd = vd->vdev_tsd;
 		ASSERT3P(dvd, !=, NULL);
-		return (vdev_disk_ldi_physio(dvd->vd_lh, addr, size,
-		    offset, doread ? B_READ : B_WRITE));
+
+		rw_enter(&dvd->vd_lock, RW_READER);
+		if (dvd->vd_lh != NULL) {
+			rc = vdev_disk_ldi_physio(dvd->vd_lh, addr, size,
+			    offset, doread ? B_READ : B_WRITE);
+		}
+		rw_exit(&dvd->vd_lock);
+		return (rc);
 	}
 }
 
