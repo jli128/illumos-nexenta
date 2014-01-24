@@ -23,7 +23,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
  */
@@ -7217,6 +7217,23 @@ stmf_itl_task_done(stmf_i_scsi_task_t *itask)
 		stmf_update_kstat_lu_q(task, kstat_waitq_exit);
 		mutex_exit(ilu->ilu_kstat_io->ks_lock);
 		stmf_update_kstat_lport_q(task, kstat_waitq_exit);
+	}
+}
+
+void
+stmf_lu_xfer_done(scsi_task_t *task, boolean_t read, hrtime_t elapsed_time)
+{
+	stmf_i_scsi_task_t *itask = task->task_stmf_private;
+
+	if (task->task_lu == dlun0)
+		return;
+
+	if (read) {
+		atomic_add_64((uint64_t *)&itask->itask_lu_read_time,
+		    elapsed_time);
+	} else {
+		atomic_add_64((uint64_t *)&itask->itask_lu_write_time,
+		    elapsed_time);
 	}
 }
 
