@@ -24,7 +24,7 @@
  * Copyright (c) 2012 by Frederik Wessels. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright (c) 2013 by Prasad Joshi (sTec). All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <assert.h>
@@ -3119,7 +3119,7 @@ int
 zpool_do_list(int argc, char **argv)
 {
 	int c;
-	int ret;
+	int ret = 0;
 	list_cbdata_t cb = { 0 };
 	static char default_props[] =
 	    "name,size,allocated,free,expandsize,capacity,dedupratio,"
