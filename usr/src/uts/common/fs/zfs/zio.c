@@ -2593,6 +2593,11 @@ zio_vdev_io_done(zio_t *zio)
 	if (unexpected_error)
 		VERIFY(vdev_probe(vd, zio) == NULL);
 
+	/*
+	 * Measure delta between start and end of the I/O in nanoseconds.
+	 * XXX: Handle overflow.
+	 */
+	zio->io_vd_timestamp = gethrtime() - zio->io_vd_timestamp;
 
 	return (ZIO_PIPELINE_CONTINUE);
 }
