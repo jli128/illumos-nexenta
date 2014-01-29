@@ -3781,6 +3781,31 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
  * the feature as needed. Activation is not reference counted.
  */
 static void
+spa_check_special_feature(spa_t *spa)
+{
+	if (spa_has_special(spa)) {
+		nvlist_t *props = NULL;
+
+		if (!spa_feature_is_enabled(spa, SPA_FEATURE_META_DEVICES)) {
+			VERIFY(nvlist_alloc(&props, NV_UNIQUE_NAME, 0) == 0);
+			VERIFY(nvlist_add_uint64(props,
+				FEATURE_META_DEVICES, 0) == 0);
+			VERIFY(spa_prop_set(spa, props) == 0);
+			nvlist_free(props);
+		}
+
+		if (!spa_feature_is_active(spa, SPA_FEATURE_META_DEVICES)) {
+			dmu_tx_t *tx =
+			    dmu_tx_create_dd(spa->spa_dsl_pool->dp_mos_dir);
+
+			VERIFY(dmu_tx_assign(tx, TXG_WAIT) == 0);
+			spa_feature_incr(spa, SPA_FEATURE_META_DEVICES, tx);
+			dmu_tx_commit(tx);
+		}
+	}
+}
+
+static void
 spa_special_feature_activate(void *arg, dmu_tx_t *tx)
 {
 	spa_t *spa = (spa_t *)arg;
@@ -4179,7 +4204,12 @@ spa_import(const char *pool, nvlist_t *config, nvlist_t *props, uint64_t flags)
 
 	/* Set/activate meta feature as needed */
 	mutex_exit(&spa_namespace_lock);
+	if (readonly)
+		spa_check_special_feature(spa);
 	spa_history_log_version(spa, "import");
+
+	if (readonly)
+		return (0);
 
 	return (dsl_sync_task(spa->spa_name, NULL, spa_special_feature_activate,
 		spa, 3));
