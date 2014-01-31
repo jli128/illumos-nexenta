@@ -1671,8 +1671,15 @@ spa_config_valid(spa_t *spa, nvlist_t *config)
 	spa_config_enter(spa, SCL_ALL, FTAG, RW_WRITER);
 	VERIFY(spa_config_parse(spa, &mrvd, nv, NULL, 0, VDEV_ALLOC_LOAD) == 0);
 
-	ASSERT3U(rvd->vdev_children, ==, mrvd->vdev_children);
-
+	/*
+	 * One of the earliest signs of a stale config is a mismatch
+	 * in the numbers of children vdev's
+	 */
+	if (rvd->vdev_children != mrvd->vdev_children) {
+		vdev_free(mrvd);
+		spa_config_exit(spa, SCL_ALL, FTAG);
+		return (B_FALSE);
+	}
 	/*
 	 * If we're doing a normal import, then build up any additional
 	 * diagnostic information about missing devices in this config.
