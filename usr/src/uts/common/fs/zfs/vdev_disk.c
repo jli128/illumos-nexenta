@@ -92,7 +92,6 @@ vdev_disk_off_notify(ldi_handle_t lh, ldi_ev_cookie_t ecookie, void *arg,
     void *ev_data)
 {
 	vdev_t *vd = (vdev_t *)arg;
-	vdev_disk_t *dvd = vd->vdev_tsd;
 
 	/*
 	 * Ignore events other than offline.
