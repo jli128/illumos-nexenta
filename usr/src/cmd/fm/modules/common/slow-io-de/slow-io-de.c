@@ -74,8 +74,9 @@ topo_walk_cb(topo_hdl_t *thp, tnode_t *tn, void *arg) {
 		(void) topo_node_resource(tn, &resource, &err);
 
 		if (err == 0) {
-			nvlist_dup(fru, &node->fru, 0);
-			nvlist_dup(resource, &node->resource, 0);
+			if (nvlist_dup(fru, &node->fru, 0) != 0 ||
+			    nvlist_dup(resource, &node->resource, 0) != 0)
+				return (TOPO_WALK_ERR);
 			return (TOPO_WALK_TERMINATE);
 		}
 	}
@@ -90,7 +91,7 @@ topo_node_lookup_by_devid(fmd_hdl_t *hdl, char *device) {
 	topo_hdl_t *thp;
 	topo_walk_t *twp;
 
-	topo_node_info_t *node = (topo_node_info_t *) fmd_hdl_zalloc(hdl,
+	topo_node_info_t *node = (topo_node_info_t *)fmd_hdl_zalloc(hdl,
 	    sizeof (topo_node_info_t), FMD_SLEEP);
 
 	thp = fmd_hdl_topo_hold(hdl, TOPO_VERSION);
