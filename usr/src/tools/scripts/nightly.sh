@@ -23,8 +23,8 @@
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2008, 2010, Richard Lowe
-# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
+# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
 # Based on the nightly script from the integration folks,
 # Mostly modified and owned by mike_s.
@@ -110,6 +110,7 @@ function normal_build {
 	# DEBUG build begins
 
 	if [ "$D_FLAG" = "y" ]; then
+		VERSION=$VERSION":debug"
 		set_debug_build_flags
 		CODESIGN_USER="$crypto_signer" \
 		    build "DEBUG" "$suffix" "" "$MULTI_PROTO"
