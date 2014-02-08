@@ -17180,19 +17180,19 @@ sdrunout(caddr_t arg)
 }
 
 static void
-sd_get_device_info(dev_info_t *dip, struct sd_device_info devinfo)
+sd_get_device_info(dev_info_t *dip, struct sd_device_info *devinfo)
 {
 
 	(void) ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-	    INQUIRY_DEVICE_TYPE, &devinfo.devtype);
+	    INQUIRY_DEVICE_TYPE, &devinfo->devtype);
 	(void) ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-	    INQUIRY_VENDOR_ID, &devinfo.vid);
+	    INQUIRY_VENDOR_ID, &devinfo->vid);
 	(void) ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-	    INQUIRY_PRODUCT_ID, &devinfo.pid);
+	    INQUIRY_PRODUCT_ID, &devinfo->pid);
 	(void) ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-	    INQUIRY_REVISION_ID, &devinfo.rev);
+	    INQUIRY_REVISION_ID, &devinfo->rev);
 	(void) ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-	    INQUIRY_SERIAL_NO, &devinfo.serial);
+	    INQUIRY_SERIAL_NO, &devinfo->serial);
 }
 
 static void
@@ -17215,7 +17215,7 @@ sd_slow_io_ereport(struct scsi_pkt *pktp)
 	    "Slow IO detected SD: 0x%p delta in nsec: %llu",
 	    (void *)un, pktp->pkt_stop - pktp->pkt_start);
 
-	sd_get_device_info(dip, devinfo);
+	sd_get_device_info(dip, &devinfo);
 
 	devid = DEVI(un->un_sd->sd_dev)->devi_devid_str;
 	scsi_fm_ereport_post(un->un_sd, 0, NULL, "cmd.disk.slow-io",
@@ -31816,7 +31816,7 @@ sd_ssc_ereport_post(sd_ssc_t *ssc, enum sd_driver_assessment drv_assess)
 	    (un->un_state == SD_STATE_DUMPING))
 		return;
 
-	sd_get_device_info(dip, devinfo);
+	sd_get_device_info(dip, &devinfo);
 
 	uscsi_pkt_reason = ssc->ssc_uscsi_info->ui_pkt_reason;
 	uscsi_pkt_state = ssc->ssc_uscsi_info->ui_pkt_state;
