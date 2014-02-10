@@ -41,6 +41,7 @@ COMMON_SUBDIRS= \
 	depcheck \
 	env \
 	findunref \
+	ips2deb \
 	ndrgen \
 	onbld \
 	pmodes \

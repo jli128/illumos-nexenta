@@ -20,7 +20,7 @@
 #
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
-# Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2014 Nexenta Systems, Inc. All rights reserved.
 #
 
 # Configuration variables for the runtime environment of the nightly
@@ -131,6 +131,15 @@ export MULTI_PROTO="no"
 GIT_REV=`git rev-parse --short=10 HEAD`
 export VERSION="${GATE}:${GIT_REV}"
 export ONNV_BUILDNUM=152
+
+if [ -x /usr/bin/dpkg ]; then
+    export PKGTYPE=deb
+    export DEB_VERSION=`dpkg -l sunwcs | awk '/sunwcs/ {
+	split($3, nsver, "-");
+	nsver[3]++;
+	printf("%s-%s-%s\n", nsver[1], nsver[2], nsver[3]);
+    }'`
+fi
 
 #
 # the RELEASE and RELEASE_DATE variables are set in Makefile.master;

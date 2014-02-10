@@ -108,11 +108,13 @@ file path=opt/onbld/bin/hg-active mode=0555
 file path=opt/onbld/bin/hgsetup mode=0555
 file path=opt/onbld/bin/interface_check mode=0555
 file path=opt/onbld/bin/interface_cmp mode=0555
+file path=opt/onbld/bin/ips2deb mode=0555
 file path=opt/onbld/bin/jstyle mode=0555
 file path=opt/onbld/bin/make_pkg_db mode=0555
 file path=opt/onbld/bin/mapfilechk mode=0555
 file path=opt/onbld/bin/nightly mode=0555
 file path=opt/onbld/bin/onu mode=0555
+file path=opt/onbld/bin/onu-deb mode=0555
 file path=opt/onbld/bin/protocmp.terse mode=0555
 file path=opt/onbld/bin/sccscheck mode=0555
 file path=opt/onbld/bin/signit mode=0555
@@ -137,6 +139,9 @@ file path=opt/onbld/etc/exception_lists/check_rtime
 file path=opt/onbld/etc/exception_lists/interface_check
 file path=opt/onbld/etc/exception_lists/interface_cmp
 file path=opt/onbld/etc/hgstyle
+file path=opt/onbld/etc/ips2deb.priorities
+file path=opt/onbld/etc/ips2deb.replaces
+file path=opt/onbld/etc/ips2deb.versions
 file path=opt/onbld/etc/its.conf
 file path=opt/onbld/etc/its.reg
 file path=opt/onbld/gk/.cshrc
