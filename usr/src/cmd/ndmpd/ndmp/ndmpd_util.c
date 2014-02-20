@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -40,7 +40,6 @@
 /* Copyright (c) 1996, 1997 PDC, Network Appliance. All Rights Reserved */
 
 #include <sys/types.h>
-#include <sys/socket.h>
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
@@ -930,16 +929,18 @@ set_socket_options(int sock)
 	int val;
 
 	/* set send buffer size */
-	val = atoi((const char *)ndmpd_get_prop_default(NDMP_SOCKET_CSS, "65"));
+	val = atoi((const char *)ndmpd_get_prop_default(NDMP_SOCKET_CSS, "60"));
 	if (val <= 0)
-		val = 65;
+		val = 60;
+	val <<= 10; /* convert the value from kilobytes to bytes */
 	if (setsockopt(sock, SOL_SOCKET, SO_SNDBUF, &val, sizeof (val)) < 0)
 		NDMP_LOG(LOG_ERR, "SO_SNDBUF failed: %m");
 
 	/* set receive buffer size */
-	val = atoi((const char *)ndmpd_get_prop_default(NDMP_SOCKET_CRS, "80"));
+	val = atoi((const char *)ndmpd_get_prop_default(NDMP_SOCKET_CRS, "60"));
 	if (val <= 0)
-		val = 80;
+		val = 60;
+	val <<= 10; /* convert the value from kilobytes to bytes */
 	if (setsockopt(sock, SOL_SOCKET, SO_RCVBUF, &val, sizeof (val)) < 0)
 		NDMP_LOG(LOG_ERR, "SO_RCVBUF failed: %m");
 
