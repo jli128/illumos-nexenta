@@ -2597,7 +2597,6 @@ zfs_zaccess_delete(znode_t *dzp, znode_t *zp, cred_t *cr)
 	uint32_t dzp_working_mode = 0;
 	uint32_t zp_working_mode = 0;
 	int dzp_error, zp_error;
-	mode_t available_perms;
 	boolean_t dzpcheck_privs;
 	boolean_t zpcheck_privs;
 
