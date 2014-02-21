@@ -46,7 +46,6 @@ typedef struct vdev_disk {
 	char		*vd_minor;
 	ldi_handle_t	vd_lh;
 	list_t		vd_ldi_cbs;
-	krwlock_t	vd_lock;
 } vdev_disk_t;
 #endif
 
