@@ -153,6 +153,7 @@ zfs_process_add(zpool_handle_t *zhp, nvlist_t *vdev, boolean_t isdisk)
 	vdev_state_t newstate;
 	nvlist_t *nvroot, *newvd;
 	uint64_t wholedisk = 0ULL;
+	uint64_t offline = 0ULL;
 	char *physpath = NULL;
 	char rawpath[PATH_MAX], fullpath[PATH_MAX];
 	size_t len;
@@ -162,6 +163,7 @@ zfs_process_add(zpool_handle_t *zhp, nvlist_t *vdev, boolean_t isdisk)
 
 	(void) nvlist_lookup_string(vdev, ZPOOL_CONFIG_PHYS_PATH, &physpath);
 	(void) nvlist_lookup_uint64(vdev, ZPOOL_CONFIG_WHOLE_DISK, &wholedisk);
+	(void) nvlist_lookup_uint64(vdev, ZPOOL_CONFIG_OFFLINE, &offline);
 
 	/*
 	 * We should have a way to online a device by guid.  With the current
@@ -175,9 +177,10 @@ zfs_process_add(zpool_handle_t *zhp, nvlist_t *vdev, boolean_t isdisk)
 	 * Attempt to online the device.  It would be nice to online this by
 	 * GUID, but the current interface only supports lookup by path.
 	 */
-	if (zpool_vdev_online(zhp, fullpath,
+	if (offline ||
+	    (zpool_vdev_online(zhp, fullpath,
 	    ZFS_ONLINE_CHECKREMOVE | ZFS_ONLINE_UNSPARE, &newstate) == 0 &&
-	    (newstate == VDEV_STATE_HEALTHY || newstate == VDEV_STATE_DEGRADED))
+	    (newstate == VDEV_STATE_HEALTHY || newstate == VDEV_STATE_DEGRADED)))
 		return;
 
 	/*
