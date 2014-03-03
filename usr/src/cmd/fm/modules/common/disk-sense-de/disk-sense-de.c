@@ -35,6 +35,7 @@ disk_sense_stat_t disk_sense_stats = {
 static const fmd_prop_t fmd_props [] = {
 	{ "io_N", FMD_TYPE_INT32, "10" },
 	{ "io_T", FMD_TYPE_TIME, "10min"},
+	{ "ignore-illegal-request", FMD_TYPE_BOOL, "true"},
 	{ NULL, 0, NULL }
 };
 
@@ -170,15 +171,26 @@ disk_sense_recv(fmd_hdl_t *hdl, fmd_event_t *event, nvlist_t *nvl,
 		return;
 	}
 
-	if ((nvlist_lookup_uint8(nvl, "key", &key) == 0) &&
-	    (nvlist_lookup_uint8(nvl, "asc", &asc) == 0) &&
-	    (nvlist_lookup_uint8(nvl, "ascq", &ascq) == 0) &&
-	    (key == 0x1 && asc == 0xb && ascq == 0x1)) {
+	if ((nvlist_lookup_uint8(nvl, "key", &key) != 0) &&
+	    (nvlist_lookup_uint8(nvl, "asc", &asc) != 0) &&
+	    (nvlist_lookup_uint8(nvl, "ascq", &ascq) != 0)) {
+		disk_sense_stats.bad_fmri.fmds_value.ui64++;
+		fmd_hdl_debug(hdl, "Invalid ereport payload");
+		return;
+	}
+
+	if (key == 0x1 && asc == 0xb && ascq == 0x1) {
 		/* over temp reported by drive sense data */
 		fmd_case_t *c = fmd_case_open(hdl, NULL);
 		fmd_case_add_ereport(hdl, c, event);
 		disk_sense_case_solve(hdl, FM_FAULT_DISK_OVERTEMP, c,
 		    devid, detector);
+		return;
+	}
+
+	if (key == 0x5 && asc == 0x26 &&
+	    (fmd_prop_get_int32(hdl, "ignore-illegal-request") == FMD_B_TRUE)) {
+		fmd_hdl_debug(hdl, "Illegal request for device, ignoring");
 		return;
 	}
 
