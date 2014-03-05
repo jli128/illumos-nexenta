@@ -1,3 +1,9 @@
+sunwsmbskr (5.11.134-31-13072-813) nexenta; urgency=high
+
+  * Issue SUP-813: SUP-813 Directory's are not visible or deleteable though CIFS
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 05 Mar 2014 12:00:00 -0400
+
 sunwsmbskr (5.11.134-31-13071-694) nexenta; urgency=high
 
   * Issue SUS-694: System panic'ed on bad mutex from smb_event_wait
