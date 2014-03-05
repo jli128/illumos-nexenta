@@ -25,7 +25,7 @@
  *
  * Copyright (c) 2011 Bayard G. Bell.  All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  *
  *
  * Copyright 2011 cyril.galibern@opensvc.com
@@ -7512,6 +7512,9 @@ sdattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 			}
 		}
 	}
+
+	(void) ddi_prop_update_int(DDI_DEV_T_NONE, devi,
+	    "allow-unconstrained-retire", 1);
 
 	/*
 	 * Initialize the Request Sense command for the target
