@@ -1712,7 +1712,8 @@ static void sd_rmw_msg_print_handler(void *arg);
  * The default behaviour is to fail all retries due to timeout when in failfast
  * active state, and not allow other retries to transition to inactive.
  */
-static int sd_failfast_enable = SD_FAILFAST_ENABLE_FAIL_RETRIES;
+static int sd_failfast_enable = SD_FAILFAST_ENABLE_FAIL_RETRIES |
+    SD_FAILFAST_ENABLE_FAIL_USCSI;
 
 /*
  * Bitmask to control behavior of buf(9S) flushes when a transition to

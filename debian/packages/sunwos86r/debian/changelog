@@ -1,3 +1,9 @@
+sunwos86r (5.11.134-31-9676-147) nexenta; urgency=medium
+
+  * Issue NEX-1584: backport OS-147 change defaults for SD_IO_TIME sd_failfast_enable and sd_ua_retry_count
+
+ -- Nexenta Systems <support@nexenta.com>  Thu, 06 Mar 2014 23:11:33 +0100
+
 sunwos86r (5.11.134-31-9675-13248) nexenta; urgency=low
 
   * backport OS-86 and OS-164 
