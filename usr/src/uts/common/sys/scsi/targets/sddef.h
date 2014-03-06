@@ -23,7 +23,7 @@
  */
 /*
  * Copyright 2011 cyril.galibern@opensvc.com
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_SYS_SCSI_TARGETS_SDDEF_H
@@ -1722,7 +1722,7 @@ struct sd_fm_internal {
  * 20 seconds is a *very* reasonable amount of time for any device with retries.
  * Doubled for slow CD operations.
  */
-#define	SD_IO_TIME			20
+#define	SD_IO_TIME			5
 
 /*
  * 2 hours is an excessively reasonable amount of time for format operations.
@@ -1781,7 +1781,7 @@ struct sd_fm_internal {
 /*
  * Number of times we will retry for unit attention.
  */
-#define	SD_UA_RETRY_COUNT		600
+#define	SD_UA_RETRY_COUNT		25
 
 #define	SD_VICTIM_RETRY_COUNT(un)	(un->un_victim_retry_count)
 #define	CD_NOT_READY_RETRY_COUNT(un)	(un->un_retry_count * 2)
