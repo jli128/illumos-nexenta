@@ -25,6 +25,7 @@
  */
 /* Copyright (c) 2013 by Saso Kiselkov. All rights reserved. */
 /* Copyright (c) 2013, Joyent, Inc. All rights reserved. */
+/* Copyright (c) 2014, Nexenta Systems, Inc. All rights reserved. */
 
 #include <sys/dmu.h>
 #include <sys/dmu_impl.h>
@@ -637,6 +638,9 @@ dmu_free_long_range_impl(objset_t *os, dnode_t *dn, uint64_t offset,
 
 	if (offset >= object_size)
 		return (0);
+
+	if (length == DMU_OBJECT_END && offset == 0)
+	    dnode_evict_dbufs(dn, 0);	
 
 	if (length == DMU_OBJECT_END || offset + length > object_size)
 		length = object_size - offset;

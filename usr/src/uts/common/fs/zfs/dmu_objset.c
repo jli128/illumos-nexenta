@@ -22,6 +22,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
+ * Copyright (c) 2014 Nexenta Systems, Inc. All rights reserved.
  */
 
 /* Portions Copyright 2010 Robert Milkowski */
@@ -612,7 +613,7 @@ dmu_objset_evict_dbufs(objset_t *os)
 		} while (next_dn && !dnode_add_ref(next_dn, FTAG));
 
 		mutex_exit(&os->os_lock);
-		dnode_evict_dbufs(dn);
+		dnode_evict_dbufs(dn, DBUF_EVICT_ALL);
 		dnode_rele(dn, FTAG);
 		mutex_enter(&os->os_lock);
 		dn = next_dn;
