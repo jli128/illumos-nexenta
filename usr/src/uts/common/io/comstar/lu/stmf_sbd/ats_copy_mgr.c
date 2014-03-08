@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/conf.h>
@@ -51,7 +51,8 @@ sbd_ats_max_nblks(void)
 }
 
 #define	is_overlapping(start1, len1, start2, len2) \
-	((((start2) - (start1)) < (len1)) || (((start1) - (start2)) < (len2)))
+	((start2) > (start1) ? ((start2) - (start1)) < (len1) : \
+	((start1) - (start2)) < (len2))
 
 sbd_status_t
 sbd_ats_handling_before_io(sbd_lu_t *sl, uint64_t lba, uint64_t count,
@@ -236,6 +237,7 @@ sbd_handle_ats_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd,
 	sbd_status_t ret;
 
 	if (dbuf->db_xfer_status != STMF_SUCCESS) {
+		sbd_free_ats_handle(task);
 		stmf_abort(STMF_QUEUE_TASK_ABORT, task,
 		    dbuf->db_xfer_status, NULL);
 		return;
@@ -330,6 +332,7 @@ sbd_do_ats_xfer(struct scsi_task *task, sbd_cmd_t *scmd,
 		    (minsize >= 512));
 		if (dbuf == NULL) {
 			if (scmd->nbufs == 0) {
+				sbd_free_ats_handle(task);
 				stmf_abort(STMF_QUEUE_TASK_ABORT, task,
 				    STMF_ALLOC_FAILURE, NULL);
 			}
