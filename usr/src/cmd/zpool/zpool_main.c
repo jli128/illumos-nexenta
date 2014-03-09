@@ -197,14 +197,7 @@ static zpool_command_t command_table[] = {
 	{ NULL },
 	{ "history",	zpool_do_history,	HELP_HISTORY		},
 	{ "get",	zpool_do_get,		HELP_GET		},
-	{ "set",	zpool_do_set,		HELP_SET		},
-	{ "vdev-get",	zpool_do_vdev_get,	HELP_VDEV_GET		},
-	{ "vdev-set",	zpool_do_vdev_set,	HELP_VDEV_SET		},
-	{ "cos-alloc",	zpool_do_cos_alloc,	HELP_COS_ALLOC		},
-	{ "cos-free",	zpool_do_cos_free,	HELP_COS_FREE		},
-	{ "cos-list",	zpool_do_cos_list,	HELP_COS_LIST		},
-	{ "cos-get",	zpool_do_cos_get,	HELP_COS_GET		},
-	{ "cos-set",	zpool_do_cos_set,	HELP_COS_SET		}
+	{ "set",	zpool_do_set,		HELP_SET		}
 };
 
 #define	NCOMMAND	(sizeof (command_table) / sizeof (command_table[0]))
