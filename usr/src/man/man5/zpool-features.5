@@ -362,6 +362,26 @@ never return to being \fBenabled\fB.
 .sp
 .ne 2
 .na
+\fB\fBmeta_devices\fR\fR
+.ad
+.RS 4n
+.TS
+l l .
+GUID	com.nexenta:meta_devices
+READ\-ONLY COMPATIBLE	yes
+DEPENDENCIES	none
+.TE
+
+This feature indicates presence of the special device tier that is
+used to store metadata. This feature will be \fBactive\fR when a special
+tier is provisioned. When special tier is de-provisioned, the feature
+returns to \fBenabled\fR state.
+
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fBvdev_properties\fR\fR
 .ad
 .RS 4n

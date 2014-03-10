@@ -66,6 +66,16 @@ zpool \- configures ZFS storage pools
 
 .LP
 .nf
+\fBzpool vdev-get\fR "\fIall\fR" | \fIproperty\fR=\fIvalue\fR \fIpool\fR \fIvdev-name | vdev-guid\fR
+.fi
+
+.LP
+.nf
+\fBzpool cos-get\fR "\fIall\fR" | \fIproperty\fR=\fIvalue\fR \fIpool\fR \fIcos-name | cos-guid\fR
+.fi
+
+.LP
+.nf
 \fBzpool history\fR [\fB-il\fR] [\fIpool\fR] ...
 .fi
 
@@ -138,6 +148,16 @@ zpool \- configures ZFS storage pools
 
 .LP
 .nf
+\fBzpool vdev-set\fR \fIproperty\fR=\fIvalue\fR \fIpool\fR \fIvdev-name | vdev-guid\fR
+.fi
+
+.LP
+.nf
+\fBzpool cos-set\fR \fIproperty\fR=\fIvalue\fR \fIpool\fR \fIcos-name | cos-guid\fR
+.fi
+
+.LP
+.nf
 \fBzpool status\fR [\fB-xv\fR] [\fIpool\fR] ...
 .fi
 
@@ -154,6 +174,21 @@ zpool \- configures ZFS storage pools
 .LP
 .nf
 \fBzpool upgrade\fR [\fB-V\fR \fIversion\fR] \fB-a\fR | \fIpool\fR ...
+.fi
+
+.LP
+.nf
+\fBzpool cos-alloc\fR \fIpool\fR \fIcos-name\fR
+.fi
+
+.LP
+.nf
+\fBzpool cos-free\fR [\fB-f\fR] \fIpool\fR \fIcos-name | cos-guid\fR
+.fi
+
+.LP
+.nf
+\fBzpool cos-list\fR \fIpool\fR
 .fi
 
 .SH DESCRIPTION
@@ -257,6 +292,20 @@ disks. The recommended number is between 3 and 9 to help increase performance.
 .RS 10n
 A special pseudo-\fBvdev\fR which keeps track of available hot spares for a
 pool. For more information, see the "Hot Spares" section.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBspecial\fR\fR
+.ad
+.RS 10n
+A special device whose function is to store specific payload (data and/or
+metadata) as directed by the corresponding properties settable on the pool and
+dataset level. If more than one special device is specified, then writes are
+load-balanced between devices. Special devices can be mirrored. However,
+\fBraidz\fR \fBvdev\fR types are not supported for the special tier. For more
+information, see the "Specialized device tier" section.
 .RE
 
 .sp
@@ -500,6 +549,54 @@ EXAMPLES section for an example of mirroring multiple log devices.
 Log devices can be added, replaced, attached, detached, and imported and
 exported as part of the larger pool. Mirrored log devices can be removed by
 specifying the top-level mirror for the log.
+.SS "Specialized device tier"
+.sp
+.LP
+The \fBZFS\fR specialized device tier allows one to add a set of devices to
+the pool and to control the type of payload (data and/or metadata) that
+is stored on those devices. For instance, one can add a set of low-latency
+devices and store pool's metadata on those devices. This is be useful if
+low-latency access to metadata is needed, for instance in case of DDTs.
+.sp
+.LP
+While special devices are provisioned and configured on the pool level, their
+usage is controlled on the dataset level. This follows the pattern
+extablished by the other pool devices, such as log and cache devices.
+See \fBzfs\fR(1M) for information on managing datasets. The following is an
+example of provisioning special device with zpool command:
+.sp
+.in +2
+.nf
+\fB# zpool create pool c0d0 c1d0 special c2d0\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Multiple special devices can also be specified, and they can be mirrored. See
+the EXAMPLES section for an example of mirroring multiple special devices.
+.sp
+.LP
+Special devices can be managed in a manner similar to the devices from the
+"normal" pool tier (where the pool's payload is stored by default). Special
+devices can be added, replaced, attached, detached, and imported and
+exported as part of the larger pool.
+.sp
+.LP
+The pool-level property "enablespecial" indicates whether the special tier is
+in use. This property is read-only, and is provided for observability. The two
+related properties, "low-watermark", and "high-watermark", allow one to control
+when the tier is in use by datasets. When the watermarks are crossed, sysevents
+are generated and can be consumed by the management software. See
+"Pool properties" section below for a description of the relevant pool
+properties.
+.sp
+.LP
+In order to properly handle software compatibility issues and placement of
+payload on special devices, there is a pool feature "feature@meta_devices"
+that indicates that the pool uses specialized devices to store metadata. See
+\fBzpool-features\fR(5) for details.
 .SS "Cache Devices"
 .sp
 .LP
@@ -841,6 +938,285 @@ is needed for backwards compatibility. Once feature flags is enabled on a
 pool this property will no longer have a value.
 .RE
 
+.sp
+.ne 2
+.na
+\fB\fBenablespecial\fR=on | off\fR\fR
+.ad
+.sp .6
+.RS 4n
+This read-only property that indicates whether or not the special device tier
+is currently in use. See "low-watermark" and "high-watermark" pool property
+description for more infromation.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBlow-watermark\fR=1..100\fR\fR
+.ad
+.sp .6
+.RS 4n
+This property sets the percentage of used space in the special device tier that
+causes ESC_ZFS_low_watermark sysevent to be generated. This event is expected
+to be consumed by the management layer, for instance, in order to notify system
+administrator that more storage might need to be provisioned for the special
+device tier.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBhigh-watermark\fR=1..100\fR\fR
+.ad
+.sp .6
+.RS 4n
+This property sets the percentage of used space in the special device tier that
+causes ESC_ZFS_high_watermark sysevent to be generated. This event is expected
+to be consumed by the management layer, for instance, in order to notify system
+administrator that more storage might need to be provisioned for the special
+device tier.
+.sp
+.LP
+One important consequence of crossing this watermark is that once it is crossed
+and until the used space percentage drops to the level specified by the
+"low-watermark", the payload (data and/or metadata) that is to be directed to
+the special device tier, will be re-directed to the "normal" pool tier and will
+not be stored in the special tier.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmeta_placement\fR=on | off\fR\fR
+.ad
+.sp .6
+.RS 4n
+This property controls whether \fBZFS\fR performs internal filtering of
+classes of metadata that are placed on the special device tier. If the property
+is "on", then the "ddt_to_metadev", "gen_meta_to_metadev", and
+"other_meta_to_metadev" properties are consulted as to whether or not the
+classes of metadata indicated by those properties, are stored in the special
+device tier.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBddt_to_metadev\fR=on | off\fR\fR
+.ad
+.sp .6
+.RS 4n
+This property controls whether DDTs can be placed on the special device tier.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBgen_meta_to_metadev\fR=on | off\fR\fR
+.ad
+.sp .6
+.RS 4n
+This property controls whether "generic" pool metadata can be placed on the
+special device tier. This type of metadata includes inindirect blocks, dnodes,
+MOS object dnodes, as well as MOS property objects.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBother_meta_to_metadev\fR=on | off\fR\fR
+.ad
+.sp .6
+.RS 4n
+This property controls whether the rest of the pool metadata blocks (other than
+DDTs and "generic" metadata) can be placed on the special device tier. This type
+of metadata does not however include \fBZPL\fR metadata, such that znodes,
+ACLs, and directories, for instance. Placement of \fBZPL\fR metadata on the tier
+is controlled by the dataset-level property "zfs_to_metadev".
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBddt_desegregation\fR=on | off\fR\fR
+.ad
+.sp .6
+.RS 4n
+This property controls whether DDT entries are classified according to their
+frequency of use and are placed in separate DDTs. When the property value is
+"off", the DDT entries are placed in separate classes according to their
+frequency of use (the default), and when it is "on", all DDT entries are
+placed in a single DDT.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdedup_best_effort\fR=on | off\fR\fR
+.ad
+.sp .6
+.RS 4n
+This property controls whether de-duplication is performed for all the writes
+of datasets with de-duplication enabled. When the property value is "off"
+(the default), all the writes are de-duplicated. When the value is "on", the
+special tier utilization (as in iostat) is consulted, and the decision is made
+based on the utilization and the values of the "dedup_lo_best_effort" and
+"dedup_hi_best_effort" properties. The goal is to control the utilization of
+the special tier incurred as a result of de-duplication. See the description
+of these properties for more information.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdedup_lo_best_effort\fR=1..100\fR\fR
+.ad
+.sp .6
+.RS 4n
+This property sets the lower bound for the special device tier utilization
+range where de-duplication is not performed for all the writes
+of datasets with de-duplication enabled, provided that the property
+"dedup_best_effort" is set to "on". If the utilization is below this bound,
+all the writes are de-duplicated.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdedup_hi_best_effort\fR=1..100\fR\fR
+.ad
+.sp .6
+.RS 4n
+This property sets the upper bound for the special device tier utilization
+range where de-duplication is not performed for all the writes
+of datasets with de-duplication enabled, provided that the property
+"dedup_best_effort" is set to "on". If the utilization is above this bound,
+no de-duplication is performed. If the utilization is between the low and
+high bounds as defined by the "dedup_lo_best_effort" and "dedup_hi_best_effort"
+properties, the percentage of writes to be de-duplciated varies linearly from
+100% to 0%.
+.RE
+
+.SS "Device properties"
+.sp
+.LP
+Each device can have several properties associated with it. These properites
+override global tunables and are designed to provide more control over the
+operational parameters of this specific device, as well as to help manage
+this device.
+
+The "cos" device property can reference a CoS property descriptor
+by name, in which case, the values of device properties are
+determined according to the following rule: the device settings override
+CoS settings, which in turn, override the global tunables.
+
+The following device properties are available:
+
+.sp
+.ne 2
+.na
+\fBprefread\fB\fR=1..100\fR\fR
+.ad
+.sp .6
+.RS 4n
+This property is meaningful for devices that belong to a mirror. The property
+determines the preference that is given to the device when reading from the
+mirror. The ratio of the value to the sum of the values of this property for
+all the devices in the mirror determines the relative frequency (which also
+be considered "probability") of reading from this specific device.
+.RE
+
+.sp
+.ne 2
+.na
+\fBcos\fB\fR=cos-name\fR\fR
+.ad
+.sp .6
+.RS 4n
+This property indicates whether the device is associated with a CoS property
+descriptor object. If so, the properties from the CoS descriptor that are
+not explicitly overridden by the device properties are in effect
+for this device.
+.RE
+
+.sp
+.ne 2
+.na
+\fBsparegroup\fB\fR=group-name\fR\fR
+.ad
+.sp .6
+.RS 4n
+This property indicates whether the device is a part of a spare device group.
+Devices in the pool (including spares) can be labeled with strings that are
+meaningful in the context of the management workflow in effect. When a failed
+device is automatically replaced by spares, the spares whose "sparegroup"
+labels match the failed device's label, are used first.
+.RE
+
+.sp
+.ne 2
+.na
+\fB[read | aread | write | awrite | scrub]_[minactive | maxactive]\fB\fR=1..1000\fR\fR
+.ad
+.sp .6
+.RS 4n
+These properties define the minimim/maximum number of outstanding active
+requests for the "queueable" classes of I/O requests as define by the
+\fBZFS\fR I/O scheduler. The classes include "read", "asynchronous read",
+"write", "asynchronous write", and "scrub" classes.
+.RE
+
+.SS "CoS properties"
+.sp
+.LP
+.sp
+.LP
+Each device can use its "cos" property to reference a CoS property descriptor
+by name. In this case, the device properties that are not explicitly
+set on device level come from the CoS descriptor. Additionally, CoS descriptor
+reference count is incremented each time a new reference is added, and
+decremented each time a reference is removed ("cos" device property of some
+device no longer references the CoS descriptor by name).
+
+.sp
+.LP
+CoS descriptors are stored persistently, and they are managed explicitly by
+the following commands. The "cos-allocate" command allocates and initializes
+a CoS descriptor, the "cos-free" command de-allcoates an unreferenced
+descriptor, and the "cos-list" command lists the available CoS descriptors
+in a given pool.
+
+The following properties are included in CoS descriptor:
+
+.sp
+.ne 2
+.na
+\fBcosguid\fR
+.ad
+.sp .6
+.RS 4n
+This property contains a system defined GUID that is associated with this CoS
+descriptor at descriptor initialization time. This is a read-only property, and
+it is designed to allow one to treat CoS name as a generic property managed by
+the user. CoS guids and names can be used interchangeably in the management
+commands dealing with CoS descriptors.
+.RE
+
+.sp
+.ne 2
+.na
+\fBcosname\fB\fR=name\fR\fR
+.ad
+.sp .6
+.RS 4n
+This property contains a user-assigned name for this CoS descriptor.
+.RE
+
+The rest of the CoS properties, "prefread" and "minactive/maxactive" for the
+queueable I/O scheduler classes, have the same semantics as their device
+counterparts. See "Device properties" for more information.
+
 .SS "Subcommands"
 .sp
 .LP
@@ -1174,6 +1550,34 @@ the following fields:
 
 See the "Pool properties" section for more information on the available pool
 properties.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBzpool vdev-get\fR "\fIall\fR" | \fIproperty\fR=\fIvalue\fR \fIpool\fR\fR \fIvdev-name | vdev-guid\fR
+.ad
+.sp .6
+.RS 4n
+Retrieves the given list of properties (or all properties if "\fBall\fR" is
+used) for the specified vdev of the specified storage pool. These properties
+are displayed in the same manner as the zpool properties. The operation is
+supported for leaf-level vdevs only. See the "Device properties" section for
+more information on the available properties.
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBzpool cos-get\fR "\fIall\fR" | \fIproperty\fR=\fIvalue\fR \fIpool\fR\fR \fIcos-name | cos-guid\fR
+.ad
+.sp .6
+.RS 4n
+Retrieves the given list of properties (or all properties if "\fBall\fR" is
+used) for the specified CoS object of the specified storage pool. These properties
+are displayed in the same manner as zpool properties. See the "CoS properties" section
+for more information on the available properties.
 .RE
 
 .sp
@@ -1713,6 +2117,31 @@ more information on what properties can be set and acceptable values.
 .sp
 .ne 2
 .na
+\fB\fBzpool vdev-set\fR \fIproperty\fR=\fIvalue\fR \fIpool\fR\fR \fIvdev-name | vdev-guid\fR
+.ad
+.sp .6
+.RS 4n
+Sets the given property on the specified device of the specified pool.
+If top-level vdev is specified, sets the property on all the child devices.
+See the "Device properties" section for more information on what properties
+can be set and acceptable values.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBzpool cos-set\fR \fIproperty\fR=\fIvalue\fR \fIpool\fR\fR \fIcos-name | cos-guid\fR
+.ad
+.sp .6
+.RS 4n
+Sets the given property on the specified CoS object of the specified pool. See the
+"CoS properties" section for more information on what properties can be set and
+acceptable values.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fBzpool status\fR [\fB-xv\fR] [\fIpool\fR] ...\fR
 .ad
 .sp .6
@@ -1805,6 +2234,51 @@ Upgrade to the specified legacy version. If the \fB-V\fR flag is specified, no
 features will be enabled on the pool. This option can only be used to increase
 the version number up to the last supported legacy version number.
 .RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBzpool cos-alloc\fR \fIpool\fR \fIcos-name\fR
+.ad
+.sp .6
+.RS 4n
+Allocates a persistent CoS properties object in the specified pool. The object
+contains a descriptor of device-related properties (see "Pool properties"
+section for more infromation). This is useful from the management standpoint
+when several devices are given the same set of properites. Devices can reference
+the CoS descriptor objects by name using their "cos" device property.
+
+.sp
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBzpool cos-free\fR [\fB-f\fR] \fIpool\fR \fIcos-name\fR
+.ad
+.sp .6
+.RS 4n
+De-allocates a persistent CoS properties object in the specified pool.
+As devices can reference the CoS descriptor objects by name using their
+"cos" device property, the command will fail if there are devices that
+still reference this descriptor object, unless the \fB-f\fR (force) option
+is specified. In the latter case, the command will scan the pool's vdev
+tree for outstanding references to the CoS descriptor at hand, will remove
+those references, and then will de-allocate the descriptor itself.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBzpool cos-list\fR \fIpool\fR
+.ad
+.sp .6
+.RS 4n
+Lists all CoS descriptor objects in the specified pool. The name and ID of each
+descriptor is listed.
 
 .RE
 
@@ -2139,6 +2613,55 @@ be able to utilized this extra capacity until all the devices under the
        c4t4d0      -      -      -         - 
 .fi
 .in -2
+
+.LP
+\fBExample 16 \fRCreating a ZFS Pool with Mirrored Specialized Devices
+.sp
+.LP
+The following command creates a ZFS storage pool consisting of two, two-way
+mirrors, two two-way mirrored specialized devices and a separate mirrored log:
+
+.sp
+.in +2
+.nf
+# \fBzpool create pool mirror c0d0 c1d0 mirror c2d0 c3d0 \e
+   special mirror c4d0 c5d0 mirror c6d0 c7d0 log mirror c8d0 c590\fR
+.fi
+.in -2
+.sp
+
+This results in the following pool configuration:
+
+.sp
+.in +2
+.nf
+   pool: tank
+  state: ONLINE
+  scrub: none requested
+config:
+
+         NAME        STATE     READ WRITE CKSUM
+         tank        ONLINE       0     0     0
+           mirror-0  ONLINE       0     0     0
+             c0d0    ONLINE       0     0     0
+             c1d0    ONLINE       0     0     0
+           mirror-1  ONLINE       0     0     0
+             c2d0    ONLINE       0     0     0
+             c3d0    ONLINE       0     0     0
+         special     ONLINE       0     0     0
+           mirror-2  ONLINE       0     0     0
+             c4d0    ONLINE       0     0     0
+             c5d0    ONLINE       0     0     0
+           mirror-3  ONLINE       0     0     0
+             c6d0    ONLINE       0     0     0
+             c7d0    ONLINE       0     0     0
+         logs
+           mirror-4  ONLINE       0     0     0
+             c8d0    ONLINE       0     0     0
+             c9d0    ONLINE       0     0     0
+.fi
+.in -2
+.sp
 
 .SH EXIT STATUS
 .sp
