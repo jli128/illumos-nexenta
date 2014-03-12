@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -2164,14 +2164,6 @@ spa_load(spa_t *spa, spa_load_state_t state, spa_import_type_t type,
 	}
 	spa->spa_load_state = error ? SPA_LOAD_ERROR : SPA_LOAD_NONE;
 	spa->spa_ena = 0;
-
-#ifdef _KERNEL
-	if (error == 0) {
-		/* start performance monitor thread */
-		spa_start_perfmon_thread(spa);
-	}
-#endif
-
 	return (error);
 }
 
@@ -3801,11 +3793,6 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	spa->spa_minref = refcount_count(&spa->spa_refcount);
 
 	mutex_exit(&spa_namespace_lock);
-
-#ifdef _KERNEL
-	/* start performance monitor thread */
-	spa_start_perfmon_thread(spa);
-#endif
 	return (0);
 }
 
@@ -4356,7 +4343,6 @@ spa_export_common(char *pool, int new_state, nvlist_t **oldconfig,
 {
 	spa_t *spa;
 	boolean_t wrcthr_stopped = B_FALSE;
-	boolean_t perfmon_stopped = B_FALSE;
 
 	if (oldconfig)
 		*oldconfig = NULL;
@@ -4378,7 +4364,6 @@ spa_export_common(char *pool, int new_state, nvlist_t **oldconfig,
 	spa_open_ref(spa, FTAG);
 	mutex_exit(&spa_namespace_lock);
 	wrcthr_stopped = stop_wrc_thread(spa); /* stop write cache thread */
-	perfmon_stopped = spa_stop_perfmon_thread(spa);
 	spa_async_suspend(spa);
 	mutex_enter(&spa_namespace_lock);
 	spa_close(spa, FTAG);
@@ -4406,8 +4391,6 @@ spa_export_common(char *pool, int new_state, nvlist_t **oldconfig,
 			mutex_exit(&spa_namespace_lock);
 			if (wrcthr_stopped)
 				start_wrc_thread(spa);
-			if (perfmon_stopped)
-				spa_start_perfmon_thread(spa);
 			return (SET_ERROR(EBUSY));
 		}
 
@@ -4423,8 +4406,6 @@ spa_export_common(char *pool, int new_state, nvlist_t **oldconfig,
 			mutex_exit(&spa_namespace_lock);
 			if (wrcthr_stopped)
 				start_wrc_thread(spa);
-			if (perfmon_stopped)
-				spa_start_perfmon_thread(spa);
 			return (SET_ERROR(EXDEV));
 		}
 
