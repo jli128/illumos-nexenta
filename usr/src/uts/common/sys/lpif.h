@@ -135,6 +135,7 @@ stmf_status_t stmf_proxy_scsi_cmd(scsi_task_t *, stmf_data_buf_t *dbuf);
 int stmf_is_standby_port(scsi_task_t *);
 void stmf_lu_xfer_done(struct scsi_task *task, boolean_t read,
     hrtime_t elapsed_time);
+boolean_t stmf_is_pgr_aptpl_always();
 
 #ifdef	__cplusplus
 }
