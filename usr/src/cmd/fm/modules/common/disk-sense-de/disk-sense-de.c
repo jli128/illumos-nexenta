@@ -171,13 +171,14 @@ disk_sense_recv(fmd_hdl_t *hdl, fmd_event_t *event, nvlist_t *nvl,
 		return;
 	}
 
-	if ((nvlist_lookup_uint8(nvl, "key", &key) != 0) &&
-	    (nvlist_lookup_uint8(nvl, "asc", &asc) != 0) &&
-	    (nvlist_lookup_uint8(nvl, "ascq", &ascq) != 0)) {
+	if (nvlist_lookup_uint8(nvl, "key", &key) != 0) {
 		disk_sense_stats.bad_fmri.fmds_value.ui64++;
 		fmd_hdl_debug(hdl, "Invalid ereport payload");
 		return;
 	}
+
+        (void) nvlist_lookup_uint8(nvl, "asc", &asc);
+        (void) nvlist_lookup_uint8(nvl, "ascq", &ascq);
 
 	if (key == 0x1 && asc == 0xb && ascq == 0x1) {
 		/* over temp reported by drive sense data */
@@ -185,6 +186,7 @@ disk_sense_recv(fmd_hdl_t *hdl, fmd_event_t *event, nvlist_t *nvl,
 		fmd_case_add_ereport(hdl, c, event);
 		disk_sense_case_solve(hdl, FM_FAULT_DISK_OVERTEMP, c,
 		    devid, detector);
+		fmd_hdl_debug(hdl, "Disk sense data reports drive over-temp");
 		return;
 	}
 
@@ -193,6 +195,9 @@ disk_sense_recv(fmd_hdl_t *hdl, fmd_event_t *event, nvlist_t *nvl,
 		fmd_hdl_debug(hdl, "Illegal request for device, ignoring");
 		return;
 	}
+
+	fmd_hdl_debug(hdl, "Recording event in SERD %s: key: %x, asc: %x "
+            "ascq: %x", devid, key, asc, ascq);
 
 	if (fmd_serd_exists(hdl, devid) == 0) {
 		fmd_serd_create(hdl, devid, fmd_prop_get_int32(hdl, "io_N"),
@@ -218,7 +223,7 @@ static const fmd_hdl_ops_t fmd_ops = {
 };
 
 static const fmd_hdl_info_t fmd_info = {
-	"disk-sense-de", "0.2", &fmd_ops, fmd_props
+	"disk-sense-de", "0.3", &fmd_ops, fmd_props
 };
 
 void
