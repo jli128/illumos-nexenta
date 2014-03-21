@@ -27,7 +27,7 @@
 .\" Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 .\" Copyright (c) 2013, Joyent, Inc. All rights reserved.
 .\"
-.TH ZFS 1M "Feb 14, 2014"
+.TH ZFS 1M "Mar 21, 2014"
 .SH NAME
 zfs \- configures ZFS file systems
 .SH SYNOPSIS
@@ -1239,15 +1239,14 @@ This property can also be referred to by its shortened column name,
 .sp
 .ne 2
 .na
-\fB\fBsecondarycache\fR=\fBall\fR | \fBnone\fR | \fBmetadata\fR | \fBdata\fR\fR
+\fB\fBsecondarycache\fR=\fBall\fR | \fBnone\fR | \fBmetadata\fR\fR
 .ad
 .sp .6
 .RS 4n
 Controls what is cached in the secondary cache (L2ARC). If this property is set
 to \fBall\fR, then both user data and metadata is cached. If this property is
 set to \fBnone\fR, then neither user data nor metadata is cached. If this
-property is set to \fBmetadata\fR, then only metadata is cached. If this
-property is set to \fBdata\fR, then only data is cached. The default
+property is set to \fBmetadata\fR, then only metadata is cached. The default
 value is \fBall\fR.
 .RE
 
@@ -1533,35 +1532,6 @@ file system is created.
 The \fBcasesensitivity\fR, \fBnormalization\fR, and \fButf8only\fR properties
 are also new permissions that can be assigned to non-privileged users by using
 the \fBZFS\fR delegated administration feature.
-
-.sp
-.ne 2
-.na
-\fB\fBspecialclass\fR=\fBzil\fR | \fBmeta\fR\fR
-.ad
-.sp .6
-.RS 4n
-Specifies the way this dataset uses the specialized device tier in the pool.
-If set to "zil", then the dataset stores ZIL on specialized devices.
-If set to "meta", then the dataset stores ZPL metadata and ZIL on
-specialized devices. However, if the pool has SLOG devices configured, then
-ZIL is stored on the SLOG devices regardless of the value of the
-"specialclass" property. If the specialized device tier is not provisioned,
-the property has no effect.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBzpl_to_metadev\fR=\fBon\fR | \fBoff\fR\fR
-.ad
-.sp .6
-.RS 4n
-Indicates whether or not this dataset stores ZPL metadata on the specialized
-devices when the "specialclass" property is set to "meta". If the specialized
-device tier is not provisioned, or the "specialclass" property is not set to
-"meta", the property has no effect.
-.RE
 
 .SS "Temporary Mount Point Properties"
 .LP
