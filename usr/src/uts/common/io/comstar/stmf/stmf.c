@@ -228,7 +228,7 @@ static int stmf_nworkers_cur;		/* # of workers currently running */
 static int stmf_nworkers_needed;	/* # of workers need to be running */
 static int stmf_worker_sel_counter = 0;
 static uint32_t stmf_cur_ntasks = 0;
-static clock_t stmf_wm_last = 0;
+static clock_t stmf_wm_next = 0;
 /*
  * This is equal to stmf_nworkers_cur while we are increasing # workers and
  * stmf_nworkers_needed while we are decreasing the worker count.
@@ -6418,9 +6418,7 @@ stmf_worker_mgmt()
 {
 	int i;
 	int workers_needed;
-	uint32_t qd;
-	clock_t tps, d = 0;
-	uint32_t cur_max_ntasks = 0;
+	uint32_t qd = 0, cur_max_ntasks = 0;
 	stmf_worker_t *w;
 
 	/* Check if we are trying to increase the # of threads */
@@ -6460,29 +6458,32 @@ stmf_worker_mgmt()
 		goto worker_mgmt_trigger_change;
 	}
 
-	tps = drv_usectohz(1 * 1000 * 1000);
-	if ((stmf_wm_last != 0) &&
-	    ((d = ddi_get_lbolt() - stmf_wm_last) > tps)) {
-		qd = 0;
-		for (i = 0; i < stmf_nworkers_accepting_cmds; i++) {
-			qd += stmf_workers[i].worker_max_qdepth_pu;
-			stmf_workers[i].worker_max_qdepth_pu = 0;
-			if (stmf_workers[i].worker_max_sys_qdepth_pu >
-			    cur_max_ntasks) {
-				cur_max_ntasks =
-				    stmf_workers[i].worker_max_sys_qdepth_pu;
-			}
-			stmf_workers[i].worker_max_sys_qdepth_pu = 0;
-		}
-	}
-	stmf_wm_last = ddi_get_lbolt();
-	if (d <= tps) {
-		/* still ramping up */
+	/* Check if we're still ramping up */
+	if (stmf_wm_next > ddi_get_lbolt()) {
 		return;
 	}
+	/* Get maximum queue depth since the last time we checked */
+	for (i = 0; i < stmf_nworkers_accepting_cmds; i++) {
+		w = &stmf_workers[i];
+		mutex_enter(&w->worker_lock);
+		if (w->worker_max_sys_qdepth_pu > cur_max_ntasks) {
+			cur_max_ntasks = w->worker_max_sys_qdepth_pu;
+		}
+		qd += w->worker_max_qdepth_pu;
+		w->worker_max_sys_qdepth_pu = 0;
+		w->worker_max_qdepth_pu = 0;
+		mutex_exit(&w->worker_lock);
+	}
+	stmf_wm_next = ddi_get_lbolt() + drv_usectohz(1 * 1000 * 1000);
+
 	/* max qdepth cannot be more than max tasks */
 	if (qd > cur_max_ntasks)
 		qd = cur_max_ntasks;
+	/* qdepth should also be within worker limits */
+	if (qd > stmf_i_max_nworkers)
+		qd = stmf_i_max_nworkers;
+	if (qd < stmf_i_min_nworkers)
+		qd = stmf_i_min_nworkers;
 
 	/* See if we have more workers */
 	if (qd < stmf_nworkers_accepting_cmds) {
@@ -6501,30 +6502,17 @@ stmf_worker_mgmt()
 		if (ddi_get_lbolt() < stmf_worker_scale_down_timer) {
 			return;
 		}
-		/* Its time to reduce the workers */
-		if (stmf_worker_scale_down_qd < stmf_i_min_nworkers)
-			stmf_worker_scale_down_qd = stmf_i_min_nworkers;
-		if (stmf_worker_scale_down_qd > stmf_i_max_nworkers)
-			stmf_worker_scale_down_qd = stmf_i_max_nworkers;
-		if (stmf_worker_scale_down_qd == stmf_nworkers_cur)
-			return;
 		workers_needed = stmf_worker_scale_down_qd;
 		stmf_worker_scale_down_qd = 0;
 		goto worker_mgmt_trigger_change;
 	}
+
 	stmf_worker_scale_down_qd = 0;
 	stmf_worker_scale_down_timer = 0;
-	if (qd > stmf_i_max_nworkers)
-		qd = stmf_i_max_nworkers;
-	if (qd < stmf_i_min_nworkers)
-		qd = stmf_i_min_nworkers;
-	if (qd == stmf_nworkers_cur)
-		return;
 	workers_needed = qd;
-	goto worker_mgmt_trigger_change;
-
-	/* NOTREACHED */
-	return;
+	if (workers_needed == stmf_nworkers_cur) {
+		return;
+	}
 
 worker_mgmt_trigger_change:
 	ASSERT(workers_needed != stmf_nworkers_cur);
