@@ -539,7 +539,7 @@ main(int argc, char *argv[])
 	 * Set number of file descriptors to unlimited
 	 */
 	if (!rpc_control(RPC_SVC_USE_POLLFD, &rpc_svc_fdunlim)) {
-		syslog(LOG_INFO, "unable to set number of FD to unlimited");
+		syslog(LOG_INFO, "unable to set number of FDs to unlimited");
 	}
 
 	/*

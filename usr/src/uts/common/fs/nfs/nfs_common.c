@@ -22,6 +22,7 @@
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2013 Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -124,7 +125,7 @@ static vfsdef_t vfw = {
 	VFSDEF_VERSION,
 	"nfsdyn",
 	nfsdyninit,
-	VSW_ZMOUNT,
+	0,
 	NULL
 };
 
@@ -141,7 +142,7 @@ static vfsdef_t vfw2 = {
 	VFSDEF_VERSION,
 	"nfs",
 	nfsinit,
-	VSW_CANREMOUNT|VSW_NOTZONESAFE|VSW_STATS|VSW_ZMOUNT,
+	VSW_CANREMOUNT|VSW_NOTZONESAFE|VSW_STATS,
 	NULL
 };
 
@@ -158,7 +159,7 @@ static vfsdef_t vfw3 = {
 	VFSDEF_VERSION,
 	"nfs3",
 	nfs3init,
-	VSW_CANREMOUNT|VSW_NOTZONESAFE|VSW_STATS|VSW_ZMOUNT,
+	VSW_CANREMOUNT|VSW_NOTZONESAFE|VSW_STATS,
 	NULL
 };
 

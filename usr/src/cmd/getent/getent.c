@@ -20,6 +20,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2014 Gary Mills
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -40,6 +41,7 @@ struct table {
 
 static struct table t[] = {
 	{ "passwd",	dogetpw },
+	{ "shadow",	dogetsp },
 	{ "group",	dogetgr },
 	{ "hosts",	dogethost },
 	{ "ipnodes",	dogetipnodes },

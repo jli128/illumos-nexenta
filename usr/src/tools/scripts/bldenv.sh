@@ -155,6 +155,8 @@ fi
 
 # force locale to C
 export \
+	LANG=C \
+	LC_ALL=C \
 	LC_COLLATE=C \
 	LC_CTYPE=C \
 	LC_MESSAGES=C \
@@ -165,23 +167,23 @@ export \
 # clear environment variables we know to be bad for the build
 unset \
 	LD_OPTIONS \
-        LD_LIBRARY_PATH \
-        LD_AUDIT \
-        LD_BIND_NOW \
-        LD_BREADTH \
-        LD_CONFIG \
+	LD_LIBRARY_PATH \
+	LD_AUDIT \
+	LD_BIND_NOW \
+	LD_BREADTH \
+	LD_CONFIG \
 	LD_DEBUG \
-        LD_FLAGS \
-        LD_LIBRARY_PATH_64 \
-        LD_NOVERSION \
-        LD_ORIGIN \
+	LD_FLAGS \
+	LD_LIBRARY_PATH_64 \
+	LD_NOVERSION \
+	LD_ORIGIN \
 	LD_LOADFLTR \
-        LD_NOAUXFLTR \
-        LD_NOCONFIG \
-        LD_NODIRCONFIG \
-        LD_NOOBJALTER \
+	LD_NOAUXFLTR \
+	LD_NOCONFIG \
+	LD_NODIRCONFIG \
+	LD_NOOBJALTER \
 	LD_PRELOAD \
-        LD_PROFILE \
+	LD_PROFILE \
 	CONFIG \
 	GROUP \
 	OWNER \
@@ -236,11 +238,9 @@ fi
 # must match the getopts in nightly.sh
 OPTIND=1
 NIGHTLY_OPTIONS="-${NIGHTLY_OPTIONS#-}"
-while getopts '+0AaBCDdFfGIilMmNnopRrtUuWwXxz' FLAG "$NIGHTLY_OPTIONS"
+while getopts '+0ABCDdFfGIilMmNnpRrtUuwW' FLAG "$NIGHTLY_OPTIONS"
 do
 	case "$FLAG" in
-	  o)	flags.o=true  ;;
-	  +o)	flags.o=false ;;
 	  t)	flags.t=true  ;;
 	  +t)	flags.t=false ;;
 	  *)	;;
@@ -256,8 +256,6 @@ BUILD_DATE=$(LC_ALL=C date +%Y-%b-%d)
 BASEWSDIR=$(basename -- "${CODEMGR_WS}")
 DEV_CM="\"@(#)SunOS Internal Development: $LOGNAME $BUILD_DATE [$BASEWSDIR]\""
 export DEV_CM RELEASE_DATE POUND_SIGN
-
-export INTERNAL_RELEASE_BUILD=
 
 print 'Build type   is  \c'
 if ${flags.d} ; then
@@ -314,18 +312,9 @@ fi
 
 export DMAKE_MODE=${DMAKE_MODE:-parallel}
 
-if "${flags.o}" ; then
-	export CH=
-else
-	unset CH
-fi
 DEF_STRIPFLAG="-s"
 
 TMPDIR="/tmp"
-
-# "o_FLAG" is used by "nightly.sh" (it may be useful to rename this
-# variable using a more descriptive name later)
-export o_FLAG="$(${flags.o} && print 'y' || print 'n')"
 
 export \
 	PATH TMPDIR \

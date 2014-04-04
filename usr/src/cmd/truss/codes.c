@@ -21,10 +21,10 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
- * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
+ * Copyright (c) 2014, OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -854,10 +854,6 @@ const struct ioc {
 	{ (uint_t)SIOCTMYADDR,		"SIOCTMYADDR",	"sioc_addrreq" },
 	{ (uint_t)SIOCTONLINK,		"SIOCTONLINK",	"sioc_addrreq" },
 	{ (uint_t)SIOCTMYSITE,		"SIOCTMYSITE",	"sioc_addrreq" },
-	{ (uint_t)SIOCFIPSECONFIG,	"SIOCFIPSECONFIG",	NULL },
-	{ (uint_t)SIOCSIPSECONFIG,	"SIOCSIPSECONFIG",	NULL },
-	{ (uint_t)SIOCDIPSECONFIG,	"SIOCDIPSECONFIG",	NULL },
-	{ (uint_t)SIOCLIPSECONFIG,	"SIOCLIPSECONFIG",	NULL },
 	{ (uint_t)SIOCGLIFBINDING,	"SIOCGLIFBINDING",	"lifreq" },
 	{ (uint_t)SIOCSLIFGROUPNAME,	"SIOCSLIFGROUPNAME",	"lifreq" },
 	{ (uint_t)SIOCGLIFGROUPNAME,	"SIOCGLIFGROUPNAME",	"lifreq" },
@@ -1267,6 +1263,12 @@ const struct ioc {
 	{ (uint_t)ZFS_IOC_SEND_SPACE,		"ZFS_IOC_SEND_SPACE",
 		"zfs_cmd_t" },
 	{ (uint_t)ZFS_IOC_CLONE,		"ZFS_IOC_CLONE",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_BOOKMARK,		"ZFS_IOC_BOOKMARK",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_GET_BOOKMARKS,	"ZFS_IOC_GET_BOOKMARKS",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_DESTROY_BOOKMARKS,	"ZFS_IOC_DESTROY_BOOKMARKS",
 		"zfs_cmd_t" },
 	{ (uint_t)ZFS_IOC_VDEV_SET_PROPS,	"ZFS_IOC_VDEV_SET_PROPS",
 		"zfs_cmd_t" },

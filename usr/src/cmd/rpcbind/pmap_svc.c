@@ -244,7 +244,7 @@ pmapproc_getport(struct svc_req *rqstp, SVCXPRT *xprt)
 	PMAP reg;
 	int port = 0;
 	PMAPLIST *fnd;
-	bool_t rbl_lock = FALSE;
+	bool_t rbl_locked = FALSE;
 
 	if (!svc_getargs(xprt, (xdrproc_t)xdr_pmap, (char *)&reg)) {
 		svcerr_decode(xprt);
@@ -269,7 +269,7 @@ retry:
 		}
 		if (ua == NULL) {
 			(void) rw_unlock(&list_pml_lock);
-			if (rbl_lock)
+			if (rbl_locked)
 				(void) rw_unlock(&list_rbl_lock);
 			goto sendreply;
 		}
@@ -282,11 +282,11 @@ retry:
 			if (is_bound(netid, serveuaddr)) {
 				port = fnd->pml_map.pm_port;
 			} else { /* this service is dead; delete it */
-				if (!rbl_lock) {
+				if (!rbl_locked) {
 					(void) rw_unlock(&list_pml_lock);
 					(void) rw_wrlock(&list_rbl_lock);
 					(void) rw_wrlock(&list_pml_lock);
-					rbl_lock = TRUE;
+					rbl_locked = TRUE;
 					goto retry;
 				}
 				delete_prog(reg.pm_prog);
@@ -294,7 +294,7 @@ retry:
 		}
 	}
 	(void) rw_unlock(&list_pml_lock);
-	if (rbl_lock)
+	if (rbl_locked)
 		(void) rw_unlock(&list_rbl_lock);
 
 sendreply:

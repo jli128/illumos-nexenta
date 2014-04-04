@@ -641,6 +641,12 @@ nfsauth_refresh_thread(void)
 		exi = ren->ren_exi;
 		ASSERT(exi != NULL);
 
+		/*
+		 * Since the ren was removed from the refreshq_queue above,
+		 * this is the only thread aware about the ren existence, so we
+		 * have the exclusive ownership of it and we do not need to
+		 * protect it by any lock.
+		 */
 		while ((ran = list_remove_head(&ren->ren_authlist))) {
 
 			struct auth_cache *p = ran->ran_auth;

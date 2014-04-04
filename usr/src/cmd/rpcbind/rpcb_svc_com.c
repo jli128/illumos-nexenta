@@ -259,7 +259,7 @@ map_unset(RPCB *regp, char *owner)
 			prev->rpcb_next = next;
 	}
 #ifdef PORTMAP
-	if (ans) {
+	if (ans != 0) {
 		(void) rw_wrlock(&list_pml_lock);
 		(void) del_pmaplist(regp);
 		(void) rw_unlock(&list_pml_lock);
@@ -337,7 +337,7 @@ rpcbproc_getaddr_com(RPCB *regp, char **result, struct svc_req *rqstp,
 	SVCXPRT *transp = rqstp->rq_xprt;
 	int verstype = rqstp->rq_proc == RPCBPROC_GETVERSADDR ? RPCB_ONEVERS :
 	    RPCB_ALLVERS;
-	bool_t pml_lock = FALSE;
+	bool_t pml_locked = FALSE;
 
 	/*
 	 * There is a potential window at startup during which rpcbind
@@ -377,13 +377,13 @@ retry:
 			/* Try whatever we have */
 			*result = strdup(fnd->rpcb_map.r_addr);
 		} else if (!(*result)[0]) {
-			if (!pml_lock) {
+			if (!pml_locked) {
 				(void) rw_unlock(&list_rbl_lock);
 				(void) rw_wrlock(&list_rbl_lock);
 #ifdef PORTMAP
 				(void) rw_wrlock(&list_pml_lock);
 #endif /* PORTMAP */
-				pml_lock = TRUE;
+				pml_locked = TRUE;
 				goto retry;
 			}
 			/*
@@ -396,7 +396,7 @@ retry:
 		*result = NULL;
 	}
 #ifdef PORTMAP
-	if (pml_lock)
+	if (pml_locked)
 		(void) rw_unlock(&list_pml_lock);
 #endif /* PORTMAP */
 	(void) rw_unlock(&list_rbl_lock);
@@ -959,6 +959,7 @@ rpcbproc_callit_com(struct svc_req *rqstp, SVCXPRT *transp, ulong_t reply_type,
 
 	bd = get_svc_dg_data(transp);
 
+	assert(!MUTEX_HELD(&finfo_lock));
 	fi = forward_register(bd->su_xid, caller, fd, ma.m_uaddr);
 	if (fi == NULL) {
 		/*  forward_register failed.  Perhaps no memory. */
@@ -966,8 +967,11 @@ rpcbproc_callit_com(struct svc_req *rqstp, SVCXPRT *transp, ulong_t reply_type,
 		if (debugging)
 			fprintf(stderr,
 			    "rpcbproc_callit_com:  forward_register failed\n");
+		assert(!MUTEX_HELD(&finfo_lock));
 		goto error;
 	}
+	/* forward_register() returns with finfo_lock held when successful */
+	assert(MUTEX_HELD(&finfo_lock));
 
 	if (fi->flag & FINFO_ACTIVE) {
 		/*

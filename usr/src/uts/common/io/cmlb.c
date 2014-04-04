@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
@@ -244,6 +245,7 @@ static i_ddi_prop_dyn_t cmlb_prop_dyn[] = {
 	{"Size",		DDI_PROP_TYPE_INT64,	S_IFCHR},
 	{"device-nblocks",	DDI_PROP_TYPE_INT64},
 	{"device-blksize",	DDI_PROP_TYPE_INT},
+	{"device-solid-state",	DDI_PROP_TYPE_INT},
 	{NULL}
 };
 
@@ -5673,11 +5675,12 @@ cmlb_prop_op(cmlb_handle_t cmlbhandle,
 	struct cmlb_lun	*cl;
 	diskaddr_t	capacity;
 	uint32_t	lbasize;
-	enum		dp { DP_NBLOCKS, DP_BLKSIZE } dp;
+	enum		dp { DP_NBLOCKS, DP_BLKSIZE, DP_SSD } dp;
 	int		callers_length;
 	caddr_t		buffer;
 	uint64_t	nblocks64;
 	uint_t		dblk;
+	tg_attribute_t	tgattr;
 
 	/* Always fallback to ddi_prop_op... */
 	cl = (struct cmlb_lun *)cmlbhandle;
@@ -5701,6 +5704,8 @@ fallback:	return (ddi_prop_op(dev, dip, prop_op, mod_flags,
 			dp = DP_NBLOCKS;
 		else if (strcmp(name, "device-blksize") == 0)
 			dp = DP_BLKSIZE;
+		else if (strcmp(name, "device-solid-state") == 0)
+			dp = DP_SSD;
 		else
 			goto fallback;
 
@@ -5708,7 +5713,7 @@ fallback:	return (ddi_prop_op(dev, dip, prop_op, mod_flags,
 		callers_length = *lengthp;
 		if (dp == DP_NBLOCKS)
 			*lengthp = sizeof (uint64_t);
-		else if (dp == DP_BLKSIZE)
+		else if ((dp == DP_BLKSIZE) || (dp == DP_SSD))
 			*lengthp = sizeof (uint32_t);
 
 		/* service request for the length of the property */
@@ -5736,11 +5741,20 @@ fallback:	return (ddi_prop_op(dev, dip, prop_op, mod_flags,
 		}
 
 		/* transfer the value into the buffer */
-		if (dp == DP_NBLOCKS)
+		switch (dp) {
+		case DP_NBLOCKS:
 			*((uint64_t *)buffer) = capacity;
-		else if (dp == DP_BLKSIZE)
+			break;
+		case DP_BLKSIZE:
 			*((uint32_t *)buffer) = lbasize;
-
+			break;
+		case DP_SSD:
+			if (DK_TG_GETATTRIBUTE(cl, &tgattr, tg_cookie) != 0)
+				tgattr.media_is_solid_state = B_FALSE;
+			*((uint32_t *)buffer) =
+			    tgattr.media_is_solid_state ? 1 : 0;
+			break;
+		}
 		return (DDI_PROP_SUCCESS);
 	}
 

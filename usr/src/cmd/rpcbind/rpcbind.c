@@ -38,9 +38,59 @@
  */
 
 /*
- * rpcbind.c
- * Implements the program, version to address mapping for rpc.
+ * This is an implementation of RCPBIND according the RFC 1833: Binding
+ * Protocols for ONC RPC Version 2.  The RFC specifies three versions of the
+ * binding protocol:
  *
+ * 1) RPCBIND Version 3 (Section 2.2.1 of the RFC)
+ * 2) RPCBIND, Version 4 (Section 2.2.2 of the RFC)
+ * 3) Port Mapper Program Protocol (Section 3 of the RFC)
+ *
+ * Where the "Port Mapper Program Protocol" is refered as Version 2 of the
+ * binding protocol.  The implementation of the Version 2 of the binding
+ * protocol is compiled in only in a case the PORTMAP macro is defined (by
+ * default it is defined).
+ *
+ * The implementation is based on top of the networking services library -
+ * libnsl(3lib) and uses Automatic MT mode (see rcp_control(3nsl) and
+ * svc_run(3nsl) for more details).
+ *
+ * Usually, when a thread handles an RPCBIND procedure (one that arrived from a
+ * client), it obtains the data for the response internally, and immediately
+ * sends the response back to the client.  The only exception to this rule are
+ * remote (aka indirect) RPC calls, for example RPCBPROC_INDIRECT.  Such
+ * procedures are designed to forward the RPC request from the client to some
+ * other RPC service specified by the client, wait for the result, and forward
+ * the result back to the client.  This is implemented in rpcbproc_callit_com().
+ *
+ * The response from the other (remote) RPC service is handled in
+ * handle_reply(), where the thread waiting in rpcbproc_callit_com() is woken
+ * up to finish the handling and to send (forward) the response back to the
+ * client.
+ *
+ * The thread implementing the indirect RPC call might be blocked in the
+ * rpcbproc_callit_com() waiting for the response from the other RPC service
+ * for very long time.  During this time the thread is unable to handle other
+ * RPCBIND requests.  To avoid a case when all threads are waiting in
+ * rpcbproc_callit_com() and there is no free thread able to handle other
+ * RPCBIND requests, the implementation has reserved eight threads to never be
+ * used for the remote RPC calls.  The number of active remote RPC calls is in
+ * rpcb_rmtcalls, the upper limit of such calls is in rpcb_rmtcalls_max.
+ *
+ * In addition to the worker threads described above, there are two other
+ * threads.  The logthread() thread is responsible for asynchronous logging to
+ * syslog.  The terminate() thread is signal handler responsible for reload of
+ * the rpcbind configuration (on SIGHUP), or for gracefully shutting down
+ * rpcbind (otherwise).
+ *
+ * There are two global lists used for holding the information about the
+ * registered services: list_rbl is for Version 3 and 4 of the binding
+ * protocol, and list_pml is for Version 2.  To protect these lists, two global
+ * readers/writer locks are defined and heavily used across the rpcbind
+ * implementation: list_rbl_lock protecting list_rbl, and list_pml_lock,
+ * protecting list_pml.
+ *
+ * The defined locking order is: list_rbl_lock first, list_pml_lock second.
  */
 
 #include <dlfcn.h>

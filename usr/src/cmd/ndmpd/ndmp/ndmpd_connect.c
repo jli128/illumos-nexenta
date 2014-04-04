@@ -41,6 +41,7 @@
  */
 /* Copyright (c) 2007, The Storage Networking Industry Association. */
 /* Copyright (c) 1996, 1997 PDC, Network Appliance. All Rights Reserved */
+/* Copyright 2014 Nexenta Systems, Inc. All rights reserved. */
 
 #include <sys/types.h>
 #include <errno.h>

@@ -20,6 +20,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2014 Gary Mills
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -40,6 +41,7 @@ extern "C" {
 #define	EXC_ENUM_NOT_SUPPORTED	3
 
 extern int dogetpw(const char **);
+extern int dogetsp(const char **);
 extern int dogetgr(const char **);
 extern int dogethost(const char **);
 extern int dogetipnodes(const char **);

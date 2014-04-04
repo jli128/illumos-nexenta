@@ -27,14 +27,12 @@ SHELL=/usr/bin/ksh93
 
 SHFILES= \
 	Install \
-	bindrop \
 	bldenv \
 	build_cscope \
 	bringovercheck \
 	check_mail_msg \
 	checkpaths \
 	checkproto \
-	cryptodrop \
 	cstyle \
 	elfcmp \
 	flg.flp \
@@ -55,8 +53,6 @@ PERLFILES= \
 	interface_check \
 	interface_cmp \
 	jstyle \
-	mkreadme_osol \
-	mktpl \
 	validate_flg \
 	validate_paths \
 	wdiff

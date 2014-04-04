@@ -78,8 +78,6 @@ int deny_severity = LOG_WARNING;
 
 static mutex_t hosts_ctl_lock = DEFAULTMUTEX;
 
-extern int hosts_ctl();
-
 /*
  * "inet_ntoa/inet_pton" for struct sockaddr_gen
  */

@@ -2010,7 +2010,7 @@ cmd_dis(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			if (opt_a)
 				mdb_printf("%-#32p%8T%s\n", addr, buf);
 			else if (opt_b)
-				mdb_printf("%-#10p%-#32a%8T%s\n",
+				mdb_printf("%-#?p  %-#32a%8T%s\n",
 				    addr, addr, buf);
 			else
 				mdb_printf("%-#32a%8T%s\n", addr, buf);
@@ -2034,7 +2034,7 @@ cmd_dis(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			if (opt_a)
 				mdb_printf("%-#32p%8T%s\n", oaddr, buf);
 			else if (opt_b)
-				mdb_printf("%-#10p%-#32a%8T%s\n",
+				mdb_printf("%-#?p  %-#32a%8T%s\n",
 				    oaddr, oaddr, buf);
 			else
 				mdb_printf("%-#32a%8T%s\n", oaddr, buf);
@@ -2049,7 +2049,7 @@ cmd_dis(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		if (opt_a)
 			mdb_printf("%-#32p%8T%s%", addr, buf);
 		else if (opt_b)
-			mdb_printf("%-#10p%-#32a%8T%s", addr, addr, buf);
+			mdb_printf("%-#?p  %-#32a%8T%s", addr, addr, buf);
 		else
 			mdb_printf("%-#32a%8T%s%", addr, buf);
 		mdb_printf("%</b>\n");
@@ -2062,7 +2062,7 @@ cmd_dis(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			if (opt_a)
 				mdb_printf("%-#32p%8T%s\n", addr, buf);
 			else if (opt_b)
-				mdb_printf("%-#10p%-#32a%8T%s\n",
+				mdb_printf("%-#?p  %-#32a%8T%s\n",
 				    addr, addr, buf);
 			else
 				mdb_printf("%-#32a%8T%s\n", addr, buf);
@@ -2943,7 +2943,8 @@ const mdb_dcmd_t mdb_dcmd_builtins[] = {
 	{ "grep", "?expr", "print dot if expression is true", cmd_grep },
 	{ "head", "-num|-n num", "limit number of elements in pipe", cmd_head,
 	    head_help },
-	{ "help", "[cmd]", "list commands/command help", cmd_help },
+	{ "help", "[cmd]", "list commands/command help", cmd_help, NULL,
+	    cmd_help_tab },
 	{ "list", "?type member [variable]",
 	    "walk list using member as link pointer", cmd_list, NULL,
 	    mdb_tab_complete_mt },
@@ -2962,7 +2963,8 @@ const mdb_dcmd_t mdb_dcmd_builtins[] = {
 	    "print the contents of a data structure", cmd_print, print_help,
 	    cmd_print_tab },
 	{ "printf", "?format type member ...", "print and format the "
-	    "member(s) of a data structure", cmd_printf, printf_help },
+	    "member(s) of a data structure", cmd_printf, printf_help,
+	    cmd_printf_tab },
 	{ "regs", NULL, "print general purpose registers", cmd_notsup },
 	{ "set", "[-wF] [+/-o opt] [-s dist] [-I path] [-L path] [-P prompt]",
 	    "get/set debugger properties", cmd_set },
