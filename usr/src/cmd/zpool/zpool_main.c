@@ -90,13 +90,20 @@ static int zpool_do_history(int, char **);
 static int zpool_do_get(int, char **);
 static int zpool_do_set(int, char **);
 
+/*LINTED E_STATIC_UNUSED*/
 static int zpool_do_vdev_get(int, char **);
+/*LINTED E_STATIC_UNUSED*/
 static int zpool_do_vdev_set(int, char **);
 
+/*LINTED E_STATIC_UNUSED*/
 static int zpool_do_cos_alloc(int, char **);
+/*LINTED E_STATIC_UNUSED*/
 static int zpool_do_cos_free(int, char **);
+/*LINTED E_STATIC_UNUSED*/
 static int zpool_do_cos_list(int, char **);
+/*LINTED E_STATIC_UNUSED*/
 static int zpool_do_cos_get(int, char **);
+/*LINTED E_STATIC_UNUSED*/
 static int zpool_do_cos_set(int, char **);
 
 /*
