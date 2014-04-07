@@ -22,13 +22,11 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2013 Joyent, Inc. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SYS_VDEV_DISK_H
 #define	_SYS_VDEV_DISK_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/vdev.h>
 #ifdef _KERNEL
@@ -47,7 +45,7 @@ typedef struct vdev_disk {
 	char		*vd_minor;
 	ldi_handle_t	vd_lh;
 	list_t		vd_ldi_cbs;
-	boolean_t	vd_ldi_offline;
+	krwlock_t	vd_lock;
 } vdev_disk_t;
 
 #ifdef _KERNEL

@@ -1043,7 +1043,7 @@ zvol_dumpio_vdev(vdev_t *vd, void *addr, uint64_t offset, uint64_t size,
     boolean_t doread, boolean_t isdump)
 {
 	vdev_disk_t *dvd;
-	int c;
+	int c, rc = ENXIO;
 	int numerrors = 0;
 
 	for (c = 0; c < vd->vdev_children; c++) {
@@ -1075,11 +1075,21 @@ zvol_dumpio_vdev(vdev_t *vd, void *addr, uint64_t offset, uint64_t size,
 		ASSERT(!doread);
 		if (doread)
 			return (EIO);
-		return (ldi_dump(dvd->vd_lh, addr, lbtodb(offset),
-		    lbtodb(size)));
+		rw_enter(&dvd->vd_lock, RW_READER);
+		if (dvd->vd_lh != NULL) {
+			rc = ldi_dump(dvd->vd_lh, addr, lbtodb(offset),
+			    lbtodb(size));
+		}
+		rw_exit(&dvd->vd_lock);
+		return (rc);
 	} else {
-		return (vdev_disk_physio(dvd->vd_lh, addr, size, offset,
-		    doread ? B_READ : B_WRITE));
+		rw_enter(&dvd->vd_lock, RW_READER);
+		if (dvd->vd_lh != NULL) {
+			rc = vdev_disk_physio(dvd->vd_lh, addr, size, offset,
+			    doread ? B_READ : B_WRITE);
+		}
+		rw_exit(&dvd->vd_lock);
+		return (rc);
 	}
 }
 

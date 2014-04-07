@@ -1,3 +1,11 @@
+sunwzfskr (5.11.134-31-12287-1626) nexenta; urgency=low
+
+  * Issue NEX-1626: backport NEX-1065 assertion failed:
+    ldi_strategy(dvd->vd_lh, bp) == 0, file: ../../common/fs/zfs/vdev_disk.c,
+    line: 815
+
+ -- Nexenta Systems <support@nexenta.com>  Mon, 07 Apr 2014 18:18:17 -0400
+
 sunwzfskr (5.11.134-31-12286-1706) nexenta; urgency=low
 
   * Isssue NEX-1706: Backport NEX-463 Zpool export stalls for several
