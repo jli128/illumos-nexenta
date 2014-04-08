@@ -691,7 +691,9 @@ e_devid_minor_to_devlist(
 	int			minor_all = 0;
 	int			ndevts = *devtcntp;
 
-	ASSERT(i_ddi_devi_attached(dip));
+	if (!i_ddi_devi_attached(dip)) {
+		return;
+	}
 
 	/* are we looking for a set of minor nodes? */
 	if ((minor_name == DEVID_MINOR_NAME_ALL) ||
