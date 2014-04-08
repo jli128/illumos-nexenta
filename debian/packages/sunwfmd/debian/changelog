@@ -1,3 +1,9 @@
+sunwfmd (5.11.134-31-11346-1879) nexenta; urgency=low
+
+  * OS-198 bring in FMA changes from 4.x 
+
+ -- maintainer@nexenta.com <maintainer@nexenta.com>  Mon, 07 Apr 2014 17:46:37 -0700
+
 sunwfmd (5.11.134-31-11346-1878) nexenta; urgency=low
 
   * Isssue REL-30 IO backports

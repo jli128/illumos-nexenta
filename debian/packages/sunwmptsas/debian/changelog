@@ -1,3 +1,15 @@
+sunwmptsas (5.11.134-31-11660-13275) nexenta; urgency=low
+
+  * backport OS-66 and NEX-1052 
+
+ -- maintainer@nexenta.com <maintainer@nexenta.com>  Mon, 07 Apr 2014 17:51:42 -0700
+
+sunwmptsas (5.11.134-31-11660-13274) nexenta; urgency=low
+
+  * backport OS-126 
+
+ -- maintainer@nexenta.com <maintainer@nexenta.com>  Mon, 07 Apr 2014 17:46:16 -0700
+
 sunwmptsas (5.11.134-31-11660-13273) nexenta; urgency=low
 
   * REL-30 io-backports

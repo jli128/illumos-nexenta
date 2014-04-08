@@ -1,3 +1,9 @@
+sunwos86r (5.11.134-31-9675-13248) nexenta; urgency=low
+
+  * backport OS-86 and OS-164 
+
+ -- maintainer@nexenta.com <maintainer@nexenta.com>  Mon, 07 Apr 2014 17:57:13 -0700
+
 sunwos86r (5.11.134-31-9675-13247) nexenta; urgency=medium
 
   * Issue 13247: Large, fixed command timeouts impair command drop
