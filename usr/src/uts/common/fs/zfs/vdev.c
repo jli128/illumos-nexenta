@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -322,6 +322,7 @@ vdev_alloc_common(spa_t *spa, uint_t id, uint64_t guid, vdev_ops_t *ops)
 	mutex_init(&vd->vdev_dtl_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&vd->vdev_stat_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&vd->vdev_probe_lock, NULL, MUTEX_DEFAULT, NULL);
+	rw_init(&vd->vdev_tsd_lock, NULL, RW_DEFAULT, NULL);
 	for (int t = 0; t < DTL_TYPES; t++) {
 		space_map_create(&vd->vdev_dtl[t], 0, -1ULL, 0,
 		    &vd->vdev_dtl_lock);
@@ -640,6 +641,7 @@ vdev_free(vdev_t *vd)
 	mutex_destroy(&vd->vdev_dtl_lock);
 	mutex_destroy(&vd->vdev_stat_lock);
 	mutex_destroy(&vd->vdev_probe_lock);
+	rw_destroy(&vd->vdev_tsd_lock);
 
 	if (vd == spa->spa_root_vdev)
 		spa->spa_root_vdev = NULL;

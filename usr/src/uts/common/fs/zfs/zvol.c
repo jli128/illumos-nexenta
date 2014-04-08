@@ -1043,7 +1043,7 @@ zvol_dumpio_vdev(vdev_t *vd, void *addr, uint64_t offset, uint64_t size,
     boolean_t doread, boolean_t isdump)
 {
 	vdev_disk_t *dvd;
-	int c, rc = ENXIO;
+	int c, rc;
 	int numerrors = 0;
 
 	for (c = 0; c < vd->vdev_children; c++) {
@@ -1067,30 +1067,40 @@ zvol_dumpio_vdev(vdev_t *vd, void *addr, uint64_t offset, uint64_t size,
 	else if (!doread && !vdev_writeable(vd))
 		return (EIO);
 
+	rw_enter(&vd->vdev_tsd_lock, RW_READER);
 	dvd = vd->vdev_tsd;
-	ASSERT3P(dvd, !=, NULL);
 	offset += VDEV_LABEL_START_SIZE;
 
 	if (ddi_in_panic() || isdump) {
 		ASSERT(!doread);
-		if (doread)
+		if (doread) {
+			rw_exit(&vd->vdev_tsd_lock);
 			return (EIO);
-		rw_enter(&dvd->vd_lock, RW_READER);
-		if (dvd->vd_lh != NULL) {
+		}
+		/* We assume here dvd is not NULL */
+		ASSERT3P(dvd, !=, NULL);
+
+		/* If our assumption is wrong, we do not want to crash */
+		if (dvd != NULL && dvd->vd_lh != NULL) {
 			rc = ldi_dump(dvd->vd_lh, addr, lbtodb(offset),
 			    lbtodb(size));
+		} else {
+			rc = ENXIO;
 		}
-		rw_exit(&dvd->vd_lock);
-		return (rc);
 	} else {
-		rw_enter(&dvd->vd_lock, RW_READER);
-		if (dvd->vd_lh != NULL) {
+		/* We assume here dvd is not NULL */
+		ASSERT3P(dvd, !=, NULL);
+
+		/* If our assumption is wrong, we do not want to crash */
+		if (dvd != NULL && dvd->vd_lh != NULL) {
 			rc = vdev_disk_physio(dvd->vd_lh, addr, size, offset,
 			    doread ? B_READ : B_WRITE);
+		} else {
+			rc = ENXIO;
 		}
-		rw_exit(&dvd->vd_lock);
-		return (rc);
 	}
+	rw_exit(&vd->vdev_tsd_lock);
+	return (rc);
 }
 
 static int

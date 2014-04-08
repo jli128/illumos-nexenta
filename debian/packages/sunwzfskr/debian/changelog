@@ -1,3 +1,10 @@
+sunwzfskr (5.11.134-31-12288-1627) nexenta; urgency=low
+
+  * Issue NEX-1627: backport NEX-1142 rw_destroy: lock still active,
+    lp=ffffff05285eba38 wwwh=8 thread=ffffff001f82ac40
+
+ -- Nexenta Systems <support@nexenta.com>  Mon, 07 Apr 2014 21:04:20 -0400
+
 sunwzfskr (5.11.134-31-12287-1626) nexenta; urgency=low
 
   * Issue NEX-1626: backport NEX-1065 assertion failed:
