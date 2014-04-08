@@ -19,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #pragma dictionary "DISK"
@@ -186,6 +186,7 @@ event fault.io.disk.predictive-failure@P, FITrate=10,
     FITrate=10, FRU=P, ASRU=P;
 event fault.io.disk.self-test-failure@P, FITrate=10,
     FITrate=10, FRU=P, ASRU=P;
+event fault.io.disk.attach-failure@P;
 
 /*
  * ereports.
@@ -193,6 +194,7 @@ event fault.io.disk.self-test-failure@P, FITrate=10,
 event ereport.io.scsi.disk.over-temperature@P;
 event ereport.io.scsi.disk.predictive-failure@P;
 event ereport.io.scsi.disk.self-test-failure@P;
+event ereport.io.scsi.disk.attach-failure@P;
 
 /*
  * Propagations.
@@ -204,4 +206,9 @@ prop fault.io.disk.self-test-failure@P ->
     ereport.io.scsi.disk.self-test-failure@P;
 
 prop fault.io.disk.predictive-failure@P ->
-    ereport.io.scsi.disk.predictive-failure@P;
+    ereport.io.scsi.disk.predictive-failure@P {
+    setpayloadprop("asc", payloadprop("additional-sense-code")) &&
+    setpayloadprop("ascq", payloadprop("additional-sense-code-qualifier")) };
+
+prop fault.io.disk.attach-failure@P ->
+    ereport.io.scsi.disk.attach-failure@P;

@@ -22,7 +22,7 @@
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -44,9 +44,6 @@
 #include <string.h>
 #include <sys/int_fmtio.h>
 #include <devid.h>
-#include <sys/scsi/scsi_address.h>
-#include <limits.h>
-#include <stdarg.h>
 
 typedef struct zfs_retire_repaired {
 	struct zfs_retire_repaired	*zrr_next;
@@ -251,6 +248,8 @@ find_by_anything(fmd_hdl_t *hdl, libzfs_handle_t *zhdl, const char *fru,
 /*
  * Given a vdev, attempt to replace it with every known spare until one
  * succeeds.
+ *
+ * XXX vdev sparegroups (zfs++ removed!)
  */
 static void
 replace_with_spare(fmd_hdl_t *hdl, zpool_handle_t *zhp, nvlist_t *vdev)
@@ -283,12 +282,22 @@ replace_with_spare(fmd_hdl_t *hdl, zpool_handle_t *zhp, nvlist_t *vdev)
 	 * Try to replace each spare, ending when we successfully
 	 * replace it.
 	 */
+
 	for (s = 0; s < nspares; s++) {
-		char *spare_name;
+		uint64_t wholedisk = 0;
+		char *spare_path;
+		char spare_name[PATH_MAX];
 
 		if (nvlist_lookup_string(spares[s], ZPOOL_CONFIG_PATH,
-		    &spare_name) != 0)
+		    &spare_path) != 0)
 			continue;
+
+		/* Chop off the 's0' for whole disks */
+		(void) nvlist_lookup_uint64(spares[s], ZPOOL_CONFIG_WHOLE_DISK,
+		    &wholedisk);
+		(void) strlcpy(spare_name, spare_path, sizeof (spare_path));
+		if (wholedisk)
+			spare_name[strlen(spare_name) - 2] = '\0';
 
 		(void) nvlist_add_nvlist_array(replacement,
 		    ZPOOL_CONFIG_CHILDREN, &spares[s], 1);
@@ -417,143 +426,27 @@ zfs_get_vdev_state(fmd_hdl_t *hdl, libzfs_handle_t *zhdl, zpool_handle_t *zhp,
 	return (vs->vs_state);
 }
 
-/* Structure that holds physical path instance. */
-struct mpath_info {
-	char *pathname;
-	struct mpath_info *next;
-	char nodename[1];
-};
-
-static int
-walk_nodes(di_node_t node, void *arg)
-{
-	char *dn = NULL;
-	di_node_t pnode;
-	struct mpath_info **mpinfo = (struct mpath_info **)arg;
-	char retpath[PATH_MAX];
-
-	if (node == NULL || di_bus_addr(node) == NULL ||
-	    strlen(di_bus_addr(node)) == 0) {
-		return (DI_WALK_CONTINUE);
-	}
-
-	if (strstr((*mpinfo)->pathname, di_bus_addr(node)) == NULL) {
-		return (DI_WALK_CONTINUE);
-	}
-
-	pnode = di_parent_node(node);
-	if (pnode != NULL) {
-		dn = di_driver_name(pnode);
-	}
-
-	if (dn != NULL && (strcmp(dn, "scsi_vhci")) == 0) {
-		di_path_t path;
-		path = DI_PATH_NIL;
-
-		while ((path = di_path_client_next_path(node, path))
-		    != NULL) {
-			char *p;
-
-			pnode = di_path_phci_node(path);
-			if (pnode != DI_NODE_NIL) {
-				p = di_devfs_path(pnode);
-
-				if (p != NULL) {
-					struct mpath_info *ri, *prev;
-					char *port_id = NULL;
-
-					if (di_path_prop_lookup_strings(path,
-					    SCSI_ADDR_PROP_TARGET_PORT,
-					    &port_id) == 1) {
-						ri = malloc(sizeof (*ri) +
-						    PATH_MAX);
-
-						if (ri != NULL) {
-							prev = *mpinfo;
-
-							ri->next = prev;
-
-							/* Preserve nodename */
-							ri->pathname =
-							    prev->pathname;
-
-							snprintf(
-							    &ri->nodename[0],
-							    PATH_MAX,
-							    "%s/disk@%s,0",
-							    p, port_id);
-
-							*mpinfo = ri;
-						}
-					}
-					di_devfs_path_free(p);
-				}
-			}
-		}
-	}
-	return (DI_WALK_CONTINUE);
-}
-
 int
 zfs_retire_device(fmd_hdl_t *hdl, char *path, boolean_t retire)
 {
 	di_retire_t drt = {0};
-	int i, err = 0;
-	struct mpath_info mpinfo, *pmpinfo, *pcurr;
-	di_node_t root_node;
+	int err;
 
 	drt.rt_abort = (void (*)(void *, const char *, ...))fmd_hdl_abort;
 	drt.rt_debug = (void (*)(void *, const char *, ...))fmd_hdl_debug;
 	drt.rt_hdl = hdl;
 
 	fmd_hdl_debug(hdl, "zfs_retire_device: "
-	    "attempting to %sretire %s\n", retire ? "" : "un", path);
+	    "attempting to %sretire %s", retire ? "" : "un", path);
 
-	if ((root_node = di_init("/", DINFOCPYALL | DINFOPATH | DINFOLYR)) ==
-	    DI_NODE_NIL) {
-		return (-1);
-	}
-
-	/* Obtain multipath information. */
-	memset(&mpinfo, 0, sizeof (mpinfo));
-	mpinfo.pathname = path;
-
-	pmpinfo = &mpinfo;
-
-	di_walk_node(root_node, DI_WALK_CLDFIRST, &pmpinfo, walk_nodes);
-
-	/* First, retire the device itself. */
 	err = retire ?
 	    di_retire_device(path, &drt, 0) :
 	    di_unretire_device(path, &drt);
 
 	if (err != 0)
 		fmd_hdl_debug(hdl, "zfs_retire_device: ",
-		    "di_%sretire_device failed: %d %s\n",
+		    "di_%sretire_device failed: %d %s",
 		    retire ? "" : "un", err, path);
-
-	/* Next, retire all possible physical paths. */
-	for (; pmpinfo != &mpinfo; ) {
-		pcurr = pmpinfo;
-		pmpinfo = pmpinfo->next;
-
-		path = &pcurr->nodename[0];
-
-		fmd_hdl_debug(hdl, "zfs_retire_device: "
-		    "attempting to %sretire physical path: %s\n",
-		    retire ? "" : "un", path);
-
-		err = retire ?
-		    di_retire_device(path, &drt, 0) :
-		    di_unretire_device(path, &drt);
-
-		if (err != 0)
-			fmd_hdl_debug(hdl, "zfs_retire_device: ",
-			    "di_%sretire_device failed: %d %s\n",
-			    retire ? "" : "un", err, path);
-
-		free(pcurr);
-	}
 
 	return (err);
 }
