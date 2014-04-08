@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -7494,7 +7494,8 @@ sd_unit_attach(dev_info_t *devi)
 			}
 		}
 	}
-
+	(void) ddi_prop_update_int(DDI_DEV_T_NONE, devi,
+	    "allow-unconstrained-retire", 1);
 	/*
 	 * Initialize the Request Sense command for the target
 	 */
