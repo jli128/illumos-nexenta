@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2014 Nexenta Systems Inc. All rights reserved.
  */
 
 /*
@@ -1196,7 +1197,12 @@ i_mdi_devinfo_remove(dev_info_t *vdip, dev_info_t *cdip, int flags)
 
 	if (i_mdi_is_child_present(vdip, cdip) == MDI_SUCCESS ||
 	    (flags & MDI_CLIENT_FLAGS_DEV_NOT_SUPPORTED)) {
-		rv = ndi_devi_offline(cdip, NDI_DEVFS_CLEAN | NDI_DEVI_REMOVE);
+		int nflags = NDI_DEVFS_CLEAN | NDI_DEVI_REMOVE;
+
+		if (flags & MDI_CLIENT_FLAGS_NO_EVENT)
+			nflags |= NDI_NO_EVENT;
+
+		rv = ndi_devi_offline(cdip, nflags);
 		if (rv != NDI_SUCCESS) {
 			MDI_DEBUG(1, (MDI_NOTE, cdip,
 			    "!failed: cdip %p", (void *)cdip));
@@ -3263,6 +3269,7 @@ mdi_pi_free(mdi_pathinfo_t *pip, int flags)
 			 * Client lost its last path.
 			 * Clean up the client device
 			 */
+			ct->ct_flags |= flags;
 			MDI_CLIENT_UNLOCK(ct);
 			(void) i_mdi_client_free(ct->ct_vhci, ct);
 			MDI_VHCI_CLIENT_UNLOCK(vh);

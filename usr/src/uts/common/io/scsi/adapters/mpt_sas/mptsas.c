@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -74,6 +74,7 @@
 #include <sys/sata/sata_defs.h>
 #include <sys/scsi/generic/sas.h>
 #include <sys/scsi/impl/scsi_sas.h>
+#include <sys/mdi_impldefs.h>
 
 #pragma pack(1)
 #include <sys/scsi/adapters/mpt_sas/mpi/mpi2_type.h>
@@ -8529,7 +8530,6 @@ mptsas_flush_target(mptsas_t *mpt, ushort_t target, int lun, uint8_t tasktype)
 					reason = CMD_TIMEOUT;
 					stat |= STAT_TIMEOUT;
 				}
-				
 				NDBG25(("mptsas_flush_target discovered non-"
 				    "NULL cmd in slot %d, tasktype 0x%x", slot,
 				    tasktype));
@@ -13845,7 +13845,8 @@ mptsas_create_virt_lun(dev_info_t *pdip, struct scsi_inquiry *inq, char *guid,
 						return (DDI_FAILURE);
 					}
 				}
-				if (mdi_pi_free(*pip, 0) != MDI_SUCCESS) {
+				if (mdi_pi_free(*pip,
+				    MDI_CLIENT_FLAGS_NO_EVENT) != MDI_SUCCESS) {
 					mptsas_log(mpt, CE_WARN, "path:target:"
 					    "%x, lun:%x free failed!", target,
 					    lun);
@@ -14070,7 +14071,7 @@ mptsas_create_virt_lun(dev_info_t *pdip, struct scsi_inquiry *inq, char *guid,
 		}
 virt_create_done:
 		if (*pip && mdi_rtn != MDI_SUCCESS) {
-			(void) mdi_pi_free(*pip, 0);
+			(void) mdi_pi_free(*pip, MDI_CLIENT_FLAGS_NO_EVENT);
 			*pip = NULL;
 			*lun_dip = NULL;
 		}
