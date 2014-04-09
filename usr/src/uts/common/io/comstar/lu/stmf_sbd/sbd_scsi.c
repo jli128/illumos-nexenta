@@ -95,6 +95,12 @@ extern dev_info_t *stmf_sbd_dip;
 	    (((cdb[4]) & 0xF0) == 0) && (((cdb[4]) & 0x01) == 0))))
 /* End of SCSI2_CONFLICT_FREE_CMDS */
 
+/*
+ * An /etc/system tunable which specifies the maximum number of LBAs supported
+ * in a single UNMAP operation. Default is 0x400000 blocks or 2 GB in size.
+ */
+volatile int stmf_sbd_unmap_max_nblks = 0x400000;
+
 stmf_status_t sbd_lu_reset_state(stmf_lu_t *lu);
 static void sbd_handle_sync_cache(struct scsi_task *task,
     struct stmf_data_buf *initial_dbuf);
@@ -3014,7 +3020,11 @@ sbd_handle_inquiry(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 		p[4] = 1;
 		p[5] = sbd_ats_max_nblks();
 		if (sl->sl_flags & SL_UNMAP_ENABLED) {
-			p[20] = p[21] = p[22] = p[23] = 0xFF;
+			p[20] = (stmf_sbd_unmap_max_nblks >> 24) & 0xff;
+			p[21] = (stmf_sbd_unmap_max_nblks >> 16) & 0xff;
+			p[22] = (stmf_sbd_unmap_max_nblks >> 8) & 0xff;
+			p[23] = stmf_sbd_unmap_max_nblks & 0xff;
+
 			p[24] = p[25] = p[26] = p[27] = 0xFF;
 		}
 		xfer_size = page_length + 4;
@@ -3038,7 +3048,7 @@ sbd_handle_inquiry(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 			exp++;
 		}
 		p[4] = exp;
-		p[5] = 0xc0;
+		p[5] = 0xc0;	/* Logical provisioning UNMAP and WRITE SAME */
 		xfer_size = page_length + 4;
 		break;
 

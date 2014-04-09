@@ -1,3 +1,13 @@
+sunwstmf (5.11.134-31-13107-849) nexenta; urgency=low
+
+  * Issue SUP-847: backport SUP-765 When a Windows Clustered Shared Volume is
+    placed on a pool under Nexenta HA Cluster control the clustered shared
+    disk looses its PGR3 reservation to the presented zvol.
+  * Issue SUP-849: backport SUP-782 COMSTAR UNMAP support should limit number
+    of LBAs per operation
+
+ -- Nexenta Systems <support@nexenta.com>  Tue, 8 Apr 2014 07:43:46 -0800
+
 sunwstmf (5.11.134-31-13106-848) nexenta; urgency=high
 
   * Issue SUP-848: backport SUP-772 COMSTAR task waiting pressure doesn't
