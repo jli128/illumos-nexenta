@@ -1,3 +1,9 @@
+sunwnfsskr (5.11.134-31-8245-1) nexenta; urgency=low
+
+  * Issue NEX-1623: Backport OS-152 NFS extremely slow in nfsauth
+
+ -- Nexenta Systems <support@nexenta.com>  Thu, 10 Apr 2014 07:23:40 +0200
+
 sunwnfsskr (5.11.134-31-8245-0) nexenta; urgency=low
 
   * Issue 7474: Fix openowner entries growing
