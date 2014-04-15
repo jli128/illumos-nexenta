@@ -1299,7 +1299,8 @@ construct_spec(int argc, char **argv)
 				if (child == NULL)
 					zpool_no_memory();
 				if ((nv = make_leaf_vdev(argv[c],
-				    (uint64_t)B_FALSE, (uint64_t)B_FALSE)) == NULL)
+				    (uint64_t)B_FALSE,
+				    (uint64_t)B_FALSE)) == NULL)
 					return (NULL);
 				child[children - 1] = nv;
 			}
@@ -1335,7 +1336,8 @@ construct_spec(int argc, char **argv)
 				verify(nvlist_add_string(nv, ZPOOL_CONFIG_TYPE,
 				    type) == 0);
 				verify(nvlist_add_uint64(nv,
-				    ZPOOL_CONFIG_IS_LOG, (uint64_t)is_log) == 0);
+				    ZPOOL_CONFIG_IS_LOG,
+				    (uint64_t)is_log) == 0);
 				verify(nvlist_add_uint64(nv,
 				    ZPOOL_CONFIG_IS_SPECIAL,
 				    (uint64_t)is_special) == 0);

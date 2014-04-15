@@ -90,21 +90,16 @@ static int zpool_do_history(int, char **);
 static int zpool_do_get(int, char **);
 static int zpool_do_set(int, char **);
 
-/*LINTED E_STATIC_UNUSED*/
 static int zpool_do_vdev_get(int, char **);
-/*LINTED E_STATIC_UNUSED*/
 static int zpool_do_vdev_set(int, char **);
 
-/*LINTED E_STATIC_UNUSED*/
 static int zpool_do_cos_alloc(int, char **);
-/*LINTED E_STATIC_UNUSED*/
 static int zpool_do_cos_free(int, char **);
-/*LINTED E_STATIC_UNUSED*/
 static int zpool_do_cos_list(int, char **);
-/*LINTED E_STATIC_UNUSED*/
 static int zpool_do_cos_get(int, char **);
-/*LINTED E_STATIC_UNUSED*/
 static int zpool_do_cos_set(int, char **);
+
+static boolean_t nexenta_meta_enable();
 
 /*
  * These libumem hooks provide a reasonable set of defaults for the allocator's
@@ -204,7 +199,14 @@ static zpool_command_t command_table[] = {
 	{ NULL },
 	{ "history",	zpool_do_history,	HELP_HISTORY		},
 	{ "get",	zpool_do_get,		HELP_GET		},
-	{ "set",	zpool_do_set,		HELP_SET		}
+	{ "set",	zpool_do_set,		HELP_SET		},
+	{ "vdev-get",	zpool_do_vdev_get,	HELP_VDEV_GET		},
+	{ "vdev-set",   zpool_do_vdev_set,	HELP_VDEV_SET		},
+	{ "cos-alloc",  zpool_do_cos_alloc,	HELP_COS_ALLOC		},
+	{ "cos-free",   zpool_do_cos_free,	HELP_COS_FREE		},
+	{ "cos-list",   zpool_do_cos_list,	HELP_COS_LIST		},
+	{ "cos-get",    zpool_do_cos_get,	HELP_COS_GET		},
+	{ "cos-set",    zpool_do_cos_set,	HELP_COS_SET		}
 };
 
 #define	NCOMMAND	(sizeof (command_table) / sizeof (command_table[0]))
@@ -306,7 +308,20 @@ get_usage(zpool_help_t idx) {
 	abort();
 	/* NOTREACHED */
 }
-
+/*
+ * Check if additional ZFS meta features are enabled.
+ */
+static boolean_t
+nexenta_meta_enable()
+{
+	if (getenv("nexenta_meta_enable") == NULL) {
+		(void) fprintf(stderr, gettext("feature not enabled\n"));
+		(void) fprintf(stderr,
+		    gettext("set nexenta_meta_enable to access\n"));
+		return (B_FALSE);
+	}
+	return (B_TRUE);
+}
 
 /*
  * Callback routine that will print out a pool property value.
@@ -5550,6 +5565,9 @@ zpool_do_vdev_get(int argc, char **argv)
 	zprop_get_cbdata_t *cb = &vcb.vcb_zprop_get_cbdata;
 	int error;
 
+	if (!nexenta_meta_enable())
+		return (-1);
+
 	if (argc > 1 && argv[1][0] == '-') {
 		(void) fprintf(stderr, gettext("invalid option '%c'\n"),
 		    argv[1][1]);
@@ -5610,6 +5628,9 @@ zpool_do_vdev_set(int argc, char **argv)
 {
 	vdev_cbdata_t cb = { 0 };
 	int error;
+
+	if (!nexenta_meta_enable())
+		return (-1);
 
 	if (argc > 1 && argv[1][0] == '-') {
 		(void) fprintf(stderr, gettext("invalid option '%c'\n"),
@@ -5680,6 +5701,9 @@ zpool_do_cos_alloc(int argc, char **argv)
 	cos_af_cbdata_t cb = { 0 };
 	int error;
 
+	if (!nexenta_meta_enable())
+		return (-1);
+
 	if (argc < 2) {
 		(void) fprintf(stderr, gettext("missing pool name\n"));
 		usage(B_FALSE);
@@ -5714,6 +5738,9 @@ zpool_do_cos_free(int argc, char **argv)
 	cos_af_cbdata_t cb = { 0 };
 	char *endp;
 	int error;
+
+	if (!nexenta_meta_enable())
+		return (-1);
 
 	if (argc > 1 && strncmp(argv[1], "-f", sizeof ("-f")) == 0) {
 		/* -f - force option */
@@ -5781,6 +5808,9 @@ zpool_do_cos_list(int argc, char **argv)
 	nvlist_t *nvl;
 	int error;
 
+	if (!nexenta_meta_enable())
+		return (-1);
+
 	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0) {
 		(void) fprintf(stderr,
 		    gettext("internal error: out of memory\n"));
@@ -5844,6 +5874,9 @@ zpool_do_cos_get(int argc, char **argv)
 	zprop_get_cbdata_t *cb = &vcb.vcb_zprop_get_cbdata;
 	int error;
 
+	if (!nexenta_meta_enable())
+		return (-1);
+
 	if (argc > 1 && argv[1][0] == '-') {
 		(void) fprintf(stderr, gettext("invalid option '%c'\n"),
 		    argv[1][1]);
@@ -5905,6 +5938,9 @@ zpool_do_cos_set(int argc, char **argv)
 {
 	cos_cbdata_t cb = { 0 };
 	int error;
+
+	if (!nexenta_meta_enable())
+		return (-1);
 
 	if (argc > 1 && argv[1][0] == '-') {
 		(void) fprintf(stderr, gettext("invalid option '%c'\n"),
