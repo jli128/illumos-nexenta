@@ -45,12 +45,6 @@
 extern int use_gzip_hardware;
 
 /*
- * Default minimum timeout is a multiple of txg synctime or txg timeout.
- */
-extern int zfs_txg_synctime_ms;
-extern int zfs_txg_timeout;
-
-/*
  * ==========================================================================
  * I/O priority table
  * ==========================================================================
@@ -114,23 +108,6 @@ uint64_t zio_faulty_vdev_delay_us = 1000000;	/* 1 second */
 #else
 int zio_buf_debug_limit = 0;
 #endif
-
-/*
- * ==========================================================================
- * I/O timeout parameters
- * ==========================================================================
- */
-/*
- * Minimum and maximum zio completion delay before an event is generated
- */
-int zio_min_timeout_ms = -1;	/* default assigned in zio_init */
-int zio_max_timeout_ms = 30000;	/* 30 seconds */
-/*
- * Shift used on average latency to calculate timeout
- * This should accommodate even long queue depths or firmware-induced latency
- * variations.
- */
-int zio_timeout_shift = 9;
 
 void
 zio_init(void)
@@ -204,18 +181,6 @@ zio_init(void)
 	zfs_mg_alloc_failures = MAX((3 * max_ncpus / 2), 8);
 
 	zio_inject_init();
-
-	/*
-	 * Initialize minimum timeout if not set.
-	 * Must be greater than the txg synctime, but it would be unreasonable
-	 * to exceed the maximum duration of a txg.
-	 */
-	if (zio_min_timeout_ms == -1) {
-		zio_min_timeout_ms =
-		    MIN(zfs_txg_synctime_ms, zfs_txg_timeout * MILLISEC);
-	}
-	if (zio_min_timeout_ms > zio_max_timeout_ms)
-		zio_min_timeout_ms = zio_max_timeout_ms;
 
 	/*
 	 * initialize the hardware compression.
@@ -2336,56 +2301,6 @@ zio_free_zil(spa_t *spa, uint64_t txg, blkptr_t *bp)
  * ==========================================================================
  */
 
-static void
-zio_timeout_handler(void *arg)
-{
-	zio_t *zio = (zio_t *)arg;
-	vdev_t *vd = zio->io_vd;
-	zio_type_t type = zio->io_type;
-	uint64_t delta;
-	uint64_t io_timeout;
-	uint64_t max_timeout =
-	    (uint64_t)zio_max_timeout_ms * (NANOSEC / MILLISEC);
-
-
-	ASSERT(vd != NULL);
-	mutex_enter(&zio->io_lock);
-
-	if (zio->io_timeout_id == 0) {
-		mutex_exit(&zio->io_lock);
-		return;
-	}
-
-	delta = gethrtime() - zio->io_vd_timestamp;
-
-	/*
-	 * Update timeout.
-	 */
-	io_timeout = MIN(max_timeout,
-	    vd->vdev_stat.vs_latency[type] << zio_timeout_shift);
-
-	/*
-	 * A faulty vdev will either block I/O indefinitely or increment
-	 * the average I/O latency gradually. If our delta is less than the
-	 * average, it is not yet indicative of a problem with *this* I/O.
-	 */
-	if (delta < io_timeout) {
-		io_timeout -= delta;
-	} else {
-		zfs_ereport_post(FM_EREPORT_ZFS_TIMEOUT, zio->io_spa, vd, zio,
-		    io_timeout / (NANOSEC / MICROSEC),
-		    delta / (NANOSEC / MICROSEC));
-	}
-
-	/*
-	 * Re-arm timeout handler for this zio.
-	 */
-	zio->io_timeout_id =
-	    timeout(zio_timeout_handler, zio, NSEC_TO_TICK(io_timeout));
-
-	mutex_exit(&zio->io_lock);
-}
-
 static int
 zio_vdev_io_start(zio_t *zio)
 {
@@ -2470,12 +2385,6 @@ zio_vdev_io_start(zio_t *zio)
 
 	if (vd->vdev_ops->vdev_op_leaf &&
 	    (type == ZIO_TYPE_READ || type == ZIO_TYPE_WRITE)) {
-		uint64_t io_timeout;
-		uint64_t min_timeout =
-		    (uint64_t)zio_min_timeout_ms * (NANOSEC / MILLISEC);
-		uint64_t max_timeout =
-		    (uint64_t)zio_max_timeout_ms * (NANOSEC / MILLISEC);
-
 		if (type == ZIO_TYPE_READ && vdev_cache_read(zio) == 0)
 			return (ZIO_PIPELINE_CONTINUE);
 
@@ -2488,28 +2397,6 @@ zio_vdev_io_start(zio_t *zio)
 			return (ZIO_PIPELINE_STOP);
 		}
 
-		/*
-		 * Set timeout based on current latency for this I/O type.
-		 */
-		io_timeout = MAX(min_timeout,
-		    vd->vdev_stat.vs_latency[type] << zio_timeout_shift);
-		/*
-		 * If this is a high priority I/O, the minimum timeout possible
-		 * is zio_min_timeout_ms; otherwise, it is twice that.
-		 * We mostly care about high priority synchronous I/O.
-		 */
-		if (zio->io_priority != ZIO_PRIORITY_NOW)
-			io_timeout += min_timeout;
-
-		if (io_timeout > max_timeout)
-			io_timeout = max_timeout;
-
-		/*
-		 * Arm timeout handler for this zio.
-		 */
-		ASSERT(zio->io_timeout_id == 0);
-		zio->io_timeout_id =
-		    timeout(zio_timeout_handler, zio, NSEC_TO_TICK(io_timeout));
 #ifdef ZFS_DEBUG
 		/*
 		 * Insert a fault simulation delay for a particular vdev.
@@ -2538,19 +2425,6 @@ zio_vdev_io_done(zio_t *zio)
 	ASSERT(zio->io_type == ZIO_TYPE_READ || zio->io_type == ZIO_TYPE_WRITE);
 
 	if (vd != NULL && vd->vdev_ops->vdev_op_leaf) {
-		timeout_id_t tid;
-
-		/*
-		 * Leaf I/O has completed, cancel the pending timeout.
-		 */
-		mutex_enter(&zio->io_lock);
-		tid = zio->io_timeout_id;
-		zio->io_timeout_id = 0;
-		mutex_exit(&zio->io_lock);
-
-		if (tid != 0)
-			(void) untimeout(tid);
-
 		vdev_queue_io_done(zio);
 
 		if (zio->io_type == ZIO_TYPE_WRITE)
@@ -3100,7 +2974,6 @@ zio_done(zio_t *zio)
 	ASSERT(zio->io_child_count == 0);
 	ASSERT(zio->io_reexecute == 0);
 	ASSERT(zio->io_error == 0 || (zio->io_flags & ZIO_FLAG_CANFAIL));
-	ASSERT(zio->io_timeout_id == 0);
 
 	/*
 	 * Report any checksum errors, since the I/O is complete.

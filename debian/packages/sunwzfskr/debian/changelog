@@ -1,3 +1,9 @@
+sunwzfskr (5.11.134-31-12282-1611) nexenta; urgency=medium
+
+  * Issue NEX-1611: Backport OS-70 remove zio timer code
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 16 Apr 2014 13:21:22 -0400
+
 sunwzfskr (5.11.134-31-12281-14120) nexenta; urgency=low
 
   * Isssue REL-30 IO backports

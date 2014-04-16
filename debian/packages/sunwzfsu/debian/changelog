@@ -1,3 +1,9 @@
+sunwzfsu (5.11.134-31-12275-1611) nexenta; urgency=medium
+
+  * Issue NEX-1611: Backport OS-70 remove zio timer code
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 16 Apr 2014 13:21:22 -0400
+
 sunwzfsu (5.11.134-31-12274-642) nexenta; urgency=high
 
   * Issue SUP-642: Regression leading to AD usernames not being displayed by zfs userspace command.
