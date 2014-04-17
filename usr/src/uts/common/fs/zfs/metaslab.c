@@ -353,6 +353,8 @@ metaslab_group_destroy(metaslab_group_t *mg)
 	 */
 	ASSERT(mg->mg_activation_count <= 0);
 
+	if (mg->mg_taskq)
+		taskq_destroy(mg->mg_taskq);
 	avl_destroy(&mg->mg_metaslab_tree);
 	mutex_destroy(&mg->mg_lock);
 	kmem_free(mg, sizeof (metaslab_group_t));
