@@ -1,3 +1,11 @@
+sunwsmbskr (5.11.134-31-13073-1680) nexenta; urgency=high
+
+  * Issue NEX-1680: backport SMB-131 Don't allow setting delete-on-close
+    on non empty dirs
+  * Issue NEX-1736: backport SMB-142 Deadlock in SMB
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 16 Apr 2014 22:05:59 -0400
+
 sunwsmbskr (5.11.134-31-13072-813) nexenta; urgency=high
 
   * Issue SUP-813: SUP-813 Directory's are not visible or deleteable though CIFS
