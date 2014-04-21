@@ -1,3 +1,10 @@
+sunwzfskr (5.11.134-31-12283-850) nexenta; urgency=low
+
+  * Issue SUP-850: Backport SUP-507 Delete or truncate of large files delayed
+    on datasets with small recordsize
+
+ -- Nexenta Systems <support@nexenta.com>  Mon, 21 Apr 2014 19:27:29 -0400
+
 sunwzfskr (5.11.134-31-12282-1611) nexenta; urgency=medium
 
   * Issue NEX-1611: Backport OS-70 remove zio timer code

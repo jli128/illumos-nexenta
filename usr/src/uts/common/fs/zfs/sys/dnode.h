@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_SYS_DNODE_H
@@ -288,7 +289,7 @@ void dnode_init(void);
 void dnode_fini(void);
 int dnode_next_offset(dnode_t *dn, int flags, uint64_t *off,
     int minlvl, uint64_t blkfill, uint64_t txg);
-void dnode_evict_dbufs(dnode_t *dn);
+void dnode_evict_dbufs(dnode_t *dn, int level);
 
 #ifdef ZFS_DEBUG
 

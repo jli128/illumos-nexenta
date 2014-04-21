@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_SYS_DBUF_H
@@ -50,6 +51,8 @@ extern "C" {
 #define	DB_RF_NOPREFETCH	(1 << 3)
 #define	DB_RF_NEVERWAIT		(1 << 4)
 #define	DB_RF_CACHED		(1 << 5)
+
+#define	DBUF_EVICT_ALL		-1
 
 /*
  * The simplified state transition diagram for dbufs looks like:

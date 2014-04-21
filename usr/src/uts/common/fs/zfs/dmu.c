@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/dmu.h>
@@ -607,6 +608,8 @@ dmu_free_long_range_impl(objset_t *os, dnode_t *dn, uint64_t offset,
 	    (dn->dn_maxblkid + 1) << dn->dn_datablkshift;
 
 	end = offset + length;
+	if (trunc && offset == 0)
+		dnode_evict_dbufs(dn, 0);
 	if (trunc || end > object_size)
 		end = object_size;
 	if (end <= offset)

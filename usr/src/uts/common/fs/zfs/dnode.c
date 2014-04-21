@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -572,7 +573,7 @@ dnode_reallocate(dnode_t *dn, dmu_object_type_t ot, int blocksize,
 	ASSERT3U(bonuslen, <=, DN_MAX_BONUSLEN);
 
 	/* clean up any unreferenced dbufs */
-	dnode_evict_dbufs(dn);
+	dnode_evict_dbufs(dn, DBUF_EVICT_ALL);
 
 	dn->dn_id_flags = 0;
 
