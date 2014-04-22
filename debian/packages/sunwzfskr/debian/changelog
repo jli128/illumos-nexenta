@@ -1,3 +1,10 @@
+sunwzfskr (5.11.134-31-12284-823) nexenta; urgency=medium
+
+  * Issue SUP-823: 1346 zfs incremental receive may leave behind temporary
+    clones
+
+ -- Nexenta Systems <support@nexenta.com>  Mon, 21 Apr 2014 22:40:15 -0400
+
 sunwzfskr (5.11.134-31-12283-850) nexenta; urgency=low
 
   * Issue SUP-850: Backport SUP-507 Delete or truncate of large files delayed
