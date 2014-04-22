@@ -1105,7 +1105,7 @@ mount_task_q_init(int argc, zfs_handle_t **handles, const char *mntopts,
 	/* allocate and init task_q */
 	task_q_size = sizeof (mount_task_q_t) +
 	    (argc - 1) * sizeof (mount_task_t);
-	task_q = malloc(task_q_size);
+	task_q = calloc(task_q_size, 1);
 	if (task_q == NULL)
 		return (ENOMEM);
 
@@ -1113,9 +1113,6 @@ mount_task_q_init(int argc, zfs_handle_t **handles, const char *mntopts,
 		free(task_q);
 		return (error);
 	}
-	task_q->hdl = NULL;
-	task_q->error_mp = NULL;
-	task_q->error = 0;
 	task_q->q_length = argc;
 	task_q->n_tasks = argc;
 	task_q->flags = flags;
@@ -1148,7 +1145,7 @@ umount_task_q_init(int argc, const char **argv, int flags,
 	/* allocate and init task_q */
 	task_q_size = sizeof (mount_task_q_t) +
 	    (argc - 1) * sizeof (mount_task_t);
-	task_q = malloc(task_q_size);
+	task_q = calloc(task_q_size, 1);
 	if (task_q == NULL)
 		return (ENOMEM);
 
@@ -1157,8 +1154,6 @@ umount_task_q_init(int argc, const char **argv, int flags,
 		return (error);
 	}
 	task_q->hdl = hdl;
-	task_q->error_mp = NULL;
-	task_q->error = 0;
 	task_q->q_length = argc;
 	task_q->n_tasks = argc;
 	task_q->flags = flags;
@@ -1440,8 +1435,7 @@ int parallel_unmount(libzfs_handle_t *hdl, int argc, const char **argv,
 
 	if (error = umount_task_q_init(argc, argv, flags, hdl, &task_queue)) {
 		assert(task_queue == NULL);
-		task_queue = NULL; /* just in case */
-		goto out;
+		return (error);
 	}
 
 	if (n_threads > argc)
@@ -1458,8 +1452,7 @@ int parallel_unmount(libzfs_handle_t *hdl, int argc, const char **argv,
 	tpool_wait(t);
 	tpool_destroy(t);
 
-out:
-	if (error || task_queue->error) {
+	if (task_queue->error) {
 		/*
 		 * Tell ZFS!
 		 */
@@ -1491,8 +1484,7 @@ int parallel_mount(get_all_cb_t *cb, int *good, const char *mntopts,
 	if (error = mount_task_q_init(cb->cb_used, cb->cb_handles,
 	    mntopts, flags, &task_queue)) {
 		assert(task_queue == NULL);
-		task_queue = NULL; /* just in case */
-		goto out;
+		return (error);
 	}
 
 	t = tpool_create(1, n_threads, 0, NULL);
@@ -1501,12 +1493,20 @@ int parallel_mount(get_all_cb_t *cb, int *good, const char *mntopts,
 		(void) tpool_dispatch(t, mounter, task_queue);
 
 	tpool_wait(t);
-	for (i = 0; i < cb->cb_used; ++i)
+	for (i = 0; i < cb->cb_used; ++i) {
 		good[i] = !task_queue->task[i].error;
+		if (!good[i]) {
+			zfs_handle_t *hdl = task_queue->error_zh;
+			zfs_error_aux(hdl->zfs_hdl,
+			    strerror(task_queue->task[i].error));
+			(void) zfs_error_fmt(hdl->zfs_hdl, EZFS_MOUNTFAILED,
+			    dgettext(TEXT_DOMAIN, "cannot mount '%s'"),
+			    task_queue->task[i].zh->zfs_name);
+		}
+	}
 	tpool_destroy(t);
 
-out:
-	if (error || task_queue->error) {
+	if (task_queue->error) {
 		zfs_handle_t *hdl = task_queue->error_zh;
 		/*
 		 * Tell ZFS!
