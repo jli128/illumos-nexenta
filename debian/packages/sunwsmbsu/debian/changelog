@@ -1,3 +1,9 @@
+sunwsmbsu (5.11.134-31-13252-1676) nexenta; urgency=high
+
+  * Issue NEX-1676: Backport NEX-1473 CIFS share unavailable after failover
+
+ -- Nexenta Systems <support@nexenta.com>  Tue, 22 Apr 2014 09:09:02 -0400
+
 sunwsmbsu (5.11.134-31-13251-56) nexenta; urgency=high
 
   * Issue SFR-56: Identity Management for UNIX (IDMU) authentication support
