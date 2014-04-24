@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -189,6 +189,8 @@ uint64_t zfs_arc_meta_limit = 0;
 int zfs_arc_grow_retry = 0;
 int zfs_arc_shrink_shift = 0;
 int zfs_arc_p_min_shift = 0;
+/* max queue size for L2ARC async eviction */
+int zfs_flush_ntasks = 64;
 
 /*
  * Note that buffers can be in one of 6 states:
@@ -3672,7 +3674,7 @@ arc_init(void)
 	    sizeof (arc_buf_hdr_t), offsetof(arc_buf_hdr_t, b_arc_node));
 
 	arc_flush_taskq = taskq_create("arc_flush_tq",
-	    max_ncpus, minclsyspri, 1, 4, TASKQ_DYNAMIC);
+	    max_ncpus, minclsyspri, 1, zfs_flush_ntasks, TASKQ_DYNAMIC);
 	buf_init();
 
 	arc_thread_exit = 0;
