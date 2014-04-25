@@ -1,3 +1,9 @@
+sunwsmbskr (5.11.134-31-13074-1844) nexenta; urgency=high
+
+	* Issue NEX-1844: backport SUP-867 panic in smb_com_locking_andx
+
+ -- Nexenta Systems <support@nexenta.com>  Fri, 25 Apr 2014 15:55:24 -0400
+
 sunwsmbskr (5.11.134-31-13073-1680) nexenta; urgency=high
 
   * Issue NEX-1680: backport SMB-131 Don't allow setting delete-on-close
