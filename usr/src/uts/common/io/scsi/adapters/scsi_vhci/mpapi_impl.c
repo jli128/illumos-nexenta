@@ -20,7 +20,6 @@
  */
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -4187,8 +4186,8 @@ vhci_mpapi_set_path_state(dev_info_t *vdip, mdi_pathinfo_t *pip, int state)
 	    MP_DRVR_PATH_STATE_UNKNOWN) || pp->hide) {
 		pp->valid = 0;
 		VHCI_DEBUG(6, (CE_NOTE, NULL, "vhci_mpapi_set_path_state: "
-		    "path(pip: %p) is not okay state: %d.  Set to invalid.",
-		    (void *)pip, state));
+		    "path(pip: %p) is not okay state.  Set to invalid.",
+		    (void *)pip));
 		svp = (scsi_vhci_priv_t *)mdi_pi_get_vhci_private(pip);
 		svl = svp->svp_svl;
 		/*
@@ -4205,19 +4204,15 @@ vhci_mpapi_set_path_state(dev_info_t *vdip, mdi_pathinfo_t *pip, int state)
 		/*
 		 * Following means the lun is offline
 		 */
-		if (pp->valid == 0 || vhci_mpapi_chk_last_path(pip) == -1) {
+		if (vhci_mpapi_chk_last_path(pip) == -1) {
 			lu_list = vhci_get_mpapi_item(vhci, NULL,
 			    MP_OBJECT_TYPE_MULTIPATH_LU, (void *)svl);
 			if (lu_list != NULL) {
 				vhci_mpapi_set_lu_valid(vhci, lu_list->item, 0);
+
 				VHCI_DEBUG(6, (CE_NOTE, NULL,
 				    "vhci_mpapi_set_path_state: "
 				    " Invalidated LU(%s)", svl->svl_lun_wwn));
-			} else {
-				VHCI_DEBUG(6, (CE_NOTE, NULL,
-				    "vhci_mpapi_set_path_state: "
-				    "LU(%s) not invalidated",
-				    svl->svl_lun_wwn));
 			}
 		}
 	}
