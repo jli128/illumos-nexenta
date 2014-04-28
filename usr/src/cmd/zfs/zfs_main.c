@@ -246,9 +246,10 @@ get_usage(zfs_help_t idx)
 	case HELP_PROMOTE:
 		return (gettext("\tpromote <clone-filesystem>\n"));
 	case HELP_RECEIVE:
-		return (gettext("\treceive [-vnFu] <filesystem|volume|"
-		"snapshot>\n"
-		"\treceive [-vnFu] [-d | -e] <filesystem>\n"));
+		return (gettext("\treceive [-vnFu] [-d | -e] "
+		    "[-o <property=value>]... [-x <property>]...\n"
+		    "\t    [-l <filesystem|volume>]... <filesystem|volume"
+		    "|snapshot>\n"));
 	case HELP_RENAME:
 		return (gettext("\trename [-f] <filesystem|volume|snapshot> "
 		    "<filesystem|volume|snapshot>\n"
@@ -477,10 +478,22 @@ usage(boolean_t requested)
 	exit(requested ? 0 : 2);
 }
 
-static int
-parseprop(nvlist_t *props)
+/*
+ * Add parameter to the list if it's not in there already
+ */
+static void
+add_unique_option(nvlist_t *props, char *propname)
 {
-	char *propname = optarg;
+	if (nvlist_lookup_string(props, propname, NULL) != 0) {
+		if (nvlist_add_boolean(props, propname) != 0) {
+			nomem();
+		}
+	}
+}
+
+static int
+parseprop(nvlist_t *props, char *propname)
+{
 	char *propval, *strval;
 
 	if ((propval = strchr(propname, '=')) == NULL) {
@@ -509,7 +522,7 @@ parse_depth(char *opt, int *flags)
 	depth = (int)strtol(opt, &tmp, 0);
 	if (*tmp) {
 		(void) fprintf(stderr,
-		    gettext("%s is not an integer\n"), optarg);
+		    gettext("%s is not an integer\n"), opt);
 		usage(B_FALSE);
 	}
 	if (depth < 0) {
@@ -600,7 +613,7 @@ zfs_do_clone(int argc, char **argv)
 	while ((c = getopt(argc, argv, "o:p")) != -1) {
 		switch (c) {
 		case 'o':
-			if (parseprop(props))
+			if (parseprop(props, optarg))
 				return (1);
 			break;
 		case 'p':
@@ -747,7 +760,7 @@ zfs_do_create(int argc, char **argv)
 				nomem();
 			break;
 		case 'o':
-			if (parseprop(props))
+			if (parseprop(props, optarg))
 				goto error;
 			break;
 		case 's':
@@ -3570,7 +3583,7 @@ zfs_do_snapshot(int argc, char **argv)
 	while ((c = getopt(argc, argv, "ro:")) != -1) {
 		switch (c) {
 		case 'o':
-			if (parseprop(props))
+			if (parseprop(props, optarg))
 				return (1);
 			break;
 		case 'r':
@@ -3829,10 +3842,15 @@ static int
 zfs_do_receive(int argc, char **argv)
 {
 	int c, err;
+	nvlist_t *exprops, *limitds;
 	recvflags_t flags = { 0 };
+	if (nvlist_alloc(&exprops, NV_UNIQUE_NAME, 0) != 0)
+		nomem();
+	if (nvlist_alloc(&limitds, NV_UNIQUE_NAME, 0) != 0)
+		nomem();
 
 	/* check options */
-	while ((c = getopt(argc, argv, ":denuvF")) != -1) {
+	while ((c = getopt(argc, argv, ":del:no:uvx:F")) != -1) {
 		switch (c) {
 		case 'd':
 			flags.isprefix = B_TRUE;
@@ -3841,14 +3859,26 @@ zfs_do_receive(int argc, char **argv)
 			flags.isprefix = B_TRUE;
 			flags.istail = B_TRUE;
 			break;
+		case 'l':
+			add_unique_option(limitds, optarg);
+			break;
 		case 'n':
 			flags.dryrun = B_TRUE;
+			break;
+		case 'o':
+			if (parseprop(exprops, optarg)) {
+				err = 1;
+				goto recverror;
+			}
 			break;
 		case 'u':
 			flags.nomount = B_TRUE;
 			break;
 		case 'v':
 			flags.verbose = B_TRUE;
+			break;
+		case 'x':
+			add_unique_option(exprops, optarg);
 			break;
 		case 'F':
 			flags.force = B_TRUE;
@@ -3886,7 +3916,12 @@ zfs_do_receive(int argc, char **argv)
 		return (1);
 	}
 
-	err = zfs_receive(g_zfs, argv[0], &flags, STDIN_FILENO, NULL);
+	err = zfs_receive(g_zfs, argv[0], &flags, STDIN_FILENO, exprops,
+	    limitds, NULL);
+
+recverror:
+	nvlist_free(exprops);
+	nvlist_free(limitds);
 
 	return (err != 0);
 }
