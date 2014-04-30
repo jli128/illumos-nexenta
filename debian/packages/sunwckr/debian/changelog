@@ -1,3 +1,9 @@
+sunwckr (5.11.134-31-12272-1695) nexenta; urgency=low
+
+  * Issue NEX-1695: scsi_vhci.conf file is not up to date
+
+ -- maintainer@nexenta.com <maintainer@nexenta.com>  Tue, 22 Apr 2014 12:16:18 -0400
+
 sunwckr (5.11.134-31-12271-12716) nexenta; urgency=low
 
   * backport OS-90, NEX-1049, OS-122 and OS-68 
