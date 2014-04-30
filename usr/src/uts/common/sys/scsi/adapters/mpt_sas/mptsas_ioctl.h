@@ -25,6 +25,7 @@
  */
 /*
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -103,6 +104,7 @@ typedef struct mptsas_pci_bits
  *  32-bit and 64-bit mode applications.
  *
  *  Adapter Type - Value = 4 = SCSI Protocol through SAS-2 adapter
+ *                 Value = 6 = SCSI Protocol through SAS-3 adapter
  *
  *  MPI Port Number - The PCI Function number for this device
  *
@@ -110,6 +112,8 @@ typedef struct mptsas_pci_bits
  *
  */
 #define	MPTIOCTL_ADAPTER_TYPE_SAS2	4
+#define	MPTIOCTL_ADAPTER_TYPE_SAS3	6
+
 typedef struct mptsas_adapter_data
 {
 	uint32_t		StructureLength;
