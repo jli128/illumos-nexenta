@@ -78,7 +78,7 @@ dsl_dir_open_obj(dsl_pool_t *dp, uint64_t ddobj,
 	dsl_dir_t *dd;
 	int err;
 
-	ASSERT(RW_LOCK_HELD(&dp->dp_config_rwlock) ||
+	ASSERT(RRW_LOCK_HELD(&dp->dp_config_rwlock) ||
 	    dsl_pool_sync_context(dp));
 
 	err = dmu_bonus_hold(dp->dp_meta_objset, ddobj, tag, &dbuf);
@@ -330,10 +330,10 @@ dsl_dir_open_spa(spa_t *spa, const char *name, void *tag,
 
 	dp = spa_get_dsl(spa);
 
-	rw_enter(&dp->dp_config_rwlock, RW_READER);
+	rrw_enter(&dp->dp_config_rwlock, RW_READER, FTAG);
 	err = dsl_dir_open_obj(dp, dp->dp_root_dir_obj, NULL, tag, &dd);
 	if (err) {
-		rw_exit(&dp->dp_config_rwlock);
+		rrw_exit(&dp->dp_config_rwlock, FTAG);
 		if (openedspa)
 			spa_close(spa, FTAG);
 		return (err);
@@ -366,7 +366,7 @@ dsl_dir_open_spa(spa_t *spa, const char *name, void *tag,
 		dd = child_ds;
 		next = nextnext;
 	}
-	rw_exit(&dp->dp_config_rwlock);
+	rrw_exit(&dp->dp_config_rwlock, FTAG);
 
 	if (err) {
 		dsl_dir_close(dd, tag);
@@ -485,7 +485,7 @@ dsl_dir_destroy_sync(void *arg1, void *tag, dmu_tx_t *tx)
 	uint64_t obj;
 	dd_used_t t;
 
-	ASSERT(RW_WRITE_HELD(&dd->dd_pool->dp_config_rwlock));
+	ASSERT(RRW_WRITE_HELD(&dd->dd_pool->dp_config_rwlock));
 	ASSERT(dd->dd_phys->dd_head_dataset_obj == 0);
 
 	/* Remove our reservation. */
@@ -547,7 +547,7 @@ dsl_dir_stats(dsl_dir_t *dd, nvlist_t *nv)
 	}
 	mutex_exit(&dd->dd_lock);
 
-	rw_enter(&dd->dd_pool->dp_config_rwlock, RW_READER);
+	rrw_enter(&dd->dd_pool->dp_config_rwlock, RW_READER, FTAG);
 	if (dsl_dir_is_clone(dd)) {
 		dsl_dataset_t *ds;
 		char buf[MAXNAMELEN];
@@ -558,7 +558,7 @@ dsl_dir_stats(dsl_dir_t *dd, nvlist_t *nv)
 		dsl_dataset_rele(ds, FTAG);
 		dsl_prop_nvlist_add_string(nv, ZFS_PROP_ORIGIN, buf);
 	}
-	rw_exit(&dd->dd_pool->dp_config_rwlock);
+	rrw_exit(&dd->dd_pool->dp_config_rwlock, FTAG);
 }
 
 void

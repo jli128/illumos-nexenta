@@ -371,7 +371,7 @@ dsl_dataset_get_ref(dsl_pool_t *dp, uint64_t dsobj, void *tag,
 	int err;
 	dmu_object_info_t doi;
 
-	ASSERT(RW_LOCK_HELD(&dp->dp_config_rwlock) ||
+	ASSERT(RRW_LOCK_HELD(&dp->dp_config_rwlock) ||
 	    dsl_pool_sync_context(dp));
 
 	err = dmu_bonus_hold(mos, dsobj, tag, &dbuf);
@@ -444,11 +444,12 @@ dsl_dataset_get_ref(dsl_pool_t *dp, uint64_t dsobj, void *tag,
 			 * we're always called with the read lock held.
 			 */
 			boolean_t need_lock =
-			    !RW_WRITE_HELD(&dp->dp_config_rwlock) &&
+			    !RRW_WRITE_HELD(&dp->dp_config_rwlock) &&
 			    dsl_pool_sync_context(dp);
 
 			if (need_lock)
-				rw_enter(&dp->dp_config_rwlock, RW_READER);
+				rrw_enter(&dp->dp_config_rwlock, RW_READER,
+				    FTAG);
 
 			err = dsl_prop_get_ds(ds,
 			    "refreservation", sizeof (uint64_t), 1,
@@ -460,7 +461,7 @@ dsl_dataset_get_ref(dsl_pool_t *dp, uint64_t dsobj, void *tag,
 			}
 
 			if (need_lock)
-				rw_exit(&dp->dp_config_rwlock);
+				rrw_exit(&dp->dp_config_rwlock, FTAG);
 		} else {
 			ds->ds_reserved = ds->ds_quota = 0;
 		}
@@ -536,15 +537,15 @@ dsl_dataset_hold_ref(dsl_dataset_t *ds, void *tag)
 	 * may block here temporarily, until the "destructability" of
 	 * the dataset is determined.
 	 */
-	ASSERT(!RW_WRITE_HELD(&dp->dp_config_rwlock));
+	ASSERT(!RRW_WRITE_HELD(&dp->dp_config_rwlock));
 	mutex_enter(&ds->ds_lock);
 	while (!rw_tryenter(&ds->ds_rwlock, RW_READER)) {
-		rw_exit(&dp->dp_config_rwlock);
+		rrw_exit(&dp->dp_config_rwlock, FTAG);
 		cv_wait(&ds->ds_exclusive_cv, &ds->ds_lock);
 		if (DSL_DATASET_IS_DESTROYED(ds)) {
 			mutex_exit(&ds->ds_lock);
 			dsl_dataset_drop_ref(ds, tag);
-			rw_enter(&dp->dp_config_rwlock, RW_READER);
+			rrw_enter(&dp->dp_config_rwlock, RW_READER, FTAG);
 			return (ENOENT);
 		}
 		/*
@@ -554,7 +555,7 @@ dsl_dataset_hold_ref(dsl_dataset_t *ds, void *tag)
 		 * the ds_lock here.
 		 */
 		mutex_exit(&ds->ds_lock);
-		rw_enter(&dp->dp_config_rwlock, RW_READER);
+		rrw_enter(&dp->dp_config_rwlock, RW_READER, FTAG);
 		mutex_enter(&ds->ds_lock);
 	}
 	mutex_exit(&ds->ds_lock);
@@ -602,7 +603,7 @@ dsl_dataset_hold(const char *name, void *tag, dsl_dataset_t **dsp)
 
 	dp = dd->dd_pool;
 	obj = dd->dd_phys->dd_head_dataset_obj;
-	rw_enter(&dp->dp_config_rwlock, RW_READER);
+	rrw_enter(&dp->dp_config_rwlock, RW_READER, FTAG);
 	if (obj)
 		err = dsl_dataset_get_ref(dp, obj, tag, dsp);
 	else
@@ -641,7 +642,7 @@ dsl_dataset_hold(const char *name, void *tag, dsl_dataset_t **dsp)
 		}
 	}
 out:
-	rw_exit(&dp->dp_config_rwlock);
+	rrw_exit(&dp->dp_config_rwlock, FTAG);
 	dsl_dir_close(dd, FTAG);
 	return (err);
 }
@@ -1127,9 +1128,9 @@ dsl_dataset_destroy(dsl_dataset_t *ds, void *tag, boolean_t defer)
 		    count == 0);
 	}
 
-	rw_enter(&dd->dd_pool->dp_config_rwlock, RW_READER);
+	rrw_enter(&dd->dd_pool->dp_config_rwlock, RW_READER, FTAG);
 	err = dsl_dir_open_obj(dd->dd_pool, dd->dd_object, NULL, FTAG, &dd);
-	rw_exit(&dd->dd_pool->dp_config_rwlock);
+	rrw_exit(&dd->dd_pool->dp_config_rwlock, FTAG);
 
 	if (err)
 		goto out;
@@ -1662,7 +1663,7 @@ dsl_dataset_destroy_sync(void *arg1, void *tag, dmu_tx_t *tx)
 		ASSERT3U(ds->ds_reserved, ==, 0);
 	}
 
-	ASSERT(RW_WRITE_HELD(&dp->dp_config_rwlock));
+	ASSERT(RRW_WRITE_HELD(&dp->dp_config_rwlock));
 
 	dsl_scan_ds_destroyed(ds, tx);
 
@@ -2024,7 +2025,7 @@ dsl_dataset_snapshot_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 	objset_t *mos = dp->dp_meta_objset;
 	int err;
 
-	ASSERT(RW_WRITE_HELD(&dp->dp_config_rwlock));
+	ASSERT(RRW_WRITE_HELD(&dp->dp_config_rwlock));
 
 	/*
 	 * The origin's ds_creation_txg has to be < TXG_INITIAL
@@ -2203,7 +2204,7 @@ dsl_dataset_fast_stat(dsl_dataset_t *ds, dmu_objset_stats_t *stat)
 	}
 
 	/* clone origin is really a dsl_dir thing... */
-	rw_enter(&ds->ds_dir->dd_pool->dp_config_rwlock, RW_READER);
+	rrw_enter(&ds->ds_dir->dd_pool->dp_config_rwlock, RW_READER, FTAG);
 	if (dsl_dir_is_clone(ds->ds_dir)) {
 		dsl_dataset_t *ods;
 
@@ -2214,7 +2215,7 @@ dsl_dataset_fast_stat(dsl_dataset_t *ds, dmu_objset_stats_t *stat)
 	} else {
 		stat->dds_origin[0] = '\0';
 	}
-	rw_exit(&ds->ds_dir->dd_pool->dp_config_rwlock);
+	rrw_exit(&ds->ds_dir->dd_pool->dp_config_rwlock, FTAG);
 }
 
 uint64_t
@@ -2251,7 +2252,7 @@ dsl_dataset_modified_since_lastsnap(dsl_dataset_t *ds)
 {
 	dsl_pool_t *dp = ds->ds_dir->dd_pool;
 
-	ASSERT(RW_LOCK_HELD(&dp->dp_config_rwlock) ||
+	ASSERT(RRW_LOCK_HELD(&dp->dp_config_rwlock) ||
 	    dsl_pool_sync_context(dp));
 	if (ds->ds_prev == NULL)
 		return (B_FALSE);
@@ -2831,7 +2832,7 @@ snaplist_make(dsl_pool_t *dp, boolean_t own,
 {
 	uint64_t obj = last_obj;
 
-	ASSERT(RW_LOCK_HELD(&dp->dp_config_rwlock));
+	ASSERT(RRW_LOCK_HELD(&dp->dp_config_rwlock));
 
 	list_create(l, sizeof (struct promotenode),
 	    offsetof(struct promotenode, link));
@@ -2949,7 +2950,7 @@ dsl_dataset_promote(const char *name, char *conflsnap)
 	 * Take ownership of them so that we can rename them into our
 	 * namespace.
 	 */
-	rw_enter(&dp->dp_config_rwlock, RW_READER);
+	rrw_enter(&dp->dp_config_rwlock, RW_READER, FTAG);
 
 	err = snaplist_make(dp, B_TRUE, 0, dd->dd_phys->dd_origin_obj,
 	    &pa.shared_snaps);
@@ -2976,7 +2977,7 @@ dsl_dataset_promote(const char *name, char *conflsnap)
 	}
 
 out:
-	rw_exit(&dp->dp_config_rwlock);
+	rrw_exit(&dp->dp_config_rwlock, FTAG);
 
 	/*
 	 * Add in 128x the snapnames zapobj size, since we will be moving
@@ -3228,12 +3229,12 @@ dsl_dsobj_to_dsname(char *pname, uint64_t obj, char *buf)
 	if ((error = spa_open(pname, &spa, FTAG)) != 0)
 		return (error);
 	dp = spa_get_dsl(spa);
-	rw_enter(&dp->dp_config_rwlock, RW_READER);
+	rrw_enter(&dp->dp_config_rwlock, RW_READER, FTAG);
 	if ((error = dsl_dataset_hold_obj(dp, obj, FTAG, &ds)) == 0) {
 		dsl_dataset_name(ds, buf);
 		dsl_dataset_rele(ds, FTAG);
 	}
-	rw_exit(&dp->dp_config_rwlock);
+	rrw_exit(&dp->dp_config_rwlock, FTAG);
 	spa_close(spa, FTAG);
 
 	return (error);
@@ -3969,9 +3970,9 @@ dsl_dataset_user_release_tmp(dsl_pool_t *dp, uint64_t dsobj, char *htag,
 	int error;
 
 	do {
-		rw_enter(&dp->dp_config_rwlock, RW_READER);
+		rrw_enter(&dp->dp_config_rwlock, RW_READER, FTAG);
 		error = dsl_dataset_hold_obj(dp, dsobj, FTAG, &ds);
-		rw_exit(&dp->dp_config_rwlock);
+		rrw_exit(&dp->dp_config_rwlock, FTAG);
 		if (error)
 			return (error);
 		namelen = dsl_dataset_namelen(ds)+1;

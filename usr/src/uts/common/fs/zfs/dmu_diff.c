@@ -184,10 +184,10 @@ dmu_diff(objset_t *tosnap, objset_t *fromsnap, struct vnode *vp, offset_t *offp)
 			return (EXDEV);
 		}
 
-		rw_enter(&dp->dp_config_rwlock, RW_READER);
+		rrw_enter(&dp->dp_config_rwlock, RW_READER, FTAG);
 		err = dsl_dataset_hold_obj(dp,
 		    findds->ds_dir->dd_phys->dd_origin_obj, FTAG, &findds);
-		rw_exit(&dp->dp_config_rwlock);
+		rrw_exit(&dp->dp_config_rwlock, FTAG);
 
 		if (relds)
 			dsl_dataset_rele(relds, FTAG);

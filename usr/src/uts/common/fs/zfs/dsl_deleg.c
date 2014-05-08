@@ -306,7 +306,7 @@ dsl_deleg_get(const char *ddname, nvlist_t **nvp)
 
 	VERIFY(nvlist_alloc(nvp, NV_UNIQUE_NAME, KM_SLEEP) == 0);
 
-	rw_enter(&dp->dp_config_rwlock, RW_READER);
+	rrw_enter(&dp->dp_config_rwlock, RW_READER, FTAG);
 	for (dd = startdd; dd != NULL; dd = dd->dd_parent) {
 		zap_cursor_t basezc;
 		zap_attribute_t baseza;
@@ -354,7 +354,7 @@ dsl_deleg_get(const char *ddname, nvlist_t **nvp)
 		VERIFY(nvlist_add_nvlist(*nvp, source, sp_nvp) == 0);
 		nvlist_free(sp_nvp);
 	}
-	rw_exit(&dp->dp_config_rwlock);
+	rrw_exit(&dp->dp_config_rwlock, FTAG);
 
 	dsl_dir_close(startdd, FTAG);
 	return (0);
@@ -562,7 +562,7 @@ dsl_deleg_access_impl(dsl_dataset_t *ds, const char *perm, cred_t *cr)
 	avl_create(&permsets, perm_set_compare, sizeof (perm_set_t),
 	    offsetof(perm_set_t, p_node));
 
-	rw_enter(&dp->dp_config_rwlock, RW_READER);
+	rrw_enter(&dp->dp_config_rwlock, RW_READER, FTAG);
 	for (dd = ds->ds_dir; dd != NULL; dd = dd->dd_parent,
 	    checkflag = ZFS_DELEG_DESCENDENT) {
 		uint64_t zapobj;
@@ -623,7 +623,7 @@ again:
 	}
 	error = EPERM;
 success:
-	rw_exit(&dp->dp_config_rwlock);
+	rrw_exit(&dp->dp_config_rwlock, FTAG);
 
 	cookie = NULL;
 	while ((setnode = avl_destroy_nodes(&permsets, &cookie)) != NULL)
