@@ -1,3 +1,10 @@
+sunwzfskr (5.11.134-31-12289-1870) nexenta; urgency=low
+
+  * Issue NEX-1870: 1898 Kernel assertion in zfs_putpage()
+     raised by rfs_write()
+
+ -- Nexenta Systems <dan.fields@nexenta.com>  Thu, 08 May 2014 12:23:39 -0400
+
 sunwzfskr (5.11.134-31-12288-1627) nexenta; urgency=low
 
   * Issue NEX-1627: backport NEX-1142 rw_destroy: lock still active,
