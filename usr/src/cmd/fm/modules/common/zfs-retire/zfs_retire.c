@@ -593,7 +593,12 @@ zfs_retire_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 		if (nvlist_lookup_boolean_value(fault, FM_SUSPECT_RETIRE,
 		    &retire) == 0 && retire == 0)
 			continue;
-
+		if (fmd_nvl_class_match(hdl, fault, "fault.io.disk.slow-io") &&
+		    fmd_prop_get_int32(hdl, "slow_io_skip_retire") ==
+		    FMD_B_TRUE) {
+			fmd_hdl_debug(hdl, "Ignoring slow io fault");
+			continue;
+		}
 		/*
 		 * While we subscribe to fault.fs.zfs.*, we only take action
 		 * for faults targeting a specific vdev (open failure or SERD
@@ -818,6 +823,7 @@ static const fmd_hdl_ops_t fmd_ops = {
 
 static const fmd_prop_t fmd_props[] = {
 	{ "spare_on_remove", FMD_TYPE_BOOL, "true" },
+	{ "slow_io_skip_retire", FMD_TYPE_BOOL, "true"},
 	{ NULL, 0, NULL }
 };
 
