@@ -248,7 +248,7 @@ int sd_reinstate_resv_delay		= SD_REINSTATE_RESV_DELAY;
  * Can be overriden for vendor/device id in sd.conf
  */
 
-hrtime_t sd_g_slow_io_threshold = 3 * NANOSEC;
+hrtime_t sd_g_slow_io_threshold		= 3LL * NANOSEC;
 
 _NOTE(SCHEME_PROTECTS_DATA("safe sharing", sd_reinstate_resv_delay))
 
