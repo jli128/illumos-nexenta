@@ -1,3 +1,9 @@
+sunwos86r (5.11.134-31-9684-1939) nexenta; urgency=medium
+
+  * Issue NEX-1939: Backport NEX-1438 Dell faulting drives for slow IO
+
+ -- Nexenta Systems <support@nexenta.com>  Fri, 16 May 2014 11:48:03 -0400
+
 sunwos86r (5.11.134-31-9683-104) nexenta; urgency=medium
 
   * Issue NEX-1559: backport OS-104 handle attach-failure ereport

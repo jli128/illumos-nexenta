@@ -136,7 +136,7 @@ msgstr "An attempt has been made to take the disk out of service. If the device 
 msgid "DISK-8000-6R.impact"
 msgstr "Optionally degraded redundancy and performance.\n"
 msgid "DISK-8000-6R.action"
-msgstr "Determine the cause of the fault using fmdump -v -u <EVENT_ID> and schedule a repair service.\n"
+msgstr "Determine the cause of the fault using fmdump -V -u <EVENT_ID> and schedule a repair service.\n"
 #
 # code: DISK-8000-74
 # keys: fault.io.disk.slow-io
@@ -148,9 +148,9 @@ msgstr "Critical"
 msgid "DISK-8000-74.description"
 msgstr "A disk device is experiencing too many slows IOs above its configured threshold.\n"
 msgid "DISK-8000-74.response"
-msgstr "An attempt has been made to take the disk out of service. If the device is part of an active ZFS pool, the device still may be in service.\n"
+msgstr "Depending on configuration the device may have been retired.\n"
 msgid "DISK-8000-74.impact"
-msgstr "Optionally degraded redundancy and performance.\n"
+msgstr "Optionally degraded performance and redundancy.\n"
 msgid "DISK-8000-74.action"
-msgstr "Determine the cause of the fault using fmdump -v -u <EVENT_ID> and schedule a repair service.\n"
+msgstr "Determine the cause of the fault using fmdump -V -u <EVENT_ID> and schedule a repair service.\n"
 

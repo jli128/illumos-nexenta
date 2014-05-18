@@ -1,3 +1,9 @@
+sunw0on (5.11.134-31-1-NEX-1939) nexenta; urgency=low
+
+  * Issue NEX-1939: Backport NEX-1438 Dell faulting drives for slow IO
+
+ -- Nexenta Systems <support@nexenta.com>  Fri, 16 May 2014 11:48:03 -0400
+
 sunw0on (5.11.134-31-0-100) nexenta; urgency=low
 
   * Renumber packages in preparation for 3.1 release

@@ -243,10 +243,10 @@ static int sd_dtype_optical_bind	= -1;
 /* Note: the following is not a bug, it really is "sd_" and not "ssd_" */
 static	char *sd_resv_conflict_name	= "sd_retry_on_reservation_conflict";
 /*
- * Default safe I/O delay threshold of 2s for all devices.
+ * Default safe I/O delay threshold of 3s for all devices.
  * Can be overriden for vendor/device id in sd.conf
  */
-hrtime_t sd_g_slow_io_threshold = 2 * NANOSEC;
+hrtime_t sd_g_slow_io_threshold		= 3LL * NANOSEC;
 
 /*
  * Global data for debug logging. To enable debug printing, sd_component_mask
@@ -31469,7 +31469,6 @@ sd_tg_getinfo(dev_info_t *devi, int cmd, void *arg, void *tg_cookie)
 static void
 sd_ssc_ereport_post(sd_ssc_t *ssc, enum sd_driver_assessment drv_assess)
 {
-	int uscsi_path_instance = 0;
 	uchar_t	uscsi_pkt_reason;
 	uint32_t uscsi_pkt_state;
 	uint32_t uscsi_pkt_statistics;
@@ -31512,7 +31511,6 @@ sd_ssc_ereport_post(sd_ssc_t *ssc, enum sd_driver_assessment drv_assess)
 		return;
 
 	uscsi_pkt_reason = ssc->ssc_uscsi_info->ui_pkt_reason;
-	uscsi_path_instance = ssc->ssc_uscsi_cmd->uscsi_path_instance;
 	uscsi_pkt_state = ssc->ssc_uscsi_info->ui_pkt_state;
 	uscsi_pkt_statistics = ssc->ssc_uscsi_info->ui_pkt_statistics;
 	uscsi_ena = ssc->ssc_uscsi_info->ui_ena;
