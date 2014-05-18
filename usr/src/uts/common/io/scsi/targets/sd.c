@@ -13750,6 +13750,11 @@ sd_core_iostart(int index, struct sd_lun *un, struct buf *bp)
 
 	mutex_enter(SD_MUTEX(un));
 
+	if (un->un_state == SD_STATE_RETIRED) {
+		un->un_failfast_state = SD_FAILFAST_INACTIVE;
+		Restore_state(un);
+	}
+
 	/*
 	 * If we are currently in the failfast state, fail any new IO
 	 * that has B_FAILFAST set, then return.
@@ -15003,14 +15008,7 @@ sd_start_cmds(struct sd_lun *un, struct buf *immed_bp)
 	ASSERT(un->un_throttle >= 0);
 
 	SD_TRACE(SD_LOG_IO_CORE | SD_LOG_ERROR, un, "sd_start_cmds: entry\n");
-	/* check if LUN is retiring */
-	/* enable failfast in this case */
-	if (DEVI(un->un_sd->sd_dev)->devi_flags &
-	    DEVI_RETIRING) {
-		un->un_failfast_state = SD_FAILFAST_ACTIVE;
-		un->un_failfast_bp = NULL;
-		return;
-	}
+
 	/* check if LUN is in retired state */
 	/* abort IO and flush queue in case if it is */
 	if (DEVI(un->un_sd->sd_dev)->devi_flags &
@@ -15026,6 +15024,8 @@ sd_start_cmds(struct sd_lun *un, struct buf *immed_bp)
 		un->un_failfast_bp = NULL;
 		un->un_failfast_state = SD_FAILFAST_ACTIVE;
 		sd_failfast_flushq(un, B_TRUE);
+		if (un->un_state != SD_STATE_RETIRED)
+			New_state(un, SD_STATE_RETIRED);
 		return;
 	}
 
