@@ -17095,6 +17095,7 @@ sd_slow_io_ereport(struct scsi_pkt *pktp)
 	    "stop", DATA_TYPE_UINT64, pktp->pkt_stop,
 	    "delta", DATA_TYPE_UINT64, pktp->pkt_stop - pktp->pkt_start,
 	    "threshold", DATA_TYPE_UINT64, un->un_slow_io_threshold,
+	    "pkt-reason", DATA_TYPE_UINT32, pktp->pkt_reason,
 	    NULL);
 }
 
