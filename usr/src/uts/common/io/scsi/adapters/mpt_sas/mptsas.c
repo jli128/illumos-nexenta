@@ -3541,7 +3541,6 @@ mptsas_save_cmd(mptsas_t *mpt, mptsas_cmd_t *cmd)
 		cmd->cmd_active_expiration = gethrtime() +
 		    (hrtime_t)cmd->cmd_pkt->pkt_time * NANOSEC;
 	}
-
 	return (TRUE);
 }
 
@@ -8504,7 +8503,6 @@ mptsas_start_cmd(mptsas_t *mpt, mptsas_cmd_t *cmd)
 	/*
 	 * Start timeout.
 	 */
-
 	cmd->cmd_active_expiration = pkt->pkt_start +
 	    (hrtime_t)pkt->pkt_time * (hrtime_t)NANOSEC;
 

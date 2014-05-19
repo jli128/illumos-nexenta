@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
- * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -416,7 +416,7 @@ ddt_stat_update_by_dds(ddt_t *ddt, ddt_entry_t *dde,
     ddt_stat_t *dds, uint64_t neg)
 {
 	ddt_histogram_t *ddh;
-	int bucket = highbit(dds->dds_ref_blocks) - 1;
+	int bucket = highbit64(dds->dds_ref_blocks) - 1;
 	ASSERT(bucket >= 0);
 
 	ddh = &ddt->ddt_histogram[dde->dde_type][dde->dde_class];

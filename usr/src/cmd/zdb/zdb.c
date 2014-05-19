@@ -22,8 +22,8 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
- * Copyright (c) 2013 by Delphix. All rights reserved.
-*/
+ * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
+ */
 
 #include <stdio.h>
 #include <unistd.h>
@@ -2814,7 +2814,8 @@ dump_simulated_ddt(spa_t *spa)
 		dds.dds_ref_psize = zdde->zdde_ref_psize;
 		dds.dds_ref_dsize = zdde->zdde_ref_dsize;
 
-		ddt_stat_add(&ddh_total.ddh_stat[highbit(refcnt) - 1], &dds, 0);
+		ddt_stat_add(&ddh_total.ddh_stat[highbit64(refcnt) - 1],
+		    &dds, 0);
 
 		umem_free(zdde, sizeof (*zdde));
 	}

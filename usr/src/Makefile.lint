@@ -134,7 +134,6 @@ COMMON_SUBDIRS = \
 	cmd/fdisk \
 	cmd/fgrep \
 	cmd/file \
-	cmd/filebench \
 	cmd/find \
 	cmd/fmthard \
 	cmd/fmtmsg \

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -2239,7 +2239,6 @@ vhci_bind_transport(struct scsi_address *ap, struct vhci_pkt *vpkt, int flags,
 	int			held;
 	int			mps_flag = MDI_SELECT_ONLINE_PATH;
 	struct scsi_vhci_lun	*vlun;
-	time_t			tnow;
 	int			path_instance = 0;
 
 	vlun = ADDR2VLUN(ap);
@@ -2377,7 +2376,7 @@ try_again:
 			if ((rval != MDI_SUCCESS) || (pip == NULL)) {
 				if (vlun->svl_waiting_for_activepath == 0) {
 					vlun->svl_waiting_for_activepath = 1;
-					vlun->svl_wfa_time = ddi_get_time();
+					vlun->svl_wfa_time = gethrtime();
 				}
 				mps_flag |= MDI_SELECT_STANDBY_PATH;
 				rval = mdi_select_path(cdip,
@@ -2409,8 +2408,8 @@ try_again:
 				 * show up obviating the need for a
 				 * failover
 				 */
-				tnow = ddi_get_time();
-				if (tnow - vlun->svl_wfa_time >= 60) {
+				if ((gethrtime() - vlun->svl_wfa_time) >=
+				    (60 * NANOSEC)) {
 					vlun->svl_waiting_for_activepath = 0;
 				} else {
 					drv_usecwait(1000);
@@ -3639,7 +3638,7 @@ vhci_handle_ext_fo(struct scsi_pkt *pkt, int fostat)
 			return (PKT_RETURN);
 		}
 		swarg->svs_svp = svp;
-		swarg->svs_tos = ddi_get_time();
+		swarg->svs_tos = gethrtime();
 		swarg->svs_pi = vpkt->vpkt_path;
 		swarg->svs_release_lun = 0;
 		swarg->svs_done = 0;
@@ -3700,7 +3699,7 @@ vhci_efo_watch_cb(caddr_t arg, struct scsi_watch_result *resultp)
 	updt_paths = 0;
 
 	if (pkt->pkt_reason != CMD_CMPLT) {
-		if ((ddi_get_time() - swarg->svs_tos) >= VHCI_EXTFO_TIMEOUT) {
+		if ((gethrtime() - swarg->svs_tos) >= VHCI_EXTFO_TIMEOUT) {
 			swarg->svs_release_lun = 1;
 			goto done;
 		}
@@ -3722,7 +3721,7 @@ vhci_efo_watch_cb(caddr_t arg, struct scsi_watch_result *resultp)
 				updt_paths = 1;
 				break;
 			default:
-				if ((ddi_get_time() - swarg->svs_tos)
+				if ((gethrtime() - swarg->svs_tos)
 				    >= VHCI_EXTFO_TIMEOUT) {
 					swarg->svs_release_lun = 1;
 					goto done;
@@ -3754,7 +3753,7 @@ vhci_efo_watch_cb(caddr_t arg, struct scsi_watch_result *resultp)
 		    KM_SLEEP);
 		return (0);
 	}
-	if ((ddi_get_time() - swarg->svs_tos) >= VHCI_EXTFO_TIMEOUT) {
+	if ((gethrtime() - swarg->svs_tos) >= VHCI_EXTFO_TIMEOUT) {
 		swarg->svs_release_lun = 1;
 		goto done;
 	}
