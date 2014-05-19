@@ -1,3 +1,10 @@
+sunwhea (5.11.134-31-13251-1938) nexenta; urgency=high
+
+  * Issue NEX-1938: Backport NEX-1923 Retiring a device may hang or
+    leave device unusable after unretire
+
+ -- Nexenta Systems <support@nexenta.com>  Fri, 16 May 2014 11:48:03 -0400
+
 sunwhea (5.11.134-31-13250-13657) nexenta; urgency=high
 
   * Issue 13657: Backport request for Enhancment 11201 - nss: need local netgroup implementation
