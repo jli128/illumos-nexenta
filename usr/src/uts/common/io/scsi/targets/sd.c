@@ -8694,7 +8694,7 @@ spinup_failed:
 	devid = DEVI(devi)->devi_devid_str;
 	scsi_fm_ereport_post(un->un_sd, 0,
 	    "disk.attach-failure", ssc->ssc_uscsi_info->ui_ena,
-	    devid, NULL, DDI_NOSLEEP, NULL,
+	    devid, DDI_NOSLEEP,
 	    FM_VERSION, DATA_TYPE_UINT8, FM_EREPORT_VERS0,
 	    DEVID_IF_KNOWN(devid));
 
