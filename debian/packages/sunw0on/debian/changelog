@@ -1,4 +1,4 @@
-sunw0on (5.11.134-31-1-NEX-1939) nexenta; urgency=low
+sunw0on (5.11.134-31-1-1939) nexenta; urgency=low
 
   * Issue NEX-1939: Backport NEX-1438 Dell faulting drives for slow IO
 
