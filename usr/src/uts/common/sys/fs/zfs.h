@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright (c) 2011, 2014 by Delphix. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
@@ -148,6 +148,7 @@ typedef enum {
 	ZFS_PROP_SNAPSHOT_LIMIT,
 	ZFS_PROP_FILESYSTEM_COUNT,
 	ZFS_PROP_SNAPSHOT_COUNT,
+	ZFS_PROP_REDUNDANT_METADATA,
 	ZFS_PROP_LSTXG,
 	ZFS_PROP_SPECIALCLASS,
 	ZFS_PROP_ZPL_TO_METADEV,
@@ -437,6 +438,10 @@ typedef enum {
 	ZFS_SYNC_DISABLED = 2
 } zfs_sync_type_t;
 
+typedef enum {
+	ZFS_REDUNDANT_METADATA_ALL,
+	ZFS_REDUNDANT_METADATA_MOST
+} zfs_redundant_metadata_type_t;
 
 /*
  * On-disk version number.
