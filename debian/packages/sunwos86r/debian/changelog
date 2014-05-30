@@ -1,3 +1,10 @@
+sunwos86r (5.11.134-31-9688-1938) nexenta; urgency=medium
+
+  * Issue NEX-1938: Backport NEX-1923 Retiring a device may hang or leave
+    device unusable after unretire
+
+ -- Nexenta Systems <support@nexenta.com>  Fri, 30 May 2014 14:20:10 -0400
+
 sunwos86r (5.11.134-31-9687-1930) nexenta; urgency=medium
 
   * Issue NEX-1930: Kernel panic due to Null pointer dereference 
