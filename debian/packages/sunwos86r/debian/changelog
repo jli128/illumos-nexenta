@@ -4,13 +4,6 @@ sunwos86r (5.11.134-31-9687-1930) nexenta; urgency=medium
 
  -- Nexenta Systems <support@nexenta.com>  Mon, 19 May 2014 16:50:50 -0400
 
-sunwos86r (5.11.134-31-9686-1938) nexenta; urgency=medium
-
-  * Issue NEX-1938: Backport NEX-1923 Retiring a device may hang or
-    leave device unusable after unretire
-
- -- Nexenta Systems <support@nexenta.com>  Fri, 16 May 2014 11:48:03 -0400
-
 sunwos86r (5.11.134-31-9685-1894) nexenta; urgency=medium
 
   * Issue NEX-1894: Backport NEX-1857 add the pkt_reason field to the slow-io error detector
