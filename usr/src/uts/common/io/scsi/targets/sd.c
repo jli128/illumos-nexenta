@@ -1754,6 +1754,8 @@ static void sd_rmw_msg_print_handler(void *arg);
  *
  * SD_FAILFAST_ENABLE_FAIL_USCSI: When set, discard all commands in the USCSI
  * chain (sdioctl or driver generated) when in failfast active state.
+ * To prevent problems with sdopen, this is limited to when there are
+ * multiple pending commands.
  */
 
 #define	SD_FAILFAST_ENABLE_FORCE_INACTIVE	0x01
@@ -10843,6 +10845,12 @@ sdclose(dev_t dev, int flag, int otyp, cred_t *cred_p)
 			}
 
 			/*
+			 * Pardon a device that is currently in failfast
+			 * active state, to not bias a future open.
+			 */
+			un->un_failfast_state = SD_FAILFAST_INACTIVE;
+
+			/*
 			 * If a device has removable media, invalidate all
 			 * parameters related to media, such as geometry,
 			 * blocksize, and blockcount.
@@ -10984,7 +10992,7 @@ sd_ready_and_valid(sd_ssc_t *ssc, int part)
 		 */
 		mutex_exit(SD_MUTEX(un));
 
-		status = sd_send_scsi_TEST_UNIT_READY(ssc, 0);
+		status = sd_send_scsi_TEST_UNIT_READY(ssc, SD_DONT_RETRY_TUR);
 		if (status != 0) {
 			sd_ssc_assessment(ssc, SD_FMT_IGNORE);
 		}
@@ -12043,14 +12051,16 @@ sd_uscsi_strategy(struct buf *bp)
 	    (cmd != SCMD_MODE_SELECT) && (cmd != SCMD_MODE_SELECT_G1))
 		un->un_f_sync_cache_required = TRUE;
 
-	mutex_exit(SD_MUTEX(un));
-
 	if (sd_failfast_enable & SD_FAILFAST_ENABLE_FAIL_USCSI) {
 		/*
-		 * Treat all commands as if they have B_FAILFAST set.
+		 * If there are outstanding commands, treat all
+		 * USCSI commands as if they have B_FAILFAST set.
 		 */
-		bp->b_flags |= B_FAILFAST;
+		if (un->un_ncmds_in_driver != 1)
+			bp->b_flags |= B_FAILFAST;
 	}
+
+	mutex_exit(SD_MUTEX(un));
 
 	switch (uip->ui_flags) {
 	case SD_PATH_DIRECT:
@@ -15104,28 +15114,20 @@ sd_start_cmds(struct sd_lun *un, struct buf *immed_bp)
 
 	SD_TRACE(SD_LOG_IO_CORE | SD_LOG_ERROR, un, "sd_start_cmds: entry\n");
 
-	/* check if LUN is retiring */
-	/* enable failfast in this case */
-	if (DEVI(un->un_sd->sd_dev)->devi_flags &
-	    DEVI_RETIRING) {
-		un->un_failfast_state = SD_FAILFAST_ACTIVE;
-		un->un_failfast_bp = NULL;
-		return;
-	}
-	/* check if LUN is in retired state */
-	/* abort IO and flush queue in case if it is */
-	if (DEVI(un->un_sd->sd_dev)->devi_flags &
-	    DEVI_RETIRED) {
+	/*
+	 * If device is currently retired, we should abort all pending I/O.
+	 */
+	if (DEVI(un->un_sd->sd_dev)->devi_flags & DEVI_RETIRED) {
 		if (immed_bp) {
 			immed_bp->b_resid = immed_bp->b_bcount;
 			bioerror(immed_bp, ENXIO);
 			biodone(immed_bp);
 		}
 		/* abort in-flight IO */
-		scsi_abort(SD_ADDRESS(un), NULL);
+		(void) scsi_abort(SD_ADDRESS(un), NULL);
 		/* abort pending IO */
-		un->un_failfast_bp = NULL;
 		un->un_failfast_state = SD_FAILFAST_ACTIVE;
+		un->un_failfast_bp = NULL;
 		sd_failfast_flushq(un, B_TRUE);
 		return;
 	}
@@ -16102,7 +16104,8 @@ sd_retry_command(struct sd_lun *un, struct buf *bp, int retry_check_flag,
 		}
 	}
 
-	if (sd_failfast_enable & SD_FAILFAST_ENABLE_FAIL_RETRIES) {
+	if (sd_failfast_enable & (SD_FAILFAST_ENABLE_FAIL_RETRIES |
+	    SD_FAILFAST_ENABLE_FAIL_ALL_RETRIES)) {
 		if (sd_failfast_enable & SD_FAILFAST_ENABLE_FAIL_ALL_RETRIES) {
 			/*
 			 * Fail ALL retries when in active failfast state,
@@ -16216,8 +16219,7 @@ sd_retry_command(struct sd_lun *un, struct buf *bp, int retry_check_flag,
 		 * active state when we see retries due to a reset.
 		 */
 		if ((sd_failfast_enable & SD_FAILFAST_ENABLE_FORCE_INACTIVE) &&
-		    (retry_check_flag & SD_RETRIES_MASK) != SD_RETRIES_VICTIM &&
-		    (DEVI(un->un_sd->sd_dev)->devi_flags & DEVI_RETIRING) == 0)
+		    (retry_check_flag & SD_RETRIES_MASK) != SD_RETRIES_VICTIM)
 			un->un_failfast_state = SD_FAILFAST_INACTIVE;
 	}
 
