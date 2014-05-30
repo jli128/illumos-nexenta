@@ -1188,7 +1188,6 @@ struct sd_fi_tran {
 #define	SD_STATE_PM_CHANGING	5
 #define	SD_STATE_ATTACHING	6
 #define	SD_STATE_ATTACH_FAILED	7
-#define	SD_STATE_RETIRED	8
 
 /*
  * The table is to be interpreted as follows: The rows lists all the states
