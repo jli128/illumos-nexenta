@@ -1332,6 +1332,7 @@ ZFS_COMMON_OBJS +=		\
 	lzjb.o			\
 	metaslab.o		\
 	refcount.o		\
+	rrwlock.o		\
 	sa.o			\
 	sha256.o		\
 	spa.o			\
@@ -1390,7 +1391,6 @@ ZFS_OBJS +=			\
 	zfs_onexit.o		\
 	zfs_replay.o		\
 	zfs_rlock.o		\
-	rrwlock.o		\
 	zfs_vfsops.o		\
 	zfs_vnops.o		\
 	zvol.o

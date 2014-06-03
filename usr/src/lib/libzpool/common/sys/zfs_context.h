@@ -77,6 +77,7 @@ extern "C" {
 #include <sys/sysevent/eventdefs.h>
 #include <sys/sysevent/dev.h>
 #include <sys/sunddi.h>
+#include <pthread.h>
 
 /*
  * Debugging

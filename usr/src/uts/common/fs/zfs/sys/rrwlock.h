@@ -72,6 +72,7 @@ void rrw_enter_read(rrwlock_t *rrl, void *tag);
 void rrw_enter_write(rrwlock_t *rrl);
 void rrw_exit(rrwlock_t *rrl, void *tag);
 boolean_t rrw_held(rrwlock_t *rrl, krw_t rw);
+void rrw_tsd_destroy(void *arg);
 
 #define	RRW_READ_HELD(x)	rrw_held(x, RW_READER)
 #define	RRW_WRITE_HELD(x)	rrw_held(x, RW_WRITER)
