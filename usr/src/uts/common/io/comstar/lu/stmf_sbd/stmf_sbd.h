@@ -21,19 +21,18 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013, 2014 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifndef	_STMF_SBD_H
 #define	_STMF_SBD_H
-
-#include "ats_copy_mgr.h"
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
 typedef	stmf_status_t	sbd_status_t;
+#include "ats_copy_mgr.h"
 extern char sbd_vendor_id[];
 extern char sbd_product_id[];
 extern char sbd_revision[];
@@ -249,6 +248,7 @@ typedef struct sbd_lu {
 	uint64_t	sl_rs_owner_session_id;
 
 	ats_state_t	sl_ats_state;		/* ats handling */
+	list_t		sl_ats_io_list;
 } sbd_lu_t;
 
 /*

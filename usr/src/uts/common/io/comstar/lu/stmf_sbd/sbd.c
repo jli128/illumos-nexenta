@@ -26,6 +26,7 @@
  */
 
 #include <sys/conf.h>
+#include <sys/list.h>
 #include <sys/file.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -154,7 +155,7 @@ static struct dev_ops sbd_ops = {
 	NULL			/* power */
 };
 
-#define	SBD_NAME	"COMSTAR SBD"
+#define	SBD_NAME	"COMSTAR SBD+ "
 
 static struct modldrv modldrv = {
 	&mod_driverops,
@@ -1468,6 +1469,12 @@ sbd_populate_and_register_lu(sbd_lu_t *sl, uint32_t *err_ret)
 		return (EIO);
 	}
 
+	/*
+	 * setup the ATS (compare and write) lists to handle multiple
+	 * ATS commands simultaneously
+	 */
+	list_create(&sl->sl_ats_io_list, sizeof (ats_state_t),
+			offsetof(ats_state_t, as_next));
 	*err_ret = 0;
 	return (0);
 }
@@ -3047,6 +3054,7 @@ sbd_data_read(sbd_lu_t *sl, struct scsi_task *task,
 		rw_exit(&sl->sl_access_state_lock);
 		return (SBD_FAILURE);
 	}
+
 	ret = vn_rdwr(UIO_READ, sl->sl_data_vp, (caddr_t)buf, (ssize_t)size,
 	    (offset_t)offset, UIO_SYSSPACE, 0, RLIM64_INFINITY, CRED(),
 	    &resid);

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2012-2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_SBD_ATS_CPMGR_H
@@ -28,11 +28,14 @@ typedef struct ats_state_s {
 	 * The conflicting_rw_count is for those I/Os which are currently
 	 * running and are potentally conflicting.
 	 */
+	list_node_t	*as_next;
+	uint32_t	as_scmd;
 	uint32_t	as_conflicting_rw_count;
 	uint32_t	as_non_conflicting_rw_count;
 	uint32_t	as_ats_gen_ndx;
 	uint32_t	as_cur_ats_handle;
 	uint64_t	as_cur_ats_lba;
+	uint64_t	as_cur_ats_lba_end;
 	uint64_t	as_cur_ats_len;		/* in nblks */
 	struct scsi_task *as_cur_ats_task;
 } ats_state_t;
@@ -55,13 +58,14 @@ void sbd_do_ats_xfer(struct scsi_task *, struct sbd_cmd *,
     struct stmf_data_buf *, uint8_t);
 void sbd_handle_ats(scsi_task_t *, struct stmf_data_buf *);
 void sbd_handle_recv_copy_results(struct scsi_task *, struct stmf_data_buf *);
-stmf_status_t sbd_ats_handling_before_io(struct sbd_lu *, uint64_t, uint64_t,
-    uint32_t *);
-void sbd_ats_handling_after_io(struct sbd_lu *, uint32_t);
+sbd_status_t sbd_ats_handling_before_io(scsi_task_t *, struct sbd_lu *,
+		uint64_t, uint64_t, ats_state_t **);
+void sbd_ats_handling_after_io(struct sbd_lu *, ats_state_t *);
 void sbd_scmd_ats_handling_after_io(struct sbd_lu *, struct sbd_cmd *);
-void sbd_free_ats_handle(struct scsi_task *);
+void sbd_free_ats_handle(struct scsi_task *, struct sbd_cmd *);
 void sbd_handle_ats(scsi_task_t *, struct stmf_data_buf *);
 uint8_t sbd_ats_max_nblks(void);
+void sbd_ats_remove_by_task(scsi_task_t *, struct sbd_lu *);
 
 /* Block-copy structures and functions. */
 

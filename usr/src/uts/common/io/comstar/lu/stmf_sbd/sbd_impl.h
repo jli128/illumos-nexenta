@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  *
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2011, 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_SBD_IMPL_H
@@ -206,7 +206,7 @@ typedef struct sbd_cmd {
 	uint32_t	len;		/* len left */
 	uint32_t	current_ro;	/* running relative offset */
 	uint8_t		*trans_data;	/* Any transient data */
-	uint32_t	non_conflicting_ats;	/* if any */
+	ats_state_t	*ats_state;
 	uint32_t	rsvd;
 } sbd_cmd_t;
 

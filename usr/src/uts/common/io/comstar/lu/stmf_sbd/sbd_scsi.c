@@ -842,7 +842,7 @@ sbd_handle_read(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 {
 	uint64_t lba, laddr;
 	uint64_t blkcount;
-	uint32_t ats_handle;
+	ats_state_t  *ats_handle;
 	uint32_t len;
 	uint8_t op = task->task_cdb[0];
 	sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private;
@@ -900,14 +900,13 @@ sbd_handle_read(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 		return;
 	}
 
-	if (sbd_ats_handling_before_io(sl, lba, blkcount, &ats_handle) !=
+	if (sbd_ats_handling_before_io(task, sl, lba, blkcount, &ats_handle) !=
 	    SBD_SUCCESS) {
 		if (stmf_task_poll_lu(task, 10) != STMF_SUCCESS) {
 			stmf_scsilib_send_status(task, STATUS_BUSY, 0);
 		}
 		return;
 	}
-
 	/*
 	 * Determine if this read can directly use DMU buffers.
 	 */
@@ -991,7 +990,7 @@ sbd_handle_read(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 		scmd->addr = laddr;
 		scmd->len = len;
 		scmd->current_ro = 0;
-		scmd->non_conflicting_ats = ats_handle;
+		scmd->ats_state = ats_handle;
 
 		/*
 		 * Kick-off the read.
@@ -1052,7 +1051,7 @@ sbd_handle_read(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	scmd->addr = laddr;
 	scmd->len = len;
 	scmd->current_ro = 0;
-	scmd->non_conflicting_ats = ats_handle;
+	scmd->ats_state = ats_handle;
 
 	sbd_do_read_xfer(task, scmd, dbuf);
 }
@@ -1492,7 +1491,7 @@ sbd_handle_write(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	sbd_cmd_t *scmd;
 	stmf_data_buf_t *dbuf;
 	uint64_t blkcount;
-	uint32_t ats_handle;
+	ats_state_t *ats_handle;
 	uint8_t	sync_wr_flag = 0;
 
 	if (sl->sl_flags & SL_WRITE_PROTECTED) {
@@ -1557,7 +1556,7 @@ sbd_handle_write(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 		return;
 	}
 
-	if (sbd_ats_handling_before_io(sl, lba, blkcount, &ats_handle) !=
+	if (sbd_ats_handling_before_io(task, sl, lba, blkcount, &ats_handle) !=
 	    SBD_SUCCESS) {
 		if (stmf_task_poll_lu(task, 10) != STMF_SUCCESS) {
 			stmf_scsilib_send_status(task, STATUS_BUSY, 0);
@@ -1604,7 +1603,7 @@ sbd_handle_write(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 		scmd->addr = laddr;
 		scmd->len = len;
 		scmd->current_ro = 0;
-		scmd->non_conflicting_ats = ats_handle;
+		scmd->ats_state = ats_handle;
 		sbd_do_sgl_write_xfer(task, scmd, 1);
 		return;
 	}
@@ -1637,7 +1636,7 @@ sbd_handle_write(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	scmd->addr = laddr;
 	scmd->len = len;
 	scmd->current_ro = 0;
-	scmd->non_conflicting_ats = ats_handle;
+	scmd->ats_state = ats_handle;
 
 	if (do_immediate_data) {
 		/*
@@ -2510,7 +2509,7 @@ sbd_handle_write_same(scsi_task_t *task, struct stmf_data_buf *initial_dbuf)
 	uint64_t addr, len;
 	sbd_cmd_t *scmd;
 	stmf_data_buf_t *dbuf;
-	uint32_t ats_handle;
+	ats_state_t *ats_handle;
 	uint8_t unmap;
 	uint8_t do_immediate_data = 0;
 	int ret;
@@ -2550,7 +2549,7 @@ sbd_handle_write_same(scsi_task_t *task, struct stmf_data_buf *initial_dbuf)
 		return;
 	}
 
-	if (sbd_ats_handling_before_io(sl, addr, len, &ats_handle) !=
+	if (sbd_ats_handling_before_io(task, sl, addr, len, &ats_handle) !=
 	    SBD_SUCCESS) {
 		if (stmf_task_poll_lu(task, 10) != STMF_SUCCESS)
 			stmf_scsilib_send_status(task, STATUS_BUSY, 0);
@@ -2629,7 +2628,7 @@ sbd_handle_write_same(scsi_task_t *task, struct stmf_data_buf *initial_dbuf)
 	scmd->trans_data_len = (uint32_t)len;
 	scmd->trans_data = kmem_alloc((size_t)len, KM_SLEEP);
 	scmd->current_ro = 0;
-	scmd->non_conflicting_ats = ats_handle;
+	scmd->ats_state = ats_handle;
 
 	if (do_immediate_data) {
 		/*
@@ -2682,7 +2681,7 @@ sbd_handle_unmap_xfer(scsi_task_t *task, uint8_t *buf, uint32_t buflen)
 {
 	sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private;
 	uint32_t ulen, dlen, num_desc;
-	uint32_t ats_handle;
+	ats_state_t *ats_handle;
 	uint64_t addr, len;
 	uint8_t *p;
 	int ret;
@@ -2705,8 +2704,8 @@ sbd_handle_unmap_xfer(scsi_task_t *task, uint8_t *buf, uint32_t buflen)
 	for (p = buf + 8; num_desc; num_desc--, p += 16) {
 		addr = READ_SCSI64(p, uint64_t);
 		len = READ_SCSI32(p+8, uint64_t);
-		if (sbd_ats_handling_before_io(sl, addr, len, &ats_handle) !=
-		    SBD_SUCCESS) {
+		if (sbd_ats_handling_before_io(task, sl, addr, len,
+				&ats_handle) != SBD_SUCCESS) {
 			/*
 			 * unmap should not overlap with an ATS. But if it
 			 * does, fail it.
@@ -3231,7 +3230,6 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 
 	cdb0 = task->task_cdb[0];
 	cdb1 = task->task_cdb[1];
-
 	/*
 	 * Don't go further if cmd is unsupported in standby mode
 	 */
@@ -3715,7 +3713,7 @@ sbd_abort(struct stmf_lu *lu, int abort_cmd, void *arg, uint32_t flags)
 	ASSERT(abort_cmd == STMF_LU_ABORT_TASK);
 	task = (scsi_task_t *)arg;
 	if (task->task_cdb[0] == SCMD_COMPARE_AND_WRITE)
-		sbd_free_ats_handle(task);
+		sbd_ats_remove_by_task(task, sl);
 	if (task->task_lu_private) {
 		sbd_cmd_t *scmd = (sbd_cmd_t *)task->task_lu_private;
 
@@ -3726,7 +3724,7 @@ sbd_abort(struct stmf_lu *lu, int abort_cmd, void *arg, uint32_t flags)
 				scmd->flags &= ~SBD_SCSI_CMD_TRANS_DATA;
 			}
 			scmd->flags &= ~SBD_SCSI_CMD_ACTIVE;
-			sbd_scmd_ats_handling_after_io(sl, scmd);
+			sbd_ats_remove_by_task(task, sl);
 			return (STMF_ABORT_SUCCESS);
 		}
 	}
