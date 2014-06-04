@@ -93,6 +93,30 @@ rrn_find(rrwlock_t *rrl)
 }
 
 /*
+ * Grabs the rrw_node_t of the current thread for a given lock. This VERIFY's
+ * that EXACTLY one rrw_node_t exists (i.e. the lock is not recursively
+ * locked).
+ */
+static rrw_node_t *
+rrn_find_single(rrwlock_t *rrl)
+{
+	rrw_node_t *rn;
+	rrw_node_t *the_rn = NULL;
+
+	VERIFY(refcount_count(&rrl->rr_linked_rcount) > 0);
+
+	for (rn = tsd_get(rrw_tsd_key); rn != NULL; rn = rn->rn_next) {
+		if (rn->rn_rrl == rrl) {
+			VERIFY(the_rn == NULL);
+			the_rn = rn;
+		}
+	}
+	VERIFY(the_rn != NULL);
+
+	return (the_rn);
+}
+
+/*
  * Add a node to the head of the singly linked list.
  */
 static void
@@ -237,7 +261,7 @@ rrw_exit(rrwlock_t *rrl, void *tag)
 		if (rrn_find_and_remove(rrl, tag)) {
 			count = refcount_remove(&rrl->rr_linked_rcount, tag);
 		} else {
-			ASSERT(!rrl->rr_track_all);
+			VERIFY(!rrl->rr_track_all);
 			count = refcount_remove(&rrl->rr_anon_rcount, tag);
 		}
 		if (count == 0)
@@ -250,6 +274,27 @@ rrw_exit(rrwlock_t *rrl, void *tag)
 		cv_broadcast(&rrl->rr_cv);
 	}
 	mutex_exit(&rrl->rr_lock);
+}
+
+/*
+ * This is a hack necessitated by the conversion of dp_config_rwlock from
+ * a standard rwlock (which doesn't need to track tags) to an RRW lock
+ * (which does). Unfortunately, portions of the old code base make tracking
+ * this tag exceedingly difficult, so we make it possible for one place
+ * dsl_dataset.c (dsl_dataset_hold_ref) to avoid the requirement having to
+ * know the tag for rw_exit.
+ * This function VERIFY's that the current thread has locked the lock in
+ * question only a single time (i.e. not recursively) in order to check for
+ * proper usage of this as only a backwards compatibility hack for rwlock's.
+ */
+void *
+rrw_exit_nonrecursive(rrwlock_t *rrl)
+{
+	rrw_node_t *rn = rrn_find_single(rrl);
+	void *tag = rn->rn_tag;
+
+	rrw_exit(rrl, tag);
+	return (tag);
 }
 
 /*

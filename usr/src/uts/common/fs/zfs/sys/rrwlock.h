@@ -71,6 +71,7 @@ void rrw_enter(rrwlock_t *rrl, krw_t rw, void *tag);
 void rrw_enter_read(rrwlock_t *rrl, void *tag);
 void rrw_enter_write(rrwlock_t *rrl);
 void rrw_exit(rrwlock_t *rrl, void *tag);
+void *rrw_exit_nonrecursive(rrwlock_t *rrl);
 boolean_t rrw_held(rrwlock_t *rrl, krw_t rw);
 void rrw_tsd_destroy(void *arg);
 

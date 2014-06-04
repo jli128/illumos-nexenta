@@ -316,7 +316,8 @@ extern void cv_broadcast(kcondvar_t *cv);
 #define	tsd_create(kp, d) pthread_key_create(kp, d)
 #define	tsd_destroy(kp) /* nothing */
 
-/* * kstat creation, installation and deletion
+/*
+ * kstat creation, installation and deletion
  */
 extern kstat_t *kstat_create(char *, int,
     char *, char *, uchar_t, ulong_t, uchar_t);

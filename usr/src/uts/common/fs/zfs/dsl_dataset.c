@@ -540,12 +540,32 @@ dsl_dataset_hold_ref(dsl_dataset_t *ds, void *tag)
 	ASSERT(!RRW_WRITE_HELD(&dp->dp_config_rwlock));
 	mutex_enter(&ds->ds_lock);
 	while (!rw_tryenter(&ds->ds_rwlock, RW_READER)) {
-		rrw_exit(&dp->dp_config_rwlock, FTAG);
+		void *dp_config_tag;
+
+		/*
+		 * This is a mightly ugly hack that assumes that exactly
+		 * a single caller above us in the stack has locked
+		 * dp_config_rwlock, however, since dp_config_rwlock has been
+		 * converted to an RRW lock to resolve SUP-862, RRW locks
+		 * need to track caller tags to appropriate place and remove
+		 * recursive locks. Unfortunately, the old call infrastructure
+		 * to this function doesn't pass this lock tag and we don't
+		 * wanna go hunting around various portions of the code base
+		 * to track all occurences down. Instead we just grab the
+		 * (hopefully) only active lock that's above us and retrieve
+		 * its lock tag. We then reinstate it at the end of this
+		 * loop.
+		 * Since version 4.0 the dp_config_rwlock semantics have been
+		 * completely reimplemented and an attempt at backporting that
+		 * fix would introduce an enormous amount of fragility.
+		 */
+		dp_config_tag = rrw_exit_nonrecursive(&dp->dp_config_rwlock);
 		cv_wait(&ds->ds_exclusive_cv, &ds->ds_lock);
 		if (DSL_DATASET_IS_DESTROYED(ds)) {
 			mutex_exit(&ds->ds_lock);
 			dsl_dataset_drop_ref(ds, tag);
-			rrw_enter(&dp->dp_config_rwlock, RW_READER, FTAG);
+			rrw_enter(&dp->dp_config_rwlock, RW_READER,
+			    dp_config_tag);
 			return (ENOENT);
 		}
 		/*
@@ -555,7 +575,7 @@ dsl_dataset_hold_ref(dsl_dataset_t *ds, void *tag)
 		 * the ds_lock here.
 		 */
 		mutex_exit(&ds->ds_lock);
-		rrw_enter(&dp->dp_config_rwlock, RW_READER, FTAG);
+		rrw_enter(&dp->dp_config_rwlock, RW_READER, dp_config_tag);
 		mutex_enter(&ds->ds_lock);
 	}
 	mutex_exit(&ds->ds_lock);
