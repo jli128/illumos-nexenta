@@ -1,3 +1,9 @@
+sunwfmd (5.11.134-31-11348-1981) nexenta; urgency=low
+
+  * Issue NEX-1981: snmp-trapgen is broken due to missing symbols
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 04 Jun 2014 17:08:08 -0400
+
 sunwfmd (5.11.134-31-11347-1939) nexenta; urgency=low
 
   * Issue NEX-1939: Backport NEX-1438 Dell faulting drives for slow IO
