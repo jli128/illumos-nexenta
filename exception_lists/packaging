@@ -22,7 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
-# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
 
 #
@@ -1019,3 +1019,8 @@ usr/lib/llib-lpcidb.ln
 # diskfltinj tool is not supposed to be installed
 #
 usr/bin/diskfltinj
+
+#
+# debugging program for libadutils
+#
+usr/bin/test-getdc
