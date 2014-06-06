@@ -1,3 +1,9 @@
+sunwsmbskr (5.11.134-31-13075-1965) nexenta; urgency=high
+
+	* Issue NEX-1965: Page fault at netbios_first_level_name_decode+0xbb
+
+ -- Nexenta Systems <support@nexenta.com>  Fri, 06 Jun 2014 12:38:02 -0400
+
 sunwsmbskr (5.11.134-31-13074-1844) nexenta; urgency=high
 
 	* Issue NEX-1844: backport SUP-867 panic in smb_com_locking_andx
