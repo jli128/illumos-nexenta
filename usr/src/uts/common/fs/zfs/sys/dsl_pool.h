@@ -34,7 +34,6 @@
 #include <sys/ddt.h>
 #include <sys/arc.h>
 #include <sys/bpobj.h>
-#include <sys/rrwlock.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -106,7 +105,7 @@ typedef struct dsl_pool {
 	 * syncing context does not need to ever have it for read, since
 	 * nobody else could possibly have it for write.
 	 */
-	rrwlock_t dp_config_rwlock;
+	krwlock_t dp_config_rwlock;
 
 	zfs_all_blkstats_t *dp_blkstats;
 } dsl_pool_t;

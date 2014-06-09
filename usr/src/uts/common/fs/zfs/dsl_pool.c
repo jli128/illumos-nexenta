@@ -77,7 +77,7 @@ dsl_pool_open_impl(spa_t *spa, uint64_t txg)
 	dp = kmem_zalloc(sizeof (dsl_pool_t), KM_SLEEP);
 	dp->dp_spa = spa;
 	dp->dp_meta_rootbp = *bp;
-	rrw_init(&dp->dp_config_rwlock, B_TRUE);
+	rw_init(&dp->dp_config_rwlock, NULL, RW_DEFAULT, NULL);
 	dp->dp_write_limit = zfs_write_limit_min;
 	txg_init(dp, txg);
 
@@ -107,7 +107,7 @@ dsl_pool_open(spa_t *spa, uint64_t txg, dsl_pool_t **dpp)
 	dsl_dataset_t *ds;
 	uint64_t obj;
 
-	rrw_enter(&dp->dp_config_rwlock, RW_WRITER, FTAG);
+	rw_enter(&dp->dp_config_rwlock, RW_WRITER);
 	err = dmu_objset_open_impl(spa, NULL, &dp->dp_meta_rootbp,
 	    &dp->dp_meta_objset);
 	if (err)
@@ -170,7 +170,7 @@ dsl_pool_open(spa_t *spa, uint64_t txg, dsl_pool_t **dpp)
 	err = dsl_scan_init(dp, txg);
 
 out:
-	rrw_exit(&dp->dp_config_rwlock, FTAG);
+	rw_exit(&dp->dp_config_rwlock);
 	if (err)
 		dsl_pool_close(dp);
 	else
@@ -212,7 +212,7 @@ dsl_pool_close(dsl_pool_t *dp)
 	arc_flush(dp->dp_spa);
 	txg_fini(dp);
 	dsl_scan_fini(dp);
-	rrw_destroy(&dp->dp_config_rwlock);
+	rw_destroy(&dp->dp_config_rwlock);
 	mutex_destroy(&dp->dp_lock);
 	taskq_destroy(dp->dp_vnrele_taskq);
 	if (dp->dp_blkstats)
@@ -725,7 +725,7 @@ dsl_pool_create_origin(dsl_pool_t *dp, dmu_tx_t *tx)
 	ASSERT(dp->dp_origin_snap == NULL);
 
 	/* create the origin dir, ds, & snap-ds */
-	rrw_enter(&dp->dp_config_rwlock, RW_WRITER, FTAG);
+	rw_enter(&dp->dp_config_rwlock, RW_WRITER);
 	dsobj = dsl_dataset_create_sync(dp->dp_root_dir, ORIGIN_DIR_NAME,
 	    NULL, 0, kcred, tx);
 	VERIFY(0 == dsl_dataset_hold_obj(dp, dsobj, FTAG, &ds));
@@ -733,7 +733,7 @@ dsl_pool_create_origin(dsl_pool_t *dp, dmu_tx_t *tx)
 	VERIFY(0 == dsl_dataset_hold_obj(dp, ds->ds_phys->ds_prev_snap_obj,
 	    dp, &dp->dp_origin_snap));
 	dsl_dataset_rele(ds, FTAG);
-	rrw_exit(&dp->dp_config_rwlock, FTAG);
+	rw_exit(&dp->dp_config_rwlock);
 }
 
 taskq_t *

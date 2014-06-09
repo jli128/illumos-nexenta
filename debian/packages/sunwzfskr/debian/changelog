@@ -1,10 +1,3 @@
-sunwzfskr (5.11.134-31-12290-862) nexenta; urgency=low
-
-  * Issue SUP-862: dsl_prop_register and dsl_sync_task_group_wait deadlock
-    for read lock on dp->dp_config_rwlock they already own
-
- -- Nexenta Systems <saso.kiselkov@nexenta.com>  Thu, 30 May 2014 22:28:00 +0200
-
 sunwzfskr (5.11.134-31-12289-1870) nexenta; urgency=low
 
   * Issue NEX-1870: 1898 Kernel assertion in zfs_putpage()

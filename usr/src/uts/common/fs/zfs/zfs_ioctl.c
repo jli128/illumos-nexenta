@@ -358,12 +358,12 @@ zfs_dozonecheck_ds(const char *dataset, dsl_dataset_t *ds, cred_t *cr)
 {
 	uint64_t zoned;
 
-	rrw_enter(&ds->ds_dir->dd_pool->dp_config_rwlock, RW_READER, FTAG);
+	rw_enter(&ds->ds_dir->dd_pool->dp_config_rwlock, RW_READER);
 	if (dsl_prop_get_ds(ds, "zoned", 8, 1, &zoned, NULL)) {
-		rrw_exit(&ds->ds_dir->dd_pool->dp_config_rwlock, FTAG);
+		rw_exit(&ds->ds_dir->dd_pool->dp_config_rwlock);
 		return (ENOENT);
 	}
-	rrw_exit(&ds->ds_dir->dd_pool->dp_config_rwlock, FTAG);
+	rw_exit(&ds->ds_dir->dd_pool->dp_config_rwlock);
 
 	return (zfs_dozonecheck_impl(dataset, zoned, cr));
 }
@@ -590,9 +590,9 @@ zfs_secpolicy_send(zfs_cmd_t *zc, cred_t *cr)
 		return (error);
 
 	dp = spa_get_dsl(spa);
-	rrw_enter(&dp->dp_config_rwlock, RW_READER, FTAG);
+	rw_enter(&dp->dp_config_rwlock, RW_READER);
 	error = dsl_dataset_hold_obj(dp, zc->zc_sendobj, FTAG, &ds);
-	rrw_exit(&dp->dp_config_rwlock, FTAG);
+	rw_exit(&dp->dp_config_rwlock);
 	spa_close(spa, FTAG);
 	if (error)
 		return (error);
@@ -775,10 +775,10 @@ zfs_secpolicy_promote(zfs_cmd_t *zc, cred_t *cr)
 		dsl_dir_t *dd;
 		dd = clone->os_dsl_dataset->ds_dir;
 
-		rrw_enter(&dd->dd_pool->dp_config_rwlock, RW_READER, FTAG);
+		rw_enter(&dd->dd_pool->dp_config_rwlock, RW_READER);
 		error = dsl_dataset_hold_obj(dd->dd_pool,
 		    dd->dd_phys->dd_origin_obj, FTAG, &pclone);
-		rrw_exit(&dd->dd_pool->dp_config_rwlock, FTAG);
+		rw_exit(&dd->dd_pool->dp_config_rwlock);
 		if (error) {
 			dmu_objset_rele(clone, FTAG);
 			return (error);
@@ -2071,9 +2071,9 @@ top:
 		 * a zfs send operation, since the new createtxg will be
 		 * beyond the range we're interested in.
 		 */
-		rrw_enter(&dp->dp_config_rwlock, RW_READER, FTAG);
+		rw_enter(&dp->dp_config_rwlock, RW_READER);
 		error = dsl_dataset_hold_obj(dp, zc->zc_obj, FTAG, &ds);
-		rrw_exit(&dp->dp_config_rwlock, FTAG);
+		rw_exit(&dp->dp_config_rwlock);
 		if (error) {
 			if (error == ENOENT) {
 				/* Racing with destroy, get the next one. */
@@ -3875,9 +3875,9 @@ zfs_ioc_send(zfs_cmd_t *zc)
 		return (error);
 
 	dp = spa_get_dsl(spa);
-	rrw_enter(&dp->dp_config_rwlock, RW_READER, FTAG);
+	rw_enter(&dp->dp_config_rwlock, RW_READER);
 	error = dsl_dataset_hold_obj(dp, zc->zc_sendobj, FTAG, &ds);
-	rrw_exit(&dp->dp_config_rwlock, FTAG);
+	rw_exit(&dp->dp_config_rwlock);
 	if (error) {
 		spa_close(spa, FTAG);
 		return (error);
@@ -3891,9 +3891,9 @@ zfs_ioc_send(zfs_cmd_t *zc)
 	}
 
 	if (zc->zc_fromobj != 0) {
-		rrw_enter(&dp->dp_config_rwlock, RW_READER, FTAG);
+		rw_enter(&dp->dp_config_rwlock, RW_READER);
 		error = dsl_dataset_hold_obj(dp, zc->zc_fromobj, FTAG, &dsfrom);
-		rrw_exit(&dp->dp_config_rwlock, FTAG);
+		rw_exit(&dp->dp_config_rwlock);
 		spa_close(spa, FTAG);
 		if (error) {
 			dsl_dataset_rele(ds, FTAG);
@@ -4637,9 +4637,9 @@ zfs_ioc_hold(zfs_cmd_t *zc)
 		return (error);
 
 	dp = spa_get_dsl(spa);
-	rrw_enter(&dp->dp_config_rwlock, RW_READER, FTAG);
+	rw_enter(&dp->dp_config_rwlock, RW_READER);
 	error = dsl_dataset_hold_obj(dp, zc->zc_sendobj, FTAG, &ds);
-	rrw_exit(&dp->dp_config_rwlock, FTAG);
+	rw_exit(&dp->dp_config_rwlock);
 	spa_close(spa, FTAG);
 	if (error)
 		return (error);
