@@ -456,9 +456,9 @@ traverse_pool(spa_t *spa, uint64_t txg_start, int flags,
 			dsl_dataset_t *ds;
 			uint64_t txg = txg_start;
 
-			rrw_enter(&dp->dp_config_rwlock, RW_READER, FTAG);
+			rw_enter(&dp->dp_config_rwlock, RW_READER);
 			err = dsl_dataset_hold_obj(dp, obj, FTAG, &ds);
-			rrw_exit(&dp->dp_config_rwlock, FTAG);
+			rw_exit(&dp->dp_config_rwlock);
 			if (err) {
 				if (!hard)
 					return (err);

@@ -270,11 +270,10 @@ spa_prop_get(spa_t *spa, nvlist_t **nvp)
 				dsl_dataset_t *ds = NULL;
 
 				dp = spa_get_dsl(spa);
-				rrw_enter(&dp->dp_config_rwlock, RW_READER,
-				    FTAG);
+				rw_enter(&dp->dp_config_rwlock, RW_READER);
 				if (err = dsl_dataset_hold_obj(dp,
 				    za.za_first_integer, FTAG, &ds)) {
-					rrw_exit(&dp->dp_config_rwlock, FTAG);
+					rw_exit(&dp->dp_config_rwlock);
 					break;
 				}
 
@@ -283,7 +282,7 @@ spa_prop_get(spa_t *spa, nvlist_t **nvp)
 				    KM_SLEEP);
 				dsl_dataset_name(ds, strval);
 				dsl_dataset_rele(ds, FTAG);
-				rrw_exit(&dp->dp_config_rwlock, FTAG);
+				rw_exit(&dp->dp_config_rwlock);
 			} else {
 				strval = NULL;
 				intval = za.za_first_integer;

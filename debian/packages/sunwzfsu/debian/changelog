@@ -1,10 +1,3 @@
-sunwzfsu (5.11.134-31-12278-862) nexenta; urgency=low
-
-  * Issue SUP-862: dsl_prop_register and dsl_sync_task_group_wait deadlock
-    for read lock on dp->dp_config_rwlock they already own
-
- -- Nexenta Systems <support@nexenta.com>  Thu, 30 May 2014 22:28:00 +0200
-
 sunwzfsu (5.11.134-31-12277-1627) nexenta; urgency=low
 
   * Issue NEX-1627: backport NEX-1142 rw_destroy: lock still active,

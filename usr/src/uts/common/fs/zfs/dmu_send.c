@@ -418,10 +418,10 @@ dmu_sendbackup(objset_t *tosnap, objset_t *fromsnap, boolean_t fromorigin,
 			return (EINVAL);
 
 		if (dsl_dir_is_clone(ds->ds_dir)) {
-			rrw_enter(&dp->dp_config_rwlock, RW_READER, FTAG);
+			rw_enter(&dp->dp_config_rwlock, RW_READER);
 			err = dsl_dataset_hold_obj(dp,
 			    ds->ds_dir->dd_phys->dd_origin_obj, FTAG, &fromds);
-			rrw_exit(&dp->dp_config_rwlock, FTAG);
+			rw_exit(&dp->dp_config_rwlock);
 			if (err)
 				return (err);
 		} else {
@@ -1497,7 +1497,7 @@ add_ds_to_guidmap(avl_tree_t *guid_map, dsl_dataset_t *ds)
 
 	ASSERT(guid_map != NULL);
 
-	rrw_enter(&dp->dp_config_rwlock, RW_READER, FTAG);
+	rw_enter(&dp->dp_config_rwlock, RW_READER);
 	err = dsl_dataset_hold_obj(dp, snapobj, guid_map, &snapds);
 	if (err == 0) {
 		gmep = kmem_alloc(sizeof (guid_map_entry_t), KM_SLEEP);
@@ -1506,7 +1506,7 @@ add_ds_to_guidmap(avl_tree_t *guid_map, dsl_dataset_t *ds)
 		avl_add(guid_map, gmep);
 	}
 
-	rrw_exit(&dp->dp_config_rwlock, FTAG);
+	rw_exit(&dp->dp_config_rwlock);
 	return (err);
 }
 
