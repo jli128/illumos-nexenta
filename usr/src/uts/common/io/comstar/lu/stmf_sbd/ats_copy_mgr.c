@@ -180,13 +180,19 @@ sbd_ats_remove_by_task(scsi_task_t *task, sbd_lu_t *sl)
 	 * other elements may have been freed so the list is scanned
 	 * to find the IO task and the element is removed.
 	 */
+
 	mutex_enter(&sl->sl_lock);
 	for (ats_state = list_head(&sl->sl_ats_io_list); ats_state != NULL;
 			ats_state = list_next(&sl->sl_ats_io_list, ats_state)) {
 		if (ats_state->as_cur_ats_task == task) {
-			sbd_ats_handling_after_io(sl, ats_state);
-			mutex_exit(&sl->sl_lock);
-			return;
+			/*
+			 * abort can call this routine multiple
+			 * times, so search the list and then remove the
+			 * io state without dropping the lock
+			 */
+			list_remove(&sl->sl_ats_io_list, ats_state);
+			kmem_free(ats_state, sizeof (ats_state_t));
+			break;
 		}
 	}
 	mutex_exit(&sl->sl_lock);
