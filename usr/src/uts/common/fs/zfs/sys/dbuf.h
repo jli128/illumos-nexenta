@@ -290,6 +290,9 @@ dbuf_dirty_record_t *dbuf_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx);
 dbuf_dirty_record_t *dbuf_dirty_sc(dmu_buf_impl_t *db, dmu_tx_t *tx,
     boolean_t usesc);
 arc_buf_t *dbuf_loan_arcbuf(dmu_buf_impl_t *db);
+void dmu_buf_write_embedded(dmu_buf_t *dbuf, void *data,
+    bp_embedded_type_t etype, enum zio_compress comp,
+    int uncompressed_size, int compressed_size, int byteorder, dmu_tx_t *tx);
 
 void dbuf_clear(dmu_buf_impl_t *db);
 void dbuf_evict(dmu_buf_impl_t *db);

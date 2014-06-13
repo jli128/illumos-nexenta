@@ -219,6 +219,11 @@ zpool_feature_init(void)
 	    "Filesystem and snapshot limits.", B_TRUE, B_FALSE, B_FALSE,
 	    filesystem_limits_deps);
 
+	zfeature_register(SPA_FEATURE_EMBEDDED_DATA,
+	    "com.delphix:embedded_data", "embedded_data",
+	    "Blocks which compress very well use even less space.",
+	    B_FALSE, B_TRUE, B_TRUE, NULL);
+
 	zfeature_register(SPA_FEATURE_META_DEVICES,
 	    "com.nexenta:meta_devices", "meta_devices",
 	    "Dedicated devices for metadata.", B_TRUE, B_FALSE, B_FALSE, NULL);

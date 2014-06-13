@@ -40,6 +40,7 @@
 #include <sys/bpobj.h>
 #include <sys/special_impl.h>
 #include <sys/wrcache.h>
+#include <sys/zfeature.h>
 #include <zfeature_common.h>
 
 #ifdef	__cplusplus
