@@ -55,7 +55,7 @@
  */
 
 /*
- * mptsas - This is a driver based on LSI Logic's MPT2.0 interface.
+ * mptsas - This is a driver based on LSI Logic's MPT2.0/2.5 interface.
  *
  */
 
@@ -430,6 +430,11 @@ static int mptsas_init_pm(mptsas_t *mpt);
  */
 boolean_t mptsas_enable_msi = B_TRUE;
 boolean_t mptsas_physical_bind_failed_page_83 = B_FALSE;
+
+/*
+ * Global switch for use of MPI2.5 FAST PATH.
+ */
+boolean_t mptsas_use_fastpath = B_TRUE;
 
 static int mptsas_register_intrs(mptsas_t *);
 static void mptsas_unregister_intrs(mptsas_t *);
@@ -824,7 +829,7 @@ mptsas_iport_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	uint64_t		attached_sas_wwn;
 	uint16_t		dev_hdl;
 	uint16_t		pdev_hdl;
-	uint16_t		bay_num, enclosure;
+	uint16_t		bay_num, enclosure, io_flags;
 	char			attached_wwnstr[MPTSAS_WWN_STRLEN];
 
 	/* CONSTCOND */
@@ -986,7 +991,7 @@ mptsas_iport_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    MPI2_SAS_DEVICE_PGAD_FORM_MASK) | (uint32_t)attached_devhdl;
 	rval = mptsas_get_sas_device_page0(mpt, page_address, &dev_hdl,
 	    &attached_sas_wwn, &dev_info, &phy_port, &phy_id,
-	    &pdev_hdl, &bay_num, &enclosure);
+	    &pdev_hdl, &bay_num, &enclosure, &io_flags);
 	if (rval != DDI_SUCCESS) {
 		mptsas_log(mpt, CE_WARN,
 		    "Failed to get device page0 for handle:%d",
@@ -7106,6 +7111,10 @@ mptsas_handle_event_sync(void *args)
 					(void) sprintf(curr, "is online at 6.0 "
 					    "Gbps");
 					break;
+				case MPI25_EVENT_SAS_TOPO_LR_RATE_12_0:
+					(void) sprintf(curr,
+					    "is online at 12.0 Gbps");
+					break;
 				default:
 					(void) sprintf(curr, "state is "
 					    "unknown");
@@ -7309,6 +7318,18 @@ mptsas_handle_event_sync(void *args)
 					    SAS_PHY_ONLINE,
 					    &mpt->m_phy_info[i].smhba_info);
 					break;
+				case MPI25_EVENT_SAS_TOPO_LR_RATE_12_0:
+					(void) sprintf(curr, "is online at "
+					    "12.0 Gbps");
+					if ((expd_handle == 0) &&
+					    (enc_handle == 1)) {
+						mpt->m_port_chng = 1;
+					}
+					mptsas_smhba_log_sysevent(mpt,
+					    ESC_SAS_PHY_EVENT,
+					    SAS_PHY_ONLINE,
+					    &mpt->m_phy_info[i].smhba_info);
+					break;
 				default:
 					(void) sprintf(curr, "state is "
 					    "unknown");
@@ -7345,6 +7366,10 @@ mptsas_handle_event_sync(void *args)
 				case MPI2_EVENT_SAS_TOPO_LR_RATE_6_0:
 					(void) sprintf(prev, ", was online at "
 					    "6.0 Gbps");
+					break;
+				case MPI25_EVENT_SAS_TOPO_LR_RATE_12_0:
+					(void) sprintf(prev, ", was online at "
+					    "12.0 Gbps");
 					break;
 				default:
 				break;
@@ -8467,6 +8492,13 @@ mptsas_start_cmd(mptsas_t *mpt, mptsas_cmd_t *cmd)
 	    io_request->CDB.CDB32, cmd->cmd_cdblen, DDI_DEV_AUTOINCR);
 
 	io_flags = cmd->cmd_cdblen;
+	if (mptsas_use_fastpath &&
+	    ptgt->m_io_flags & MPI25_SAS_DEVICE0_FLAGS_ENABLED_FAST_PATH) {
+		io_flags |= MPI25_SCSIIO_IOFLAGS_FAST_PATH;
+		request_desc_low = MPI25_REQ_DESCRIPT_FLAGS_FAST_PATH_SCSI_IO;
+	} else {
+		request_desc_low = MPI2_REQ_DESCRIPT_FLAGS_SCSI_IO;
+	}
 	ddi_put16(acc_hdl, &io_request->IoFlags, io_flags);
 	/*
 	 * setup the Scatter/Gather DMA list for this request
@@ -8504,7 +8536,7 @@ mptsas_start_cmd(mptsas_t *mpt, mptsas_cmd_t *cmd)
 	/*
 	 * Build request descriptor and write it to the request desc post reg.
 	 */
-	request_desc_low = (SMID << 16) + MPI2_REQ_DESCRIPT_FLAGS_SCSI_IO;
+	request_desc_low |= (SMID << 16);
 	request_desc_high = ptgt->m_devhdl << 16;
 	MPTSAS_START_CMD(mpt, request_desc_low, request_desc_high);
 
@@ -13465,13 +13497,13 @@ mptsas_get_target_device_info(mptsas_t *mpt, uint32_t page_address,
 	uint64_t	devicename;
 	uint16_t	pdev_hdl;
 	mptsas_target_t	*tmp_tgt = NULL;
-	uint16_t	bay_num, enclosure;
+	uint16_t	bay_num, enclosure, io_flags;
 
 	ASSERT(*pptgt == NULL);
 
 	rval = mptsas_get_sas_device_page0(mpt, page_address, dev_handle,
 	    &sas_wwn, &dev_info, &physport, &phynum, &pdev_hdl,
-	    &bay_num, &enclosure);
+	    &bay_num, &enclosure, &io_flags);
 	if (rval != DDI_SUCCESS) {
 		rval = DEV_INFO_FAIL_PAGE0;
 		return (rval);
@@ -13535,6 +13567,7 @@ mptsas_get_target_device_info(mptsas_t *mpt, uint32_t page_address,
 		rval = DEV_INFO_FAIL_ALLOC;
 		return (rval);
 	}
+	(*pptgt)->m_io_flags = io_flags;
 	(*pptgt)->m_enclosure = enclosure;
 	(*pptgt)->m_slot_num = bay_num;
 	return (DEV_INFO_SUCCESS);
@@ -14948,7 +14981,7 @@ mptsas_create_virt_lun(dev_info_t *pdip, struct scsi_inquiry *inq, char *guid,
 	uint8_t			physport;
 	uint8_t			phy_id;
 	uint32_t		page_address;
-	uint16_t		bay_num, enclosure;
+	uint16_t		bay_num, enclosure, io_flags;
 	char			pdev_wwn_str[MPTSAS_WWN_STRLEN];
 	uint32_t		dev_info;
 
@@ -15127,7 +15160,7 @@ mptsas_create_virt_lun(dev_info_t *pdip, struct scsi_inquiry *inq, char *guid,
 		    (uint32_t)ptgt->m_devhdl;
 		rval = mptsas_get_sas_device_page0(mpt, page_address,
 		    &dev_hdl, &dev_sas_wwn, &dev_info, &physport,
-		    &phy_id, &pdev_hdl, &bay_num, &enclosure);
+		    &phy_id, &pdev_hdl, &bay_num, &enclosure, &io_flags);
 		if (rval != DDI_SUCCESS) {
 			mutex_exit(&mpt->m_mutex);
 			mptsas_log(mpt, CE_WARN, "mptsas unable to get "
@@ -15140,7 +15173,7 @@ mptsas_create_virt_lun(dev_info_t *pdip, struct scsi_inquiry *inq, char *guid,
 		    MPI2_SAS_DEVICE_PGAD_FORM_MASK) | (uint32_t)pdev_hdl;
 		rval = mptsas_get_sas_device_page0(mpt, page_address,
 		    &dev_hdl, &pdev_sas_wwn, &pdev_info, &physport,
-		    &phy_id, &pdev_hdl, &bay_num, &enclosure);
+		    &phy_id, &pdev_hdl, &bay_num, &enclosure, &io_flags);
 		if (rval != DDI_SUCCESS) {
 			mutex_exit(&mpt->m_mutex);
 			mptsas_log(mpt, CE_WARN, "mptsas unable to get"
@@ -15297,7 +15330,7 @@ mptsas_create_phys_lun(dev_info_t *pdip, struct scsi_inquiry *inq,
 	uint8_t			physport;
 	uint8_t			phy_id;
 	uint32_t		page_address;
-	uint16_t		bay_num, enclosure;
+	uint16_t		bay_num, enclosure, io_flags;
 	char			pdev_wwn_str[MPTSAS_WWN_STRLEN];
 	uint32_t		dev_info;
 	int64_t			lun64 = 0;
@@ -15434,7 +15467,7 @@ mptsas_create_phys_lun(dev_info_t *pdip, struct scsi_inquiry *inq,
 		rval = mptsas_get_sas_device_page0(mpt, page_address,
 		    &dev_hdl, &dev_sas_wwn, &dev_info,
 		    &physport, &phy_id, &pdev_hdl,
-		    &bay_num, &enclosure);
+		    &bay_num, &enclosure, &io_flags);
 		if (rval != DDI_SUCCESS) {
 			mutex_exit(&mpt->m_mutex);
 			mptsas_log(mpt, CE_WARN, "mptsas unable to get"
@@ -15446,8 +15479,8 @@ mptsas_create_phys_lun(dev_info_t *pdip, struct scsi_inquiry *inq,
 		page_address = (MPI2_SAS_DEVICE_PGAD_FORM_HANDLE &
 		    MPI2_SAS_DEVICE_PGAD_FORM_MASK) | (uint32_t)pdev_hdl;
 		rval = mptsas_get_sas_device_page0(mpt, page_address,
-		    &dev_hdl, &pdev_sas_wwn, &pdev_info,
-		    &physport, &phy_id, &pdev_hdl, &bay_num, &enclosure);
+		    &dev_hdl, &pdev_sas_wwn, &pdev_info, &physport,
+		    &phy_id, &pdev_hdl, &bay_num, &enclosure, &io_flags);
 		if (rval != DDI_SUCCESS) {
 			mutex_exit(&mpt->m_mutex);
 			mptsas_log(mpt, CE_WARN, "mptsas unable to create "
@@ -15697,7 +15730,7 @@ mptsas_online_smp(dev_info_t *pdip, mptsas_smp_t *smp_node,
 	char		*iport = NULL;
 	mptsas_phymask_t	phy_mask = 0;
 	uint16_t	attached_devhdl;
-	uint16_t	bay_num, enclosure;
+	uint16_t	bay_num, enclosure, io_flags;
 
 	(void) sprintf(wwn_str, "%"PRIx64, smp_node->m_addr.mta_wwn);
 
@@ -15764,8 +15797,8 @@ mptsas_online_smp(dev_info_t *pdip, mptsas_smp_t *smp_node,
 		    MPI2_SAS_DEVICE_PGAD_FORM_MASK) |
 		    (uint32_t)dev_info.m_pdevhdl;
 		rval = mptsas_get_sas_device_page0(mpt, page_address,
-		    &dev_hdl, &sas_wwn, &smp_node->m_pdevinfo,
-		    &physport, &phy_id, &pdev_hdl, &bay_num, &enclosure);
+		    &dev_hdl, &sas_wwn, &smp_node->m_pdevinfo, &physport,
+		    &phy_id, &pdev_hdl, &bay_num, &enclosure, &io_flags);
 		if (rval != DDI_SUCCESS) {
 			mutex_exit(&mpt->m_mutex);
 			mptsas_log(mpt, CE_WARN, "mptsas unable to get "
@@ -15779,7 +15812,8 @@ mptsas_online_smp(dev_info_t *pdip, mptsas_smp_t *smp_node,
 		    (uint32_t)dev_info.m_devhdl;
 		rval = mptsas_get_sas_device_page0(mpt, page_address,
 		    &dev_hdl, &smp_sas_wwn, &smp_node->m_deviceinfo,
-		    &physport, &phy_id, &pdev_hdl, &bay_num, &enclosure);
+		    &physport, &phy_id, &pdev_hdl, &bay_num, &enclosure,
+		    &io_flags);
 		if (rval != DDI_SUCCESS) {
 			mutex_exit(&mpt->m_mutex);
 			mptsas_log(mpt, CE_WARN, "mptsas unable to get "

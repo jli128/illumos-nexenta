@@ -1431,7 +1431,7 @@ mptsas_sasdevpage_0_cb(mptsas_t *mpt, caddr_t page_memp,
 	uint64_t		*sas_wwn;
 	uint32_t		*dev_info;
 	uint8_t			*physport, *phynum;
-	uint16_t		*pdevhdl, io_flags;
+	uint16_t		*pdevhdl, *io_flags;
 	uint32_t		page_address;
 
 	if ((iocstatus != MPI2_IOCSTATUS_SUCCESS) &&
@@ -1465,7 +1465,7 @@ mptsas_sasdevpage_0_cb(mptsas_t *mpt, caddr_t page_memp,
 	pdevhdl = va_arg(ap, uint16_t *);
 	bay_num = va_arg(ap, uint16_t *);
 	enclosure = va_arg(ap, uint16_t *);
-
+	io_flags = va_arg(ap, uint16_t *);
 
 	sasdevpage = (pMpi2SasDevicePage0_t)page_memp;
 
@@ -1482,28 +1482,17 @@ mptsas_sasdevpage_0_cb(mptsas_t *mpt, caddr_t page_memp,
 	*pdevhdl = ddi_get16(accessp, &sasdevpage->ParentDevHandle);
 	*bay_num = ddi_get16(accessp, &sasdevpage->Slot);
 	*enclosure = ddi_get16(accessp, &sasdevpage->EnclosureHandle);
+	*io_flags = ddi_get16(accessp, &sasdevpage->Flags);
 
-	/*
-	 * This is where we would check the flag
-	 * MPI25_SAS_DEVICE0_FLAGS_FAST_PATH_CAPABLE
-	 * and set something that will allow us to use fastpath during
-	 * target transfers.
-	 */
-	io_flags = ddi_get16(accessp, &sasdevpage->Flags);
-	if (io_flags & MPI25_SAS_DEVICE0_FLAGS_FAST_PATH_CAPABLE) {
+	if (*io_flags & MPI25_SAS_DEVICE0_FLAGS_FAST_PATH_CAPABLE) {
 		/*
-		 * uint8_t  *fast_path;
-		 * fast_path = va_arg(ap, uint8_t *);
-		 * *fast_path = MPI25_REQ_DESCRIPT_FLAGS_FAST_PATH_SCSI_IO;
-		 *
-		 * Need to change all calls to mptsas_get_sas_device_page0()
-		 * to include another argument to collect this. And then what
-		 * do we do with it?
-		 * XXX For now print a message..
+		 * Leave a messages about FP cabability in the log.
 		 */
 		mptsas_log(mpt, CE_CONT,
-		    "!Found MPI25_SAS_DEVICE0_FLAGS_FAST_"
-		    "PATH_CAPABLE for %llx", (long long)*sas_wwn);
+		    "!w%016"PRIx64" FastPath Capable%s", *sas_wwn,
+		    (*io_flags &
+		    MPI25_SAS_DEVICE0_FLAGS_ENABLED_FAST_PATH)?
+		    " and Enabled":" but Disabled");
 	}
 
 	return (rval);
@@ -1517,7 +1506,7 @@ int
 mptsas_get_sas_device_page0(mptsas_t *mpt, uint32_t page_address,
     uint16_t *dev_handle, uint64_t *sas_wwn, uint32_t *dev_info,
     uint8_t *physport, uint8_t *phynum, uint16_t *pdev_handle,
-    uint16_t *bay_num, uint16_t *enclosure)
+    uint16_t *bay_num, uint16_t *enclosure, uint16_t *io_flags)
 {
 	int rval = DDI_SUCCESS;
 
@@ -1532,7 +1521,7 @@ mptsas_get_sas_device_page0(mptsas_t *mpt, uint32_t page_address,
 	    MPI2_CONFIG_EXTPAGETYPE_SAS_DEVICE, 0, page_address,
 	    mptsas_sasdevpage_0_cb, page_address, dev_handle, sas_wwn,
 	    dev_info, physport, phynum, pdev_handle,
-	    bay_num, enclosure);
+	    bay_num, enclosure, io_flags);
 
 	return (rval);
 }

@@ -102,12 +102,40 @@ static int mptsas_do_ioc_init_reply(mptsas_t *mpt, caddr_t memp, int var,
 	ddi_acc_handle_t accessp);
 
 static const char *
-mptsas_product_type_string(mptsas_t *mpt)
+mptsas_devid_type_string(mptsas_t *mpt)
 {
-	switch (mpt->m_productid & MPI2_FW_HEADER_PID_PROD_MASK) {
-
-	case MPI2_FW_HEADER_PID_PROD_A:
-		return ("A");
+	switch (mpt->m_devid) {
+	case MPI2_MFGPAGE_DEVID_SAS2008:
+		return ("SAS2008");
+	case MPI2_MFGPAGE_DEVID_SAS2004:
+		return ("SAS2004");
+	case MPI2_MFGPAGE_DEVID_SAS2108_1:
+	case MPI2_MFGPAGE_DEVID_SAS2108_2:
+	case MPI2_MFGPAGE_DEVID_SAS2108_3:
+		return ("SAS2108");
+	case MPI2_MFGPAGE_DEVID_SAS2116_1:
+	case MPI2_MFGPAGE_DEVID_SAS2116_2:
+		return ("SAS2116");
+	case MPI2_MFGPAGE_DEVID_SAS2208_1:
+	case MPI2_MFGPAGE_DEVID_SAS2208_2:
+	case MPI2_MFGPAGE_DEVID_SAS2208_3:
+	case MPI2_MFGPAGE_DEVID_SAS2208_4:
+	case MPI2_MFGPAGE_DEVID_SAS2208_5:
+	case MPI2_MFGPAGE_DEVID_SAS2208_6:
+		return ("SAS2208");
+	case MPI2_MFGPAGE_DEVID_SAS2308_1:
+	case MPI2_MFGPAGE_DEVID_SAS2308_2:
+	case MPI2_MFGPAGE_DEVID_SAS2308_3:
+		return ("SAS2308");
+	case MPI25_MFGPAGE_DEVID_SAS3004:
+		return ("SAS3004");
+	case MPI25_MFGPAGE_DEVID_SAS3008:
+		return ("SAS3008");
+	case MPI25_MFGPAGE_DEVID_SAS3108_1:
+	case MPI25_MFGPAGE_DEVID_SAS3108_2:
+	case MPI25_MFGPAGE_DEVID_SAS3108_5:
+	case MPI25_MFGPAGE_DEVID_SAS3108_6:
+		return ("SAS3108");
 	default:
 		return ("?");
 	}
@@ -209,8 +237,8 @@ mptsas_ioc_do_get_facts_reply(mptsas_t *mpt, caddr_t memp, int var,
 	    ddi_get8(accessp, &factsreply->FWVersion.Struct.Minor),
 	    ddi_get8(accessp, &factsreply->FWVersion.Struct.Unit),
 	    ddi_get8(accessp, &factsreply->FWVersion.Struct.Dev));
-	mptsas_log(mpt, CE_NOTE, "?mpt%d Firmware version v%s (%s)\n",
-	    mpt->m_instance, buf, mptsas_product_type_string(mpt));
+	mptsas_log(mpt, CE_NOTE, "?MPT Firmware version v%s (%s)\n",
+	    buf, mptsas_devid_type_string(mpt));
 	(void) ddi_prop_update_string(DDI_DEV_T_NONE, mpt->m_dip,
 	    "firmware-version", buf);
 

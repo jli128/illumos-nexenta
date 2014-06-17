@@ -229,6 +229,7 @@ typedef	struct mptsas_target {
 
 		uint16_t		m_qfull_retry_interval;
 		uint8_t			m_qfull_retries;
+		uint16_t		m_io_flags;
 		uint16_t		m_enclosure;
 		uint16_t		m_slot_num;
 		uint32_t		m_tgt_unconfigured;
@@ -1358,7 +1359,7 @@ int mptsas_ioc_init(mptsas_t *mpt);
 int mptsas_get_sas_device_page0(mptsas_t *mpt, uint32_t page_address,
     uint16_t *dev_handle, uint64_t *sas_wwn, uint32_t *dev_info,
     uint8_t *physport, uint8_t *phynum, uint16_t *pdevhandle,
-    uint16_t *slot_num, uint16_t *enclosure);
+    uint16_t *slot_num, uint16_t *enclosure, uint16_t *io_flags);
 int mptsas_get_sas_io_unit_page(mptsas_t *mpt);
 int mptsas_get_sas_io_unit_page_hndshk(mptsas_t *mpt);
 int mptsas_get_sas_expander_page0(mptsas_t *mpt, uint32_t page_address,
