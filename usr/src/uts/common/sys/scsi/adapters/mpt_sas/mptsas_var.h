@@ -727,6 +727,7 @@ typedef struct mptsas {
 	mptsas_doneq_thread_list_t	*m_doneq_thread_id;
 	uint32_t		m_doneq_thread_n;
 	uint32_t		m_doneq_thread_threshold;
+	uint32_t		m_doneq_length_threshold;
 	uint32_t		m_doneq_len;
 	kcondvar_t		m_doneq_thread_cv;
 	kmutex_t		m_doneq_mutex;

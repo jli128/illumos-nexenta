@@ -1253,6 +1253,8 @@ mptsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	mpt->m_doneq_thread_threshold = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
 	    0, "mptsas_doneq_thread_threshold_prop", 10);
+	mpt->m_doneq_length_threshold = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
+	    0, "mptsas_doneq_length_threshold_prop", 8);
 	mpt->m_doneq_thread_n = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
 	    0, "mptsas_doneq_thread_n_prop", 8);
 
@@ -5937,13 +5939,19 @@ mptsas_intr(caddr_t arg1, caddr_t arg2)
 	NDBG1(("mptsas_intr complete"));
 
 	/*
-	 * If no helper threads are created, process the doneq in ISR.
-	 * Otherwise we deliver the IO completions to the helpers.
+	 * If no helper threads are created, process the doneq in ISR. If
+	 * helpers are created, use the doneq length as a metric to measure the
+	 * load on the interrupt CPU. If it is long enough, which indicates the
+	 * load is heavy, then we deliver the IO completions to the helpers.
+	 * This measurement has some limitations, although it is simple and
+	 * straightforward and works well for most of the cases at present.
 	 */
-	if (mpt->m_doneq_thread_n == 0)
+	if (!mpt->m_doneq_thread_n ||
+	    (mpt->m_doneq_len <= mpt->m_doneq_length_threshold)) {
 		mptsas_doneq_empty(mpt);
-	else
+	} else {
 		mptsas_deliver_doneq_thread(mpt);
+	}
 
 	/*
 	 * If there are queued cmd, start them now.
