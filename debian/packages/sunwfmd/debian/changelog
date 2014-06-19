@@ -1,3 +1,9 @@
+sunwfmd (5.11.134-31-11349-198) nexenta; urgency=low
+
+  * Issue OS-198: backport FMA DE and agent changes to 3.x
+
+ -- Nexenta Systems <support@nexenta.com>  Wed, 18 Jun 2014 21:24:28 -0400
+
 sunwfmd (5.11.134-31-11348-1981) nexenta; urgency=low
 
   * Issue NEX-1981: snmp-trapgen is broken due to missing symbols
