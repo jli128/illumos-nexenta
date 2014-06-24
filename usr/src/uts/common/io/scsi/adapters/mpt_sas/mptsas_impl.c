@@ -1252,7 +1252,7 @@ mptsas_uflash2(pMpi2FWDownloadRequest fwdownload,
 }
 
 /*
- * Complete firmware download frame for v2.0 cards.
+ * Complete firmware download frame for v2.5 cards.
  */
 static void
 mptsas_uflash25(pMpi25FWDownloadRequest fwdownload,
@@ -1383,10 +1383,10 @@ mptsas_update_flash(mptsas_t *mpt, caddr_t ptrbuffer, uint32_t size,
 	bzero(memp, mpt->m_req_frame_size);
 
 	if (mpt->m_MPI25)
-		mptsas_uflash2((pMpi2FWDownloadRequest)memp,
+		mptsas_uflash25((pMpi25FWDownloadRequest)memp,
 		    mpt->m_acc_req_frame_hdl, size, type, flsh_cookie);
 	else
-		mptsas_uflash25((pMpi25FWDownloadRequest)memp,
+		mptsas_uflash2((pMpi2FWDownloadRequest)memp,
 		    mpt->m_acc_req_frame_hdl, size, type, flsh_cookie);
 
 	/*
