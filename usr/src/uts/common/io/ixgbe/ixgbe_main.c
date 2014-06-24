@@ -467,14 +467,6 @@ ixgbe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	ixgbe->attach_progress |= ATTACH_PROGRESS_PROPS;
 
 	/*
-	 * Register interrupt callback
-	 */
-	if (ixgbe_intr_cb_register(ixgbe) != IXGBE_SUCCESS) {
-		ixgbe_error(ixgbe, "Failed to register interrupt callback");
-		goto attach_fail;
-	}
-
-	/*
 	 * Allocate interrupts
 	 */
 	if (ixgbe_alloc_intrs(ixgbe) != IXGBE_SUCCESS) {
@@ -608,6 +600,15 @@ ixgbe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	ixgbe_log(ixgbe, "%s, %s", ixgbe_ident, ixgbe_version);
 	atomic_or_32(&ixgbe->ixgbe_state, IXGBE_INITIALIZED);
 
+	/*
+	 * Register interrupt callback
+	 */
+	if (ixgbe->intr_type == DDI_INTR_TYPE_MSIX)
+		if (ixgbe_intr_cb_register(ixgbe) != IXGBE_SUCCESS) {
+			ixgbe_error(ixgbe,
+			    "Failed to register interrupt callback");
+		}
+
 	return (DDI_SUCCESS);
 
 attach_fail:
@@ -736,6 +737,12 @@ static void
 ixgbe_unconfigure(dev_info_t *devinfo, ixgbe_t *ixgbe)
 {
 	/*
+	 * Unregister interrupt callback handler
+	 */
+	if (ixgbe->cb_hdl != NULL)
+		(void) ddi_cb_unregister(ixgbe->cb_hdl);
+
+	/*
 	 * Disable interrupt
 	 */
 	if (ixgbe->attach_progress & ATTACH_PROGRESS_ENABLE_INTR) {
@@ -793,11 +800,6 @@ ixgbe_unconfigure(dev_info_t *devinfo, ixgbe_t *ixgbe)
 	if (ixgbe->attach_progress & ATTACH_PROGRESS_ALLOC_INTR) {
 		ixgbe_rem_intrs(ixgbe);
 	}
-
-	/*
-	 * Unregister interrupt callback handler
-	 */
-	(void) ddi_cb_unregister(ixgbe->cb_hdl);
 
 	/*
 	 * Remove driver properties
@@ -1843,19 +1845,22 @@ static int
 ixgbe_intr_adjust(ixgbe_t *ixgbe, ddi_cb_action_t cbaction, int count)
 {
 	int i, rc, actual;
+	uint32_t started;
+
+	if (!(ixgbe->ixgbe_state & IXGBE_INITIALIZED)) {
+		return (DDI_FAILURE);
+	}
+
+	if (cbaction == DDI_CB_INTR_REMOVE &&
+	    ixgbe->intr_cnt - count < ixgbe->intr_cnt_min)
+		return (DDI_FAILURE);
+
+	if (cbaction == DDI_CB_INTR_ADD &&
+	    ixgbe->intr_cnt + count > ixgbe->intr_cnt_max)
+		count = ixgbe->intr_cnt_max - ixgbe->intr_cnt;
 
 	if (count == 0)
 		return (DDI_SUCCESS);
-
-	if ((cbaction == DDI_CB_INTR_ADD &&
-	    ixgbe->intr_cnt + count > ixgbe->intr_cnt_max) ||
-	    (cbaction == DDI_CB_INTR_REMOVE &&
-	    ixgbe->intr_cnt - count < ixgbe->intr_cnt_min))
-		return (DDI_FAILURE);
-
-	if (!(ixgbe->ixgbe_state & IXGBE_STARTED)) {
-		return (DDI_FAILURE);
-	}
 
 	for (i = 0; i < ixgbe->num_rx_rings; i++)
 		mac_ring_intr_set(ixgbe->rx_rings[i].ring_handle, NULL);
@@ -1863,12 +1868,14 @@ ixgbe_intr_adjust(ixgbe_t *ixgbe, ddi_cb_action_t cbaction, int count)
 		mac_ring_intr_set(ixgbe->tx_rings[i].ring_handle, NULL);
 
 	mutex_enter(&ixgbe->gen_lock);
+	started = ixgbe->ixgbe_state & IXGBE_STARTED;
 	ixgbe->ixgbe_state &= ~IXGBE_STARTED;
 	ixgbe->ixgbe_state |= IXGBE_INTR_ADJUST;
 	ixgbe->ixgbe_state |= IXGBE_SUSPENDED;
 	mac_link_update(ixgbe->mac_hdl, LINK_STATE_UNKNOWN);
 
-	ixgbe_stop(ixgbe, B_FALSE);
+	if (started)
+		ixgbe_stop(ixgbe, B_FALSE);
 	/*
 	 * Disable interrupts
 	 */
@@ -1963,13 +1970,14 @@ ixgbe_intr_adjust(ixgbe_t *ixgbe, ddi_cb_action_t cbaction, int count)
 		goto intr_adjust_fail;
 	}
 	ixgbe->attach_progress |= ATTACH_PROGRESS_ENABLE_INTR;
-	if (ixgbe_start(ixgbe, B_FALSE) != IXGBE_SUCCESS) {
-		ixgbe_error(ixgbe, "IRM CB: Failed to start");
-		goto intr_adjust_fail;
-	}
+	if (started)
+		if (ixgbe_start(ixgbe, B_FALSE) != IXGBE_SUCCESS) {
+			ixgbe_error(ixgbe, "IRM CB: Failed to start");
+			goto intr_adjust_fail;
+		}
 	ixgbe->ixgbe_state &= ~IXGBE_INTR_ADJUST;
 	ixgbe->ixgbe_state &= ~IXGBE_SUSPENDED;
-	ixgbe->ixgbe_state |= IXGBE_STARTED;
+	ixgbe->ixgbe_state |= started;
 	mutex_exit(&ixgbe->gen_lock);
 
 	for (i = 0; i < ixgbe->num_rx_rings; i++) {
