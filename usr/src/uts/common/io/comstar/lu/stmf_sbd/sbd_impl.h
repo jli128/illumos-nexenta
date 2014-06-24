@@ -219,6 +219,7 @@ typedef struct sbd_cmd {
 #define	SBD_SCSI_CMD_SYNC_WRITE		0x08
 #define	SBD_SCSI_CMD_TRANS_DATA		0x10
 #define	SBD_SCSI_CMD_ATS_RELATED	0x20
+#define	SBD_SCSI_CMD_RUNNING		0x40
 
 /*
  * cmd types

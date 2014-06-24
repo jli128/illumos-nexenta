@@ -284,12 +284,11 @@ void
 sbd_handle_ats_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd,
     struct stmf_data_buf *dbuf, uint8_t dbuf_reusable)
 {
-	/* sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private; */
+	sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private;
 	uint64_t laddr;
 	uint32_t buflen, iolen, miscompare_off;
 	int ndx;
 	sbd_status_t ret;
-
 
 	if (dbuf->db_xfer_status != STMF_SUCCESS) {
 		sbd_free_ats_handle(task, scmd);
@@ -309,6 +308,23 @@ sbd_handle_ats_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd,
 		 */
 		sbd_do_ats_xfer(task, scmd, NULL, 0);
 	}
+
+	/*
+	 * See SUP-698 (Appliance is regularly crashing with a kernel
+	 * memory allocator, duplicate free: buffer freed twice called
+	 * from stmf_sbd:sbd_handle_ats_xfer_completion) for more details.
+	 * if there are multiple transfers completing concurrently then
+	 * it is possible that the completion process will be run
+	 * multiple times with scmd->len == 0.  This prevents multiple
+	 * instances of the ats from running concurrently.
+	 */
+	mutex_enter(&sl->sl_lock);
+	if (scmd->flags & SBD_SCSI_CMD_RUNNING) {
+		mutex_exit(&sl->sl_lock);
+		return;
+	}
+	scmd->flags |= SBD_SCSI_CMD_RUNNING;
+	mutex_exit(&sl->sl_lock);
 
 	laddr = dbuf->db_relative_offset;
 
