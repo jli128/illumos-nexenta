@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -36,7 +36,7 @@ static int
 v8cfg_target_iter(v8_cfg_t *cfgp, int (*func)(mdb_symbol_t *, void *),
     void *arg)
 {
-	return (mdb_symbol_iter(MDB_OBJ_EVERY, MDB_SYMTAB,
+	return (mdb_symbol_iter(MDB_OBJ_EVERY, MDB_DYNSYM,
 	    MDB_BIND_GLOBAL | MDB_TYPE_OBJECT | MDB_TYPE_FUNC,
 	    func, arg));
 }
@@ -45,7 +45,12 @@ v8cfg_target_iter(v8_cfg_t *cfgp, int (*func)(mdb_symbol_t *, void *),
 static int
 v8cfg_target_readsym(v8_cfg_t *cfgp, const char *name, intptr_t *valp)
 {
-	return (mdb_readsym(valp, sizeof (valp), name));
+	int val, rval;
+
+	if ((rval = mdb_readsym(&val, sizeof (val), name)) != -1)
+		*valp = (intptr_t)val;
+
+	return (rval);
 }
 
 /*

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -50,7 +50,7 @@
  * Extract the value of a SMI "pointer".  Recall that small integers are stored
  * using the upper 31 bits.
  */
-#define	V8_SMI_VALUE(smi)	((smi) >> V8_SmiValueShift)
+#define	V8_SMI_VALUE(smi)	((smi) >> (V8_SmiValueShift + V8_SmiShiftSize))
 
 /*
  * Determine the encoding and representation of a V8 string.
@@ -64,6 +64,8 @@
 	(((type) & V8_StringRepresentationMask) == V8_SeqStringTag)
 #define	V8_STRREP_CONS(type)	\
 	(((type) & V8_StringRepresentationMask) == V8_ConsStringTag)
+#define	V8_STRREP_SLICED(type)	\
+	(((type) & V8_StringRepresentationMask) == V8_SlicedStringTag)
 #define	V8_STRREP_EXT(type)	\
 	(((type) & V8_StringRepresentationMask) == V8_ExternalStringTag)
 
@@ -76,6 +78,6 @@
 #define	V8_DESC_DETIDX(x)		(((x) << 1) + 1)
 
 #define	V8_DESC_ISFIELD(x)		\
-	(V8_SMI_VALUE((x) & V8_PROP_TYPE_MASK) == V8_PROP_TYPE_FIELD)
+	((V8_SMI_VALUE(x) & V8_PROP_TYPE_MASK) == V8_PROP_TYPE_FIELD)
 
 #endif /* _V8DBG_H */

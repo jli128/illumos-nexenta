@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -27,6 +27,14 @@
  * makes heavy use of metadata defined in the V8 binary for inspecting in-memory
  * structures.  Canned configurations can be manually loaded for V8 binaries
  * that predate this metadata.  See mdb_v8_cfg.c for details.
+ *
+ * NOTE: This dmod implementation (including this file and related headers and C
+ * files) exist in both the Node and illumos source trees.  THESE SHOULD BE KEPT
+ * IN SYNC.  The version in the Node tree is built directly into modern Node
+ * binaries as part of the build process, and the version in the illumos source
+ * tree is delivered with the OS for debugging Node binaries that predate
+ * support for including the dmod directly in the binary.  Note too that these
+ * files have different licenses to match their corresponding repositories.
  */
 
 /*
@@ -95,6 +103,7 @@ static int 		v8_next_type;
 static v8_enum_t 	v8_frametypes[16];
 static int 		v8_next_frametype;
 
+static int		v8_warnings;
 static int		v8_silent;
 
 /*
@@ -122,6 +131,7 @@ static intptr_t	V8_AsciiStringTag;
 static intptr_t	V8_StringRepresentationMask;
 static intptr_t	V8_SeqStringTag;
 static intptr_t	V8_ConsStringTag;
+static intptr_t	V8_SlicedStringTag;
 static intptr_t	V8_ExternalStringTag;
 static intptr_t	V8_FailureTag;
 static intptr_t	V8_FailureTagMask;
@@ -130,6 +140,7 @@ static intptr_t	V8_HeapObjectTagMask;
 static intptr_t	V8_SmiTag;
 static intptr_t	V8_SmiTagMask;
 static intptr_t	V8_SmiValueShift;
+static intptr_t	V8_SmiShiftSize;
 static intptr_t	V8_PointerSizeLog2;
 
 static intptr_t	V8_ISSHARED_SHIFT;
@@ -151,6 +162,12 @@ static intptr_t	V8_TRANSITIONS_IDX_DESC;
 static intptr_t V8_TYPE_JSOBJECT = -1;
 static intptr_t V8_TYPE_JSARRAY = -1;
 static intptr_t V8_TYPE_FIXEDARRAY = -1;
+
+static intptr_t V8_ELEMENTS_KIND_SHIFT;
+static intptr_t V8_ELEMENTS_KIND_BITCOUNT;
+static intptr_t V8_ELEMENTS_FAST_ELEMENTS;
+static intptr_t V8_ELEMENTS_FAST_HOLEY_ELEMENTS;
+static intptr_t V8_ELEMENTS_DICTIONARY_ELEMENTS;
 
 /*
  * Although we have this information in v8_classes, the following offsets are
@@ -175,19 +192,26 @@ static ssize_t V8_OFF_MAP_INOBJECT_PROPERTIES;
 static ssize_t V8_OFF_MAP_INSTANCE_ATTRIBUTES;
 static ssize_t V8_OFF_MAP_INSTANCE_DESCRIPTORS;
 static ssize_t V8_OFF_MAP_INSTANCE_SIZE;
+static ssize_t V8_OFF_MAP_BIT_FIELD;
+static ssize_t V8_OFF_MAP_BIT_FIELD2;
 static ssize_t V8_OFF_MAP_BIT_FIELD3;
 static ssize_t V8_OFF_MAP_TRANSITIONS;
 static ssize_t V8_OFF_ODDBALL_TO_STRING;
 static ssize_t V8_OFF_SCRIPT_LINE_ENDS;
 static ssize_t V8_OFF_SCRIPT_NAME;
+static ssize_t V8_OFF_SCRIPT_SOURCE;
 static ssize_t V8_OFF_SEQASCIISTR_CHARS;
 static ssize_t V8_OFF_SEQONEBYTESTR_CHARS;
+static ssize_t V8_OFF_SEQTWOBYTESTR_CHARS;
 static ssize_t V8_OFF_SHAREDFUNCTIONINFO_CODE;
+static ssize_t V8_OFF_SHAREDFUNCTIONINFO_END_POSITION;
 static ssize_t V8_OFF_SHAREDFUNCTIONINFO_FUNCTION_TOKEN_POSITION;
 static ssize_t V8_OFF_SHAREDFUNCTIONINFO_INFERRED_NAME;
 static ssize_t V8_OFF_SHAREDFUNCTIONINFO_LENGTH;
 static ssize_t V8_OFF_SHAREDFUNCTIONINFO_SCRIPT;
 static ssize_t V8_OFF_SHAREDFUNCTIONINFO_NAME;
+static ssize_t V8_OFF_SLICEDSTRING_PARENT;
+static ssize_t V8_OFF_SLICEDSTRING_OFFSET;
 static ssize_t V8_OFF_STRING_LENGTH;
 
 #define	NODE_OFF_EXTSTR_DATA		0x4	/* see node_string.h */
@@ -235,6 +259,8 @@ static v8_constant_t v8_constants[] = {
 	{ &V8_StringRepresentationMask,	"v8dbg_StringRepresentationMask" },
 	{ &V8_SeqStringTag,		"v8dbg_SeqStringTag"		},
 	{ &V8_ConsStringTag,		"v8dbg_ConsStringTag"		},
+	{ &V8_SlicedStringTag,		"v8dbg_SlicedStringTag",
+	    V8_CONSTANT_FALLBACK(0, 0), 0x3 },
 	{ &V8_ExternalStringTag,	"v8dbg_ExternalStringTag"	},
 	{ &V8_FailureTag,		"v8dbg_FailureTag"		},
 	{ &V8_FailureTagMask,		"v8dbg_FailureTagMask"		},
@@ -243,6 +269,12 @@ static v8_constant_t v8_constants[] = {
 	{ &V8_SmiTag,			"v8dbg_SmiTag"			},
 	{ &V8_SmiTagMask,		"v8dbg_SmiTagMask"		},
 	{ &V8_SmiValueShift,		"v8dbg_SmiValueShift"		},
+	{ &V8_SmiShiftSize,		"v8dbg_SmiShiftSize",
+#ifdef _LP64
+	    V8_CONSTANT_FALLBACK(0, 0), 31 },
+#else
+	    V8_CONSTANT_FALLBACK(0, 0), 0 },
+#endif
 	{ &V8_PointerSizeLog2,		"v8dbg_PointerSizeLog2"		},
 
 	{ &V8_DICT_SHIFT,		"v8dbg_dict_shift",
@@ -271,6 +303,20 @@ static v8_constant_t v8_constants[] = {
 	    V8_CONSTANT_FALLBACK(0, 0), 3 },
 	{ &V8_TRANSITIONS_IDX_DESC,	"v8dbg_transitions_idx_descriptors",
 	    V8_CONSTANT_OPTIONAL },
+
+	{ &V8_ELEMENTS_KIND_SHIFT,	"v8dbg_elements_kind_shift",
+	    V8_CONSTANT_FALLBACK(0, 0), 3 },
+	{ &V8_ELEMENTS_KIND_BITCOUNT,	"v8dbg_elements_kind_bitcount",
+	    V8_CONSTANT_FALLBACK(0, 0), 5 },
+	{ &V8_ELEMENTS_FAST_ELEMENTS,
+	    "v8dbg_elements_fast_elements",
+	    V8_CONSTANT_FALLBACK(0, 0), 2 },
+	{ &V8_ELEMENTS_FAST_HOLEY_ELEMENTS,
+	    "v8dbg_elements_fast_holey_elements",
+	    V8_CONSTANT_FALLBACK(0, 0), 3 },
+	{ &V8_ELEMENTS_DICTIONARY_ELEMENTS,
+	    "v8dbg_elements_dictionary_elements",
+	    V8_CONSTANT_FALLBACK(0, 0), 6 },
 };
 
 static int v8_nconstants = sizeof (v8_constants) / sizeof (v8_constants[0]);
@@ -323,6 +369,8 @@ static v8_offset_t v8_offsets[] = {
 	    "Map", "transitions", B_TRUE },
 	{ &V8_OFF_MAP_INSTANCE_SIZE,
 	    "Map", "instance_size" },
+	{ &V8_OFF_MAP_BIT_FIELD2,
+	    "Map", "bit_field2", B_TRUE },
 	{ &V8_OFF_MAP_BIT_FIELD3,
 	    "Map", "bit_field3", B_TRUE },
 	{ &V8_OFF_ODDBALL_TO_STRING,
@@ -331,12 +379,18 @@ static v8_offset_t v8_offsets[] = {
 	    "Script", "line_ends" },
 	{ &V8_OFF_SCRIPT_NAME,
 	    "Script", "name" },
+	{ &V8_OFF_SCRIPT_SOURCE,
+	    "Script", "source" },
 	{ &V8_OFF_SEQASCIISTR_CHARS,
 	    "SeqAsciiString", "chars", B_TRUE },
 	{ &V8_OFF_SEQONEBYTESTR_CHARS,
 	    "SeqOneByteString", "chars", B_TRUE },
+	{ &V8_OFF_SEQTWOBYTESTR_CHARS,
+	    "SeqTwoByteString", "chars", B_TRUE },
 	{ &V8_OFF_SHAREDFUNCTIONINFO_CODE,
 	    "SharedFunctionInfo", "code" },
+	{ &V8_OFF_SHAREDFUNCTIONINFO_END_POSITION,
+	    "SharedFunctionInfo", "end_position" },
 	{ &V8_OFF_SHAREDFUNCTIONINFO_FUNCTION_TOKEN_POSITION,
 	    "SharedFunctionInfo", "function_token_position" },
 	{ &V8_OFF_SHAREDFUNCTIONINFO_INFERRED_NAME,
@@ -347,6 +401,10 @@ static v8_offset_t v8_offsets[] = {
 	    "SharedFunctionInfo", "name" },
 	{ &V8_OFF_SHAREDFUNCTIONINFO_SCRIPT,
 	    "SharedFunctionInfo", "script" },
+	{ &V8_OFF_SLICEDSTRING_OFFSET,
+	    "SlicedString", "offset" },
+	{ &V8_OFF_SLICEDSTRING_PARENT,
+	    "SlicedString", "parent", B_TRUE },
 	{ &V8_OFF_STRING_LENGTH,
 	    "String", "length" },
 };
@@ -511,6 +569,23 @@ again:
 
 	if (V8_OFF_SEQONEBYTESTR_CHARS != -1)
 		V8_OFF_SEQASCIISTR_CHARS = V8_OFF_SEQONEBYTESTR_CHARS;
+
+	if (V8_OFF_SEQTWOBYTESTR_CHARS == -1)
+		V8_OFF_SEQTWOBYTESTR_CHARS = V8_OFF_SEQASCIISTR_CHARS;
+
+	if (V8_OFF_SLICEDSTRING_PARENT == -1)
+		V8_OFF_SLICEDSTRING_PARENT = V8_OFF_SLICEDSTRING_OFFSET -
+		    sizeof (uintptr_t);
+
+	/*
+	 * If we don't have bit_field/bit_field2 for Map, we know that they're
+	 * the second and third byte of instance_attributes.
+	 */
+	if (V8_OFF_MAP_BIT_FIELD == -1)
+		V8_OFF_MAP_BIT_FIELD = V8_OFF_MAP_INSTANCE_ATTRIBUTES + 2;
+
+	if (V8_OFF_MAP_BIT_FIELD2 == -1)
+		V8_OFF_MAP_BIT_FIELD2 = V8_OFF_MAP_INSTANCE_ATTRIBUTES + 3;
 
 	return (failed ? -1 : 0);
 }
@@ -789,11 +864,19 @@ conf_class_compute_offsets(v8_class_t *clp)
  */
 #define	JSSTR_NONE		0
 #define	JSSTR_NUDE		JSSTR_NONE
-#define	JSSTR_VERBOSE		0x1
-#define	JSSTR_QUOTED		0x2
+
+#define	JSSTR_FLAGSHIFT		16
+#define	JSSTR_VERBOSE		(0x1 << JSSTR_FLAGSHIFT)
+#define	JSSTR_QUOTED		(0x2 << JSSTR_FLAGSHIFT)
+#define	JSSTR_ISASCII		(0x4 << JSSTR_FLAGSHIFT)
+
+#define	JSSTR_MAXDEPTH		512
+#define	JSSTR_DEPTH(f)		((f) & ((1 << JSSTR_FLAGSHIFT) - 1))
+#define	JSSTR_BUMPDEPTH(f)	((f) + 1)
 
 static int jsstr_print(uintptr_t, uint_t, char **, size_t *);
 static boolean_t jsobj_is_undefined(uintptr_t addr);
+static boolean_t jsobj_is_hole(uintptr_t addr);
 
 static const char *
 enum_lookup_str(v8_enum_t *enums, int val, const char *dflt)
@@ -860,7 +943,7 @@ v8_warn(const char *format, ...)
 	va_list alist;
 	int len;
 
-	if (v8_silent)
+	if (!v8_warnings || v8_silent)
 		return;
 
 	va_start(alist, format);
@@ -992,6 +1075,7 @@ read_heap_array(uintptr_t addr, uintptr_t **retp, size_t *lenp, int flags)
 		if (!(flags & UM_GC))
 			mdb_free(*retp, len * sizeof (uintptr_t));
 
+		*retp = NULL;
 		return (-1);
 	}
 
@@ -1076,7 +1160,6 @@ read_heap_dict(uintptr_t addr,
 	char *bufp;
 	int rval = -1;
 	uintptr_t *dict, ndict, i;
-	const char *typename;
 
 	if (read_heap_array(addr, &dict, &ndict, UM_SLEEP) != 0)
 		return (-1);
@@ -1096,28 +1179,31 @@ read_heap_dict(uintptr_t addr,
 		if (jsobj_is_undefined(dict[i]))
 			continue;
 
-		if (read_typebyte(&type, dict[i]) != 0)
-			goto out;
+		if (V8_IS_SMI(dict[i])) {
+			intptr_t val = V8_SMI_VALUE(dict[i]);
 
-		typename = enum_lookup_str(v8_types, type, NULL);
+			(void) snprintf(buf, sizeof (buf), "%ld", val);
+		} else {
+			if (jsobj_is_hole(dict[i])) {
+				/*
+				 * In some cases, the key can (apparently) be a
+				 * hole, in which case we skip over it.
+				 */
+				continue;
+			}
 
-		if (typename != NULL && strcmp(typename, "Oddball") == 0) {
-			/*
-			 * In some cases, the key can (apparently) be a hole;
-			 * assume that any Oddball in the key field falls into
-			 * this case and skip over it.
-			 */
-			continue;
+			if (read_typebyte(&type, dict[i]) != 0)
+				goto out;
+
+			if (!V8_TYPE_STRING(type))
+				goto out;
+
+			bufp = buf;
+			len = sizeof (buf);
+
+			if (jsstr_print(dict[i], JSSTR_NUDE, &bufp, &len) != 0)
+				goto out;
 		}
-
-		if (!V8_TYPE_STRING(type))
-			goto out;
-
-		bufp = buf;
-		len = sizeof (buf);
-
-		if (jsstr_print(dict[i], JSSTR_NUDE, &bufp, &len) != 0)
-			goto out;
 
 		if (func(buf, dict[i + 1], arg) == -1)
 			goto out;
@@ -1286,11 +1372,13 @@ obj_print_class(uintptr_t addr, v8_class_t *clp)
 }
 
 /*
- * Print the ASCII string for the given ASCII JS string, expanding ConsStrings
- * and ExternalStrings as needed.
+ * Print the ASCII string for the given JS string, expanding ConsStrings and
+ * ExternalStrings as needed.
  */
-static int jsstr_print_seq(uintptr_t, uint_t, char **, size_t *);
+static int jsstr_print_seq(uintptr_t, uint_t, char **, size_t *, size_t,
+    ssize_t);
 static int jsstr_print_cons(uintptr_t, uint_t, char **, size_t *);
+static int jsstr_print_sliced(uintptr_t, uint_t, char **, size_t *);
 static int jsstr_print_external(uintptr_t, uint_t, char **, size_t *);
 
 static int
@@ -1303,17 +1391,14 @@ jsstr_print(uintptr_t addr, uint_t flags, char **bufp, size_t *lenp)
 	char buf[64];
 	boolean_t verbose = flags & JSSTR_VERBOSE ? B_TRUE : B_FALSE;
 
-	if (read_typebyte(&typebyte, addr) != 0)
-		return (0);
+	if (read_typebyte(&typebyte, addr) != 0) {
+		(void) bsnprintf(bufp, lenp, "<could not read type>");
+		return (-1);
+	}
 
 	if (!V8_TYPE_STRING(typebyte)) {
 		(void) bsnprintf(bufp, lenp, "<not a string>");
-		return (0);
-	}
-
-	if (!V8_STRENC_ASCII(typebyte)) {
-		(void) bsnprintf(bufp, lenp, "<two-byte string>");
-		return (0);
+		return (-1);
 	}
 
 	if (verbose) {
@@ -1324,12 +1409,26 @@ jsstr_print(uintptr_t addr, uint_t flags, char **bufp, size_t *lenp)
 		(void) mdb_inc_indent(4);
 	}
 
+	if (JSSTR_DEPTH(flags) > JSSTR_MAXDEPTH) {
+		(void) bsnprintf(bufp, lenp, "<maximum depth exceeded>");
+		return (-1);
+	}
+
+	if (V8_STRENC_ASCII(typebyte))
+		flags |= JSSTR_ISASCII;
+	else
+		flags &= ~JSSTR_ISASCII;
+
+	flags = JSSTR_BUMPDEPTH(flags);
+
 	if (V8_STRREP_SEQ(typebyte))
-		err = jsstr_print_seq(addr, flags, bufp, lenp);
+		err = jsstr_print_seq(addr, flags, bufp, lenp, 0, -1);
 	else if (V8_STRREP_CONS(typebyte))
 		err = jsstr_print_cons(addr, flags, bufp, lenp);
 	else if (V8_STRREP_EXT(typebyte))
 		err = jsstr_print_external(addr, flags, bufp, lenp);
+	else if (V8_STRREP_SLICED(typebyte))
+		err = jsstr_print_sliced(addr, flags, bufp, lenp);
 	else {
 		(void) bsnprintf(bufp, lenp, "<unknown string type>");
 		err = -1;
@@ -1342,42 +1441,100 @@ jsstr_print(uintptr_t addr, uint_t flags, char **bufp, size_t *lenp)
 }
 
 static int
-jsstr_print_seq(uintptr_t addr, uint_t flags, char **bufp, size_t *lenp)
+jsstr_print_seq(uintptr_t addr, uint_t flags, char **bufp, size_t *lenp,
+    size_t sliceoffset, ssize_t slicelen)
 {
 	/*
 	 * To allow the caller to allocate a very large buffer for strings,
 	 * we'll allocate a buffer sized based on our input, making it at
 	 * least enough space for our ellipsis and at most 256K.
 	 */
-	uintptr_t len, rlen, blen = *lenp + sizeof ("[...]") + 1;
-	char *buf = alloca(MIN(blen, 256 * 1024));
+	uintptr_t i, nreadoffset, blen, nstrbytes, nstrchrs;
+	ssize_t nreadbytes;
 	boolean_t verbose = flags & JSSTR_VERBOSE ? B_TRUE : B_FALSE;
 	boolean_t quoted = flags & JSSTR_QUOTED ? B_TRUE : B_FALSE;
+	char *buf;
+	uint16_t chrval;
 
-	if (read_heap_smi(&len, addr, V8_OFF_STRING_LENGTH) != 0)
-		return (-1);
+	if ((blen = MIN(*lenp, 256 * 1024)) == 0)
+		return (0);
 
-	rlen = len <= blen - 1 ? len : blen - sizeof ("[...]");
+	buf = alloca(blen);
 
-	if (verbose)
-		mdb_printf("length: %d, will read: %d\n", len, rlen);
-
-	buf[0] = '\0';
-
-	if (rlen > 0 && mdb_readstr(buf, rlen + 1,
-	    addr + V8_OFF_SEQASCIISTR_CHARS) == -1) {
-		v8_warn("failed to read SeqString data");
+	if (read_heap_smi(&nstrchrs, addr, V8_OFF_STRING_LENGTH) != 0) {
+		(void) bsnprintf(bufp, lenp,
+		    "<string (failed to read length)>");
 		return (-1);
 	}
 
-	if (rlen != len)
-		(void) strlcat(buf, "[...]", blen);
+	if (slicelen != -1)
+		nstrchrs = slicelen;
+
+	if ((flags & JSSTR_ISASCII) != 0) {
+		nstrbytes = nstrchrs;
+		nreadoffset = sliceoffset;
+	} else {
+		nstrbytes = 2 * nstrchrs;
+		nreadoffset = 2 * sliceoffset;
+	}
+
+	nreadbytes = nstrbytes + sizeof ("\"\"") <= blen ? nstrbytes :
+	    blen - sizeof ("\"\"[...]");
+
+	if (nreadbytes < 0) {
+		/*
+		 * We don't even have the room to store the ellipsis; zero
+		 * the buffer out and set the length to zero.
+		 */
+		*bufp = '\0';
+		*lenp = 0;
+		return (0);
+	}
 
 	if (verbose)
-		mdb_printf("value: \"%s\"\n", buf);
+		mdb_printf("length: %d chars (%d bytes), "
+		    "will read %d bytes from offset %d\n",
+		    nstrchrs, nstrbytes, nreadbytes, nreadoffset);
 
-	(void) bsnprintf(bufp, lenp, "%s%s%s",
-	    quoted ? "\"" : "", buf, quoted ? "\"" : "");
+	if (nstrbytes == 0) {
+		(void) bsnprintf(bufp, lenp, "%s%s",
+		    quoted ? "\"" : "", quoted ? "\"" : "");
+		return (0);
+	}
+
+	buf[0] = '\0';
+
+	if ((flags & JSSTR_ISASCII) != 0) {
+		if (mdb_readstr(buf, nreadbytes + 1,
+		    addr + V8_OFF_SEQASCIISTR_CHARS + nreadoffset) == -1) {
+			v8_warn("failed to read SeqString data");
+			return (-1);
+		}
+
+		if (nreadbytes != nstrbytes)
+			(void) strlcat(buf, "[...]", blen);
+
+		(void) bsnprintf(bufp, lenp, "%s%s%s",
+		    quoted ? "\"" : "", buf, quoted ? "\"" : "");
+	} else {
+		if (mdb_readstr(buf, nreadbytes,
+		    addr + V8_OFF_SEQTWOBYTESTR_CHARS + nreadoffset) == -1) {
+			v8_warn("failed to read SeqTwoByteString data");
+			return (-1);
+		}
+
+		(void) bsnprintf(bufp, lenp, "%s", quoted ? "\"" : "");
+		for (i = 0; i < nreadbytes; i += 2) {
+			/*LINTED*/
+			chrval = *((uint16_t *)(buf + i));
+			(void) bsnprintf(bufp, lenp, "%c",
+			    (isascii(chrval) || chrval == 0) ?
+			    (char)chrval : '?');
+		}
+		if (nreadbytes != nstrbytes)
+			(void) bsnprintf(bufp, lenp, "[...]");
+		(void) bsnprintf(bufp, lenp, "%s", quoted ? "\"" : "");
+	}
 
 	return (0);
 }
@@ -1389,9 +1546,17 @@ jsstr_print_cons(uintptr_t addr, uint_t flags, char **bufp, size_t *lenp)
 	boolean_t quoted = flags & JSSTR_QUOTED ? B_TRUE : B_FALSE;
 	uintptr_t ptr1, ptr2;
 
-	if (read_heap_ptr(&ptr1, addr, V8_OFF_CONSSTRING_FIRST) != 0 ||
-	    read_heap_ptr(&ptr2, addr, V8_OFF_CONSSTRING_SECOND) != 0)
+	if (read_heap_ptr(&ptr1, addr, V8_OFF_CONSSTRING_FIRST) != 0) {
+		(void) bsnprintf(bufp, lenp,
+		    "<cons string (failed to read first)>");
 		return (-1);
+	}
+
+	if (read_heap_ptr(&ptr2, addr, V8_OFF_CONSSTRING_SECOND) != 0) {
+		(void) bsnprintf(bufp, lenp,
+		    "<cons string (failed to read second)>");
+		return (-1);
+	}
 
 	if (verbose) {
 		mdb_printf("ptr1: %p\n", ptr1);
@@ -1401,10 +1566,12 @@ jsstr_print_cons(uintptr_t addr, uint_t flags, char **bufp, size_t *lenp)
 	if (quoted)
 		(void) bsnprintf(bufp, lenp, "\"");
 
-	if (jsstr_print(ptr1, verbose, bufp, lenp) != 0)
+	flags = JSSTR_BUMPDEPTH(flags) & ~JSSTR_QUOTED;
+
+	if (jsstr_print(ptr1, flags, bufp, lenp) != 0)
 		return (-1);
 
-	if (jsstr_print(ptr2, verbose, bufp, lenp) != 0)
+	if (jsstr_print(ptr2, flags, bufp, lenp) != 0)
 		return (-1);
 
 	if (quoted)
@@ -1414,49 +1581,126 @@ jsstr_print_cons(uintptr_t addr, uint_t flags, char **bufp, size_t *lenp)
 }
 
 static int
-jsstr_print_external(uintptr_t addr, uint_t flags, char **bufp,
-    size_t *lenp)
+jsstr_print_sliced(uintptr_t addr, uint_t flags, char **bufp, size_t *lenp)
+{
+	uintptr_t parent, offset, length;
+	uint8_t typebyte;
+	boolean_t verbose = flags & JSSTR_VERBOSE ? B_TRUE : B_FALSE;
+	boolean_t quoted = flags & JSSTR_QUOTED ? B_TRUE : B_FALSE;
+
+	if (read_heap_ptr(&parent, addr, V8_OFF_SLICEDSTRING_PARENT) != 0) {
+		(void) bsnprintf(bufp, lenp,
+		    "<sliced string (failed to read parent)>");
+		return (-1);
+	}
+
+	if (read_heap_smi(&offset, addr, V8_OFF_SLICEDSTRING_OFFSET) != 0) {
+		(void) bsnprintf(bufp, lenp,
+		    "<sliced string (failed to read offset)>");
+		return (-1);
+	}
+
+	if (read_heap_smi(&length, addr, V8_OFF_STRING_LENGTH) != 0) {
+		(void) bsnprintf(bufp, lenp,
+		    "<sliced string (failed to read length)>");
+		return (-1);
+	}
+
+	if (verbose)
+		mdb_printf("parent: %p, offset = %d, length = %d\n",
+		    parent, offset, length);
+
+	if (read_typebyte(&typebyte, parent) != 0) {
+		(void) bsnprintf(bufp, lenp,
+		    "<sliced string (failed to read parent type)>");
+		return (0);
+	}
+
+	if (!V8_STRREP_SEQ(typebyte)) {
+		(void) bsnprintf(bufp, lenp,
+		    "<sliced string (parent is not a sequential string)>");
+		return (0);
+	}
+
+	if (quoted)
+		(void) bsnprintf(bufp, lenp, "\"");
+
+	flags = JSSTR_BUMPDEPTH(flags) & ~JSSTR_QUOTED;
+
+	if (V8_STRENC_ASCII(typebyte))
+		flags |= JSSTR_ISASCII;
+
+	if (jsstr_print_seq(parent, flags, bufp, lenp, offset, length) != 0)
+		return (-1);
+
+	if (quoted)
+		(void) bsnprintf(bufp, lenp, "\"");
+
+	return (0);
+}
+
+static int
+jsstr_print_external(uintptr_t addr, uint_t flags, char **bufp, size_t *lenp)
 {
 	uintptr_t ptr1, ptr2;
 	size_t blen = *lenp + 1;
-	char *buf = alloca(blen);
+	char *buf;
 	boolean_t quoted = flags & JSSTR_QUOTED ? B_TRUE : B_FALSE;
+	int rval = -1;
+
+	if ((flags & JSSTR_ISASCII) == 0) {
+		(void) bsnprintf(bufp, lenp, "<external two-byte string>");
+		return (0);
+	}
 
 	if (flags & JSSTR_VERBOSE)
 		mdb_printf("assuming Node.js string\n");
 
-	if (read_heap_ptr(&ptr1, addr, V8_OFF_EXTERNALSTRING_RESOURCE) != 0)
+	if (read_heap_ptr(&ptr1, addr, V8_OFF_EXTERNALSTRING_RESOURCE) != 0) {
+		(void) bsnprintf(bufp, lenp,
+		    "<external string (failed to read resource)>");
 		return (-1);
+	}
 
 	if (mdb_vread(&ptr2, sizeof (ptr2),
 	    ptr1 + NODE_OFF_EXTSTR_DATA) == -1) {
-		v8_warn("failed to read node external pointer: %p",
+		(void) bsnprintf(bufp, lenp, "<external string (failed to "
+		    "read node external pointer %p)>",
 		    ptr1 + NODE_OFF_EXTSTR_DATA);
 		return (-1);
 	}
 
+	buf = mdb_alloc(blen, UM_SLEEP);
+
 	if (mdb_readstr(buf, blen, ptr2) == -1) {
-		v8_warn("failed to read ExternalString data");
-		return (-1);
+		(void) bsnprintf(bufp, lenp, "<external string "
+		    "(failed to read ExternalString data)>");
+		goto out;
 	}
 
 	if (buf[0] != '\0' && !isascii(buf[0])) {
-		v8_warn("failed to read ExternalString ascii data\n");
-		return (-1);
+		(void) bsnprintf(bufp, lenp, "<external string "
+		    "(failed to read ExternalString ascii data)>");
+		goto out;
 	}
 
 	(void) bsnprintf(bufp, lenp, "%s%s%s",
 	    quoted ? "\"" : "", buf, quoted ? "\"" : "");
 
-	return (0);
+	rval = 0;
+out:
+	mdb_free(buf, blen);
+
+	return (rval);
 }
 
 /*
- * Returns true if the given address refers to the "undefined" object.  Returns
- * false on failure (since we shouldn't fail on the actual "undefined" value).
+ * Returns true if the given address refers to the named oddball object (e.g.
+ * "undefined").  Returns false on failure (since we shouldn't fail on the
+ * actual "undefined" value).
  */
 static boolean_t
-jsobj_is_undefined(uintptr_t addr)
+jsobj_is_oddball(uintptr_t addr, char *oddball)
 {
 	uint8_t type;
 	uintptr_t strptr;
@@ -1473,7 +1717,6 @@ jsobj_is_undefined(uintptr_t addr)
 	}
 
 	v8_silent--;
-
 	typename = enum_lookup_str(v8_types, type, "<unknown>");
 	if (strcmp(typename, "Oddball") != 0)
 		return (B_FALSE);
@@ -1484,16 +1727,28 @@ jsobj_is_undefined(uintptr_t addr)
 	if (jsstr_print(strptr, JSSTR_NUDE, &bufp, &len) != 0)
 		return (B_FALSE);
 
-	return (strcmp(buf, "undefined") == 0);
+	return (strcmp(buf, oddball) == 0);
+}
+
+static boolean_t
+jsobj_is_undefined(uintptr_t addr)
+{
+	return (jsobj_is_oddball(addr, "undefined"));
+}
+
+static boolean_t
+jsobj_is_hole(uintptr_t addr)
+{
+	return (jsobj_is_oddball(addr, "hole"));
 }
 
 static int
 jsobj_properties(uintptr_t addr,
     int (*func)(const char *, uintptr_t, void *), void *arg)
 {
-	uintptr_t ptr, map;
-	uintptr_t *props = NULL, *descs = NULL, *content = NULL, *trans;
-	size_t size, nprops, ndescs, ncontent, ntrans;
+	uintptr_t ptr, map, elements;
+	uintptr_t *props = NULL, *descs = NULL, *content = NULL, *trans, *elts;
+	size_t size, nprops, ndescs, ncontent, ntrans, len;
 	ssize_t ii, rndescs;
 	uint8_t type, ninprops;
 	int rval = -1;
@@ -1531,6 +1786,51 @@ jsobj_properties(uintptr_t addr,
 	 */
 	if (mdb_vread(&map, ps, addr + V8_OFF_HEAPOBJECT_MAP) == -1)
 		goto err;
+
+	/*
+	 * Check to see if our elements member is an array and non-zero; if
+	 * so, it contains numerically-named properties.
+	 */
+	if (V8_ELEMENTS_KIND_SHIFT != -1 &&
+	    read_heap_ptr(&elements, addr, V8_OFF_JSOBJECT_ELEMENTS) == 0 &&
+	    read_heap_array(elements, &elts, &len, UM_SLEEP) == 0 && len != 0) {
+		uint8_t bit_field2, kind;
+		size_t sz = len * sizeof (uintptr_t);
+
+		if (mdb_vread(&bit_field2, sizeof (bit_field2),
+		    map + V8_OFF_MAP_BIT_FIELD2) == -1) {
+			mdb_free(elts, sz);
+			goto err;
+		}
+
+		kind = bit_field2 >> V8_ELEMENTS_KIND_SHIFT;
+		kind &= (1 << V8_ELEMENTS_KIND_BITCOUNT) - 1;
+
+		if (kind == V8_ELEMENTS_FAST_ELEMENTS ||
+		    kind == V8_ELEMENTS_FAST_HOLEY_ELEMENTS) {
+			for (ii = 0; ii < len; ii++) {
+				char name[10];
+
+				if (kind == V8_ELEMENTS_FAST_HOLEY_ELEMENTS &&
+				    jsobj_is_hole(elts[ii]))
+					continue;
+
+				snprintf(name, sizeof (name), "%d", ii);
+
+				if (func(name, elts[ii], arg) != 0) {
+					mdb_free(elts, sz);
+					goto err;
+				}
+			}
+		} else if (kind == V8_ELEMENTS_DICTIONARY_ELEMENTS) {
+			if (read_heap_dict(elements, func, arg) != 0) {
+				mdb_free(elts, sz);
+				goto err;
+			}
+		}
+
+		mdb_free(elts, sz);
+	}
 
 	if (V8_DICT_SHIFT != -1) {
 		uintptr_t bit_field3;
@@ -1583,7 +1883,7 @@ jsobj_properties(uintptr_t addr,
 	if (mdb_vread(&ptr, ps, map + off) == -1)
 		goto err;
 
-	if (V8_OFF_MAP_TRANSITIONS != -1) {
+	if (V8_OFF_MAP_INSTANCE_DESCRIPTORS == -1) {
 		if (read_heap_array(ptr, &trans, &ntrans, UM_SLEEP) != 0)
 			goto err;
 
@@ -1622,7 +1922,7 @@ jsobj_properties(uintptr_t addr,
 		uintptr_t keyidx, validx, detidx, baseidx;
 		char buf[1024];
 		intptr_t val;
-		uint_t len = sizeof (buf);
+		size_t len = sizeof (buf);
 		char *c = buf;
 
 		if (V8_PROP_IDX_CONTENT != -1) {
@@ -1675,18 +1975,27 @@ jsobj_properties(uintptr_t addr,
 			/* property is stored directly in the object */
 			if (mdb_vread(&ptr, sizeof (ptr), addr + V8_OFF_HEAP(
 			    size + val * sizeof (uintptr_t))) == -1) {
-				v8_warn("failed to read in-object "
-				    "property at %p\n", addr + V8_OFF_HEAP(
-				    size + val * sizeof (uintptr_t)));
+				v8_warn("object %p: failed to read in-object "
+				    "property at %p\n", addr, addr +
+				    V8_OFF_HEAP(size + val *
+				    sizeof (uintptr_t)));
 				continue;
 			}
 		} else {
 			/* property should be in "props" array */
 			if (val >= nprops) {
-				v8_warn("property descriptor %d: value index "
-				    "value (%d) out of bounds (%d)\n", ii, val,
-				    nprops);
-				continue;
+				/*
+				 * This can happen when properties are deleted.
+				 * If this value isn't obviously corrupt, we'll
+				 * just silently ignore it.
+				 */
+				if (val < rndescs)
+					continue;
+
+				v8_warn("object %p: property descriptor %d: "
+				    "value index value (%d) out of bounds "
+				    "(%d)\n", addr, ii, val, nprops);
+				goto err;
 			}
 
 			ptr = props[val];
@@ -1716,10 +2025,14 @@ err:
  * undefined, prints the token position instead.
  */
 static int
-jsfunc_lineno(uintptr_t lendsp, uintptr_t tokpos, char *buf, size_t buflen)
+jsfunc_lineno(uintptr_t lendsp, uintptr_t tokpos,
+    char *buf, size_t buflen, int *lineno)
 {
 	uintptr_t size, bufsz, lower, upper, ii = 0;
 	uintptr_t *data;
+
+	if (lineno != NULL)
+		*lineno = -1;
 
 	if (jsobj_is_undefined(lendsp)) {
 		/*
@@ -1729,6 +2042,10 @@ jsfunc_lineno(uintptr_t lendsp, uintptr_t tokpos, char *buf, size_t buflen)
 		 * we must convert it here.
 		 */
 		mdb_snprintf(buf, buflen, "position %d", V8_SMI_VALUE(tokpos));
+
+		if (lineno != NULL)
+			*lineno = 0;
+
 		return (0);
 	}
 
@@ -1754,12 +2071,20 @@ jsfunc_lineno(uintptr_t lendsp, uintptr_t tokpos, char *buf, size_t buflen)
 	if (tokpos > data[upper]) {
 		(void) strlcpy(buf, "position out of range", buflen);
 		mdb_free(data, bufsz);
+
+		if (lineno != NULL)
+			*lineno = 0;
+
 		return (0);
 	}
 
 	if (tokpos <= data[0]) {
 		(void) strlcpy(buf, "line 1", buflen);
 		mdb_free(data, bufsz);
+
+		if (lineno != NULL)
+			*lineno = 1;
+
 		return (0);
 	}
 
@@ -1773,9 +2098,115 @@ jsfunc_lineno(uintptr_t lendsp, uintptr_t tokpos, char *buf, size_t buflen)
 			break;
 	}
 
+	if (lineno != NULL)
+		*lineno = ii + 1;
+
 	(void) mdb_snprintf(buf, buflen, "line %d", ii + 1);
 	mdb_free(data, bufsz);
 	return (0);
+}
+
+/*
+ * Given a Script object, prints nlines on either side of lineno, with each
+ * line prefixed by prefix (if non-NULL).
+ */
+static void
+jsfunc_lines(uintptr_t scriptp,
+    uintptr_t start, uintptr_t end, int nlines, char *prefix)
+{
+	uintptr_t src;
+	char *buf, *bufp;
+	size_t bufsz = 1024, len;
+	int i, line, slop = 10;
+	boolean_t newline = B_TRUE;
+	int startline = -1, endline = -1;
+
+	if (read_heap_ptr(&src, scriptp, V8_OFF_SCRIPT_SOURCE) != 0)
+		return;
+
+	for (;;) {
+		if ((buf = mdb_zalloc(bufsz, UM_NOSLEEP)) == NULL) {
+			mdb_warn("failed to allocate source code "
+			    "buffer of size %d", bufsz);
+			return;
+		}
+
+		bufp = buf;
+		len = bufsz;
+
+		if (jsstr_print(src, JSSTR_NUDE, &bufp, &len) != 0) {
+			mdb_free(buf, bufsz);
+			return;
+		}
+
+		if (len > slop)
+			break;
+
+		mdb_free(buf, bufsz);
+		bufsz <<= 1;
+	}
+
+	if (end >= bufsz)
+		return;
+
+	/*
+	 * First, take a pass to determine where our lines actually start.
+	 */
+	for (i = 0, line = 1; buf[i] != '\0'; i++) {
+		if (buf[i] == '\n')
+			line++;
+
+		if (i == start)
+			startline = line;
+
+		if (i == end) {
+			endline = line;
+			break;
+		}
+	}
+
+	if (startline == -1 || endline == -1) {
+		mdb_warn("for script %p, could not determine startline/endline"
+		    " (start %ld, end %ld, nlines %d)",
+		    scriptp, start, end, nlines);
+		mdb_free(buf, bufsz);
+		return;
+	}
+
+	for (i = 0, line = 1; buf[i] != '\0'; i++) {
+		if (buf[i] == '\n') {
+			line++;
+			newline = B_TRUE;
+		}
+
+		if (line < startline - nlines)
+			continue;
+
+		if (line > endline + nlines)
+			break;
+
+		mdb_printf("%c", buf[i]);
+
+		if (newline) {
+			if (line >= startline && line <= endline)
+				mdb_printf("%<b>");
+
+			if (prefix != NULL)
+				mdb_printf(prefix, line);
+
+			if (line >= startline && line <= endline)
+				mdb_printf("%</b>");
+
+			newline = B_FALSE;
+		}
+	}
+
+	mdb_printf("\n");
+
+	if (line == endline)
+		mdb_printf("%</b>");
+
+	mdb_free(buf, bufsz);
 }
 
 /*
@@ -1790,8 +2221,13 @@ jsfunc_name(uintptr_t funcinfop, char **bufp, size_t *lenp)
 	char *bufs = *bufp;
 
 	if (read_heap_ptr(&ptrp, funcinfop,
-	    V8_OFF_SHAREDFUNCTIONINFO_NAME) != 0 ||
-	    jsstr_print(ptrp, JSSTR_NUDE, bufp, lenp) != 0)
+	    V8_OFF_SHAREDFUNCTIONINFO_NAME) != 0) {
+		(void) bsnprintf(bufp, lenp,
+		    "<function (failed to read SharedFunctionInfo)>");
+		return (-1);
+	}
+
+	if (jsstr_print(ptrp, JSSTR_NUDE, bufp, lenp) != 0)
 		return (-1);
 
 	if (*bufp != bufs)
@@ -1830,6 +2266,7 @@ typedef struct jsobj_print {
 	int jsop_nprops;
 	const char *jsop_member;
 	boolean_t jsop_found;
+	boolean_t jsop_descended;
 } jsobj_print_t;
 
 static int jsobj_print_number(uintptr_t, jsobj_print_t *);
@@ -1872,12 +2309,14 @@ jsobj_print(uintptr_t addr, jsobj_print_t *jsop)
 	}
 
 	if (!V8_IS_HEAPOBJECT(addr)) {
-		v8_warn("not a heap object: %p\n", addr);
+		(void) bsnprintf(bufp, lenp, "<not a heap object>");
 		return (-1);
 	}
 
-	if (read_typebyte(&type, addr) != 0)
+	if (read_typebyte(&type, addr) != 0) {
+		(void) bsnprintf(bufp, lenp, "<couldn't read type>");
 		return (-1);
+	}
 
 	if (V8_TYPE_STRING(type)) {
 		if (jsstr_print(addr, JSSTR_QUOTED, bufp, lenp) == -1)
@@ -1889,11 +2328,14 @@ jsobj_print(uintptr_t addr, jsobj_print_t *jsop)
 	klass = enum_lookup_str(v8_types, type, "<unknown>");
 
 	for (ent = &table[0]; ent->name != NULL; ent++) {
-		if (strcmp(klass, ent->name) == 0)
+		if (strcmp(klass, ent->name) == 0) {
+			jsop->jsop_descended = B_TRUE;
 			return (ent->func(addr, jsop));
+		}
 	}
 
-	v8_warn("%p: unknown JavaScript object type \"%s\"\n", addr, klass);
+	(void) bsnprintf(bufp, lenp,
+	    "<unknown JavaScript object type \"%s\">", klass);
 	return (-1);
 }
 
@@ -2029,10 +2471,20 @@ jsobj_print_jsarray_member(uintptr_t addr, jsobj_print_t *jsop)
 	uintptr_t ptr;
 	const char *member = jsop->jsop_member, *end, *p;
 	size_t elt = 0, place = 1, len, rv;
+	char **bufp = jsop->jsop_bufp;
+	size_t *lenp = jsop->jsop_lenp;
 
-	if (read_heap_ptr(&ptr, addr, V8_OFF_JSOBJECT_ELEMENTS) != 0 ||
-	    read_heap_array(ptr, &elts, &len, UM_SLEEP | UM_GC) != 0)
+	if (read_heap_ptr(&ptr, addr, V8_OFF_JSOBJECT_ELEMENTS) != 0) {
+		(void) bsnprintf(bufp, lenp,
+		    "<array member (failed to read elements)>");
 		return (-1);
+	}
+
+	if (read_heap_array(ptr, &elts, &len, UM_SLEEP | UM_GC) != 0) {
+		(void) bsnprintf(bufp, lenp,
+		    "<array member (failed to read array)>");
+		return (-1);
+	}
 
 	if (*member != '[') {
 		mdb_warn("expected bracketed array index; "
@@ -2116,9 +2568,16 @@ jsobj_print_jsarray(uintptr_t addr, jsobj_print_t *jsop)
 		return (0);
 	}
 
-	if (read_heap_ptr(&ptr, addr, V8_OFF_JSOBJECT_ELEMENTS) != 0 ||
-	    read_heap_array(ptr, &elts, &len, UM_SLEEP | UM_GC) != 0)
+	if (read_heap_ptr(&ptr, addr, V8_OFF_JSOBJECT_ELEMENTS) != 0) {
+		(void) bsnprintf(bufp, lenp,
+		    "<array (failed to read elements)>");
 		return (-1);
+	}
+
+	if (read_heap_array(ptr, &elts, &len, UM_SLEEP | UM_GC) != 0) {
+		(void) bsnprintf(bufp, lenp, "<array (failed to read array)>");
+		return (-1);
+	}
 
 	if (len == 0) {
 		(void) bsnprintf(bufp, lenp, "[]");
@@ -2138,7 +2597,7 @@ jsobj_print_jsarray(uintptr_t addr, jsobj_print_t *jsop)
 
 	(void) bsnprintf(bufp, lenp, "[\n");
 
-	for (ii = 0; ii < len; ii++) {
+	for (ii = 0; ii < len && *lenp > 0; ii++) {
 		(void) bsnprintf(bufp, lenp, "%*s", indent + 4, "");
 		(void) jsobj_print(elts[ii], &descend);
 		(void) bsnprintf(bufp, lenp, ",\n");
@@ -2179,17 +2638,23 @@ jsobj_print_jsdate(uintptr_t addr, jsobj_print_t *jsop)
 		return (0);
 	}
 
-	if (read_heap_ptr(&value, addr, V8_OFF_JSDATE_VALUE) != 0)
+	if (read_heap_ptr(&value, addr, V8_OFF_JSDATE_VALUE) != 0) {
+		(void) bsnprintf(bufp, lenp, "<JSDate (failed to read value)>");
 		return (-1);
+	}
 
-	if (read_typebyte(&type, value) != 0)
+	if (read_typebyte(&type, value) != 0) {
+		(void) bsnprintf(bufp, lenp, "<JSDate (failed to read type)>");
 		return (-1);
+	}
 
 	if (strcmp(enum_lookup_str(v8_types, type, ""), "HeapNumber") != 0)
 		return (-1);
 
-	if (read_heap_double(&numval, value, V8_OFF_HEAPNUMBER_VALUE) == -1)
+	if (read_heap_double(&numval, value, V8_OFF_HEAPNUMBER_VALUE) == -1) {
+		(void) bsnprintf(bufp, lenp, "<JSDate (failed to read num)>");
 		return (-1);
+	}
 
 	mdb_snprintf(buf, sizeof (buf), "%Y",
 	    (time_t)((long long)numval / MILLISEC));
@@ -2276,7 +2741,7 @@ dcmd_v8function(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	uint8_t type;
 	uintptr_t funcinfop, scriptp, lendsp, tokpos, namep, codep;
 	char *bufp;
-	uint_t len;
+	size_t len;
 	boolean_t opt_d = B_FALSE;
 	char buf[512];
 
@@ -2284,12 +2749,14 @@ dcmd_v8function(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    NULL) != argc)
 		return (DCMD_USAGE);
 
+	v8_warnings++;
+
 	if (read_typebyte(&type, addr) != 0)
-		return (DCMD_ERR);
+		goto err;
 
 	if (strcmp(enum_lookup_str(v8_types, type, ""), "JSFunction") != 0) {
 		v8_warn("%p is not an instance of JSFunction\n", addr);
-		return (DCMD_ERR);
+		goto err;
 	}
 
 	if (read_heap_ptr(&funcinfop, addr, V8_OFF_JSFUNCTION_SHARED) != 0 ||
@@ -2299,12 +2766,12 @@ dcmd_v8function(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    V8_OFF_SHAREDFUNCTIONINFO_SCRIPT) != 0 ||
 	    read_heap_ptr(&namep, scriptp, V8_OFF_SCRIPT_NAME) != 0 ||
 	    read_heap_ptr(&lendsp, scriptp, V8_OFF_SCRIPT_LINE_ENDS) != 0)
-		return (DCMD_ERR);
+		goto err;
 
 	bufp = buf;
 	len = sizeof (buf);
 	if (jsfunc_name(funcinfop, &bufp, &len) != 0)
-		return (DCMD_ERR);
+		goto err;
 
 	mdb_printf("%p: JSFunction: %s\n", addr, buf);
 
@@ -2315,16 +2782,22 @@ dcmd_v8function(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (jsstr_print(namep, JSSTR_NUDE, &bufp, &len) == 0)
 		mdb_printf("%s ", buf);
 
-	if (jsfunc_lineno(lendsp, tokpos, buf, sizeof (buf)) == 0)
+	if (jsfunc_lineno(lendsp, tokpos, buf, sizeof (buf), NULL) == 0)
 		mdb_printf("%s", buf);
 
 	mdb_printf("\n");
 
 	if (read_heap_ptr(&codep,
 	    funcinfop, V8_OFF_SHAREDFUNCTIONINFO_CODE) != 0)
-		return (DCMD_ERR);
+		goto err;
+
+	v8_warnings--;
 
 	return (do_v8code(codep, opt_d));
+
+err:
+	v8_warnings--;
+	return (DCMD_ERR);
 }
 
 /* ARGSUSED */
@@ -2424,8 +2897,17 @@ load_current_context(uintptr_t *fpp, uintptr_t *raddrp)
 {
 	mdb_reg_t regfp, regip;
 
+#ifdef __amd64
+	if (mdb_getareg(1, "rbp", &regfp) != 0 ||
+	    mdb_getareg(1, "rip", &regip) != 0) {
+#else
+#ifdef __i386
 	if (mdb_getareg(1, "ebp", &regfp) != 0 ||
 	    mdb_getareg(1, "eip", &regip) != 0) {
+#else
+#error Unrecognized microprocessor
+#endif
+#endif
 		v8_warn("failed to load current context");
 		return (-1);
 	}
@@ -2498,15 +2980,16 @@ do_jsframe_special(uintptr_t fptr, uintptr_t raddr, char *prop)
 
 static int
 do_jsframe(uintptr_t fptr, uintptr_t raddr, boolean_t verbose,
-    char *func, char *prop)
+    char *func, char *prop, uintptr_t nlines)
 {
-	uintptr_t funcp, funcinfop, tokpos, scriptp, lendsp, ptrp;
+	uintptr_t funcp, funcinfop, tokpos, endpos, scriptp, lendsp, ptrp;
 	uintptr_t ii, nargs;
 	const char *typename;
 	char *bufp;
 	size_t len;
 	uint8_t type;
 	char buf[256];
+	int lineno;
 
 	/*
 	 * Check for non-JavaScript frames first.
@@ -2529,20 +3012,14 @@ do_jsframe(uintptr_t fptr, uintptr_t raddr, boolean_t verbose,
 	 * Check if this thing is really a JSFunction at all. For some frames,
 	 * it's a Code object, presumably indicating some internal frame.
 	 */
-	v8_silent++;
-
 	if (read_typebyte(&type, funcp) != 0 ||
 	    (typename = enum_lookup_str(v8_types, type, NULL)) == NULL) {
-		v8_silent--;
-
 		if (func != NULL || prop != NULL)
 			return (DCMD_OK);
 
 		mdb_printf("%p %a\n", fptr, raddr);
 		return (DCMD_OK);
 	}
-
-	v8_silent--;
 
 	if (strcmp("Code", typename) == 0) {
 		if (func != NULL || prop != NULL)
@@ -2610,16 +3087,6 @@ do_jsframe(uintptr_t fptr, uintptr_t raddr, boolean_t verbose,
 	if (read_heap_ptr(&lendsp, scriptp, V8_OFF_SCRIPT_LINE_ENDS) != 0)
 		return (DCMD_ERR);
 
-	(void) jsfunc_lineno(lendsp, tokpos, buf, sizeof (buf));
-
-	if (prop != NULL && strcmp(prop, "posn") == 0) {
-		mdb_printf("%s\n", buf);
-		return (DCMD_OK);
-	}
-
-	if (prop == NULL)
-		mdb_printf("posn: %s\n", buf);
-
 	if (read_heap_smi(&nargs, funcinfop,
 	    V8_OFF_SHAREDFUNCTIONINFO_LENGTH) == 0) {
 		for (ii = 0; ii < nargs; ii++) {
@@ -2649,11 +3116,27 @@ do_jsframe(uintptr_t fptr, uintptr_t raddr, boolean_t verbose,
 		}
 	}
 
+	(void) jsfunc_lineno(lendsp, tokpos, buf, sizeof (buf), &lineno);
+
 	if (prop != NULL) {
+		if (strcmp(prop, "posn") == 0) {
+			mdb_printf("%s\n", buf);
+			return (DCMD_OK);
+		}
+
 		mdb_warn("unknown frame property '%s'\n", prop);
 		return (DCMD_ERR);
 	}
 
+	mdb_printf("posn: %s", buf);
+
+	if (nlines != 0 && read_heap_smi(&endpos, funcinfop,
+	    V8_OFF_SHAREDFUNCTIONINFO_END_POSITION) == 0) {
+		jsfunc_lines(scriptp,
+		    V8_SMI_VALUE(tokpos), endpos, nlines, "%5d ");
+	}
+
+	mdb_printf("\n");
 	(void) mdb_dec_indent(4);
 
 	return (DCMD_OK);
@@ -2860,7 +3343,7 @@ static void
 findjsobjects_constructor(findjsobjects_obj_t *obj)
 {
 	char *bufp = obj->fjso_constructor;
-	unsigned int len = sizeof (obj->fjso_constructor);
+	size_t len = sizeof (obj->fjso_constructor);
 	uintptr_t map, funcinfop;
 	uintptr_t addr = obj->fjso_instances.fjsi_addr;
 	uint8_t type;
@@ -3523,7 +4006,7 @@ dcmd_findjsobjects(uintptr_t addr,
 	if (references || fjs.fjs_marking)
 		return (DCMD_OK);
 
-	mdb_printf("%-?s %8s %8s %s\n", "OBJECT",
+	mdb_printf("%?s %8s %8s %s\n", "OBJECT",
 	    "#OBJECTS", "#PROPS", "CONSTRUCTOR: PROPS");
 
 	for (obj = fjs.fjs_objects; obj != NULL; obj = obj->fjso_next) {
@@ -3543,11 +4026,13 @@ dcmd_jsframe(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	uintptr_t fptr, raddr;
 	boolean_t opt_v = B_FALSE, opt_i = B_FALSE;
 	char *opt_f = NULL, *opt_p = NULL;
+	uintptr_t opt_n = 5;
 
 	if (mdb_getopts(argc, argv,
 	    'v', MDB_OPT_SETBITS, B_TRUE, &opt_v,
 	    'i', MDB_OPT_SETBITS, B_TRUE, &opt_i,
 	    'f', MDB_OPT_STR, &opt_f,
+	    'n', MDB_OPT_UINTPTR, &opt_n,
 	    'p', MDB_OPT_STR, &opt_p, NULL) != argc)
 		return (DCMD_USAGE);
 
@@ -3559,7 +4044,7 @@ dcmd_jsframe(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	 * overridden with the "-i" option (for "immediate").
 	 */
 	if (opt_i)
-		return (do_jsframe(addr, 0, opt_v, opt_f, opt_p));
+		return (do_jsframe(addr, 0, opt_v, opt_f, opt_p, opt_n));
 
 	if (mdb_vread(&raddr, sizeof (raddr),
 	    addr + sizeof (uintptr_t)) == -1) {
@@ -3576,7 +4061,7 @@ dcmd_jsframe(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (fptr == NULL)
 		return (DCMD_OK);
 
-	return (do_jsframe(fptr, raddr, opt_v, opt_f, opt_p));
+	return (do_jsframe(fptr, raddr, opt_v, opt_f, opt_p, opt_n));
 }
 
 /* ARGSUSED */
@@ -3629,8 +4114,12 @@ dcmd_jsprint(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			len = bufsz;
 		}
 
-		if (jsop.jsop_member == NULL && rv != 0)
+		if (jsop.jsop_member == NULL && rv != 0) {
+			if (!jsop.jsop_descended)
+				mdb_warn("%s\n", buf);
+
 			return (DCMD_ERR);
+		}
 
 		if (jsop.jsop_member && !jsop.jsop_found) {
 			if (jsop.jsop_baseaddr)
@@ -3745,13 +4234,14 @@ dcmd_v8array(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 static int
 dcmd_jsstack(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	uintptr_t raddr;
-	boolean_t opt_v;
+	uintptr_t raddr, opt_n = 5;
+	boolean_t opt_v = B_FALSE;
 	char *opt_f = NULL, *opt_p = NULL;
 
 	if (mdb_getopts(argc, argv,
 	    'v', MDB_OPT_SETBITS, B_TRUE, &opt_v,
 	    'f', MDB_OPT_STR, &opt_f,
+	    'n', MDB_OPT_UINTPTR, &opt_n,
 	    'p', MDB_OPT_STR, &opt_p,
 	    NULL) != argc)
 		return (DCMD_USAGE);
@@ -3763,7 +4253,7 @@ dcmd_jsstack(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	 */
 	if (!(flags & DCMD_ADDRSPEC)) {
 		if (load_current_context(&addr, &raddr) != 0 ||
-		    do_jsframe(addr, raddr, opt_v, opt_f, opt_p) != 0)
+		    do_jsframe(addr, raddr, opt_v, opt_f, opt_p, opt_n) != 0)
 			return (DCMD_ERR);
 	}
 
@@ -3852,6 +4342,16 @@ dcmd_v8load(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	mdb_printf("V8 dmod configured based on %s\n", cfgp->v8cfg_name);
+	return (DCMD_OK);
+}
+
+/* ARGSUSED */
+static int
+dcmd_v8warnings(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	v8_warnings ^= 1;
+	mdb_printf("v8 warnings are now %s\n", v8_warnings ? "on" : "off");
+
 	return (DCMD_OK);
 }
 
@@ -3978,11 +4478,11 @@ static const mdb_dcmd_t v8_mdb_dcmds[] = {
 	/*
 	 * Commands to inspect JavaScript-level state
 	 */
-	{ "jsframe", ":[-iv] [-f function] [-p property]",
+	{ "jsframe", ":[-iv] [-f function] [-p property] [-n numlines]",
 		"summarize a JavaScript stack frame", dcmd_jsframe },
 	{ "jsprint", ":[-ab] [-d depth] [member]", "print a JavaScript object",
 		dcmd_jsprint },
-	{ "jsstack", "[-v] [-f function] [-p property]",
+	{ "jsstack", "[-v] [-f function] [-p property] [-n numlines]",
 		"print a JavaScript stacktrace", dcmd_jsstack },
 	{ "findjsobjects", "?[-vb] [-r | -c cons | -p prop]", "find JavaScript "
 		"objects", dcmd_findjsobjects, dcmd_findjsobjects_help },
@@ -4012,6 +4512,8 @@ static const mdb_dcmd_t v8_mdb_dcmds[] = {
 		dcmd_v8type },
 	{ "v8types", NULL, "list known V8 heap object types",
 		dcmd_v8types },
+	{ "v8warnings", NULL, "toggle V8 warnings",
+		dcmd_v8warnings },
 
 	{ NULL }
 };
