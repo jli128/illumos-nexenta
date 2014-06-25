@@ -1,3 +1,9 @@
+sunwiscsidmu (5.11.134-31-1-2111) nexenta; urgency=low
+
+  * Issue NEX-2111: Bump changelog files for 3.1.6 release
+
+ -- Nexenta systems <support@nexenta.com>  Wed, 25 Jun 2014 07:50:45 -0400
+
 sunwiscsidmu (5.11.134-31-0-102) nexenta; urgency=low
 
   * REL-30 io-backports

@@ -1,3 +1,9 @@
+sunwnfsskr (5.11.134-31-8246-2111) nexenta; urgency=low
+
+  * Issue NEX-2111: Bump changelog files for 3.1.6 release
+
+ -- Nexenta systems <support@nexenta.com>  Wed, 25 Jun 2014 07:50:45 -0400
+
 sunwnfsskr (5.11.134-31-8245-1) nexenta; urgency=low
 
   * Issue NEX-1623: Backport OS-152 NFS extremely slow in nfsauth

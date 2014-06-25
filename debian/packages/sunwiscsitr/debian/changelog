@@ -1,3 +1,9 @@
+sunwiscsitr (5.11.134-31-10221-2111) nexenta; urgency=low
+
+  * Issue NEX-2111: Bump changelog files for 3.1.6 release
+
+ -- Nexenta systems <support@nexenta.com>  Wed, 25 Jun 2014 07:50:45 -0400
+
 sunwiscsitr (5.11.134-31-10220-32) nexenta; urgency=low
 
   * OS-34 DoS possible againts NS iSCSI target - uncovered by codenomicon
