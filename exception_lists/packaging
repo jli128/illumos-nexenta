@@ -1025,3 +1025,9 @@ usr/bin/diskfltinj
 # debugging program for libadutils
 #
 usr/bin/test-getdc
+
+#
+# disk-light should not be shipped
+#
+usr/lib/fm/fmd/plugins/disk-lights.conf
+usr/lib/fm/fmd/plugins/disk-lights.so
