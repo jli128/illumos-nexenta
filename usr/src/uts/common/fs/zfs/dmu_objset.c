@@ -1703,10 +1703,10 @@ dmu_objset_find_spa(spa_t *spa, const char *name,
 	 */
 	if (flags & DS_FIND_SNAPSHOTS) {
 		if (!dsl_pool_sync_context(dp))
-			rw_enter(&dp->dp_config_rwlock, RW_READER);
+			rrw_enter(&dp->dp_config_rwlock, RW_READER, FTAG);
 		err = dsl_dataset_hold_obj(dp, thisobj, FTAG, &ds);
 		if (!dsl_pool_sync_context(dp))
-			rw_exit(&dp->dp_config_rwlock);
+			rrw_exit(&dp->dp_config_rwlock, FTAG);
 
 		if (err == 0) {
 			uint64_t snapobj = ds->ds_phys->ds_snapnames_zapobj;

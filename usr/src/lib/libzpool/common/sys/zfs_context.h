@@ -77,6 +77,7 @@ extern "C" {
 #include <sys/sysevent/eventdefs.h>
 #include <sys/sysevent/dev.h>
 #include <sys/sunddi.h>
+#include <pthread.h>
 
 /*
  * Debugging
@@ -277,6 +278,9 @@ typedef int krw_t;
 #undef RW_WRITE_HELD
 #define	RW_WRITE_HELD(x)	_rw_write_held(&(x)->rw_lock)
 
+#undef RW_LOCK_HELD
+#define	RW_LOCK_HELD(x)	(RW_READ_HELD(x) || RW_WRITE_HELD(x))
+
 extern void rw_init(krwlock_t *rwlp, char *name, int type, void *arg);
 extern void rw_destroy(krwlock_t *rwlp);
 extern void rw_enter(krwlock_t *rwlp, krw_t rw);
@@ -305,7 +309,14 @@ extern void cv_signal(kcondvar_t *cv);
 extern void cv_broadcast(kcondvar_t *cv);
 
 /*
- * kstat creation, installation and deletion
+ * Thread-specific data
+ */
+#define	tsd_get(k) pthread_getspecific(k)
+#define	tsd_set(k, v) pthread_setspecific(k, v)
+#define	tsd_create(kp, d) pthread_key_create(kp, d)
+#define	tsd_destroy(kp) /* nothing */
+
+/* * kstat creation, installation and deletion
  */
 extern kstat_t *kstat_create(char *, int,
     char *, char *, uchar_t, ulong_t, uchar_t);
@@ -554,7 +565,7 @@ typedef struct callb_cpr {
 #define	INGLOBALZONE(z)			(1)
 
 extern char *kmem_asprintf(const char *fmt, ...);
-#define	strfree(str) kmem_free((str), strlen(str)+1)
+#define	strfree(str) kmem_free((str), strlen(str) + 1)
 
 /*
  * Hostname information

@@ -84,7 +84,7 @@ dsl_prop_get_dd(dsl_dir_t *dd, const char *propname,
 	char *inheritstr;
 	char *recvdstr;
 
-	ASSERT(RW_LOCK_HELD(&dd->dd_pool->dp_config_rwlock));
+	ASSERT(RRW_LOCK_HELD(&dd->dd_pool->dp_config_rwlock));
 
 	if (setpoint)
 		setpoint[0] = '\0';
@@ -99,7 +99,7 @@ dsl_prop_get_dd(dsl_dir_t *dd, const char *propname,
 	 * after this loop.
 	 */
 	for (; dd != NULL; dd = dd->dd_parent) {
-		ASSERT(RW_LOCK_HELD(&dd->dd_pool->dp_config_rwlock));
+		ASSERT(RRW_LOCK_HELD(&dd->dd_pool->dp_config_rwlock));
 
 		if (dd != target || snapshot) {
 			if (!inheritable)
@@ -169,7 +169,7 @@ dsl_prop_get_ds(dsl_dataset_t *ds, const char *propname,
 	boolean_t snapshot;
 	uint64_t zapobj;
 
-	ASSERT(RW_LOCK_HELD(&ds->ds_dir->dd_pool->dp_config_rwlock));
+	ASSERT(RRW_LOCK_HELD(&ds->ds_dir->dd_pool->dp_config_rwlock));
 	inheritable = (prop == ZPROP_INVAL || zfs_prop_inheritable(prop));
 	snapshot = (ds->ds_phys != NULL && dsl_dataset_is_snapshot(ds));
 	zapobj = (ds->ds_phys == NULL ? 0 : ds->ds_phys->ds_props_obj);
@@ -239,14 +239,14 @@ dsl_prop_register(dsl_dataset_t *ds, const char *propname,
 	int err;
 	int need_rwlock;
 
-	need_rwlock = !RW_WRITE_HELD(&dp->dp_config_rwlock);
+	need_rwlock = !RRW_WRITE_HELD(&dp->dp_config_rwlock);
 	if (need_rwlock)
-		rw_enter(&dp->dp_config_rwlock, RW_READER);
+		rrw_enter(&dp->dp_config_rwlock, RW_READER, FTAG);
 
 	err = dsl_prop_get_ds(ds, propname, 8, 1, &value, NULL);
 	if (err != 0) {
 		if (need_rwlock)
-			rw_exit(&dp->dp_config_rwlock);
+			rrw_exit(&dp->dp_config_rwlock, FTAG);
 		return (err);
 	}
 
@@ -263,7 +263,7 @@ dsl_prop_register(dsl_dataset_t *ds, const char *propname,
 	cbr->cbr_func(cbr->cbr_arg, value);
 
 	if (need_rwlock)
-		rw_exit(&dp->dp_config_rwlock);
+		rrw_exit(&dp->dp_config_rwlock, FTAG);
 	return (0);
 }
 
@@ -278,9 +278,9 @@ dsl_prop_get(const char *dsname, const char *propname,
 	if (err)
 		return (err);
 
-	rw_enter(&ds->ds_dir->dd_pool->dp_config_rwlock, RW_READER);
+	rrw_enter(&ds->ds_dir->dd_pool->dp_config_rwlock, RW_READER, FTAG);
 	err = dsl_prop_get_ds(ds, propname, intsz, numints, buf, setpoint);
-	rw_exit(&ds->ds_dir->dd_pool->dp_config_rwlock);
+	rrw_exit(&ds->ds_dir->dd_pool->dp_config_rwlock, FTAG);
 
 	dsl_dataset_rele(ds, FTAG);
 	return (err);
@@ -498,7 +498,7 @@ dsl_prop_changed_notify(dsl_pool_t *dp, uint64_t ddobj,
 	zap_attribute_t *za;
 	int err;
 
-	ASSERT(RW_WRITE_HELD(&dp->dp_config_rwlock));
+	ASSERT(RRW_WRITE_HELD(&dp->dp_config_rwlock));
 	err = dsl_dir_open_obj(dp, ddobj, NULL, FTAG, &dd);
 	if (err)
 		return;
@@ -1017,7 +1017,7 @@ dsl_prop_get_all_ds(dsl_dataset_t *ds, nvlist_t **nvp,
 	if (dsl_dataset_is_snapshot(ds))
 		flags |= DSL_PROP_GET_SNAPSHOT;
 
-	rw_enter(&dp->dp_config_rwlock, RW_READER);
+	rrw_enter(&dp->dp_config_rwlock, RW_READER, FTAG);
 
 	if (ds->ds_phys->ds_props_obj != 0) {
 		ASSERT(flags & DSL_PROP_GET_SNAPSHOT);
@@ -1042,7 +1042,7 @@ dsl_prop_get_all_ds(dsl_dataset_t *ds, nvlist_t **nvp,
 			break;
 	}
 out:
-	rw_exit(&dp->dp_config_rwlock);
+	rrw_exit(&dp->dp_config_rwlock, FTAG);
 	return (err);
 }
 
@@ -1053,9 +1053,9 @@ dsl_prop_get_hasrecvd(objset_t *os)
 	int rc;
 	uint64_t dummy;
 
-	rw_enter(&ds->ds_dir->dd_pool->dp_config_rwlock, RW_READER);
+	rrw_enter(&ds->ds_dir->dd_pool->dp_config_rwlock, RW_READER, FTAG);
 	rc = dsl_prop_get_ds(ds, ZPROP_HAS_RECVD, 8, 1, &dummy, NULL);
-	rw_exit(&ds->ds_dir->dd_pool->dp_config_rwlock);
+	rrw_exit(&ds->ds_dir->dd_pool->dp_config_rwlock, FTAG);
 	ASSERT(rc != 0 || spa_version(os->os_spa) >= SPA_VERSION_RECVD_PROPS);
 	return (rc == 0);
 }

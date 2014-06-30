@@ -85,7 +85,7 @@ top:
 
 	/* Do a preliminary error check. */
 	dstg->dstg_err = 0;
-	rw_enter(&dstg->dstg_pool->dp_config_rwlock, RW_READER);
+	rrw_enter(&dstg->dstg_pool->dp_config_rwlock, RW_READER, FTAG);
 	for (dst = list_head(&dstg->dstg_tasks); dst;
 	    dst = list_next(&dstg->dstg_tasks, dst)) {
 #ifdef ZFS_DEBUG
@@ -101,7 +101,7 @@ top:
 		if (dst->dst_err)
 			dstg->dstg_err = dst->dst_err;
 	}
-	rw_exit(&dstg->dstg_pool->dp_config_rwlock);
+	rrw_exit(&dstg->dstg_pool->dp_config_rwlock, FTAG);
 
 	if (dstg->dstg_err) {
 		dmu_tx_commit(tx);
@@ -181,7 +181,7 @@ dsl_sync_task_group_sync(dsl_sync_task_group_t *dstg, dmu_tx_t *tx)
 	/*
 	 * Check for errors by calling checkfuncs.
 	 */
-	rw_enter(&dp->dp_config_rwlock, RW_WRITER);
+	rrw_enter(&dp->dp_config_rwlock, RW_WRITER, FTAG);
 	for (dst = list_head(&dstg->dstg_tasks); dst;
 	    dst = list_next(&dstg->dstg_tasks, dst)) {
 		dst->dst_err =
@@ -199,7 +199,7 @@ dsl_sync_task_group_sync(dsl_sync_task_group_t *dstg, dmu_tx_t *tx)
 			dst->dst_syncfunc(dst->dst_arg1, dst->dst_arg2, tx);
 		}
 	}
-	rw_exit(&dp->dp_config_rwlock);
+	rrw_exit(&dp->dp_config_rwlock, FTAG);
 
 	if (dstg->dstg_nowaiter)
 		dsl_sync_task_group_destroy(dstg);
