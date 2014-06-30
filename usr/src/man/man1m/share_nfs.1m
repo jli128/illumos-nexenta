@@ -20,9 +20,9 @@
 .\"
 .\"
 .\" Copyright (C) 2008, Sun Microsystems, Inc. All Rights Reserved
-.\" Copyright 2013 Nexenta Systems, Inc. All rights reserved
+.\" Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 .\"
-.Dd January 12, 2013
+.Dd June 30, 2014
 .Dt SHARE_NFS 1M
 .Os
 .Sh NAME
@@ -90,6 +90,55 @@ Clients that match the
 .Ar access_list
 for one of these properties will be assumed to be using that character set and
 file and path names will be converted to UTF-8 for the server.
+.It Sy gidmap Ns = Ns Ar mapping Ns Oo ~ Ns Ar mapping Oc Ns ...
+Where
+.Ar mapping
+is:
+.Oo Ar clnt Oc : Ns Oo Ar srv Oc : Ns Ar access_list
+.Pp
+Allows remapping the group ID (gid) in the incoming request to some other gid.
+This effectively changes the identity of the user in the request to that of
+some other local user.
+.Pp
+For clients where the gid in the incoming request is
+.Ar clnt
+and the client matches the
+.Ar access_list Ns
+, change the group ID to
+.Ar srv Ns .  If
+.Ar clnt
+is asterisk (*), all groups are mapped by this rule.  If
+.Ar clnt
+is omitted, all unknown groups are mapped by this rule.  If
+.Ar srv
+is set to -1, access is denied.  If
+.Ar srv
+is omitted, the gid is mapped to UID_NOBODY.
+.Pp
+The particular
+.Ar mapping Ns s
+are separated in the
+.Sy gidmap Ns =
+option by tilde (~) and are evaluated in the specified order until a match is
+found.  Both
+.Sy root Ns =
+and
+.Sy root_mapping Ns =
+options (if specified) are evaluated before the
+.Sy gidmap Ns =
+option.  The
+.Sy gidmap Ns =
+option is skipped in the case when the client matches the
+.Sy root Ns =
+option.
+.Pp
+The
+.Sy gidmap Ns =
+option is evaluated before the
+.Sy anon Ns =
+option.
+.Pp
+This option is supported only for AUTH_SYS.
 .It Sy index Ns = Ns Ar file
 Load file rather than a listing of the directory containing this file when the
 directory is referenced by an NFS URL.
@@ -240,6 +289,55 @@ option for a description of how unauthenticated requests are handled.
 This option has been deprecated in favor of the
 .Sy sec Ns = Ns Sy dh
 option.
+.It Sy uidmap Ns = Ns Ar mapping Ns Oo ~ Ns Ar mapping Oc Ns ...
+Where
+.Ar mapping
+is:
+.Oo Ar clnt Oc : Ns Oo Ar srv Oc : Ns Ar access_list
+.Pp
+Allows remapping the user ID (uid) in the incoming request to some other uid.
+This effectively changes the identity of the user in the request to that of
+some other local user.
+.Pp
+For clients where the uid in the incoming request is
+.Ar clnt
+and the client matches the
+.Ar access_list Ns
+, change the user ID to
+.Ar srv Ns .  If
+.Ar clnt
+is asterisk (*), all users are mapped by this rule.  If
+.Ar clnt
+is omitted, all unknown users are mapped by this rule.  If
+.Ar srv
+is set to -1, access is denied.  If
+.Ar srv
+is omitted, the uid is mapped to UID_NOBODY.
+.Pp
+The particular
+.Ar mapping Ns s
+are separated in the
+.Sy uidmap Ns =
+option by tilde (~) and are evaluated in the specified order until a match is
+found.  Both
+.Sy root Ns =
+and
+.Sy root_mapping Ns =
+options (if specified) are evaluated before the
+.Sy uidmap Ns =
+option.  The
+.Sy uidmap Ns =
+option is skipped in the case when the client matches the
+.Sy root Ns =
+option.
+.Pp
+The
+.Sy uidmap Ns =
+option is evaluated before the
+.Sy anon Ns =
+option.
+.Pp
+This option is supported only for AUTH_SYS.
 .It Sy window Ns = Ns Ar value
 When sharing with
 .Sy sec Ns = Ns Sy dh ,
@@ -410,6 +508,16 @@ is shared with logging enabled upon starting or rebooting the system. Simply
 sharing a file system with logging enabled from the command line does not start
 the
 .Xr nfslogd 1M .
+.Ss Example 2 Remap A User Coming From The Particular NFS Client
+The following example remaps the user with uid
+.Sy 100
+at client
+.Sy 10.0.0.1
+to user
+.Sy joe Ns :
+.Bd -literal -offset indent
+share -o uidmap=100:joe:@10.0.0.1 /export
+.Ed
 .Sh SEE ALSO
 .Xr mount 1M ,
 .Xr mountd 1M ,

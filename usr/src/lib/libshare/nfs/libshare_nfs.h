@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -54,6 +54,8 @@ extern "C" {
 #define	SHOPT_LOG	"log"
 #define	SHOPT_CKSUM	"cksum"
 #define	SHOPT_NOACLFAB	"noaclfab"
+#define	SHOPT_UIDMAP	"uidmap"
+#define	SHOPT_GIDMAP	"gidmap"
 #define	SHOPT_NOHIDE	"nohide"
 
 /*
@@ -77,6 +79,7 @@ extern "C" {
 #define	OPT_TYPE_DOMAIN		13
 #define	OPT_TYPE_ONOFF		14
 #define	OPT_TYPE_PROTOCOL	15
+#define	OPT_TYPE_MAPPING	16
 
 #define	OPT_SHARE_ONLY		1
 
