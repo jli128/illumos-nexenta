@@ -20,8 +20,8 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2011, 2014 by Delphix. All rights reserved.
  */
 
 #ifndef _SYS_SPA_IMPL_H
@@ -54,9 +54,9 @@ extern "C" {
 #define	TRYIMPORT_NAME	"$import"
 
 typedef struct spa_error_entry {
-	zbookmark_t	se_bookmark;
-	char		*se_name;
-	avl_node_t	se_avl;
+	zbookmark_phys_t	se_bookmark;
+	char			*se_name;
+	avl_node_t		se_avl;
 } spa_error_entry_t;
 
 typedef struct spa_history_phys {

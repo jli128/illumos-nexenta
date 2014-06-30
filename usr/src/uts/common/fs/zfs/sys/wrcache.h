@@ -114,7 +114,7 @@ typedef struct wrc_parseblock_cb {
 	/*
 	 * A bookmark for resume
 	 */
-	zbookmark_t	zb;
+	zbookmark_phys_t	zb;
 
 	/*
 	 * Total size of all collected blocks

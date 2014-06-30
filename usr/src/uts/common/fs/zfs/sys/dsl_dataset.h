@@ -167,7 +167,7 @@ typedef struct dsl_dataset {
 	 * during traversal process. Used to resume traversal
 	 * later.
 	 */
-	zbookmark_t ds_lszb;
+	zbookmark_phys_t ds_lszb;
 
 	/*
 	 * Long holds prevent the ds from being destroyed; they allow the

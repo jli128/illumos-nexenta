@@ -387,7 +387,7 @@ wrc_check_parseblocks_hold(spa_t *spa)
 
 static boolean_t
 wrc_should_pause_scanblocks(dsl_pool_t *dp,
-    wrc_parseblock_cb_t *cbd, const zbookmark_t *zb)
+    wrc_parseblock_cb_t *cbd, const zbookmark_phys_t *zb)
 {
 	hrtime_t elapsed_ns;
 
@@ -420,7 +420,7 @@ wrc_should_pause_scanblocks(dsl_pool_t *dp,
 /* ARGSUSED */
 int
 wrc_traverse_ds_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
-    const zbookmark_t *zb, const dnode_phys_t *dnp, void *arg)
+    const zbookmark_phys_t *zb, const dnode_phys_t *dnp, void *arg)
 {
 	wrc_data_t *wrc_data = &spa->spa_wrc;
 	wrc_parseblock_cb_t *cbd = arg;
