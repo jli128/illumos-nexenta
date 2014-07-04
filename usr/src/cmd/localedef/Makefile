@@ -11,7 +11,6 @@
 
 #
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
-# Copyright 2011 EveryCity Ltd. All rights reserved.
 #
 
 PROG=localedef
@@ -118,7 +117,6 @@ UTF_8_LOCALES		= \
 		bg_BG \
 		bn_BD bn_IN \
 		bo_CN bo_IN \
-		bs_BA \
 		ca_ES \
 		cs_CZ \
 		da_DK \
@@ -173,7 +171,6 @@ UTF_8_LOCALES		= \
 		sa_IN \
 		si_LK \
 		sk_SK \
-		sl_SI \
 		sq_AL \
 		sr_BA sr_ME sr_RS \
 		sv_FI sv_SE \
