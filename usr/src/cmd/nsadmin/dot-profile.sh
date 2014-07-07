@@ -1,7 +1,8 @@
 #
+# Want XPG6 commands. See standards(5).
 # Use less(1) as the default pager for the man(1) command.
 #
-export PATH=/usr/bin:/usr/sbin:/sbin
+export PATH=/usr/xpg6/bin:/usr/xpg4/bin:/usr/bin:/usr/sbin:/sbin
 export PAGER="/usr/bin/less -ins"
 
 #
