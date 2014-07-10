@@ -1,3 +1,9 @@
+sunwos86r (5.11.134-31-9689-14) nexenta; urgency=medium
+
+  * Issue NEX-1700: Revert NEX-1569 backport OS-14 sd attach should not issue potentially slow scsi commands (ddi-forceattach=1)
+
+ -- Nexenta Systems <support@nexenta.com>  Thu, 10 Jul 2014 22:13:10 +0200
+
 sunwos86r (5.11.134-31-9688-1938) nexenta; urgency=medium
 
   * Issue NEX-1938: Backport NEX-1923 Retiring a device may hang or leave
