@@ -13,23 +13,35 @@
 # Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
 
+
 PROG=		mandoc
 
-include		$(SRC)/cmd/Makefile.cmd
+CMDDIR=	$(SRC)/cmd/mandoc
+SRCS=	$(OBJS:%.o=$(CMDDIR)/%.c)
+CLEANFILES=	$(PROG) $(OBJS)
 
-include		$(SRC)/cmd/mandoc/Makefile.common
+include ../Makefile.tools
+
+include $(SRC)/cmd/mandoc/Makefile.common
 
 .KEEP_STATE:
 
+install: all .WAIT $(ROOTONBLDMACHPROG)
+
 $(PROG):	$(OBJS)
-		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
+		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 		$(POST_PROCESS)
 
 all:		$(PROG)
 
+
+%.o:		$(CMDDIR)/%.c
+		$(COMPILE.c) -o $@ $<
+
+%.o:		$(LIBDIR)/%.c
+		$(COMPILE.c) -o $@ $<
+
 clean:
-		$(RM) $(OBJS)
+		$(RM) $(CLEANFILES)
 
-install:	all $(ROOTPROG)
-
-include		$(SRC)/cmd/Makefile.targ
+include ../Makefile.targ
