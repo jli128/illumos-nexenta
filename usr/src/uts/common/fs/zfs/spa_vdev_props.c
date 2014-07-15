@@ -513,7 +513,7 @@ int
 spa_vdev_props_sync_task_do(spa_t *spa)
 {
 	return (dsl_sync_task(spa->spa_name, NULL, spa_vdev_sync_props,
-	    spa, 3));
+	    spa, 3, ZFS_SPACE_CHECK_RESERVED));
 }
 
 /*

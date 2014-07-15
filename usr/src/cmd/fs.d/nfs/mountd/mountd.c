@@ -2212,7 +2212,7 @@ get_uid(char *value, uid_t *uid)
 	} else {
 		uint64_t intval;
 		intval = strtoull(value, NULL, 0);
-		if (intval > UID_MAX && intval != ~0)
+		if (intval > UID_MAX && intval != -1)
 			return (B_FALSE);
 		*uid = (uid_t)intval;
 	}
@@ -2237,7 +2237,7 @@ get_gid(char *value, gid_t *gid)
 	} else {
 		uint64_t intval;
 		intval = strtoull(value, NULL, 0);
-		if (intval > UID_MAX && intval != ~0)
+		if (intval > UID_MAX && intval != -1)
 			return (B_FALSE);
 		*gid = (gid_t)intval;
 	}

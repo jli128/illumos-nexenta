@@ -2139,7 +2139,7 @@ check_user(char *value)
 	} else {
 		uint64_t intval;
 		intval = strtoull(value, NULL, 0);
-		if (intval > UID_MAX && intval != ~0)
+		if (intval > UID_MAX && intval != -1)
 			ret = SA_BAD_VALUE;
 	}
 
@@ -2164,7 +2164,7 @@ check_group(char *value)
 	} else {
 		uint64_t intval;
 		intval = strtoull(value, NULL, 0);
-		if (intval > UID_MAX && intval != ~0)
+		if (intval > UID_MAX && intval != -1)
 			ret = SA_BAD_VALUE;
 	}
 

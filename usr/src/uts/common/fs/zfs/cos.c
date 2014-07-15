@@ -523,7 +523,8 @@ cos_sync_task_do(spa_t *spa, cos_feature_action_t action)
 	/* argument allocated and initialized here and freed in the callback */
 	arg->spa = spa;
 	arg->action = action;
-	err = dsl_sync_task(spa->spa_name, NULL, cos_sync_props, arg, 3);
+	err = dsl_sync_task(spa->spa_name, NULL, cos_sync_props, arg, 3,
+	    ZFS_SPACE_CHECK_RESERVED);
 	return (err);
 }
 
