@@ -1,3 +1,10 @@
+sunwsmbsu (5.11.134-31-13254-942) nexenta; urgency=high
+
+  * Issue SUP-942: smb add share failed when importing a zpool when CIFS
+    services offline
+
+ -- Nexenta Systems <support@nexenta.com>  Thu, 17 Jul 2014 16:30:30 -0400
+
 sunwsmbsu (5.11.134-31-13253-1848) nexenta; urgency=high
 
   * Issue NEX-1848: Backport re #12412 rb3944 mdb smbsess dcmd
