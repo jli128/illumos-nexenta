@@ -14,6 +14,7 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
-SUBDIRS = newlocale
+SUBDIRS = newlocale nl_langinfo wcsrtombs
 
+include $(SRC)/Makefile.master
 include $(SRC)/test/Makefile.com

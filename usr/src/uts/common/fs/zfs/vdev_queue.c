@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -367,9 +367,10 @@ vdev_queue_class_min_active(zio_priority_t p, vdev_queue_t *vq)
 }
 
 static int
-vdev_queue_max_async_writes(uint64_t dirty, vdev_queue_t *vq)
+vdev_queue_max_async_writes(spa_t *spa, vdev_queue_t *vq)
 {
 	int writes;
+	uint64_t dirty = spa->spa_dsl_pool->dp_dirty_total;
 	uint64_t min_bytes = zfs_dirty_data_max *
 	    zfs_vdev_async_write_active_min_dirty_percent / 100;
 	uint64_t max_bytes = zfs_dirty_data_max *
@@ -387,6 +388,14 @@ vdev_queue_max_async_writes(uint64_t dirty, vdev_queue_t *vq)
 	    vdev_queue_get_prop_uint64(vq, VDEV_PROP_AWRITE_MAXACTIVE);
 	int max_active =
 	    (vqc_max_active) ? vqc_max_active : zfs_vdev_async_write_max_active;
+
+	/*
+	 * Sync tasks correspond to interactive user actions. To reduce the
+	 * execution time of those actions we push data out as fast as possible.
+	 */
+	if (spa_has_pending_synctask(spa)) {
+		return (zfs_vdev_async_write_max_active);
+	}
 
 	if (dirty < min_bytes)
 		return (min_active);
@@ -428,8 +437,7 @@ vdev_queue_class_max_active(spa_t *spa, zio_priority_t p, vdev_queue_t *vq)
 		break;
 	case ZIO_PRIORITY_ASYNC_WRITE:
 		/* takes into account vdev-specific props internally */
-		vqc_max_active = vdev_queue_max_async_writes(
-		    spa->spa_dsl_pool->dp_dirty_total, vq);
+		vqc_max_active = vdev_queue_max_async_writes(spa, vq);
 		ASSERT(vqc_max_active);
 		break;
 	case ZIO_PRIORITY_SCRUB:
