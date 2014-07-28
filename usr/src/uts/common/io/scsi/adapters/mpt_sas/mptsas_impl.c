@@ -1309,7 +1309,7 @@ mptsas_update_flash(mptsas_t *mpt, caddr_t ptrbuffer, uint32_t size,
 	int			rvalue = 0;
 	uint32_t		request_desc_low;
 
-	if (mpt->m_MPI25) {
+	if (mpt->m_MPI25 && !mptsas_enable_mpi25_flashupdate) {
 		/*
 		 * The code is there but not tested yet.
 		 * User has to know there are risks here.
@@ -1318,9 +1318,8 @@ mptsas_update_flash(mptsas_t *mpt, caddr_t ptrbuffer, uint32_t size,
 		    "Updating firmware through MPI 2.5 has not been "
 		    "tested yet!\n"
 		    "To enable set mptsas_enable_mpi25_flashupdate to 1\n");
-		if (!mptsas_enable_mpi25_flashupdate)
-			return (-1);
-	}
+		return (-1);
+	} /* Otherwise, you pay your money and you take your chances. */
 
 	if ((rvalue = (mptsas_request_from_pool(mpt, &cmd, &pkt))) == -1) {
 		mptsas_log(mpt, CE_WARN, "mptsas_update_flash(): allocation "

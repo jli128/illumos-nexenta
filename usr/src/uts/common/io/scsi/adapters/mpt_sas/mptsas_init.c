@@ -319,9 +319,7 @@ mptsas_ioc_do_get_facts_reply(mptsas_t *mpt, caddr_t memp, int var,
 	 * Calculate max frames per request based on DMA S/G length.
 	 */
 	simple_sge_main = MPTSAS_MAX_FRAME_SGES64(mpt) - 1;
-	simple_sge_next = mpt->m_req_frame_size /
-	    (mpt->m_MPI25 ? sizeof (MPI2_IEEE_SGE_SIMPLE64) :
-	    sizeof (MPI2_SGE_SIMPLE64)) - 1;
+	simple_sge_next = mpt->m_req_frame_size / MPTSAS_SGE_SIZE(mpt) - 1;
 
 	mpt->m_max_request_frames = (MPTSAS_MAX_DMA_SEGS -
 	    simple_sge_main) / simple_sge_next + 1;

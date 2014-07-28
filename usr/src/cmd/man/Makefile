@@ -11,10 +11,12 @@
 
 #
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
 PROG=		man
-LINKS=		apropos whatis
+LINKS=		apropos whatis catman
+LIBLINKS =	makewhatis
 OBJS=		makewhatis.o man.o stringlist.o
 SRCS=		$(OBJS:%.o=%.c)
 
@@ -22,7 +24,7 @@ include		$(SRC)/cmd/Makefile.cmd
 
 CFLAGS +=	$(CCVERBOSE)
 
-ROOTLINKS=	$(LINKS:%=$(ROOTBIN)/%)
+ROOTLINKS=	$(LINKS:%=$(ROOTBIN)/%) $(LIBLINKS:%=$(ROOTLIB)/%)
 
 .KEEP_STATE :
 

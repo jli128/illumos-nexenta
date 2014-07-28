@@ -14,8 +14,6 @@
 # Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
 
-include		$(SRC)/Makefile.master
-
 MANDOC=		$(ONBLD_TOOLS)/bin/${MACH}/mandoc
 ROOTMAN=	$(ROOT)/usr/share/man
 ROOTHASMAN=	$(ROOT)/usr/has/man
@@ -26,11 +24,16 @@ FILEMODE=	0444
 #
 # MANSECT=
 
+MANCHECKS=	$(MANFILES:%=%.check)
 ROOTMANFILES= 	$(MANFILES:%=$(ROOTMAN)/man$(MANSECT)/%)
 ROOTMANLINKS=	$(MANLINKS:%=$(ROOTMAN)/man$(MANSECT)/%)
 
 $(ROOTMAN)/man$(MANSECT)/% $(ROOTHASMAN)/man$(MANSECT)/%: %
 		$(INS.file)
+
+$(MANCHECKS):
+		@$(ECHO) "checking $(@:%.check=%)"; \
+		$(MANDOC) -Tlint $(@:%.check=%)
 
 $(MANLINKS):
 		$(RM) $@; $(SYMLINK) $(LINKSRC) $@
@@ -40,8 +43,7 @@ $(ROOTMANLINKS): $(MANLINKS)
 
 all:
 
-check:
-		@[[ -z "$(MANFILES)" ]] || $(MANDOC) -Tlint $(MANFILES)
+check:		$(MANCHECKS)
 
 clean:
 

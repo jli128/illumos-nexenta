@@ -28,6 +28,7 @@
 
 /*
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  */
 
 #include <sys/types.h>
@@ -176,16 +177,24 @@ sbuf_need(struct sbuf *sbuf, int nchars)
 {
 	char *new_content;
 	size_t size, cntsize;
+	size_t grow = 128;
 
-	/* Double the size of the allocation until the buffer is big enough */
-	while (sbuf->end + nchars > sbuf->last) {
+	while (grow < nchars) {
+		grow += 128;	/* we grow in chunks of 128 bytes */
+	}
+
+	/* Grow if the buffer isn't big enough */
+	if (sbuf->end + nchars > sbuf->last) {
 		size = sbuf->last + 1 - sbuf->content;
-		size *= 2;
+		size += grow;
 		cntsize = sbuf->end - sbuf->content;
 
-		new_content = (char *)malloc(size);
-		(void) memcpy(new_content, sbuf->content, cntsize);
-		free(sbuf->content);
+		if ((new_content = realloc(sbuf->content, size)) == NULL) {
+			perror("realloc");
+			if (tempfile[0] != '\0')
+				(void) unlink(tempfile);
+			exit(1);
+		}
 		sbuf->content = new_content;
 		sbuf->end = new_content + cntsize;
 		sbuf->last = new_content + size - 1;
@@ -259,17 +268,18 @@ static int
 no_page_exists(char *dir, stringlist *names, char *suffix)
 {
 	char	path[MAXPATHLEN];
+	char	*suffixes[] = { "", ".gz", ".bz2", NULL };
 	size_t	i;
+	int	j;
 
 	for (i = 0; i < names->sl_cur; i++) {
-		(void) snprintf(path, MAXPATHLEN, "%s/%s.%s.gz",
-		    dir, names->sl_str[i], suffix);
-		if (access(path, F_OK) < 0) {
-			path[strlen(path) - 3] = '\0';
-			if (access(path, F_OK) < 0)
-				continue;
+		for (j = 0; suffixes[j] != NULL; j++) {
+			(void) snprintf(path, MAXPATHLEN, "%s/%s.%s%s",
+			    dir, names->sl_str[i], suffix, suffixes[j]);
+			if (access(path, F_OK) == 0) {
+				return (0);
+			}
 		}
-		return (0);
 	}
 	return (1);
 }

@@ -147,6 +147,10 @@ typedef uint16_t		mptsas_phymask_t;
 #define	MPTSAS_MAX_FRAME_SGES(mpt) \
 	(((mpt->m_req_frame_size - (sizeof (MPI2_SCSI_IO_REQUEST))) / 8) + 1)
 
+#define	MPTSAS_SGE_SIZE(mpt)					\
+	((mpt)->m_MPI25 ? sizeof (MPI2_IEEE_SGE_SIMPLE64) :	\
+	    sizeof (MPI2_SGE_SIMPLE64))
+
 /*
  * Calculating how many 64-bit DMA simple elements can be stored in the first
  * frame. Note that msg_scsi_io_request contains 2 double-words (8 bytes) for
@@ -157,8 +161,7 @@ typedef uint16_t		mptsas_phymask_t;
 #define	MPTSAS_MAX_FRAME_SGES64(mpt) \
 	((mpt->m_req_frame_size - \
 	sizeof (MPI2_SCSI_IO_REQUEST) + sizeof (MPI2_SGE_IO_UNION)) / \
-	(mpt->m_MPI25 ? sizeof (MPI2_IEEE_SGE_SIMPLE64) : \
-	sizeof (MPI2_SGE_SIMPLE64)))
+	MPTSAS_SGE_SIZE(mpt))
 
 /*
  * Scatter-gather list structure defined by HBA hardware
@@ -381,7 +384,7 @@ typedef struct mptsas_pt_request {
 	uint32_t request_size;
 	uint32_t data_size;
 	uint32_t dataout_size;
-	uint8_t direction;
+	uint32_t direction;
 	uint8_t simple;
 	uint16_t sgl_offset;
 	ddi_dma_cookie_t data_cookie;

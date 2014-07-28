@@ -23,6 +23,7 @@
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012, Josef 'Jeff' Sipek <jeffpc@31bits.net>. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989  AT&T.	*/
@@ -82,7 +83,8 @@ static const struct map_entry {
 	{ "3t",		"3thr"		},
 	{ "3x",		"3curses"	},
 	{ "3xc",	"3xcurses"	},
-	{ "3xn",	"3xnet"		}
+	{ "3xn",	"3xnet"		},
+	{ NULL,		NULL		}
 };
 
 struct suffix {
@@ -158,10 +160,12 @@ static int	makewhatis = 0;
 static int	printmp = 0;
 static int	sargs = 0;
 static int	psoutput = 0;
+static int	lintout = 0;
 static int	whatis = 0;
+static int	makewhatishere = 0;
 
 static char	*mansec;
-static char	*pager;
+static char	*pager = NULL;
 
 static char	*addlocale(char *);
 static struct man_node *build_manpath(char **, int);
@@ -191,6 +195,8 @@ static void	sortdir(DIR *, char ***);
 static char	**split(char *, char);
 static void	usage_man(void);
 static void	usage_whatapro(void);
+static void	usage_catman(void);
+static void	usage_makewhatis(void);
 static void	whatapro(struct man_node *, char *);
 
 static char	language[MAXPATHLEN]; 	/* LC_MESSAGES */
@@ -213,6 +219,7 @@ main(int argc, char **argv)
 	int		ret = 0;
 	char		*opts;
 	char		*mwstr;
+	int		catman = 0;
 
 	(void) setlocale(LC_ALL, "");
 	(void) strcpy(language, setlocale(LC_MESSAGES, (char *)NULL));
@@ -231,8 +238,21 @@ main(int argc, char **argv)
 		apropos++;
 		whatis++;
 		opts = "M:ds:";
+	} else if (strcmp(__progname, "catman") == 0) {
+		catman++;
+		makewhatis++;
+		opts = "P:M:w";
+	} else if (strcmp(__progname, "makewhatis") == 0) {
+		makewhatis++;
+		makewhatishere++;
+		manpath = ".";
+		opts = "";
 	} else {
-		opts = "M:adfklps:tw";
+		opts = "FM:P:T:adfklprs:tw";
+		if (argc > 1 && strcmp(argv[1], "-") == 0) {
+			pager = "cat";
+			optind++;
+		}
 	}
 
 	opterr = 0;
@@ -255,7 +275,8 @@ main(int argc, char **argv)
 			break;
 		case 'l':
 			list++;
-			/*FALLTHROUGH*/
+			all++;
+			break;
 		case 'p':
 			printmp++;
 			break;
@@ -263,8 +284,16 @@ main(int argc, char **argv)
 			mansec = optarg;
 			sargs++;
 			break;
+		case 'r':
+			lintout++;
+			break;
 		case 't':
 			psoutput++;
+			break;
+		case 'T':
+		case 'P':
+		case 'F':
+			/* legacy options, compatibility only and ignored */
 			break;
 		case 'w':
 			makewhatis++;
@@ -273,6 +302,10 @@ main(int argc, char **argv)
 		default:
 			if (apropos)
 				usage_whatapro();
+			else if (catman)
+				usage_catman();
+			else if (makewhatishere)
+				usage_makewhatis();
 			else
 				usage_man();
 		}
@@ -334,8 +367,10 @@ main(int argc, char **argv)
 		DPRINTF("-- Using non-standard page width: %d\n", manwidth);
 	}
 
-	if ((pager = getenv("PAGER")) == NULL || *pager == '\0')
-		pager = PAGER;
+	if (pager == NULL) {
+		if ((pager = getenv("PAGER")) == NULL || *pager == '\0')
+			pager = PAGER;
+	}
 	DPRINTF("-- Using pager: %s\n", pager);
 
 	for (i = 0; i < argc; i++) {
@@ -690,8 +725,10 @@ search_whatis(char *whatpath, char *word)
 	char		s[MAXNAMELEN];
 	int		i;
 
-	if ((fp = fopen(whatpath, "r")) == NULL)
+	if ((fp = fopen(whatpath, "r")) == NULL) {
+		perror(whatpath);
 		return;
+	}
 
 	DPRINTF("-- Found %s: %s\n", WHATIS, whatpath);
 
@@ -1127,21 +1164,15 @@ static char *
 map_section(char *section, char *path)
 {
 	int	i;
-	int	len;
 	char	fullpath[MAXPATHLEN];
 
 	if (list)  /* -l option fall through */
 		return (NULL);
 
-	for (i = 0; i <= ((sizeof (map)/sizeof (map[0]) - 1)); i++) {
-		if (strlen(section) > strlen(map[i].new_name)) {
-			len = strlen(section);
-		} else {
-			len = strlen(map[i].new_name);
-		}
-		if (strncmp(section, map[i].old_name, len) == 0) {
+	for (i = 0; map[i].new_name != NULL; i++) {
+		if (strcmp(section, map[i].old_name) == 0) {
 			(void) snprintf(fullpath, sizeof (fullpath),
-			    "%s/sman%s", path, map[i].new_name);
+			    "%s/man%s", path, map[i].new_name);
 			if (!access(fullpath, R_OK | X_OK)) {
 				return (map[i].new_name);
 			} else {
@@ -1178,7 +1209,7 @@ format(char *path, char *dir, char *name, char *pg)
 	    dir + 3, pg);
 
 	/* Can't do PS output if manpage doesn't exist */
-	if (stat(manpname, &sbman) != 0 && psoutput)
+	if (stat(manpname, &sbman) != 0 && (psoutput|lintout))
 		return (-1);
 
 	/*
@@ -1194,7 +1225,7 @@ format(char *path, char *dir, char *name, char *pg)
 	else if (fnmatch("*.bz2", manpname, 0) == 0)
 		cattool = "bzcat";
 	else
-		cattool = "gzcat -f";
+		cattool = "cat";
 
 	/* Preprocess UTF-8 input with preconv (could be smarter) */
 	if (strstr(path, "UTF-8") != NULL)
@@ -1202,12 +1233,19 @@ format(char *path, char *dir, char *name, char *pg)
 
 	if (psoutput) {
 		(void) snprintf(cmdbuf, BUFSIZ,
-		    "cd %s; %s %s%s | mandoc -Tps", path, cattool, manpname,
-		    utf8 ? " | preconv -e UTF-8 " : "");
+		    "cd %s; %s %s%s | mandoc -Tps | lp -Tpostscript",
+		    path, cattool, manpname,
+		    utf8 ? " | " PRECONV " -e UTF-8" : "");
 		DPRINTF("-- Using manpage: %s\n", manpname);
 		goto cmd;
+	} else if (lintout) {
+		(void) snprintf(cmdbuf, BUFSIZ,
+		    "cd %s; %s %s%s | mandoc -Tlint",
+		    path, cattool, manpname,
+		    utf8 ? " | " PRECONV " -e UTF-8" : "");
+		DPRINTF("-- Linting manpage: %s\n", manpname);
+		goto cmd;
 	}
-
 
 	/*
 	 * Output catpage if:
@@ -1225,7 +1263,8 @@ format(char *path, char *dir, char *name, char *pg)
 	if (manwidth > 0)
 		(void) snprintf(tmpbuf, BUFSIZ, "-Owidth=%d ", manwidth);
 	(void) snprintf(cmdbuf, BUFSIZ, "cd %s; %s %s%s | mandoc -T%s %s| %s",
-	    path, cattool, manpname, utf8 ? " | preconv -e UTF-8 " : "",
+	    path, cattool, manpname,
+	    utf8 ? " | " PRECONV " -e UTF-8 " : "",
 	    utf8 ? "utf8" : "ascii", (manwidth > 0) ? tmpbuf : "", pager);
 
 cmd:
@@ -1548,8 +1587,8 @@ usage_man(void)
 
 	(void) fprintf(stderr, gettext(
 "usage: man [-alptw] [-M path] [-s section] name ...\n"
-"       man [-M path] [-s section] -k keyword -- emulate apropos\n"
-"       man [-M path] [-s section] -f keyword -- emulate whatis\n"));
+"       man [-M path] [-s section] -k keyword ...\n"
+"       man [-M path] [-s section] -f keyword ...\n"));
 
 	exit(1);
 }
@@ -1561,6 +1600,23 @@ usage_whatapro(void)
 	(void) fprintf(stderr, gettext(
 "usage: %s [-M path] [-s section] keyword ...\n"),
 	    whatis ? "whatis" : "apropos");
+
+	exit(1);
+}
+
+static void
+usage_catman(void)
+{
+	(void) fprintf(stderr, gettext(
+"usage: catman [-M path] [-w]\n"));
+
+	exit(1);
+}
+
+static void
+usage_makewhatis(void)
+{
+	(void) fprintf(stderr, gettext("usage: makewhatis\n"));
 
 	exit(1);
 }

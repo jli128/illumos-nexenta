@@ -15,7 +15,7 @@
 .\" Copyright (c) 2011 Kristaps Dzonsons <kristaps@bsd.lv>
 .\" Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 .\"
-.Dd Sep 25, 2011
+.Dd Jul 19, 2014
 .Dt EQN 5
 .Os
 .Sh NAME
@@ -167,7 +167,9 @@ Its syntax is as follows:
 .Pp
 .D1 gfont Ar font
 .Pp
-In mandoc, this value is discarded.
+In
+.Xr mandoc 1 ,
+this value is discarded.
 .It Cm gsize
 Set the default size of subsequent output.
 Its syntax is as follows:
@@ -179,7 +181,9 @@ The
 value should be an integer.
 .It Cm set
 Set an equation mode.
-In mandoc, both arguments are thrown away.
+In
+.Xr mandoc 1 ,
+both arguments are thrown away.
 Its syntax is as follows:
 .Pp
 .D1 set Ar key val
@@ -205,9 +209,11 @@ is not expanded for replacements.
 This statement is a GNU extension.
 .El
 .Sh COMPATIBILITY
-This section documents the compatibility of mandoc
+This section documents the compatibility of
+.Xr mandoc 1
 .Nm
-and the troff
+and the
+.Xr troff 1
 .Nm
 implementation (including GNU troff).
 .Pp
@@ -215,21 +221,31 @@ implementation (including GNU troff).
 .It
 The text string
 .Sq \e\*q
-is interpreted as a literal quote in troff.
-In mandoc, this is interpreted as a comment.
+is interpreted as a literal quote in
+.Xr troff 1 .
+In
+.Xr mandoc 1 ,
+this is interpreted as a comment.
 .It
-In troff, The circumflex and tilde white-space symbols map to
+In
+.Xr troff 1 ,
+The circumflex and tilde white-space symbols map to
 fixed-width spaces.
-In mandoc, these characters are synonyms for the space character.
+In
+.Xr mandoc 1 ,
+these characters are synonyms for the space character.
 .It
-The troff implementation of
+The
+.Xr troff 1 ,
+implementation of
 .Nm
 allows for equation alignment with the
 .Cm mark
 and
 .Cm lineup
 tokens.
-mandoc discards these tokens.
+.Xr mandoc 1
+discards these tokens.
 The
 .Cm back Ar n ,
 .Cm fwd Ar n ,
@@ -240,7 +256,7 @@ commands are also ignored.
 .El
 .Sh SEE ALSO
 .Xr mandoc 1 ,
-.Xr man 7 ,
+.Xr man 5 ,
 .Xr mandoc_char 5 ,
 .Xr mdoc 5 ,
 .Xr roff 5

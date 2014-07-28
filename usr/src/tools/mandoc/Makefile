@@ -17,12 +17,15 @@
 PROG=		mandoc
 
 CMDDIR=	$(SRC)/cmd/mandoc
-SRCS=	$(OBJS:%.o=$(CMDDIR)/%.c)
-CLEANFILES=	$(PROG) $(OBJS)
 
 include ../Makefile.tools
 
 include $(SRC)/cmd/mandoc/Makefile.common
+
+SRCS=	$(mandoc_OBJS:%.o=$(CMDDIR)/%.c)
+CLEANFILES=	$(PROG) $(OBJS)
+OBJS= $(mandoc_OBJS)
+PROG= mandoc
 
 .KEEP_STATE:
 
@@ -45,3 +48,4 @@ clean:
 		$(RM) $(CLEANFILES)
 
 include ../Makefile.targ
+

@@ -43,7 +43,7 @@ the AMD PCnet family of Ethernet controllers\.
 .SH "APPLICATION PROGRAMMING INTERFACE"
 The \fBpcn\fR driver can be used as either a "style 1" or a "style 2" Data Link
 Service Provider\. Physical points of attachment (PPAs) are interpreted as the
-instance number of the \fBpcn\fR controller as assigned by the illumos
+instance number of the \fBpcn\fR controller as assigned by the
 operating environment\.
 .sp
 .LP

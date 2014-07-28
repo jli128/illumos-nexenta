@@ -13,6 +13,7 @@
 # Copyright 2011, Richard Lowe
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
 include		$(SRC)/Makefile.master

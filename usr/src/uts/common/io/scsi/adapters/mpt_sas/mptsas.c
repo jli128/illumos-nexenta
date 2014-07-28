@@ -248,7 +248,7 @@ static void mptsas_cmd_timeout(mptsas_t *mpt, mptsas_target_t *ptgt);
 static void mptsas_start_passthru(mptsas_t *mpt, mptsas_cmd_t *cmd);
 static int mptsas_do_passthru(mptsas_t *mpt, uint8_t *request, uint8_t *reply,
     uint8_t *data, uint32_t request_size, uint32_t reply_size,
-    uint32_t data_size, uint8_t direction, uint8_t *dataout,
+    uint32_t data_size, uint32_t direction, uint8_t *dataout,
     uint32_t dataout_size, short timeout, int mode);
 static int mptsas_free_devhdl(mptsas_t *mpt, uint16_t devhdl);
 
@@ -433,6 +433,8 @@ boolean_t mptsas_physical_bind_failed_page_83 = B_FALSE;
 
 /*
  * Global switch for use of MPI2.5 FAST PATH.
+ * We don't really know what FAST PATH actually does, so if it is suspected
+ * to cause problems it can be turned off by setting this variable to B_FALSE.
  */
 boolean_t mptsas_use_fastpath = B_TRUE;
 
@@ -506,7 +508,7 @@ ddi_dma_attr_t mptsas_dma_attrs64 = {
 	0xffffffffull,	/* max segment size (DMA boundary)	*/
 	MPTSAS_MAX_DMA_SEGS, /* scatter/gather list length	*/
 	512,		/* granularity - device transfer size	*/
-	0		/* flags, set to 0 */
+	DDI_DMA_RELAXED_ORDERING	/* flags, enable relaxed ordering */
 };
 
 ddi_device_acc_attr_t mptsas_dev_attr = {
@@ -584,7 +586,7 @@ static struct modlinkage modlinkage = {
  * Local static data
  */
 #if defined(MPTSAS_DEBUG)
-uint32_t mptsas_debug_flags = 0x0;
+uint32_t mptsas_debug_flags = 0;
 #endif	/* defined(MPTSAS_DEBUG) */
 uint32_t mptsas_debug_resets = 0;
 
@@ -602,20 +604,6 @@ static clock_t mptsas_tick;
 static timeout_id_t mptsas_reset_watch;
 static timeout_id_t mptsas_timeout_id;
 static int mptsas_timeouts_enabled = 0;
-
-/*
- * The only software retriction on switching msg buffers to 64 bit seems to
- * be the Auto Request Sense interface. The high 32 bits for all such
- * requests appear to be required to sit in the same 4G segment.
- * See initialization of SenseBufferAddressHigh in mptsas_init.c, and
- * the use of SenseBufferLowAddress in requests. Note that there is
- * currently a dependency on scsi_alloc_consistent_buf() adhering to
- * this requirement.
- * There is also a question about improved performance over PCI/PCIX
- * if transfers are within the first 4Gb.
- */
-static int mptsas_use_64bit_msgaddr = 0;
-
 /*
  * warlock directives
  */
@@ -1194,11 +1182,7 @@ mptsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* Make a per-instance copy of the structures */
 	mpt->m_io_dma_attr = mptsas_dma_attrs64;
-	if (mptsas_use_64bit_msgaddr) {
-		mpt->m_msg_dma_attr = mptsas_dma_attrs64;
-	} else {
-		mpt->m_msg_dma_attr = mptsas_dma_attrs;
-	}
+	mpt->m_msg_dma_attr = mptsas_dma_attrs;
 	mpt->m_reg_acc_attr = mptsas_dev_attr;
 	mpt->m_dev_acc_attr = mptsas_dev_attr;
 
@@ -2263,7 +2247,7 @@ mptsas_cache_create(mptsas_t *mpt)
 	 */
 	(void) sprintf(buf, "mptsas%d_cache", instance);
 	mpt->m_kmem_cache = kmem_cache_create(buf,
-	    sizeof (struct mptsas_cmd) + scsi_pkt_size(), 16,
+	    sizeof (struct mptsas_cmd) + scsi_pkt_size(), 8,
 	    mptsas_kmem_cache_constructor, mptsas_kmem_cache_destructor,
 	    NULL, (void *)mpt, NULL, 0);
 
@@ -2278,7 +2262,7 @@ mptsas_cache_create(mptsas_t *mpt)
 	 */
 	(void) sprintf(buf, "mptsas%d_cache_frames", instance);
 	mpt->m_cache_frames = kmem_cache_create(buf,
-	    sizeof (mptsas_cache_frames_t), 16,
+	    sizeof (mptsas_cache_frames_t), 8,
 	    mptsas_cache_frames_constructor, mptsas_cache_frames_destructor,
 	    NULL, (void *)mpt, NULL, 0);
 
@@ -4143,7 +4127,7 @@ mptsas_cache_frames_constructor(void *buf, void *cdrarg, int kmflags)
 	 * address to dma to and from the driver.  The second
 	 * address is the address mpt uses to fill in the SGL.
 	 */
-	p->m_phys_addr = cookie.dmac_laddress;
+	p->m_phys_addr = cookie.dmac_address;
 
 	return (DDI_SUCCESS);
 }
@@ -4351,8 +4335,7 @@ mptsas_pkt_comp(struct scsi_pkt *pkt, mptsas_cmd_t *cmd)
 
 static void
 mptsas_sge_mainframe(mptsas_cmd_t *cmd, pMpi2SCSIIORequest_t frame,
-		ddi_acc_handle_t acc_hdl, uint_t cookiec,
-		uint32_t end_flags)
+    ddi_acc_handle_t acc_hdl, uint_t cookiec, uint32_t end_flags)
 {
 	pMpi2SGESimple64_t	sge;
 	mptti_t			*dmap;
@@ -4362,11 +4345,12 @@ mptsas_sge_mainframe(mptsas_cmd_t *cmd, pMpi2SCSIIORequest_t frame,
 
 	sge = (pMpi2SGESimple64_t)(&frame->SGL);
 	while (cookiec--) {
-		ddi_put32(acc_hdl, &sge->Address.Low,
-		    dmap->addr.address64.Low);
-		ddi_put32(acc_hdl, &sge->Address.High,
-		    dmap->addr.address64.High);
-		ddi_put32(acc_hdl, &sge->FlagsLength, dmap->count);
+		ddi_put32(acc_hdl,
+		    &sge->Address.Low, dmap->addr.address64.Low);
+		ddi_put32(acc_hdl,
+		    &sge->Address.High, dmap->addr.address64.High);
+		ddi_put32(acc_hdl, &sge->FlagsLength,
+		    dmap->count);
 		flags = ddi_get32(acc_hdl, &sge->FlagsLength);
 		flags |= ((uint32_t)
 		    (MPI2_SGE_FLAGS_SIMPLE_ELEMENT |
@@ -4400,16 +4384,14 @@ mptsas_sge_chain(mptsas_t *mpt, mptsas_cmd_t *cmd,
 {
 	pMpi2SGESimple64_t	sge;
 	pMpi2SGEChain64_t	sgechain;
-	uint64_t		nframe_phys_addr;
 	uint_t			cookiec;
 	mptti_t			*dmap;
 	uint32_t		flags;
-	int			i, j, k, l, frames, sgemax;
-	int			temp, maxframe_sges;
-	uint8_t			chainflags;
-	uint16_t		chainlength;
-	mptsas_cache_frames_t	*p;
 
+	/*
+	 * Save the number of entries in the DMA
+	 * Scatter/Gather list
+	 */
 	cookiec = cmd->cmd_cookiec;
 
 	/*
@@ -4442,6 +4424,11 @@ mptsas_sge_chain(mptsas_t *mpt, mptsas_cmd_t *cmd,
 	 *    recognize that there's not enough room for another SGL
 	 *    element and move the sge pointer to the next frame.
 	 */
+	int			i, j, k, l, frames, sgemax;
+	int			temp;
+	uint8_t			chainflags;
+	uint16_t		chainlength;
+	mptsas_cache_frames_t	*p;
 
 	/*
 	 * Sgemax is the number of SGE's that will fit
@@ -4449,15 +4436,16 @@ mptsas_sge_chain(mptsas_t *mpt, mptsas_cmd_t *cmd,
 	 * number of frames we'll need.  1 sge entry per
 	 * frame is reseverd for the chain element thus the -1 below.
 	 */
-	sgemax = ((mpt->m_req_frame_size / sizeof (MPI2_SGE_SIMPLE64)) - 1);
-	maxframe_sges = MPTSAS_MAX_FRAME_SGES64(mpt);
-	temp = (cookiec - (maxframe_sges - 1)) / sgemax;
+	sgemax = ((mpt->m_req_frame_size / sizeof (MPI2_SGE_SIMPLE64))
+	    - 1);
+	temp = (cookiec - (MPTSAS_MAX_FRAME_SGES64(mpt) - 1)) / sgemax;
 
 	/*
 	 * A little check to see if we need to round up the number
 	 * of frames we need
 	 */
-	if ((cookiec - (maxframe_sges - 1)) - (temp * sgemax) > 1) {
+	if ((cookiec - (MPTSAS_MAX_FRAME_SGES64(mpt) - 1)) - (temp *
+	    sgemax) > 1) {
 		frames = (temp + 1);
 	} else {
 		frames = temp;
@@ -4468,7 +4456,7 @@ mptsas_sge_chain(mptsas_t *mpt, mptsas_cmd_t *cmd,
 	/*
 	 * First fill in the main frame
 	 */
-	j = maxframe_sges - 1;
+	j = MPTSAS_MAX_FRAME_SGES64(mpt) - 1;
 	mptsas_sge_mainframe(cmd, frame, acc_hdl, j,
 	    ((uint32_t)(MPI2_SGE_FLAGS_LAST_ELEMENT) <<
 	    MPI2_SGE_FLAGS_SHIFT));
@@ -4507,6 +4495,7 @@ mptsas_sge_chain(mptsas_t *mpt, mptsas_cmd_t *cmd,
 	 * have been processed (stored in frames).
 	 */
 	if (frames >= 2) {
+		ASSERT(mpt->m_req_frame_size >= sizeof (MPI2_SGE_SIMPLE64));
 		chainlength = mpt->m_req_frame_size /
 		    sizeof (MPI2_SGE_SIMPLE64) *
 		    sizeof (MPI2_SGE_SIMPLE64);
@@ -4519,8 +4508,9 @@ mptsas_sge_chain(mptsas_t *mpt, mptsas_cmd_t *cmd,
 
 	ddi_put16(acc_hdl, &sgechain->Length, chainlength);
 	ddi_put32(acc_hdl, &sgechain->Address.Low,
-	    (p->m_phys_addr&0xffffffffull));
-	ddi_put32(acc_hdl, &sgechain->Address.High, p->m_phys_addr>>32);
+	    p->m_phys_addr);
+	/* SGL is allocated in the first 4G mem range */
+	ddi_put32(acc_hdl, &sgechain->Address.High, 0);
 
 	/*
 	 * If there are more than 2 frames left we have to
@@ -4578,14 +4568,12 @@ mptsas_sge_chain(mptsas_t *mpt, mptsas_cmd_t *cmd,
 				 * Note that frames are in contiguous
 				 * memory space.
 				 */
-				nframe_phys_addr = p->m_phys_addr +
-				    (mpt->m_req_frame_size * k);
 				ddi_put32(p->m_acc_hdl,
 				    &sgechain->Address.Low,
-				    nframe_phys_addr&0xffffffffull);
+				    (p->m_phys_addr +
+				    (mpt->m_req_frame_size * k)));
 				ddi_put32(p->m_acc_hdl,
-				    &sgechain->Address.High,
-				    nframe_phys_addr>>32);
+				    &sgechain->Address.High, 0);
 
 				/*
 				 * If there are more than 2 frames left
@@ -4692,8 +4680,7 @@ mptsas_sge_chain(mptsas_t *mpt, mptsas_cmd_t *cmd,
 
 static void
 mptsas_ieee_sge_mainframe(mptsas_cmd_t *cmd, pMpi2SCSIIORequest_t frame,
-    ddi_acc_handle_t acc_hdl, uint_t cookiec,
-    uint8_t end_flag)
+    ddi_acc_handle_t acc_hdl, uint_t cookiec, uint8_t end_flag)
 {
 	pMpi2IeeeSgeSimple64_t	ieeesge;
 	mptti_t			*dmap;
@@ -4706,11 +4693,12 @@ mptsas_ieee_sge_mainframe(mptsas_cmd_t *cmd, pMpi2SCSIIORequest_t frame,
 
 	ieeesge = (pMpi2IeeeSgeSimple64_t)(&frame->SGL);
 	while (cookiec--) {
-		ddi_put32(acc_hdl, &ieeesge->Address.Low,
-		    dmap->addr.address64.Low);
-		ddi_put32(acc_hdl, &ieeesge->Address.High,
-		    dmap->addr.address64.High);
-		ddi_put32(acc_hdl, &ieeesge->Length, dmap->count);
+		ddi_put32(acc_hdl,
+		    &ieeesge->Address.Low, dmap->addr.address64.Low);
+		ddi_put32(acc_hdl,
+		    &ieeesge->Address.High, dmap->addr.address64.High);
+		ddi_put32(acc_hdl, &ieeesge->Length,
+		    dmap->count);
 		NDBG1(("mptsas_ieee_sge_mainframe: len=%d", dmap->count));
 		flags = (MPI2_IEEE_SGE_FLAGS_SIMPLE_ELEMENT |
 		    MPI2_IEEE_SGE_FLAGS_SYSTEM_ADDR);
@@ -4723,10 +4711,6 @@ mptsas_ieee_sge_mainframe(mptsas_cmd_t *cmd, pMpi2SCSIIORequest_t frame,
 			flags |= end_flag;
 		}
 
-		/*
-		 * XXX: Hmmm, what about the direction based on
-		 * cmd->cmd_flags & CFLAG_DMASEND?
-		 */
 		ddi_put8(acc_hdl, &ieeesge->Flags, flags);
 		dmap++;
 		ieeesge++;
@@ -4739,16 +4723,14 @@ mptsas_ieee_sge_chain(mptsas_t *mpt, mptsas_cmd_t *cmd,
 {
 	pMpi2IeeeSgeSimple64_t	ieeesge;
 	pMpi25IeeeSgeChain64_t	ieeesgechain;
-	uint64_t		nframe_phys_addr;
 	uint_t			cookiec;
 	mptti_t			*dmap;
 	uint8_t			flags;
-	int			i, j, k, l, frames, sgemax;
-	int			temp, maxframe_sges;
-	uint8_t			chainflags;
-	uint32_t		chainlength;
-	mptsas_cache_frames_t	*p;
 
+	/*
+	 * Save the number of entries in the DMA
+	 * Scatter/Gather list
+	 */
 	cookiec = cmd->cmd_cookiec;
 
 	NDBG1(("mptsas_ieee_sge_chain: cookiec=%d", cookiec));
@@ -4772,17 +4754,17 @@ mptsas_ieee_sge_chain(mptsas_t *mpt, mptsas_cmd_t *cmd,
 	 *    frames go into the mpt SGL buffer allocated on the fly,
 	 *    not immediately following the main message frame, as in
 	 *    Gen1.
-	 * Some restrictions:
-	 * 1. For 64-bit DMA, the simple element and chain element
+	 * Restrictions:
+	 *    For 64-bit DMA, the simple element and chain element
 	 *    are both of 4 double-words (16 bytes) in size, even
 	 *    though all frames are stored in the first 4G of mem
 	 *    range and the higher 32-bits of the address are always 0.
-	 * 2. On some controllers (like the 1064/1068), a frame can
-	 *    hold SGL elements with the last 1 or 2 double-words
-	 *    (4 or 8 bytes) un-used. On these controllers, we should
-	 *    recognize that there's not enough room for another SGL
-	 *    element and move the sge pointer to the next frame.
 	 */
+	int			i, j, k, l, frames, sgemax;
+	int			temp;
+	uint8_t			chainflags;
+	uint32_t		chainlength;
+	mptsas_cache_frames_t	*p;
 
 	/*
 	 * Sgemax is the number of SGE's that will fit
@@ -4792,14 +4774,14 @@ mptsas_ieee_sge_chain(mptsas_t *mpt, mptsas_cmd_t *cmd,
 	 */
 	sgemax = ((mpt->m_req_frame_size / sizeof (MPI2_IEEE_SGE_SIMPLE64))
 	    - 1);
-	maxframe_sges = MPTSAS_MAX_FRAME_SGES64(mpt);
-	temp = (cookiec - (maxframe_sges - 1)) / sgemax;
+	temp = (cookiec - (MPTSAS_MAX_FRAME_SGES64(mpt) - 1)) / sgemax;
 
 	/*
 	 * A little check to see if we need to round up the number
 	 * of frames we need
 	 */
-	if ((cookiec - (maxframe_sges - 1)) - (temp * sgemax) > 1) {
+	if ((cookiec - (MPTSAS_MAX_FRAME_SGES64(mpt) - 1)) - (temp *
+	    sgemax) > 1) {
 		frames = (temp + 1);
 	} else {
 		frames = temp;
@@ -4811,7 +4793,7 @@ mptsas_ieee_sge_chain(mptsas_t *mpt, mptsas_cmd_t *cmd,
 	/*
 	 * First fill in the main frame
 	 */
-	j = maxframe_sges - 1;
+	j = MPTSAS_MAX_FRAME_SGES64(mpt) - 1;
 	mptsas_ieee_sge_mainframe(cmd, frame, acc_hdl, j, 0);
 	dmap += j;
 	ieeesge += j;
@@ -4847,6 +4829,8 @@ mptsas_ieee_sge_chain(mptsas_t *mpt, mptsas_cmd_t *cmd,
 	 * have been processed (stored in frames).
 	 */
 	if (frames >= 2) {
+		ASSERT(mpt->m_req_frame_size >=
+		    sizeof (MPI2_IEEE_SGE_SIMPLE64));
 		chainlength = mpt->m_req_frame_size /
 		    sizeof (MPI2_IEEE_SGE_SIMPLE64) *
 		    sizeof (MPI2_IEEE_SGE_SIMPLE64);
@@ -4859,8 +4843,9 @@ mptsas_ieee_sge_chain(mptsas_t *mpt, mptsas_cmd_t *cmd,
 
 	ddi_put32(acc_hdl, &ieeesgechain->Length, chainlength);
 	ddi_put32(acc_hdl, &ieeesgechain->Address.Low,
-	    p->m_phys_addr&0xffffffffull);
-	ddi_put32(acc_hdl, &ieeesgechain->Address.High, p->m_phys_addr>>32);
+	    p->m_phys_addr);
+	/* SGL is allocated in the first 4G mem range */
+	ddi_put32(acc_hdl, &ieeesgechain->Address.High, 0);
 
 	/*
 	 * If there are more than 2 frames left we have to
@@ -4917,14 +4902,12 @@ mptsas_ieee_sge_chain(mptsas_t *mpt, mptsas_cmd_t *cmd,
 				 * Note that frames are in contiguous
 				 * memory space.
 				 */
-				nframe_phys_addr = p->m_phys_addr +
-				    (mpt->m_req_frame_size * k);
 				ddi_put32(p->m_acc_hdl,
 				    &ieeesgechain->Address.Low,
-				    nframe_phys_addr&0xffffffffull);
+				    (p->m_phys_addr +
+				    (mpt->m_req_frame_size * k)));
 				ddi_put32(p->m_acc_hdl,
-				    &ieeesgechain->Address.High,
-				    nframe_phys_addr>>32);
+				    &ieeesgechain->Address.High, 0);
 
 				/*
 				 * If there are more than 2 frames left
@@ -4939,6 +4922,8 @@ mptsas_ieee_sge_chain(mptsas_t *mpt, mptsas_cmd_t *cmd,
 					    (sgemax *
 					    sizeof (MPI2_IEEE_SGE_SIMPLE64))
 					    >> 4);
+					ASSERT(mpt->m_req_frame_size >=
+					    sizeof (MPI2_IEEE_SGE_SIMPLE64));
 					ddi_put32(p->m_acc_hdl,
 					    &ieeesgechain->Length,
 					    mpt->m_req_frame_size /
@@ -10253,9 +10238,11 @@ mptsas_passthru_sge(ddi_acc_handle_t acc_hdl, mptsas_pt_request_t *pt,
 		    MPI2_SGE_FLAGS_SHIFT);
 		ddi_put32(acc_hdl, &sgep->FlagsLength, sge_flags);
 		ddi_put32(acc_hdl, &sgep->Address.Low,
-		    (uint32_t)(dataout_cookie.dmac_laddress & 0xffffffffull));
+		    (uint32_t)(dataout_cookie.dmac_laddress &
+		    0xffffffffull));
 		ddi_put32(acc_hdl, &sgep->Address.High,
-		    (uint32_t)(dataout_cookie.dmac_laddress >> 32));
+		    (uint32_t)(dataout_cookie.dmac_laddress
+		    >> 32));
 		sgep++;
 	}
 	sge_flags = data_size;
@@ -10272,9 +10259,11 @@ mptsas_passthru_sge(ddi_acc_handle_t acc_hdl, mptsas_pt_request_t *pt,
 		sge_flags |= ((uint32_t)(MPI2_SGE_FLAGS_IOC_TO_HOST) <<
 		    MPI2_SGE_FLAGS_SHIFT);
 	}
-	ddi_put32(acc_hdl, &sgep->FlagsLength, sge_flags);
+	ddi_put32(acc_hdl, &sgep->FlagsLength,
+	    sge_flags);
 	ddi_put32(acc_hdl, &sgep->Address.Low,
-	    (uint32_t)(data_cookie.dmac_laddress & 0xffffffffull));
+	    (uint32_t)(data_cookie.dmac_laddress &
+	    0xffffffffull));
 	ddi_put32(acc_hdl, &sgep->Address.High,
 	    (uint32_t)(data_cookie.dmac_laddress >> 32));
 }
@@ -10323,7 +10312,7 @@ mptsas_start_passthru(mptsas_t *mpt, mptsas_cmd_t *cmd)
 	mptsas_pt_request_t	*pt = pkt->pkt_ha_private;
 	uint32_t		request_size;
 	uint32_t		request_desc_low, request_desc_high = 0;
-	uint64_t		sense_bufp;
+	uint32_t		i, sense_bufp;
 	uint8_t			desc_type;
 	uint8_t			*request, function;
 	ddi_dma_handle_t	dma_hdl = mpt->m_dma_req_frame_hdl;
@@ -10342,7 +10331,9 @@ mptsas_start_passthru(mptsas_t *mpt, mptsas_cmd_t *cmd)
 	request_hdrp = (pMPI2RequestHeader_t)memp;
 	bzero(memp, mpt->m_req_frame_size);
 
-	bcopy(request, memp, request_size);
+	for (i = 0; i < request_size; i++) {
+		bcopy(request + i, memp + i, 1);
+	}
 
 	NDBG15(("mptsas_start_passthru: Func 0x%x, MsgFlags 0x%x, "
 	    "size=%d, in %d, out %d", request_hdrp->Function,
@@ -10379,8 +10370,8 @@ mptsas_start_passthru(mptsas_t *mpt, mptsas_cmd_t *cmd)
 		    &scsi_io_req->SenseBufferLength,
 		    (uint8_t)(request_size - 64));
 
-		sense_bufp = (uint32_t)(mpt->m_req_frame_dma_addr +
-		    (mpt->m_req_frame_size * cmd->cmd_slot) & 0xffffffffull);
+		sense_bufp = mpt->m_req_frame_dma_addr +
+		    (mpt->m_req_frame_size * cmd->cmd_slot);
 		sense_bufp += 64;
 		ddi_put32(acc_hdl,
 		    &scsi_io_req->SenseBufferLowAddress, sense_bufp);
@@ -10784,7 +10775,7 @@ mptsas_prep_sgl_offset(mptsas_t *mpt, mptsas_pt_request_t *pt)
 static int
 mptsas_do_passthru(mptsas_t *mpt, uint8_t *request, uint8_t *reply,
     uint8_t *data, uint32_t request_size, uint32_t reply_size,
-    uint32_t data_size, uint8_t direction, uint8_t *dataout,
+    uint32_t data_size, uint32_t direction, uint8_t *dataout,
     uint32_t dataout_size, short timeout, int mode)
 {
 	mptsas_pt_request_t		pt;
@@ -10860,9 +10851,9 @@ mptsas_do_passthru(mptsas_t *mpt, uint8_t *request, uint8_t *reply,
 			}
 			mutex_enter(&mpt->m_mutex);
 		}
-	}
-	else
+	} else {
 		bzero(&data_dma_state, sizeof (data_dma_state));
+	}
 
 	if (dataout_size != 0) {
 		dataout_dma_state.size = dataout_size;
@@ -10885,9 +10876,9 @@ mptsas_do_passthru(mptsas_t *mpt, uint8_t *request, uint8_t *reply,
 			}
 		}
 		mutex_enter(&mpt->m_mutex);
-	}
-	else
+	} else {
 		bzero(&dataout_dma_state, sizeof (dataout_dma_state));
+	}
 
 	if ((rvalue = (mptsas_request_from_pool(mpt, &cmd, &pkt))) == -1) {
 		status = EAGAIN;
@@ -11124,7 +11115,7 @@ mptsas_pass_thru(mptsas_t *mpt, mptsas_pass_thru_t *data, int mode)
 		    (uint8_t *)((uintptr_t)data->PtrReply),
 		    (uint8_t *)((uintptr_t)data->PtrData),
 		    data->RequestSize, data->ReplySize,
-		    data->DataSize, (uint8_t)data->DataDirection,
+		    data->DataSize, data->DataDirection,
 		    (uint8_t *)((uintptr_t)data->PtrDataOut),
 		    data->DataOutSize, data->Timeout, mode));
 	} else {
@@ -15967,7 +15958,7 @@ static int mptsas_smp_start(struct smp_pkt *smp_pkt)
 	uint64_t			wwn;
 	Mpi2SmpPassthroughRequest_t	req;
 	Mpi2SmpPassthroughReply_t	rep;
-	uint8_t				direction = 0;
+	uint32_t			direction = 0;
 	mptsas_t			*mpt;
 	int				ret;
 	uint64_t			tmp64;

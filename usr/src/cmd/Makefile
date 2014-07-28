@@ -25,13 +25,13 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2013 Nexenta Systems, Inc. All rights reserved.
 # Copyright (c) 2013 DEY Storage Systems, Inc. All rights reserved.
-#
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 
 include ../Makefile.master
 include $(NZA_MAKEDEFS)
 
 #
-#	Note that the commands 'lp' and 'perl' are first in
+#	Note that the commands 'lp', and 'perl' are first in
 #	the list, violating alphabetical order.  This is because they are very
 #	long-running and should be given the most wall-clock time for a
 #	parallel build.
@@ -321,7 +321,6 @@ COMMON_SUBDIRS=		\
 	plockstat	\
 	pr		\
 	prctl		\
-	preconv		\
 	print		\
 	printf		\
 	priocntl	\
@@ -512,7 +511,7 @@ sparc_SUBDIRS=		\
 
 #
 # Commands that are messaged.  Note that 'lp' comes first
-# (see previous comment about 'lp').
+# (see previous comment about 'lp'.)
 #
 MSGSUBDIRS=		\
 	lp		\

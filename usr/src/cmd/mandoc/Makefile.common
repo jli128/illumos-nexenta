@@ -10,10 +10,12 @@
 #
 
 #
-# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
-OBJS=		arch.o att.o chars.o eqn.o eqn_html.o eqn_term.o 	\
+PROGS=		mandoc mandoc_preconv
+mandoc_OBJS =	arch.o att.o chars.o eqn.o eqn_html.o eqn_term.o 	\
 		html.o lib.o main.o man.o man_hash.o man_html.o		\
 		man_macro.o man_term.o man_validate.o mandoc.o mdoc.o	\
 		mdoc_argv.o mdoc_hash.o mdoc_html.o mdoc_macro.o	\
@@ -22,7 +24,7 @@ OBJS=		arch.o att.o chars.o eqn.o eqn_html.o eqn_term.o 	\
 		tbl_layout.o tbl_opts.o tbl_term.o term.o term_ascii.o	\
 		term_ps.o tree.o vol.o
 
-.PARALLEL:	$(OBJS)
+preconv_OBJS =	preconv.o
 
 CFLAGS +=	$(CC_VERBOSE)
 

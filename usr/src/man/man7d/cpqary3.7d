@@ -13,7 +13,6 @@
 .\"
 .TH CPQARY3 7D Aug 26, 2013"
 .SH NAME
-.LP
 cpqary3 - provides disk and SCSI tape support for HP Smart Array controllers
 .SH DESCRIPTION
 .LP

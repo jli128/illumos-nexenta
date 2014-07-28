@@ -11,7 +11,7 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
 
 include $(NZA_MAKEDEFS)
@@ -107,6 +107,7 @@ check		:= TARGET = check
 clean		:= TARGET = clean
 clobber		:= TARGET = clobber
 install		:= TARGET = install
+check		:= TARGET = check
 
 all check clean clobber install: $(SUBDIRS)
 

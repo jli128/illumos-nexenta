@@ -60,6 +60,7 @@ _MANFILES=	6to4relay.1m		\
 		cachefsstat.1m		\
 		cachefswssize.1m	\
 		captoinfo.1m		\
+		catman.1m		\
 		cfgadm.1m		\
 		cfgadm_ac.1m		\
 		cfgadm_cardbus.1m	\

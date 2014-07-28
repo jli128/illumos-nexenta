@@ -1,17 +1,9 @@
-.\"
-.\" This file and its contents are supplied under the terms of the
-.\" Common Development and Distribution License ("CDDL"), version 1.0.
-.\" You may only use this file in accordance with the terms of version
-.\" 1.0 of the CDDL.
-.\"
-.\" A full copy of the text of the CDDL should have accompanied this
-.\" source.  A copy of the CDDL is also available via the Internet at
-.\" http://www.illumos.org/license/CDDL.
-.\"
-.\"
-.\" Copyright 2012 Nexenta Systems, Inc. All rights reserved.
-.\"
-.Dd October 18, 2012
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright (c) 1980 Regents of the University of California.
+.\" The Berkeley software License Agreement specifies the terms and conditions
+.\" for redistribution.
+.Dd Jul 18, 2014
 .Dt MAN 1
 .Os
 .Sh NAME
@@ -19,95 +11,391 @@
 .Nd find and display reference manual pages
 .Sh SYNOPSIS
 .Nm
-.Op Fl alptw
-.Op Fl M Ar manpath
-.Op Fl s Ar mansect
-.Ar page ...
+.Op Fl
+.Op Fl adFlrt
+.Op Fl T Ar macro-package
+.Op Fl M Ar path
+.Op Fl s Ar section
+.Ar name ...
 .Nm
-.Op Fl s Ar mansect
-.Fl f
-.Ar keyword ...
-.Nm
-.Op Fl s Ar mansect
+.Op Fl M Ar path
+.Op Fl s Ar section
 .Fl k
-.Ar keyword ...
+.Ar keyword
+.Ar ...
+.Nm
+.Op Fl M Ar path
+.Op Fl s Ar section
+.Fl f
+.Ar
+.Nm
+.Op Fl M Ar path
+.Fl w
 .Sh DESCRIPTION
 The
 .Nm
-utility finds and displays reference manual pages.
-.Pp
-Options that
+command displays information from the reference manuals. It
+displays complete manual pages that you select by
+.Ar name ,
+or one-line summaries selected either by
+.Ar keyword
+.Pq Fl k ,
+or by the name of an associated file
+.Pq Fl f .
+If no manual page is located,
 .Nm
-understands:
+prints an error message.
+.Ss "Source Format"
+Reference Manual pages are marked up with either
+.Xr man 5 ,
+or
+.Xr mdoc 5
+language tags. The
+.Nm
+command recognizes the type of markup and
+processes the file accordingly.
+.
+.Ss "Location of Manual Pages"
+.
+The online Reference Manual page directories are conventionally located in
+.Pa /usr/share/man .
+Each directory corresponds to a
+section of the manual. Since these directories are optionally installed, they
+might not reside on your host. You might have to mount
+.Pa /usr/share/man
+from a host on which they do reside.
+The
+.Nm
+command reformats a page whenever it is requested.
+.Pp
+If the standard output is not a terminal, or if the
+.Fl
+flag is given,
+.Nm
+pipes its output through
+.Xr cat 1 .
+Otherwise,
+.Nm
+pipes its output through a pager such as
+.Xr more 1
+to handle paging and underlining on the screen.
+.Sh OPTIONS
+The following options are supported:
 .Bl -tag -width indent
-.It Fl M Ar manpath
-Forces a specific colon separated manual path instead of the default
-search path.
-Overrides the
+.It Fl a
+Shows all manual pages matching
+.Ar name
+within the
+.Ev MANPATH
+search path. Manual pages are displayed in the order found.
+.It Fl d
+Debugs. Displays what a section-specifier evaluates to, method used for
+searching, and paths searched by
+.Nm .
+.It Fl f Ar file ...
+Attempts to locate manual pages related to any of the given
+.Ar file
+names. It strips the leading path name components from each
+.Ar file ,
+and then prints one-line summaries containing the resulting basename or names.
+This option also uses the
+.Pa whatis
+database.
+.It Fl F
+This option is present for backwards compatibility and is documented
+here for reference only.  It performs no function.
+.It Fl k Ar keyword ...
+Prints out one-line summaries from the
+.Pa whatis
+database (table of contents) that contain any of the given
+.Ar keyword .
+The
+.Pa whatis
+database is created using the
+.Fl w
+option.
+.It Fl l
+Lists all manual pages found matching
+.Ar name
+within the search path.
+.It Fl M Ar path
+Specifies an alternate search path for manual pages. The
+.Ar path
+is a colon-separated list of directories that contain manual page directory
+subtrees. For example, if
+.Ar path
+is
+.Pa /usr/share/man:/usr/local/man ,
+.Nm
+searches for
+.Ar name
+in the standard location, and then
+.Pa /usr/local/man .
+When used with the
+.Fl k ,
+.Fl f ,
+or
+.Fl w
+options, the
+.Fl M
+option must appear first. Each directory in the
+.Ar path
+is assumed to contain subdirectories of the form
+.Pa man* ,
+one for each section. This option overrides the
 .Ev MANPATH
 environment variable.
-.It Fl a
-Display all manual pages instead of just the first found for each
-.Ar page
-argument.
-.It Fl f
-Emulate
-.Xr whatis 1 .
-.It Fl k
-Emulate
-.Xr apropos 1 .
-.It Fl l
-Display the location of the manual page instead of the contents of
-the manual page.
-.It Fl p
-Output current path used for searching.
-.It Fl s Ar mansect
-Restrict manual sections searched to the specified colon delimited list.
-.It Fl t
-Output PostScript allowing transformation of the manual pages to other formats.
-.It Fl w
-Create
-.Nm whatis
-databases used by
-.Xr apropos 1
-and
-.Xr whatis 1 .
-.El
-.Sh ENVIRONMENT
-The following environment variables affect the execution of
-.Nm :
-.Bl -tag -width ".Ev MANPATH"
-.It Ev LC_ALL , LC_CTYPE , LANG
-Used to find locale-specific manual pages.
-.It Ev MANPATH
-Used to find the location of the manual files.
-Corresponds to the
-.Fl M
-option.
-.It Ev MANWIDTH
-Defines the width of output. If set to
-.Dq Li tty ,
-and output is to a terminal, full width of terminal is used.
-.It Ev PAGER
-Program used to display files. If unset,
-.Dq Li "less -ins"
-is used.
-.It Ev PATH
-Used to find location of manual files if
+.It Fl r
+Reformats the manual page, checking for formatting errors, but does not
+display it.
+.It Fl s Ar section
+Specifies sections of the manual for
+.Nm
+to search. The directories searched for
+.Ar name
+are limited to those specified by
+.Ar section .
+.Ar section
+can be a numerical digit, perhaps followed by one or more letters
+to match the desired section of the manual, for example,
+.Li "3libucb".
+Also,
+.Ar section
+can be a word, for example,
+.Li local ,
+.Li new ,
+.Li old ,
+.Li public .
+.Ar section
+can also be a letter. To specify multiple sections,
+separate each section with a comma. This option overrides the
 .Ev MANPATH
+environment variable and the
+.Pa man.cf
+file. See
+.Sx Search Path
+below for an explanation of how
+.Nm
+conducts its search.
+.It Fl t
+Arranges for the specified manual pages to be sent to the default
+printer as PostScript.
+.It Fl T Ar macro-package
+This option is present for backwards compatibility and is documented
+here for reference only.  It performs no function.
+.It Fl w
+Updates the
+.Nm whatis
+database.
+.El
+.Sh OPERANDS
+The following operand is supported:
+.Bl -tag -width indent
+.It Ar name
+The name of a standard utility or a keyword.
+.El
+.Sh USAGE
+The usage of
+.Nm
+is described below:
+.
+.Ss "Manual Page Sections"
+.
+Entries in the reference manuals are organized into
+.Em sections .
+A section
+name consists of a major section name, typically a single digit, optionally
+followed by a subsection name, typically one or more letters. An unadorned
+major section name, for example,
+.Qq 9 ,
+does not act as an abbreviation for
+the subsections of that name, such as
+.Qq 9e ,
+.Qq 9f ,
+or
+.Qq 9s .
+That is, each subsection must be searched separately by
+.Nm
+.Fl s .
+Each section contains descriptions apropos to a particular reference category,
+with subsections refining these distinctions. See the
+.Em intro
+manual pages for an explanation of the classification used in this release.
+.
+.Ss "Search Path"
+.
+Before searching for a given
+.Ar name ,
+.Nm
+constructs a list of candidate directories and sections.
+It searches for
+.Ar name
+in the directories specified by the
+.Ev MANPATH
+environment variable.
+.Lp
+In the absence of
+.Ev MANPATH ,
+.Nm
+constructs its search path based upon the
+.Ev PATH
+environment variable, primarily by substituting
+.Li man
+for the last component of the
+.Ev PATH
+element. Special provisions are added
+to account for unique characteristics of directories such as
+.Pa /sbin ,
+.Pa /usr/ucb ,
+.Pa /usr/xpg4/bin ,
+and others. If the file argument contains
+a
+.Qq /
+character, the
+.Em dirname
+portion of the argument is used in place of
+.Ev PATH
+elements to construct the search path.
+.Lp
+Within the manual page directories,
+.Nm
+confines its search to the
+sections specified in the following order:
+.Bl -bullet
+.It
+.Ar sections
+specified on the command line with the
+.Fl s
+option
+.It
+.Ar sections
+embedded in the
+.Ev MANPATH
+environment variable
+.It
+.Ar sections
+specified in the
+.Pa man.cf
+file for each directory specified in the
+.Ev MANPATH
+environment variable
+.El
+If none of the above exist,
+.Nm
+searches each directory in the manual
+page path, and displays the first matching manual page found.
+.Lp
+The
+.Pa man.cf
+file has the following format:
+.Lp
+.Dl Pf MANSECTS= Ar section , Ns Op Ar section...
+.Lp
+Lines beginning with
+.Sq Li #
+and blank lines are considered comments, and are
+ignored. Each directory specified in
+.Ev MANPATH
+can contain a manual page
+configuration file, specifying the default search order for that directory.
+.Sh "Referring to Other Manual Pages"
+If the first line of the manual page is a reference to another manual
+page entry fitting the pattern:
+.Lp
+.Dl \&.so man*/\fIsourcefile\fR
+.Lp
+.Nm
+processes the indicated file in place of the current one. The
+reference must be expressed as a path name relative to the root of the manual
+page directory subtree.
+.Lp
+When the second or any subsequent line starts with \fB\&.so\fR, \fBman\fR
+ignores it; \fBtroff\fR(1) or \fBnroff\fR(1) processes the request in the usual
+manner.
+.Sh ENVIRONMENT VARIABLES
+See
+.Xr environ 5
+for descriptions of the following environment variables
+that affect the execution of
+.Nm man :
+.Ev LANG ,
+.Ev LC_ALL ,
+.Ev LC_CTYPE ,
+.Ev LC_MESSAGES ,
 and
-.Fl M
-are not specified.
+.Ev NLSPATH .
+.Bl -tag -width indent
+.It Ev MANPATH
+A colon-separated list of directories; each directory can be followed by a
+comma-separated list of sections. If set, its value overrides
+\fB/usr/share/man\fR as the default directory search path, and the \fBman.cf\fR
+file as the default section search path. The \fB-M\fR and \fB-s\fR flags, in
+turn, override these values.)
+.It Ev PAGER
+A program to use for interactively delivering
+output to the screen. If not set,
+.Sq Nm more Fl s
+is used. See
+.Xr more 1 .
 .El
 .Sh FILES
-.Bl -tag -width indent -compact
+.Bl -tag -width indent
+.It Pa /usr/share/man
+Root of the standard manual page directory subtree
+.It Pa /usr/share/man/man?/*
+Unformatted manual entries
+.It Pa /usr/share/man/whatis
+Table of contents and keyword database
 .It Pa man.cf
-Per-manpath configuration settings.
+Default search order by section
 .El
+.Sh EXIT STATUS
+.Ex -std man
+.Sh EXAMPLES
+.
+.Ss Example 1: Creating a PostScript Version of a man page
+.
+The following example spools the
+.Xr pipe 2
+man page in PostScript to the default printer:
+.Pp
+.Dl % man -t -s 2 pipe
+.Pp
+Note that
+.Xr mandoc 1
+can be used to obtain the PostScript content directly.
+.Ss Example 2: Creating a Text Version of a man page
+The following example creates the
+.Xr pipe 2
+man page in ASCII text:
+.Pp
+.Dl % man pipe.2 | col -x -b > pipe.text
+.Sh CODE SET INDEPENDENCE
+Enabled.
+.Sh INTERFACE STABILITY
+.Nm Committed .
 .Sh SEE ALSO
 .Xr apropos 1 ,
-.Xr intro 1 ,
+.Xr cat 1 ,
+.Xr col 1 ,
 .Xr mandoc 1 ,
+.Xr more 1 ,
 .Xr whatis 1 ,
+.Xr environ 5 ,
 .Xr man 5 ,
 .Xr mdoc 5
+.Sh NOTES
+The
+.Fl f
+and
+.Fl k
+options use the
+.Nm whatis
+database, which is
+created with the
+.Fl w
+option.
+.Sh BUGS
+The manual is supposed to be reproducible either on a phototypesetter or on an
+ASCII terminal. However, on a terminal some information (indicated by
+font changes, for instance) is lost.

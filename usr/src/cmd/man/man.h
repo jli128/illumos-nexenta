@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  */
 
 /*
@@ -25,6 +26,7 @@
 #define	INDENT		24
 #define	PAGER		"less -ins"
 #define	WHATIS		"whatis"
+#define	PRECONV		"/usr/lib/mandoc_preconv"
 
 #define	LINE_ALLOC	4096
 #define	MAXDIRS		128

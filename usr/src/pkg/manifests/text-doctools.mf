@@ -22,8 +22,10 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
+# man moved to system/man
 set name=pkg.fmri value=pkg:/text/doctools@$(PKGVERS)
 set name=pkg.description \
     value="utilities and fonts for development, display, and production of documentation such as manual pages (nroff/troff)"
@@ -341,5 +343,4 @@ license usr/src/cmd/vgrind/THIRDPARTYLICENSE \
 link path=usr/lib/tmac target=../share/lib/tmac
 link path=usr/share/man/man1/checkeq.1 target=eqn.1
 link path=usr/share/man/man1/neqn.1 target=eqn.1
-# man(1) was moved to text/mantools
-depend fmri=text/mantools type=require
+depend fmri=system/man type=require

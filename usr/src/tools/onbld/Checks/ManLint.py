@@ -20,40 +20,38 @@
 #
 
 #
-# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
-# Copyright 2010, Richard Lowe
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+#
+# ManLint, wrap the mandoc lint tool in a pythonic API
+#
 
-include $(SRC)/Makefile.master
-include ../../Makefile.tools
+import sys
+from onbld.Checks.ProcessCheck import processcheck
 
-PYSRCS = \
-	CStyle.py	\
-	Cddl.py		\
-	CmtBlk.py	\
-	Comments.py	\
-	Copyright.py	\
-	DbLookups.py	\
-	HdrChk.py	\
-	JStyle.py	\
-	Keywords.py	\
-	ManLint.py	\
-	Mapfile.py	\
-	ProcessCheck.py \
-	__init__.py
+def manlint(fh, filename=None, output=sys.stderr, **opts):
+	opttrans = { 'picky': None }
 
-PYOBJS =	$(PYSRCS:%.py=%.pyc)
-PYTOPDIR =	$(ROOTONBLDLIB)
-PYMODDIR = 	onbld/Checks
+	for x in filter(lambda x: x not in opttrans, opts):
+		raise TypeError('mandoc() got an unexpected keyword '
+				'argument %s' % x)
 
-include ../../Makefile.python
+	options = [opttrans[x] for x in opts if opts[x] and opttrans[x]]
+	options.append('-Tlint')
 
-all: $(PYVERSOJBS)
+	if not filename:
+		filename = fh.name
 
-install: all $(ROOTPYFILES)
+	ret, tmpfile = processcheck('mandoc', options, fh, output)
 
-clean:
+	if tmpfile:
+		for line in tmpfile:
+			line = line.replace('<stdin>', filename)
+			output.write(line)
 
-clobber: clean pyclobber
+		tmpfile.close()
+	return ret
