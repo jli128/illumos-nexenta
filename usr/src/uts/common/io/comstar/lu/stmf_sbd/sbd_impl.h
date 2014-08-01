@@ -36,6 +36,11 @@ struct modify_lu_cmd;
 struct sbd_lu_attr;
 struct sbd_it_data;
 
+#define	ATOMIC8_GET(val) (		\
+			(atomic_add_8_nv(&(val), 0)))
+#define	ATOMIC32_GET(val) (		\
+			(atomic_add_32_nv(&(val), 0)))
+
 /*
  * sms endianess
  */
