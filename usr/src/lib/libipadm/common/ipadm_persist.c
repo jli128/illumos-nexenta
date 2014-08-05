@@ -81,6 +81,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/sockio.h>
+#include <sys/note.h>
 #include "libipadm_impl.h"
 
 #define	MAXLINELEN		1024
@@ -664,10 +665,10 @@ i_ipadm_families_nvp2dbline(nvpair_t *nvp, char *buf, size_t buflen)
  * output nvp: name = IPADM_NVP_FAMILIES and value = array of 'uint16_t'
  *
  */
-/* LINTED E_FUNC_ARG_UNUSED */
 static void
 i_ipadm_families_dbline2nvl(nvlist_t *nvl, char *name, char *value)
 {
+	_NOTE(ARGUNUSED(name))
 	uint16_t	families[2];
 	uint_t	nelem = 0;
 	char	*val, *lasts;

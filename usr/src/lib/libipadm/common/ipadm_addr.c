@@ -2644,7 +2644,6 @@ i_ipadm_create_addr(ipadm_handle_t iph, ipadm_addrobj_t ipaddr, uint32_t flags)
 	 * Create a new logical interface if needed; otherwise, just
 	 * use the 0th logical interface.
 	 */
-retry:
 	if (!(iph->iph_flags & IPH_LEGACY)) {
 		status = i_ipadm_do_addif(iph, ipaddr);
 		if (status != IPADM_SUCCESS)

@@ -597,7 +597,7 @@ libfstyp:	libnvpair
 libelfsign:	libcryptoutil libkmf
 libidmap:	libadutils libldap5 libavl libsldap libuutil
 libipadm:	libnsl libinetutil libsocket libdlpi libnvpair libdhcpagent \
-		libdladm libsecdb
+		libdladm libsecdb libcmdutils
 libiscsit:	libc libnvpair libstmf libuuid libnsl
 libkmf:		libcryptoutil pkcs11
 libnsl:		libmd5
