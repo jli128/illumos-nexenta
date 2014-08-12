@@ -3898,8 +3898,6 @@ sbd_flush_data_cache(sbd_lu_t *sl, int fsync_done)
 	int r = 0;
 	sbd_status_t ret;
 
-	ASSERT3S(RW_LOCK_HELD(&sl->sl_access_state_lock), ==, 0);
-
 	rw_enter(&sl->sl_access_state_lock, RW_READER);
 	if ((sl->sl_flags & SL_MEDIA_LOADED) == 0) {
 		ret = SBD_FILEIO_FAILURE;
