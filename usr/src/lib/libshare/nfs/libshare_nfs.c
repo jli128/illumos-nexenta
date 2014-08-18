@@ -2573,6 +2573,10 @@ struct proto_option_defs {
 	{"mountd_max_threads",
 	    "mountd_max_threads", PROTO_OPT_MOUNTD_MAX_THREADS,
 	    OPT_TYPE_NUMBER, 16, SVC_NFSD|SVC_MOUNTD, 1, INT32_MAX},
+#define	PROTO_OPT_MOUNTD_BSM_AUDIT		17
+	{"mountd_bsm_audit",
+	    "mountd_bsm_audit", PROTO_OPT_MOUNTD_BSM_AUDIT,
+	    OPT_TYPE_BOOLEAN, B_FALSE, SVC_NFSD|SVC_MOUNTD, 0, 0},
 	{NULL}
 };
 

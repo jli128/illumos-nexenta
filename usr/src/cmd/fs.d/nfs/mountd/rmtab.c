@@ -121,6 +121,8 @@ mntlist_contains(char *host, char *path)
 static void
 mntlist_insert(char *host, char *path)
 {
+	static int	valid_keys = 0;
+
 	if (!mntlist_contains(host, path)) {
 		struct mntentry *m;
 
@@ -129,7 +131,17 @@ mntlist_insert(char *host, char *path)
 		m->m_host = exstrdup(host);
 		m->m_path = exstrdup(path);
 		m->m_pos = rmtab_insert(host, path);
-		(void) h_put(mntlist, m);
+
+		if (h_put(mntlist, m) == (const void *)m) {
+			/* already something valid there */
+			valid_keys++;
+			syslog(LOG_NOTICE, "mntlist_insert: valid keys = %d",
+			    valid_keys);
+
+			free(m->m_path);
+			free(m->m_host);
+			free(m);
+		}
 	}
 }
 

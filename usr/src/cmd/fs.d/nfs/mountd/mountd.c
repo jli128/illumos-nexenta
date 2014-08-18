@@ -92,7 +92,6 @@ struct sh_list *share_list;
 
 rwlock_t sharetab_lock;		/* lock to protect the cached sharetab */
 static mutex_t mnttab_lock;	/* prevent concurrent mnttab readers */
-
 static mutex_t logging_queue_lock;
 static cond_t logging_queue_cv;
 
@@ -128,7 +127,14 @@ extern void nfscmd_func(void *, char *, size_t, door_desc_t *, uint_t);
 
 thread_t	nfsauth_thread;
 thread_t	cmd_thread;
-thread_t	logging_thread;
+
+/*
+ * The following logging and BSM related data structs
+ * are only valid when mountd_bsm_audit SMF property
+ * is explicitly configured to "true" (Default: "false")
+ */
+static bool_t	mountd_bsm_audit = FALSE;
+thread_t	log_thr;
 
 typedef struct logging_data {
 	char			*ld_host;
@@ -143,19 +149,102 @@ typedef struct logging_data {
 static logging_data *logging_head = NULL;
 static logging_data *logging_tail = NULL;
 
+#define MOUNTD_STKSZ	(16 * 1024)		/* 16KB Stacks */
+static	uint32_t	nm_thrds = 0;
+static	uint32_t	mx_thrds = (1 << 10);	/* 1024 Max Door Threads */
+static	mutex_t		auth_door_mtx;
+static	int		auth_door_fd = -1;
+
+void *
+nfsauth_dr_thrd(void *arg)
+{
+	door_info_t	*dp;
+
+	if ((door_info_t *)arg == NULL) {
+#ifdef DEBUG
+		syslog(LOG_NOTICE, "nfsauth_dr_thrd: arg == NULL");
+#endif
+		return (NULL);
+	}
+	dp = (door_info_t *)arg;
+
+	if ((void *)(uintptr_t)dp->di_proc !=
+	    (void *)(uintptr_t)(nfsauth_func)) {
+#ifdef	DEBUG
+		syslog(LOG_ERR, "nfsauth_dr_thrd: unknown func: 0x%p",
+		    dp->di_proc);
+#endif
+		thr_exit(NULL);
+	}
+
+	(void) mutex_lock(&auth_door_mtx);
+	if (door_bind(auth_door_fd) < 0) {
+		/*
+		 * Can't bind the thread to the door; game over !
+		 */
+		syslog(LOG_ERR, "nfsauth_dr_thrd: %s", strerror(errno));
+		(void) mutex_unlock(&auth_door_mtx);
+		thr_exit(NULL);
+	}
+	(void) mutex_unlock(&auth_door_mtx);
+#ifdef DEBUG
+	syslog(LOG_NOTICE, "nfsauth_dr_thrd: Door Bound Successfully");
+#endif
+
+	door_return(NULL, 0, NULL, 0);
+	/* NOTREACHED */
+	return (NULL);
+}
+
+/*
+ * Manages stacksize and threadpool; called on every door_call()
+ */
+static void
+nfsauth_dr_create(door_info_t *dp)
+{
+	thread_t	 tid;
+	int		 num = 0;
+	int		 rc = 0;
+	size_t		 stksz = MOUNTD_STKSZ;
+	long		 flags = THR_DETACHED;
+
+	if ((num = atomic_inc_32_nv(&nm_thrds)) > mx_thrds) {
+		atomic_dec_32(&nm_thrds);
+		num -= 1;
+		syslog(LOG_ERR,
+		    "nfsauth_dr_create: %d threads already active", num);
+		return;
+	}
+
+	rc = thr_create(NULL, stksz, nfsauth_dr_thrd, (void *)dp, flags, &tid);
+	if (rc < 0) {
+		syslog(LOG_ERR, "nfsauth_dr_create: %s", strerror(errno));
+		return;
+	}
+#ifdef	DEBUG
+	syslog(LOG_NOTICE, "nfsauth_dr_create: tid %d created", tid);
+#endif
+}
+
 /* ARGSUSED */
 static void *
 nfsauth_svc(void *arg)
 {
-	int	doorfd = -1;
 	uint_t	darg;
+	uint_t	flags = (DOOR_PRIVATE | DOOR_NO_CANCEL | DOOR_REFUSE_DESC);
 #ifdef DEBUG
 	int	dfd;
 #endif
+	/* server function to create/optimize door threads */
+	(void) door_server_create(nfsauth_dr_create);
 
-	if ((doorfd = door_create(nfsauth_func, NULL,
-	    DOOR_REFUSE_DESC | DOOR_NO_CANCEL)) == -1) {
-		syslog(LOG_ERR, "Unable to create door: %m\n");
+	/* register 'nfsauth_func' as the new door service */
+	(void) mutex_lock(&auth_door_mtx);
+	auth_door_fd = door_create(nfsauth_func, NULL, flags);
+	(void) mutex_unlock(&auth_door_mtx);
+
+	if (auth_door_fd < 0) {
+		syslog(LOG_ERR, "nfsauth_svc: %s", strerror(errno));
 		exit(10);
 	}
 
@@ -166,7 +255,7 @@ nfsauth_svc(void *arg)
 	if ((dfd = open(MOUNTD_DOOR, O_RDWR|O_CREAT|O_TRUNC,
 	    S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH)) == -1) {
 		syslog(LOG_ERR, "Unable to open %s: %m\n", MOUNTD_DOOR);
-		(void) close(doorfd);
+		(void) close(auth_door_fd);
 		exit(11);
 	}
 
@@ -178,10 +267,10 @@ nfsauth_svc(void *arg)
 	/*
 	 * Register in namespace to pass to the kernel to door_ki_open
 	 */
-	if (fattach(doorfd, MOUNTD_DOOR) == -1) {
+	if (fattach(auth_door_fd, MOUNTD_DOOR) == -1) {
 		syslog(LOG_ERR, "Unable to fattach door: %m\n");
 		(void) close(dfd);
-		(void) close(doorfd);
+		(void) close(auth_door_fd);
 		exit(12);
 	}
 	(void) close(dfd);
@@ -190,7 +279,7 @@ nfsauth_svc(void *arg)
 	/*
 	 * Must pass the doorfd down to the kernel.
 	 */
-	darg = doorfd;
+	darg = auth_door_fd;
 	(void) _nfssys(MOUNTD_ARGS, &darg);
 
 	/*
@@ -241,9 +330,20 @@ cmd_svc(void *arg)
 	return (NULL);
 }
 
+/*
+ * The following routines are only in play when the
+ * mountd_bsm_audit smf property has been explicitly
+ * enabled.
+ *		- free_logging_data()
+ *		- remove_head_of_queue()
+ *		- do_logging_queue()
+ *		- logging_svc()
+ */
 static void
 free_logging_data(logging_data *lq)
 {
+	assert(mountd_bsm_audit == TRUE);
+
 	if (lq != NULL) {
 		free(lq->ld_host);
 		free(lq->ld_netid);
@@ -264,6 +364,8 @@ static logging_data *
 remove_head_of_queue(void)
 {
 	logging_data    *lq;
+
+	assert(mountd_bsm_audit == TRUE);
 
 	/*
 	 * Pull it off the queue.
@@ -286,10 +388,11 @@ remove_head_of_queue(void)
 static void
 do_logging_queue(logging_data *lq)
 {
-	int		cleared = 0;
-	char		*host;
-
+	int			 cleared = 0;
+	char			*host;
 	struct nd_hostservlist	*clnames;
+
+	assert(mountd_bsm_audit == TRUE);
 
 	while (lq) {
 		if (lq->ld_host == NULL) {
@@ -326,6 +429,8 @@ static void *
 logging_svc(void *arg)
 {
 	logging_data	*lq;
+
+	assert(mountd_bsm_audit == TRUE);
 
 	for (;;) {
 		(void) mutex_lock(&logging_queue_lock);
@@ -372,7 +477,7 @@ main(int argc, char *argv[])
 	bool_t	exclbind = TRUE;
 	bool_t	can_do_mlp;
 	long	thr_flags = (THR_NEW_LWP|THR_DAEMON);
-	char defval[4];
+	char	defval[5] = {0};
 	int defvers, ret, bufsz;
 	struct rlimit rl;
 	int listen_backlog = 0;
@@ -482,6 +587,14 @@ main(int argc, char *argv[])
 		    "failed, using default value");
 	}
 
+	bufsz = 5;
+	bzero(defval, bufsz);
+	ret = nfs_smf_get_prop("mountd_bsm_audit", defval, DEFAULT_INSTANCE,
+	    SCF_TYPE_BOOLEAN, NFSD, &bufsz);
+	if (ret == SA_OK)
+		if (strncasecmp(defval, "true", 4) == 0)
+                        mountd_bsm_audit = TRUE;
+
 	/*
 	 * Sanity check versions,
 	 * even though we may get versions > MOUNTVERS3, we still need
@@ -494,8 +607,11 @@ main(int argc, char *argv[])
 	(void) setlocale(LC_ALL, "");
 	(void) rwlock_init(&sharetab_lock, USYNC_THREAD, NULL);
 	(void) mutex_init(&mnttab_lock, USYNC_THREAD, NULL);
-	(void) mutex_init(&logging_queue_lock, USYNC_THREAD, NULL);
-	(void) cond_init(&logging_queue_cv, USYNC_THREAD, NULL);
+	if (mountd_bsm_audit) {
+		(void) mutex_init(&logging_queue_lock, USYNC_THREAD, NULL);
+		(void) cond_init(&logging_queue_cv, USYNC_THREAD, NULL);
+	}
+	(void) mutex_init(&auth_door_mtx, USYNC_THREAD, NULL);
 
 	netgroup_init();
 
@@ -535,7 +651,8 @@ main(int argc, char *argv[])
 		exit(0);
 	}
 
-	audit_mountd_setup();	/* BSM */
+	if (mountd_bsm_audit)
+		audit_mountd_setup();	/* BSM */
 
 	/*
 	 * Set number of file descriptors to unlimited
@@ -620,15 +737,18 @@ main(int argc, char *argv[])
 	}
 
 	/*
-	 * Create an additional thread to service the rmtab and
-	 * audit_mountd_mount logging for mount requests. Use the same
-	 * signal disposition as the main thread. We create
-	 * a separate thread to allow the mount request threads to
-	 * clear as soon as possible.
+	 * If configured via smf, create an additional thread to service
+	 * the rmtab and audit_mountd_mount logging for mount requests.
+	 * Use the same signal disposition as the main thread. We create
+	 * a separate thread to allow the mount request threads to clear
+	 * as soon as possible.
 	 */
-	if (thr_create(NULL, 0, logging_svc, 0, thr_flags, &logging_thread)) {
-		syslog(LOG_ERR, gettext("Failed to create LOGGING svc thread"));
-		exit(2);
+	if (mountd_bsm_audit) {
+		if (thr_create(NULL, 0, logging_svc, 0, thr_flags, &log_thr)) {
+			syslog(LOG_ERR,
+			    gettext("Failed to create LOGGING svc thread"));
+			exit(2);
+		}
 	}
 
 	/*
@@ -1450,19 +1570,30 @@ reply:
 	 * If we can not create a queue entry, go ahead and do it
 	 * in the context of this thread.
 	 */
-	enqueued = enqueue_logging_data(host, transp, path, rpath,
-	    audit_status, error);
-	if (enqueued == FALSE) {
-		if (host == NULL) {
-			DTRACE_PROBE(mountd, name_by_in_thread);
+	if (mountd_bsm_audit) {
+		enqueued = enqueue_logging_data(host, transp, path, rpath,
+		    audit_status, error);
+
+		if (enqueued == FALSE) {
+			if (host == NULL) {
+				DTRACE_PROBE(mountd, name_by_in_thread);
+				if (getclientsnames(transp, &nb, &clnames) == 0)
+					host = clnames->h_hostservs[0].h_host;
+			}
+
+			DTRACE_PROBE(mountd, logged_in_thread);
+			audit_mountd_mount(host, path, audit_status); /* BSM */
+
+			if (!error)		/* add entry to mount list */
+				mntlist_new(host, rpath);
+		}
+	} else {
+		if (host == NULL)
 			if (getclientsnames(transp, &nb, &clnames) == 0)
 				host = clnames->h_hostservs[0].h_host;
-		}
 
-		DTRACE_PROBE(mountd, logged_in_thread);
-		audit_mountd_mount(host, path, audit_status); /* BSM */
 		if (!error)
-			mntlist_new(host, rpath); /* add entry to mount list */
+			mntlist_new(host, rpath);
 	}
 
 	if (path != NULL)
@@ -3025,7 +3156,8 @@ umount(struct svc_req *rqstp)
 	if (verbose)
 		syslog(LOG_NOTICE, "UNMOUNT: %s unmounted %s", host, path);
 
-	audit_mountd_umount(host, path);
+	if (mountd_bsm_audit)
+		audit_mountd_umount(host, path);
 
 	remove_path = rpath;	/* assume we will use the cannonical path */
 	if (realpath(path, rpath) == NULL) {

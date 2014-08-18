@@ -170,6 +170,7 @@
 	   <propval name='servers' type='integer' value='16'/>
 	   <propval name='mountd_listen_backlog' type='integer' value='64'/>
 	   <propval name='mountd_max_threads' type='integer' value='16'/>
+	   <propval name='mountd_bsm_audit' type='boolean' value='false'/>
 	 </property_group>
 	</instance>
 
