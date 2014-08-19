@@ -248,7 +248,7 @@ i_ipadm_nvl2ifinfo(nvlist_t *ifs_info_nvl, ipadm_if_info_t **if_info)
 	ipadm_if_info_t *ific = NULL, *ifil = NULL;
 	nvlist_t	*if_info_nvl;
 	nvpair_t	*nvp;
-	char	*strval;
+	char	*strval, *afstr;
 	ipadm_status_t	status = IPADM_SUCCESS;
 	uint16_t	*families;
 	uint_t	nelem = 0;
@@ -281,11 +281,18 @@ i_ipadm_nvl2ifinfo(nvlist_t *ifs_info_nvl, ipadm_if_info_t **if_info)
 				else if (families[nelem] == AF_INET6)
 					ific->ifi_pflags |= IFIF_IPV6;
 			}
+		} else if (nvlist_lookup_string(if_info_nvl,
+		    IPADM_NVP_FAMILY, &afstr) == 0) {  
+			if (atoi(afstr) == AF_INET)
+				ific->ifi_pflags |= IFIF_IPV4;
+			else
+				ific->ifi_pflags |= IFIF_IPV6;
 		} else {
 			ipadm_free_if_info(ific);
 			ific = NULL;
 			continue;
 		}
+
 		if (nvlist_lookup_string(if_info_nvl,
 		    IPADM_NVP_IFCLASS, &strval) == 0)
 			ific->ifi_class = atoi(strval);
@@ -345,7 +352,7 @@ i_ipadm_fill_cmembers(char *gropname, ipadm_ipmp_members_t *cmembers)
 	ipmp_handle_t ipmp_handle;
 	ipmp_groupinfo_t *grinfo;
 	ipmp_iflist_t *iflistp;
-	ipadm_ipmp_member_t *ipmp_member;
+	ipadm_ipmp_member_t *ipmp_member, *members;
 	ipadm_status_t ipadm_status = IPADM_SUCCESS;
 	/* LINTED E_FUNC_SET_NOT_USED */
 	int ipmp_status;
@@ -362,20 +369,21 @@ i_ipadm_fill_cmembers(char *gropname, ipadm_ipmp_members_t *cmembers)
 	}
 
 	iflistp = grinfo->gr_iflistp;
+	members = calloc(iflistp->il_nif, sizeof (ipadm_ipmp_member_t));
+	if (members == NULL) {
+		ipadm_status = ipadm_errno2status(errno);
+		goto fail_free_grinfo;
+	}
 	for (i = 0; i < iflistp->il_nif; i++) {
-		if ((ipmp_member = calloc(1,
-		    sizeof (ipadm_ipmp_member_t))) == NULL) {
-			ipadm_status = ipadm_errno2status(errno);
-			goto fail;
-		}
 
+		ipmp_member = &members[i];
 		(void) strlcpy(ipmp_member->if_name, iflistp->il_ifs[i],
 		    sizeof (ipmp_member->if_name));
 		list_insert_tail(cmembers, ipmp_member);
 	}
-
-fail:
+fail_free_grinfo:
 	ipmp_freegroupinfo(grinfo);
+fail:
 	ipmp_close(ipmp_handle);
 	return (ipadm_status);
 }
@@ -1811,7 +1819,7 @@ i_ipadm_free_ipmp_members(ipadm_ipmp_members_t *ipmp_members)
 {
 	ipadm_ipmp_member_t *ipmp_member;
 
-	while ((ipmp_member = list_remove_head(ipmp_members)) != NULL)
+	if ((ipmp_member = list_remove_head(ipmp_members)) != NULL)
 		free(ipmp_member);
 
 	list_destroy(ipmp_members);

@@ -721,10 +721,7 @@ ipmgmt_db_update_if(void *arg, nvlist_t *db_nvl, char *buf, size_t buflen,
 		*errp = EINVAL;
 		return (B_FALSE);
 	}
-
-	if (!nvlist_exists(db_nvl, IPADM_NVP_FAMILIES))
-		return (B_TRUE);
-
+	
 	if (nvlist_lookup_string(db_nvl,
 	    IPADM_NVP_IFNAME, &db_line_if_name) == 0 &&
 	    nvlist_lookup_string(in_nvl, IPADM_NVP_GIFNAME, &gifname) == 0 &&
@@ -811,7 +808,7 @@ ipmgmt_db_getif(void *arg, nvlist_t *db_nvl, char *buf, size_t buflen,
 			    &db_families, &nelem);
 	}
 
-	if (db_ifname == NULL || db_families == NULL)
+	if (db_ifname == NULL)
 		return (B_TRUE);
 
 	if (ifname != NULL && ifname[0] != '\0' &&

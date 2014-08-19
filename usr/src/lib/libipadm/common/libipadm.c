@@ -661,6 +661,7 @@ i_ipadm_init_ifobj(ipadm_handle_t iph, const char *ifname, nvlist_t *ifnvl)
 	ipadm_status_t	status;
 	ipadm_status_t	ret_status = IPADM_SUCCESS;
 	char		newifname[LIFNAMSIZ];
+	char		*afstr;
 	char		*aobjstr;
 	char		*ifclass_str, *gif_name;
 	uint16_t	*families;
@@ -682,7 +683,15 @@ i_ipadm_init_ifobj(ipadm_handle_t iph, const char *ifname, nvlist_t *ifnvl)
 		if (nvpair_value_nvlist(nvp, &nvl) != 0)
 			continue;
 
-		if (nvlist_lookup_uint16_array(nvl, IPADM_NVP_FAMILIES,
+		/* Keep compatibility with old ipadm.conf */
+		if (nvlist_lookup_string(nvl, IPADM_NVP_FAMILY, &afstr) == 0) {
+
+			status = i_ipadm_plumb_if(iph, newifname, atoi(afstr),
+			    IPADM_OPT_ACTIVE);
+			if (status == IPADM_IF_EXISTS)
+				status = IPADM_SUCCESS;
+
+		} else if (nvlist_lookup_uint16_array(nvl, IPADM_NVP_FAMILIES,
 		    &families, &nelem) == 0) {
 
 			ipadm_flags = IPADM_OPT_ACTIVE;
@@ -779,8 +788,8 @@ i_ipadm_init_ifobj(ipadm_handle_t iph, const char *ifname, nvlist_t *ifnvl)
 				status = IPADM_SUCCESS;
 			}
 		} else {
-			assert(nvlist_exists(nvl, IPADM_NVP_PROTONAME));
-			status = i_ipadm_init_ifprop(iph, nvl);
+			if (nvlist_exists(nvl, IPADM_NVP_PROTONAME) == B_TRUE)
+				status = i_ipadm_init_ifprop(iph, nvl);
 		}
 		if (status != IPADM_SUCCESS)
 			return (status);
