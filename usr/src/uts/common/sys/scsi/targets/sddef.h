@@ -1719,10 +1719,10 @@ struct sd_fm_internal {
 
 
 /*
- * 20 seconds is a *very* reasonable amount of time for any device with retries.
+ * 15 seconds is a *very* reasonable amount of time for any device with retries.
  * Doubled for slow CD operations.
  */
-#define	SD_IO_TIME			5
+#define	SD_IO_TIME			15
 
 /*
  * 2 hours is an excessively reasonable amount of time for format operations.
