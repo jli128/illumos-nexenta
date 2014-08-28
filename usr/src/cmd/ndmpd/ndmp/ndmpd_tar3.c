@@ -3780,13 +3780,11 @@ ndmpd_tar_backup_starter_v3(void *arg)
 		sarg.bs_path = nlp->nlp_backup_path;
 
 		/* Get an estimate of the data size */
-		if (pthread_create(&tid, NULL, (funct_t)get_backup_size,
-		    (void *)&sarg) == 0)
-			(void) pthread_detach(tid);
+		(void) get_backup_size(&sarg);
 
 		err = ndmp_get_cur_bk_time(nlp, &nlp->nlp_cdate, jname);
 		if (err != 0) {
-			NDMP_LOG(LOG_DEBUG, "err %d", err);
+			NDMP_LOG(LOG_DEBUG, "Failed to get current backup time %d", err);
 		} else {
 			log_bk_params_v3(session, params, nlp);
 			err = tar_backup_v3(session, params, nlp, jname);
