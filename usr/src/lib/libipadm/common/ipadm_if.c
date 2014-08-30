@@ -282,17 +282,12 @@ i_ipadm_nvl2ifinfo(nvlist_t *ifs_info_nvl, ipadm_if_info_t **if_info)
 					ific->ifi_pflags |= IFIF_IPV6;
 			}
 		} else if (nvlist_lookup_string(if_info_nvl,
-		    IPADM_NVP_FAMILY, &afstr) == 0) {  
+		    IPADM_NVP_FAMILY, &afstr) == 0) {
 			if (atoi(afstr) == AF_INET)
 				ific->ifi_pflags |= IFIF_IPV4;
 			else
 				ific->ifi_pflags |= IFIF_IPV6;
-		} else {
-			ipadm_free_if_info(ific);
-			ific = NULL;
-			continue;
 		}
-
 		if (nvlist_lookup_string(if_info_nvl,
 		    IPADM_NVP_IFCLASS, &strval) == 0)
 			ific->ifi_class = atoi(strval);
