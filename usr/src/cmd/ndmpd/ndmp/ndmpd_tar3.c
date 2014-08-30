@@ -3755,7 +3755,6 @@ ndmpd_tar_backup_starter_v3(void *arg)
 	ndmp_lbr_params_t *nlp;
 	char jname[TLM_MAX_BACKUP_JOB_NAME];
 	ndmp_bkup_size_arg_t sarg;
-	pthread_t tid;
 
 	session = (ndmpd_session_t *)(params->mp_daemon_cookie);
 	*(params->mp_module_cookie) = nlp = ndmp_get_nlp(session);
