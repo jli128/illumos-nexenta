@@ -24,6 +24,7 @@
  */
 /*
  * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -203,7 +204,7 @@ mdb_ia32_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 
 	uintptr_t fp = gsp->kregs[KREG_EBP];
 	uintptr_t pc = gsp->kregs[KREG_EIP];
-	uintptr_t lastfp;
+	uintptr_t lastfp = 0;
 
 	ssize_t size;
 	uint_t argc;
@@ -218,6 +219,13 @@ mdb_ia32_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 	bcopy(gsp, &gregs, sizeof (gregs));
 
 	while (fp != 0) {
+
+		/*
+		 * Ensure progress (increasing fp), and prevent
+		 * endless loop with the same FP.
+		 */
+		if (fp <= lastfp)
+			return (set_errno(EMDB_STKFRAME));
 
 		if (fp & (STACK_ALIGN - 1))
 			return (set_errno(EMDB_STKALIGN));

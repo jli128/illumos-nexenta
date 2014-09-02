@@ -24,8 +24,8 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -229,7 +229,7 @@ mdb_amd64_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 
 	uintptr_t fp = gsp->kregs[KREG_RBP];
 	uintptr_t pc = gsp->kregs[KREG_RIP];
-	uintptr_t lastfp;
+	uintptr_t lastfp = 0;
 
 	ssize_t size;
 	ssize_t insnsize;
@@ -250,6 +250,13 @@ mdb_amd64_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 
 	while (fp != 0) {
 		int args_style = 0;
+
+		/*
+		 * Ensure progress (increasing fp), and prevent
+		 * endless loop with the same FP.
+		 */
+		if (fp <= lastfp)
+			return (set_errno(EMDB_STKFRAME));
 
 		if (!fp_is_aligned(fp, xpv_panic))
 			return (set_errno(EMDB_STKALIGN));
