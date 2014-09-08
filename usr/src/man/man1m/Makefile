@@ -159,10 +159,6 @@ _MANFILES=	6to4relay.1m		\
 		fssnap_ufs.1m		\
 		fsstat.1m		\
 		fstyp.1m		\
-		ftpaddhost.1m		\
-		ftpconfig.1m		\
-		ftprestart.1m		\
-		ftpshut.1m		\
 		fuser.1m		\
 		fwflash.1m		\
 		fwtmp.1m		\
@@ -208,7 +204,6 @@ _MANFILES=	6to4relay.1m		\
 		in.discardd.1m		\
 		in.echod.1m		\
 		in.fingerd.1m		\
-		in.ftpd.1m		\
 		in.iked.1m		\
 		in.lpd.1m		\
 		in.mpathd.1m		\
@@ -600,21 +595,8 @@ _MANFILES=	6to4relay.1m		\
 		zpool.1m		\
 		zstreamdump.1m
 
-i386_MANFILES=	lms.1m			\
-		parted.1m		\
-		mkntfs.1m		\
-		ntfscat.1m		\
-		ntfsclone.1m		\
-		ntfscluster.1m		\
-		ntfscmp.1m		\
-		ntfscp.1m		\
-		ntfsfix.1m		\
-		ntfsinfo.1m		\
-		ntfslabel.1m		\
-		ntfsls.1m		\
-		ntfsprogs.1m		\
-		ntfsresize.1m		\
-		ntfsundelete.1m
+i386_MANFILES=				\
+		lms.1m
 
 sparc_MANFILES=	cvcd.1m			\
 		dcs.1m			\
@@ -647,7 +629,6 @@ MANLINKS=	acctcon1.1m			\
 		dodisk.1m			\
 		fcadm.1m			\
 		fingerd.1m			\
-		ftpd.1m				\
 		grpck.1m			\
 		hal-find-by-capability.1m	\
 		hal-find-by-property.1m		\
@@ -756,7 +737,6 @@ poweroff.1m			:= LINKSRC = halt.1m
 
 comsat.1m			:= LINKSRC = in.comsat.1m
 fingerd.1m			:= LINKSRC = in.fingerd.1m
-ftpd.1m				:= LINKSRC = in.ftpd.1m
 rarpd.1m			:= LINKSRC = in.rarpd.1m
 rdisc.1m			:= LINKSRC = in.rdisc.1m
 rexecd.1m			:= LINKSRC = in.rexecd.1m

@@ -1250,7 +1250,7 @@ out:
 		dmu_objset_disown(zfsvfs->z_os, zfsvfs);
 		zfsvfs_free(zfsvfs);
 	} else {
-		atomic_add_32(&zfs_active_fs_count, 1);
+		atomic_inc_32(&zfs_active_fs_count);
 	}
 
 	return (error);
@@ -2184,7 +2184,7 @@ zfs_freevfs(vfs_t *vfsp)
 
 	zfsvfs_free(zfsvfs);
 
-	atomic_add_32(&zfs_active_fs_count, -1);
+	atomic_dec_32(&zfs_active_fs_count);
 }
 
 /*

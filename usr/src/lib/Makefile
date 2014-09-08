@@ -269,8 +269,6 @@ SUBDIRS += \
 	$($(MACH)_SUBDIRS)
 
 i386_SUBDIRS=		\
-	libntfs		\
-	libparted	\
 	libfdisk	\
 	libsaveargs
 
@@ -513,7 +511,6 @@ HDRSUBDIRS=		\
 	$($(MACH)_HDRSUBDIRS)
 
 i386_HDRSUBDIRS=	\
-	libparted	\
 	libfdisk	\
 	libsaveargs
 

@@ -20,6 +20,8 @@
  */
 
 /*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
@@ -154,7 +156,6 @@ typedef	struct __fd_set {
 #endif /* _KERNEL */
 
 #if !defined(_KERNEL) && !defined(_FAKE_KERNEL)
-#ifdef	__STDC__
 extern int select(int, fd_set *_RESTRICT_KYWD, fd_set *_RESTRICT_KYWD,
 	fd_set *_RESTRICT_KYWD, struct timeval *_RESTRICT_KYWD);
 
@@ -164,12 +165,6 @@ extern int pselect(int, fd_set *_RESTRICT_KYWD, fd_set *_RESTRICT_KYWD,
 	const sigset_t *_RESTRICT_KYWD);
 #endif
 
-#else /* _KERNEL */
-extern int select();
-#if !defined(__XOPEN_OR_POSIX) || defined(_XPG6) || defined(__EXTENSIONS__)
-extern int pselect();
-#endif
-#endif	/* __STDC__ */
 #endif	/* _KERNEL */
 
 #ifdef	__cplusplus
