@@ -2234,6 +2234,7 @@ backup_reader_v3(backup_reader_arg_t *argp)
 	char *jname;
 	ndmp_lbr_params_t *nlp;
 	tlm_commands_t *cmds;
+	int rc;
 
 	if (!argp)
 		return (-1);
@@ -2261,7 +2262,10 @@ backup_reader_v3(backup_reader_arg_t *argp)
 	bp.bp_opr = 0;
 
 	/* release the parent thread, after referencing the job stats */
-	(void) pthread_barrier_wait(&argp->br_barrier);
+	rc = pthread_barrier_wait(&argp->br_barrier);
+	if (rc == PTHREAD_BARRIER_SERIAL_THREAD ) {
+		(void) pthread_barrier_destroy(&argp->br_barrier);
+	}
 
 	bp.bp_tmp = ndmp_malloc(sizeof (char) * TLM_MAX_PATH_NAME);
 	if (!bp.bp_tmp)
@@ -2291,7 +2295,6 @@ backup_reader_v3(backup_reader_arg_t *argp)
 	ft.ft_path = nlp->nlp_backup_path;
 	ft.ft_lpath = bp.bp_chkpnm;
 
-	NDMP_LOG(LOG_DEBUG, "path %s lpath %s", ft.ft_path, ft.ft_lpath);
 	if (NLP_ISSET(nlp, NLPF_TOKENBK) || NLP_ISSET(nlp, NLPF_LEVELBK)) {
 		ft.ft_callbk = timebk_v3;
 		tlm_acls.acl_clear_archive = FALSE;
@@ -2304,7 +2307,7 @@ backup_reader_v3(backup_reader_arg_t *argp)
 	} else {
 		rv = -1;
 		MOD_LOGV3(nlp->nlp_params, NDMP_LOG_ERROR,
-		    "Unknow backup type.\n");
+		    "Unknown backup type.\n");
 	}
 	ft.ft_arg = &bp;
 	ft.ft_logfp = (ft_log_t)ndmp_log;
@@ -2373,6 +2376,7 @@ tar_backup_v3(ndmpd_session_t *session, ndmpd_module_params_t *params,
 	int result;
 	ndmp_context_t nctx;
 	int err;
+	int rc;
 
 	if (ndmp_get_bk_dir_ino(nlp))
 		return (-1);
@@ -2441,8 +2445,10 @@ tar_backup_v3(ndmpd_session_t *session, ndmpd_module_params_t *params,
 		err = pthread_create(&rdtp, NULL, (funct_t)backup_reader_v3,
 		    (void *)&arg);
 		if (err == 0) {
-			(void) pthread_barrier_wait(&arg.br_barrier);
-			(void) pthread_barrier_destroy(&arg.br_barrier);
+			rc =  pthread_barrier_wait(&arg.br_barrier);
+			if (rc == PTHREAD_BARRIER_SERIAL_THREAD ) {
+				(void) pthread_barrier_destroy(&arg.br_barrier);
+			}
 		} else {
 			(void) pthread_barrier_destroy(&arg.br_barrier);
 			free_structs_v3(session, jname);
@@ -2466,7 +2472,6 @@ tar_backup_v3(ndmpd_session_t *session, ndmpd_module_params_t *params,
 
 		ndmp_wait_for_reader(cmds);
 		(void) pthread_join(rdtp, NULL);
-
 		/* exit as if there was an internal error */
 		if (session->ns_eof) {
 			result = EPIPE;

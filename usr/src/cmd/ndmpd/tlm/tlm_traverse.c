@@ -142,15 +142,14 @@ typedef struct dent_arg {
 } dent_arg_t;
 
 static int traverse_level_nondir(struct fs_traverse *ftp,
-    traverse_state_t *tsp, struct fst_node *pnp,
-    dent_arg_t *darg);
+		struct fst_node *pnp, dent_arg_t *darg);
 
 /*
  * Gather some directory entry information and return them
  */
 static int
 fs_populate_dents(void *arg, int namelen,
-    char *name, long *countp, struct stat64 *attr,
+    char *name, struct stat64 *attr,
     fs_fhandle_t *fh)
 {
 	dent_arg_t *darg = (dent_arg_t *)arg;
@@ -170,10 +169,7 @@ fs_populate_dents(void *arg, int namelen,
 	dent->fd_len = reclen;
 	darg->da_end += reclen;
 
-	if (countp)
-		(*countp)++;
-
-	return (0);
+	return(0);
 }
 
 /*
@@ -215,67 +211,68 @@ fs_getstat(char *path, fs_fhandle_t *fh, struct stat64 *st)
 }
 
 /*
- * Get directory entries info and return in the buffer. Cookie
- * will keep the state of each call
+ * Get directory entries info and return in the buffer.
  */
-static int
-fs_getdents(int fildes, struct dirent *buf, size_t *nbyte,
-    char *pn_path, long *dpos, longlong_t *cookie,
-    long *n_entries, dent_arg_t *darg)
+static long
+fs_getdents(DIR *fildes, char *pn_path, dent_arg_t *darg)
 {
-	struct dirent *ptr;
-	char file_path[PATH_MAX + 1];
-	fs_fhandle_t fh;
-	struct stat64 st;
-	char *p;
-	int len;
-	int rv;
+	struct dirent	*ptr;
+	char		file_path[PATH_MAX + 1];
+	fs_fhandle_t	fh;
+	struct stat64	st;
+	int		res;
+	off_t		last = 0L;
+	long		n_entries = 0L;
 
-	if (*nbyte == 0) {
-		(void) memset((char *)buf, 0, MAX_DENT_BUF_SIZE);
-		*nbyte = rv = getdents(fildes, buf, darg->da_size);
-		*cookie = 0LL;
-
-		if (rv <= 0)
-			return (rv);
-	}
-
-	p = (char *)buf + *cookie;
-	len = *nbyte;
-	do {
-		/* LINTED improper alignment */
-		ptr = (struct dirent *)p;
-		*dpos =  ptr->d_off;
-
+	while ((ptr = readdir(fildes)) != NULL) {
+		if (ptr == NULL && ((errno == EIO || errno == EACCES))) {
+			NDMP_LOG(LOG_INFO, "Reposisiont to previous dirent");
+			seekdir(fildes, last);
+			continue;
+		}
+tryone:
+		if ((last = telldir(fildes)) == -1) {
+			if (ptr == NULL && ((errno == EIO || errno == EACCES))) {
+				NDMP_LOG(LOG_INFO, "Capture current position interrupted");
+				goto tryone;
+			}
+			return (last);
+		}
 		if (rootfs_dot_or_dotdot(ptr->d_name))
-			goto skip_entry;
+			continue;
 
+tryagain:
 		(void) snprintf(file_path, PATH_MAX, "%s/", pn_path);
 		(void) strlcat(file_path, ptr->d_name, PATH_MAX + 1);
 		(void) memset(&fh, 0, sizeof (fs_fhandle_t));
 
-		if (lstat64(file_path, &st) != 0) {
-			rv = -1;
+		res = lstat64(file_path, &st);
+		if (res != 0) {
+			if (errno == EIO || errno == EACCES){
+				NDMP_LOG(LOG_ERR, "Try again on path %s errno = (%d)", file_path, errno);
+				errno = 0;
+				goto tryagain;
+			}
+			NDMP_LOG(LOG_ERR, "Error on path %s errno = (%d)", file_path, errno);
+			n_entries = -1;
 			break;
 		}
 
 		fh.fh_fid = st.st_ino;
 
-		if (S_ISDIR(st.st_mode))
-			goto skip_entry;
+		if (S_ISDIR(st.st_mode)) {
+			continue;
+		}
 
-		if (fs_populate_dents(darg, strlen(ptr->d_name),
-		    (char *)ptr->d_name, n_entries, &st, &fh) != 0)
-			break;
+		res = fs_populate_dents(darg, strlen(ptr->d_name),
+						(char *)ptr->d_name, &st, &fh);
+		if (res != -1)
+		{
+			n_entries += 1;
+		}
+	}
 
-skip_entry:
-		p = p + ptr->d_reclen;
-		len -= ptr->d_reclen;
-	} while (len);
-
-	*cookie = (longlong_t)(p - (char *)buf);
-	*nbyte = len;
-	return (rv);
+	return (n_entries);
 }
 
 /*
@@ -637,103 +634,88 @@ traverse_post(struct fs_traverse *ftp)
  */
 static int
 traverse_level_nondir(struct fs_traverse *ftp,
-    traverse_state_t *tsp, struct fst_node *pnp, dent_arg_t *darg)
+		struct fst_node *pnp, dent_arg_t *darg)
 {
-	int pl; /* path length */
-	int rv;
-	struct fst_node en; /* entry node */
-	longlong_t cookie_verf;
-	fs_dent_info_t *dent;
-	struct dirent *buf;
-	size_t len = 0;
-	int fd;
+	int		path_length; /* path length */
+	int		rv;
+	struct fst_node	en; /* entry node */
+	fs_dent_info_t	*dent;
+	DIR		*fd;
+	long		i, n_entries;
 
+	darg->da_end = 0;
+	n_entries = 0;
 	rv = 0;
-	pl = strlen(pnp->tn_path);
+	path_length = strlen(pnp->tn_path);
 
-	buf = ndmp_malloc(MAX_DENT_BUF_SIZE);
-	if (buf == NULL)
-		return (errno);
-
-	fd = open(tsp->ts_fh.fh_fpath, O_RDONLY);
-	if (fd == -1) {
-		free(buf);
+	fd = opendir(pnp->tn_path);
+	if (fd == NULL) {
 		return (errno);
 	}
 
-	while (rv == 0) {
-		long i, n_entries;
+	n_entries = fs_getdents(fd, pnp->tn_path, darg);
+	if (n_entries < 0) {
+		traverse_stats.fss_readdir_err++;
 
-		darg->da_end = 0;
-		n_entries = 0;
-		rv = fs_getdents(fd, buf, &len, pnp->tn_path, &tsp->ts_dpos,
-		    &cookie_verf, &n_entries, darg);
-		if (rv < 0) {
-			traverse_stats.fss_readdir_err++;
+		NDMP_LOG(LOG_INFO,
+			"Error getting dir entries for (%s) errno %d",
+				pnp->tn_path, errno);
 
-			NDMP_LOG(LOG_DEBUG, "Error %d on readdir(%s) pos %d",
-			    rv, pnp->tn_path, tsp->ts_dpos);
-			if (STOP_ONERR(ftp))
-				break;
+		if (STOP_ONERR(ftp)) {
+			rv = -1;
+		} else {
 			/*
 			 * We cannot read the directory entry, we should
 			 * skip to the next directory.
 			 */
 			rv = SKIP_ENTRY;
+		}
+		goto out;
+	}
+
+	/* LINTED imporper alignment */
+	dent = (fs_dent_info_t *)darg->da_buf;
+	/* LINTED imporper alignment */
+	for (i = 0; i < n_entries; i++, dent = (fs_dent_info_t *)
+	    ((char *)dent + dent->fd_len)) {
+
+		if (VERBOSE(ftp))
+			NDMP_LOG(LOG_DEBUG, "i %u dname: \"%s\"",
+			    dent->fd_fh.fh_fid, dent->fd_name);
+
+		if ((path_length + strlen(dent->fd_name)) > PATH_MAX) {
+			traverse_stats.fss_longpath_err++;
+
+			NDMP_LOG(LOG_ERR, "Path %s/%s is too long.",
+			    pnp->tn_path, dent->fd_name);
+			if (STOP_ONLONG(ftp))
+				rv = -ENAMETOOLONG;
+			free(dent->fd_fh.fh_fpath);
 			continue;
-		} else {
-			/* Break at the end of directory */
-			if (rv > 0)
-				rv = 0;
-			else
-				break;
 		}
 
-		/* LINTED imporper alignment */
-		dent = (fs_dent_info_t *)darg->da_buf;
-		/* LINTED imporper alignment */
-		for (i = 0; i < n_entries; i++, dent = (fs_dent_info_t *)
-		    ((char *)dent + dent->fd_len)) {
+		/*
+		 * The entry is not a directory so the callback
+		 * function must be called.
+		 */
+		if (!S_ISDIR(dent->fd_attr.st_mode)) {
+			traverse_stats.fss_nondir_calls++;
 
-			if (VERBOSE(ftp))
-				NDMP_LOG(LOG_DEBUG, "i %u dname: \"%s\"",
-				    dent->fd_fh.fh_fid, dent->fd_name);
-
-			if ((pl + strlen(dent->fd_name)) > PATH_MAX) {
-				traverse_stats.fss_longpath_err++;
-
-				NDMP_LOG(LOG_ERR, "Path %s/%s is too long.",
-				    pnp->tn_path, dent->fd_name);
-				if (STOP_ONLONG(ftp))
-					rv = -ENAMETOOLONG;
-				free(dent->fd_fh.fh_fpath);
-				continue;
-			}
-
-			/*
-			 * The entry is not a directory so the callback
-			 * function must be called.
-			 */
-			if (!S_ISDIR(dent->fd_attr.st_mode)) {
-				traverse_stats.fss_nondir_calls++;
-
-				en.tn_path = dent->fd_name;
-				en.tn_fh = &dent->fd_fh;
-				en.tn_st = &dent->fd_attr;
-				rv = CALLBACK(pnp, &en);
-				dent->fd_fh.fh_fpath = NULL;
-				if (rv < 0)
-					break;
-				if (rv == FST_SKIP) {
-					traverse_stats.fss_nondir_skipped++;
-					break;
-				}
+			en.tn_path = dent->fd_name;
+			en.tn_fh = &dent->fd_fh;
+			en.tn_st = &dent->fd_attr;
+			rv = CALLBACK(pnp, &en);
+			dent->fd_fh.fh_fpath = NULL;
+			if (rv < 0)
+				goto out;
+			if (rv == FST_SKIP) {
+				traverse_stats.fss_nondir_skipped++;
+				goto out;
 			}
 		}
 	}
-
-	free(buf);
-	(void) close(fd);
+out:
+	(void) closedir(fd);
 	return (rv);
 }
 
@@ -858,7 +840,7 @@ traverse_level(struct fs_traverse *ftp)
 			if (VERBOSE(ftp))
 				NDMP_LOG(LOG_DEBUG, "pl %d \"%s\"", pl, path);
 
-			rv = traverse_level_nondir(ftp, tsp, &pn, &darg);
+			rv = traverse_level_nondir(ftp, &pn, &darg);
 			if (rv < 0) {
 				NEGATE(rv);
 				free(tsp->ts_fh.fh_fpath);
