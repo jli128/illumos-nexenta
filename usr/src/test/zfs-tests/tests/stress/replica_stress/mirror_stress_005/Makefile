@@ -18,25 +18,21 @@
 include $(SRC)/Makefile.master
 
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
-TESTDIR = $(ROOTOPTPKG)/tests/stress
+TESTDIR = $(ROOTOPTPKG)/tests/stress/replica_stress/mirror_stress_005
 
-FILE = stress.cfg
+PROGS = cleanup mirror_stress_005 setup
 
-CONFIG = $(FILE:%=$(TESTDIR)/%)
-$(CONFIG) := FILEMODE = 0555
+CMDS = $(PROGS:%=$(TESTDIR)/%)
+$(CMDS) := FILEMODE = 0555
 
 all lint clean clobber:
 
-install: $(CONFIG)
+install: $(CMDS)
 
-$(CONFIG): $(TESTDIR)
+$(CMDS): $(TESTDIR)
 
 $(TESTDIR):
 	$(INS.dir)
 
-$(TESTDIR)/%: %
-	$(INS.file)
-
-SUBDIRS = bin replica_stress
-
-include $(SRC)/test/Makefile.com
+$(TESTDIR)/%: %.ksh
+	$(INS.rename)

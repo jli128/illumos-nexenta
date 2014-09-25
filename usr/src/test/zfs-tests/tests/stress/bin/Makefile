@@ -13,30 +13,27 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
-.PARALLEL: $(SUBDIRS)
-
 include $(SRC)/Makefile.master
 
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
-TESTDIR = $(ROOTOPTPKG)/tests/stress
+TESTDIR = $(ROOTOPTPKG)/tests/stress/bin
 
-FILE = stress.cfg
+PROGS = dataset_create_write_destroy \
+	dataset_create_write_destroy_acl \
+	dataset_create_write_destroy_exattr \
+	dataset_run_xattr 
 
-CONFIG = $(FILE:%=$(TESTDIR)/%)
-$(CONFIG) := FILEMODE = 0555
+CMDS = $(PROGS:%=$(TESTDIR)/%)
+$(CMDS) := FILEMODE = 0555
 
 all lint clean clobber:
 
-install: $(CONFIG)
+install: $(CMDS)
 
-$(CONFIG): $(TESTDIR)
+$(CMDS): $(TESTDIR)
 
 $(TESTDIR):
 	$(INS.dir)
 
-$(TESTDIR)/%: %
-	$(INS.file)
-
-SUBDIRS = bin replica_stress
-
-include $(SRC)/test/Makefile.com
+$(TESTDIR)/%: %.ksh
+	$(INS.rename)
