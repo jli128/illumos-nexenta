@@ -527,6 +527,9 @@ mkdir -p $DEST/usr/bin && cp -f $DEST/usr/lib/isaexec $DEST/usr/sbin/update_drv\
         #
         # Add commands for each link action to the appropriate package files.
         #
+        mediator = [] # temporary location for mediator command
+        old_mtr = None;
+        
         for link in self.mf.gen_actions_by_type('link'):
             pth = link.attrs['path']
             target = link.attrs['target']
@@ -534,14 +537,16 @@ mkdir -p $DEST/usr/bin && cp -f $DEST/usr/lib/isaexec $DEST/usr/sbin/update_drv\
             mtr_ver = link.attrs.get('mediator-version')
             mtr_pri = link.attrs.get('mediator-priority')
 
+            if old_mtr and mtr != old_mtr:
+                raise Exception("%s: multiple mediator groups per manifest "
+                                "not supported"
+                                % (self.pkgname))
+
             dire = dirname(pth)
             if not dire:
                 dire = '.'
-            alt = basename(pth)
-            if '/i386/' in pth or '/sparcv7/' in pth:
-                alt += '.32'
-            elif '/amd64/' in pth or '/sparcv9/' in pth:
-                alt += '.64'
+
+            alt = pth.replace("/","-")
 
             if mtr:
                 alt_pri = 99
@@ -550,47 +555,44 @@ mkdir -p $DEST/usr/bin && cp -f $DEST/usr/lib/isaexec $DEST/usr/sbin/update_drv\
             else:
                 alt_pri = 0
 
-            if link.attrs.get('variant.opensolaris.zone') == 'global':
-                if mtr:
-                    #
-                    # NOTE: This seemed like an important piece of
-                    # commented out code in the perl script, 
-                    # so I kept it in here as well.
-                    #
+            if mtr and link.attrs.get('variant.opensolaris.zone'):
+                raise Exception("%s: mediated links using "
+                                "variant.opensolaris.zone not supported"
+                                % (self.pkgname))
 
-                    #self.post.append('[ "$ZONEINST" = "1" ] || '
-                    #    '(update-alternatives --quiet --altdir '
-                    #    '$BASEDIR/etc/alternatives --admindir '
-                    #    '$BASEDIR/var/lib/dpkg/alternatives '
-                    #    '--install %s %s $BASEDIR/%s/%s %s || true)' 
-                    #    % (pth, alt, dire, target, alt_pri))
-                    self.post.append('(update-alternatives --quiet --altdir '
-                        '$BASEDIR/etc/alternatives --admindir '
-                        '$BASEDIR/var/lib/dpkg/alternatives '
-                        '--install /%s %s /%s/%s %s || true)' 
-                        % (pth, alt, dire, target, alt_pri))
-                else:
-                    self.post.append(
-                        '[ "$ZONEINST" = "1" ] || (mkdir -p $BASEDIR/%s && '
-                        'ln -f -s %s $BASEDIR/%s)' % (dire, target, pth))
+            if mtr and len(mediator) == 0:
+                makedirs(join(bwd, "var/mediator"))
+                copyfile("/dev/null", join(bwd, "var/mediator/", self.pkgname))
+                self.fix.append("mkdir -p $DEST/var/mediator")
+
+                # The following will "just work" as our update-alternatives
+                # honors the BASEDIR environment variable.
+                mediator.append(
+                    '(update-alternatives --quiet '
+                    '--install /var/mediator/%s %s /var/mediator/%s %s'
+                    %(mtr, mtr, self.pkgname, alt_pri))
+                self.rm.append(
+"""if [ "$1" != "upgrade" ]; then
+	(update-alternatives --quiet --remove %s /var/mediator/%s)
+fi
+""" %(mtr, self.pkgname))
+
+            if link.attrs.get('variant.opensolaris.zone') == 'global':
+                self.post.append(
+                    '[ "$ZONEINST" = "1" ] || (mkdir -p $BASEDIR/%s && '
+                    'ln -f -s %s $BASEDIR/%s)' % (dire, target, pth))
 
             else: # != 'global'
                 if mtr:
-                    self.post.append('(update-alternatives --quiet --altdir '
-                        '$BASEDIR/etc/alternatives --admindir '
-                        '$BASEDIR/var/lib/dpkg/alternatives '
-                        '--install /%s %s /%s/%s %s || true)' 
-                        % (pth, alt, dire, target, alt_pri))
-                    self.rm.append(
-"""if [ "$1" != "upgrade" ]; then
-	(update-alternatives --altdir $BASEDIR/etc/alternatives --admindir \
-$BASEDIR/var/lib/dpkg/alternatives --remove %s /%s/%s || true)
-fi
-""" % (alt, dire, target))
+                    mediator.append('--slave /%s %s /%s/%s'
+                                %(pth, alt, dire, target))
                 else:
                     self.fix.append('mkdir -p $DEST/%s && ln -f -s %s $DEST/%s' 
                                % (dire, target, pth))
 
+        if len(mediator):
+            mediator.append(')')
+            self.post.append(' '.join(mediator))
 
         # Groups
         for grp in self.mf.gen_actions_by_type('group'):
