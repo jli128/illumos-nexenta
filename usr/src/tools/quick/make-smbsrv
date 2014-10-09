@@ -136,18 +136,33 @@ do_kern() {
 
 ################################################################
 
-do_libs() {
+# Note lib1 builds prerequisite libraries not delivered by the
+# tar file we create below.  To accelerate clean/install, we
+# skip these on clean (but still nuke them for clobber)
+
+do_lib1() {
+
+for lib in \
+    libavl \
+    libgss \
+    libkrb5 \
+    libcmdutils \
+    libsqlite \
+    libuutil
+do
+  (cd $SRC/lib/$lib && $make $1)
+done
+}
+
+# lib2 builds stuff we include in the tar file,
+# or that we don't mind rebuilding after clean.
+
+do_lib2() {
 
 for lib in \
   libfakekernel \
-  libavl \
-  libgss \
-  libkrb5 \
-  libcmdutils \
   libads \
-  libsmbfs \
-  libsqlite \
-  libuutil
+  libsmbfs
 do
   (cd $SRC/lib/$lib && $make $1)
 done
@@ -297,22 +312,26 @@ do
     set -e
     do_hdrs $arg
     do_kern $arg
-    do_libs $arg
+    do_lib1 $arg
+    do_lib2 $arg
     do_cmds $arg
     ;;
   lint)
     do_kern $arg
-    do_libs $arg
+    do_lib1 $arg
+    do_lib2 $arg
     do_cmds $arg
     ;;
   clean)
+    # intentionally skip: lib1, hdrs, tools
     do_cmds $arg
-    do_libs $arg
+    do_lib2 $arg
     do_kern $arg
     ;;
   clobber)
     do_cmds $arg
-    do_libs $arg
+    do_lib2 $arg
+    do_lib1 $arg
     do_kern $arg
     do_hdrs $arg
     clobber_tools
