@@ -4593,9 +4593,13 @@ top:
 	}
 	mutex_exit(&l2arc_buflist_mtx);
 
-	vdev_space_update(dev->l2ad_vdev, -bytes_evicted, 0, 0);
-
+	/*
+	 * Note: l2ad_vdev can only be touched if space_update is set,
+	 * otherwise the vdev might have been removed by an async
+	 * spa_unload.
+	 */
 	if (space_update) {
+		vdev_space_update(dev->l2ad_vdev, -bytes_evicted, 0, 0);
 		dev->l2ad_evict = taddr;
 	}
 }
