@@ -128,7 +128,14 @@ extern void nfscmd_func(void *, char *, size_t, door_desc_t *, uint_t);
 
 thread_t	nfsauth_thread;
 thread_t	cmd_thread;
-thread_t	logging_thread;
+
+/*
+ * The following logging and BSM related data structs
+ * are only used when mountd_bsm_audit is TRUE; this
+ * is done by specifying the undocumented -A flag to
+ * mountd(1m).
+ */
+static bool_t	mountd_bsm_audit = FALSE;
 
 typedef struct logging_data {
 	char			*ld_host;
@@ -244,6 +251,8 @@ cmd_svc(void *arg)
 static void
 free_logging_data(logging_data *lq)
 {
+	assert(mountd_bsm_audit == TRUE);
+
 	if (lq != NULL) {
 		free(lq->ld_host);
 		free(lq->ld_netid);
@@ -264,6 +273,8 @@ static logging_data *
 remove_head_of_queue(void)
 {
 	logging_data    *lq;
+
+	assert(mountd_bsm_audit == TRUE);
 
 	/*
 	 * Pull it off the queue.
@@ -290,6 +301,8 @@ do_logging_queue(logging_data *lq)
 	char		*host;
 
 	struct nd_hostservlist	*clnames;
+
+	assert(mountd_bsm_audit == TRUE);
 
 	while (lq) {
 		if (lq->ld_host == NULL) {
@@ -326,6 +339,8 @@ static void *
 logging_svc(void *arg)
 {
 	logging_data	*lq;
+
+	assert(mountd_bsm_audit == TRUE);
 
 	for (;;) {
 		(void) mutex_lock(&logging_queue_lock);
@@ -421,7 +436,7 @@ main(int argc, char *argv[])
 		    "failed, using default value");
 	}
 
-	while ((c = getopt(argc, argv, "vrm:")) != EOF) {
+	while ((c = getopt(argc, argv, "vrm:A")) != EOF) {
 		switch (c) {
 		case 'v':
 			verbose++;
@@ -437,6 +452,9 @@ main(int argc, char *argv[])
 				break;
 			}
 			max_threads = tmp;
+			break;
+		case 'A':
+			mountd_bsm_audit = TRUE;
 			break;
 		default:
 			fprintf(stderr, "usage: mountd [-v] [-r]\n");
@@ -494,8 +512,10 @@ main(int argc, char *argv[])
 	(void) setlocale(LC_ALL, "");
 	(void) rwlock_init(&sharetab_lock, USYNC_THREAD, NULL);
 	(void) mutex_init(&mnttab_lock, USYNC_THREAD, NULL);
-	(void) mutex_init(&logging_queue_lock, USYNC_THREAD, NULL);
-	(void) cond_init(&logging_queue_cv, USYNC_THREAD, NULL);
+	if (mountd_bsm_audit) {
+		(void) mutex_init(&logging_queue_lock, USYNC_THREAD, NULL);
+		(void) cond_init(&logging_queue_cv, USYNC_THREAD, NULL);
+	}
 
 	netgroup_init();
 
@@ -535,7 +555,8 @@ main(int argc, char *argv[])
 		exit(0);
 	}
 
-	audit_mountd_setup();	/* BSM */
+	if (mountd_bsm_audit)
+		audit_mountd_setup();	/* BSM */
 
 	/*
 	 * Set number of file descriptors to unlimited
@@ -626,9 +647,12 @@ main(int argc, char *argv[])
 	 * a separate thread to allow the mount request threads to
 	 * clear as soon as possible.
 	 */
-	if (thr_create(NULL, 0, logging_svc, 0, thr_flags, &logging_thread)) {
-		syslog(LOG_ERR, gettext("Failed to create LOGGING svc thread"));
-		exit(2);
+	if (mountd_bsm_audit) {
+		if (thr_create(NULL, 0, logging_svc, 0, thr_flags, NULL)) {
+			syslog(LOG_ERR,
+			    gettext("Failed to create LOGGING svc thread"));
+			exit(2);
+		}
 	}
 
 	/*
@@ -1103,6 +1127,8 @@ enqueue_logging_data(char *host, SVCXPRT *transp, char *path,
 	logging_data	*lq;
 	struct netbuf	*nb;
 
+	assert(mountd_bsm_audit == TRUE);
+
 	lq = (logging_data *)calloc(1, sizeof (logging_data));
 	if (lq == NULL)
 		goto cleanup;
@@ -1450,17 +1476,28 @@ reply:
 	 * If we can not create a queue entry, go ahead and do it
 	 * in the context of this thread.
 	 */
-	enqueued = enqueue_logging_data(host, transp, path, rpath,
-	    audit_status, error);
-	if (enqueued == FALSE) {
-		if (host == NULL) {
-			DTRACE_PROBE(mountd, name_by_in_thread);
+	if (mountd_bsm_audit) {
+		enqueued = enqueue_logging_data(host, transp, path, rpath,
+		    audit_status, error);
+
+		if (enqueued == FALSE) {
+			if (host == NULL) {
+				DTRACE_PROBE(mountd, name_by_in_thread);
+				if (getclientsnames(transp, &nb, &clnames) == 0)
+					host = clnames->h_hostservs[0].h_host;
+			}
+
+			DTRACE_PROBE(mountd, logged_in_thread);
+			audit_mountd_mount(host, path, audit_status); /* BSM */
+
+			if (!error)		/* add entry to mount list */
+				mntlist_new(host, rpath);
+		}
+	} else {
+		if (host == NULL)
 			if (getclientsnames(transp, &nb, &clnames) == 0)
 				host = clnames->h_hostservs[0].h_host;
-		}
 
-		DTRACE_PROBE(mountd, logged_in_thread);
-		audit_mountd_mount(host, path, audit_status); /* BSM */
 		if (!error)
 			mntlist_new(host, rpath); /* add entry to mount list */
 	}
@@ -3025,7 +3062,8 @@ umount(struct svc_req *rqstp)
 	if (verbose)
 		syslog(LOG_NOTICE, "UNMOUNT: %s unmounted %s", host, path);
 
-	audit_mountd_umount(host, path);
+	if (mountd_bsm_audit)
+		audit_mountd_umount(host, path);
 
 	remove_path = rpath;	/* assume we will use the cannonical path */
 	if (realpath(path, rpath) == NULL) {
