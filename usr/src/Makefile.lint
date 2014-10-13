@@ -200,6 +200,7 @@ COMMON_SUBDIRS = \
 	cmd/luxadm \
 	cmd/lvm \
 	cmd/machid \
+	cmd/mailwrapper \
 	cmd/makekey \
 	cmd/man \
 	cmd/mdb \

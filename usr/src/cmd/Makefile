@@ -257,6 +257,7 @@ COMMON_SUBDIRS=		\
 	mach		\
 	machid		\
 	mail		\
+	mailwrapper	\
 	mailx		\
 	makekey		\
 	man		\
