@@ -177,6 +177,8 @@ class IPSConvert:
         self.origname = self.pkgfmri.pkg_name.rsplit('/', 1)[-1].lower()
 
         self.arch = self.mf.get('variant.arch', None)
+        if (type(self.arch) == list and len(self.arch) != 0):
+            self.arch = self.arch[0]
         self.arch = 'solaris-%s' % (self.arch or 'i386')
 
         #
