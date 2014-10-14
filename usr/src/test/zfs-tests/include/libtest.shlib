@@ -26,6 +26,7 @@
 
 #
 # Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright 2014 Nexenta Systems, Inc.
 #
 
 . ${STF_TOOLS}/contrib/include/logapi.shlib
@@ -2570,10 +2571,12 @@ function is_te_enabled
 	fi
 }
 
-# Utility function to determine if a system has multiple cpus.
+#
+# Check if system has multiple CPUs (cores)
+#
 function is_mp
 {
-	(($(psrinfo -p) > 1))
+	(($(psrinfo | wc -l) > 1))
 }
 
 # Run the given command as the user provided.
