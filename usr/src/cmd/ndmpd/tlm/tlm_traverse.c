@@ -198,8 +198,19 @@ new_tsp(char *path)
 int
 fs_getstat(char *path, fs_fhandle_t *fh, struct stat64 *st)
 {
-	if (lstat64(path, st) == -1)
+	int res;
+tryagain:
+
+	res = lstat64(path, st);
+	if (res != 0) {
+		if (errno == EIO || errno == EACCES){
+			NDMP_LOG(LOG_ERR, "Try again on path %s errno = (%d)", path, errno);
+			errno = 0;
+			goto tryagain;
+		}
+		NDMP_LOG(LOG_ERR, "Error on path %s errno = (%d)", path, errno);
 		return (errno);
+	}
 
 	fh->fh_fid = st->st_ino;
 
@@ -422,7 +433,6 @@ traverse_post(struct fs_traverse *ftp)
 			    &efh, &est);
 
 			if (rv != 0) {
-				free(efh.fh_fpath);
 				traverse_stats.fss_readdir_err++;
 
 				NDMP_LOG(LOG_DEBUG,
