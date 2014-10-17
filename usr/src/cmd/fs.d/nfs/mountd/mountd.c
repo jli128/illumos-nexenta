@@ -60,6 +60,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <thread.h>
+#include <pthread.h>
 #include <assert.h>
 #include <priv_utils.h>
 #include <nfs/auth.h>
@@ -150,19 +151,134 @@ typedef struct logging_data {
 static logging_data *logging_head = NULL;
 static logging_data *logging_tail = NULL;
 
+#define	MOUNTD_STKSZ	(16 * 1024)	/* 16KB Stacks */
+static	uint32_t	nm_thrds = 0;
+static	uint32_t	mx_thrds = 2;	/* fallback default: see main() */
+
+static	thread_key_t	door_key;
+static	mutex_t		door_lock;
+static	cond_t		door_cv;
+static	int		cmd_door = -1;
+static	int		auth_door = -1;
+
+void *
+mntd_door_thread(void *arg)
+{
+	door_info_t	*dp = (door_info_t *)arg;
+	void		*proc = (void *)(uintptr_t)dp->di_proc;
+	static void	*value;
+	int		 dfd = 0;
+	char		 func[1024];
+
+	(void) mutex_lock(&door_lock);
+	while (auth_door == -1 || cmd_door == -1)
+		cond_wait(&door_cv, &door_lock);
+	(void) mutex_unlock(&door_lock);
+
+	value = (nm_thrds >= mx_thrds) ? (void *)1 : (void *)0;
+	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
+	(void) thr_setspecific(door_key, value);
+
+	bzero(func, 1024);
+	if (proc == (void *)nfsauth_func) {
+		dfd = auth_door;
+		bcopy("nfsauth_func", func, strlen("nfsauth_func")+1);
+	} else if (proc == (void *)nfscmd_func) {
+		dfd = cmd_door;
+		bcopy("nfscmd_func", func, strlen("nfscmd_func")+1);
+	} else {
+#ifdef	DEBUG
+		char	buf[1024];
+		uint_t	len = 1024;
+
+		bzero(buf, len);
+		(void) addrtosymstr(proc, buf, len);
+		syslog(LOG_ERR, "mntd_door_thread: unknown func \"%s\"", buf);
+#endif
+		thr_exit(NULL);
+	}
+
+	if (door_bind(dfd) < 0) {
+		/* Can't bind thread to door; game over ! */
+		syslog(LOG_ERR,
+		    "Unable to bind door for %s: %s", func, strerror(errno));
+		exit(20);
+	}
+#ifdef	DEBUG
+	syslog(LOG_NOTICE, "%s: (%d) Door Bound Successfully", func, dfd);
+#endif
+	door_return(NULL, 0, NULL, 0);
+
+	/* NOTREACHED */
+	return (NULL);
+}
+
+/*
+ * Manages stacksize and threadpool
+ */
+static void
+mntd_door_create(door_info_t *dp)
+{
+	thread_t	 tid;
+	int		 num = 0;
+	int		 rc = 0;
+	size_t		 stksz = MOUNTD_STKSZ;
+	long		 flags = THR_DETACHED;
+
+	if (dp == NULL) {
+		syslog(LOG_NOTICE, "mntd_door_create: dp == NULL");
+		return;
+	}
+
+	if ((num = atomic_inc_32_nv(&nm_thrds)) > mx_thrds) {
+		atomic_dec_32(&nm_thrds);
+		num -= 1;
+#ifdef	DEBUG
+		syslog(LOG_ERR,
+		    "mntd_door_create: %d threads already active", num);
+#endif
+		return;
+	}
+
+	rc = thr_create(NULL, stksz, mntd_door_thread, (void *)dp, flags, &tid);
+	if (rc != 0) {
+		atomic_dec_32(&nm_thrds);
+		syslog(LOG_ERR, "mntd_door_create: %s", strerror(errno));
+		return;
+	}
+#ifdef	DEBUG
+	syslog(LOG_NOTICE,
+	    "mntd_door_create: tid %d created (nm_thrds = %d)", tid, nm_thrds);
+#endif
+}
+
+static void
+mntd_door_destroy(void *arg)
+{
+	atomic_dec_32(&nm_thrds);
+#ifdef	DEBUG
+	syslog(LOG_NOTICE, "mntd_door_destroy: (nm_thrds = %d)", nm_thrds);
+#endif
+}
+
 /* ARGSUSED */
 static void *
 nfsauth_svc(void *arg)
 {
-	int	doorfd = -1;
 	uint_t	darg;
+	uint_t	flags = (DOOR_PRIVATE | DOOR_NO_CANCEL | DOOR_REFUSE_DESC);
 #ifdef DEBUG
 	int	dfd;
 #endif
 
-	if ((doorfd = door_create(nfsauth_func, NULL,
-	    DOOR_REFUSE_DESC | DOOR_NO_CANCEL)) == -1) {
-		syslog(LOG_ERR, "Unable to create door: %m\n");
+	/* register 'nfsauth_func' as the new door service */
+	(void) mutex_lock(&door_lock);
+	auth_door = door_create(nfsauth_func, NULL, flags);
+	cond_signal(&door_cv);
+	(void) mutex_unlock(&door_lock);
+
+	if (auth_door < 0) {
+		syslog(LOG_ERR, "nfsauth_svc: %s", strerror(errno));
 		exit(10);
 	}
 
@@ -173,7 +289,7 @@ nfsauth_svc(void *arg)
 	if ((dfd = open(MOUNTD_DOOR, O_RDWR|O_CREAT|O_TRUNC,
 	    S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH)) == -1) {
 		syslog(LOG_ERR, "Unable to open %s: %m\n", MOUNTD_DOOR);
-		(void) close(doorfd);
+		(void) close(auth_door);
 		exit(11);
 	}
 
@@ -185,10 +301,10 @@ nfsauth_svc(void *arg)
 	/*
 	 * Register in namespace to pass to the kernel to door_ki_open
 	 */
-	if (fattach(doorfd, MOUNTD_DOOR) == -1) {
+	if (fattach(auth_door, MOUNTD_DOOR) == -1) {
 		syslog(LOG_ERR, "Unable to fattach door: %m\n");
 		(void) close(dfd);
-		(void) close(doorfd);
+		(void) close(auth_door);
 		exit(12);
 	}
 	(void) close(dfd);
@@ -197,7 +313,7 @@ nfsauth_svc(void *arg)
 	/*
 	 * Must pass the doorfd down to the kernel.
 	 */
-	darg = doorfd;
+	darg = auth_door;
 	(void) _nfssys(MOUNTD_ARGS, &darg);
 
 	/*
@@ -221,19 +337,24 @@ nfsauth_svc(void *arg)
 static void *
 cmd_svc(void *arg)
 {
-	int	doorfd = -1;
 	uint_t	darg;
+	uint_t	flags = (DOOR_PRIVATE | DOOR_NO_CANCEL | DOOR_REFUSE_DESC);
 
-	if ((doorfd = door_create(nfscmd_func, NULL,
-	    DOOR_REFUSE_DESC | DOOR_NO_CANCEL)) == -1) {
+	/* register 'nfscmd_func' as the new door service */
+	(void) mutex_lock(&door_lock);
+	cmd_door = door_create(nfscmd_func, NULL, flags);
+	cond_signal(&door_cv);
+	(void) mutex_unlock(&door_lock);
+
+	if (cmd_door < 0) {
 		syslog(LOG_ERR, "Unable to create cmd door: %m\n");
 		exit(10);
 	}
 
 	/*
-	 * Must pass the doorfd down to the kernel.
+	 * Must pass the cmd_door down to the kernel.
 	 */
-	darg = doorfd;
+	darg = cmd_door;
 	(void) _nfssys(NFSCMD_ARGS, &darg);
 
 	/*
@@ -604,9 +725,13 @@ main(int argc, char *argv[])
 	 * If max_threads was specified, then set the
 	 * maximum number of threads to the value specified.
 	 */
-	if (max_threads > 0 && !rpc_control(RPC_SVC_THRMAX_SET, &max_threads)) {
-		fprintf(stderr, "unable to set max_threads\n");
-		exit(1);
+	if (max_threads > 0) {
+		if (!rpc_control(RPC_SVC_THRMAX_SET, &max_threads)) {
+			fprintf(stderr, "unable to set max_threads\n");
+			exit(1);
+		}
+		/* Default to one fourth of all threads */
+		mx_thrds = (uint32_t)(max_threads / 4);
 	}
 
 	/*
@@ -616,6 +741,14 @@ main(int argc, char *argv[])
 	svc_unreg(MOUNTPROG, MOUNTVERS);
 	svc_unreg(MOUNTPROG, MOUNTVERS_POSIX);
 	svc_unreg(MOUNTPROG, MOUNTVERS3);
+
+	/* server function to create/optimize door threads */
+	(void) door_server_create(mntd_door_create);
+	if (thr_keycreate(&door_key, mntd_door_destroy) != 0) {
+		fprintf(stderr, "thr_keycreate (server thread): %s\n",
+		    strerror(errno));
+		exit(3);
+	}
 
 	/*
 	 * Create the nfsauth thread with same signal disposition
