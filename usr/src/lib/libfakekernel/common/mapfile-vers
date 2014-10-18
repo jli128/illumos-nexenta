@@ -38,6 +38,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	_curzone;
 
 	aok		{ FLAGS = NODIRECT };
+	boot_time;
 	cmn_err;
 	copyinstr;
 	copystr;

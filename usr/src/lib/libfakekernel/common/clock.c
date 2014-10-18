@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 
@@ -28,6 +28,15 @@ int tick_per_msec = 0;
 int msec_per_tick = 1;
 int usec_per_tick = 1000;
 int nsec_per_tick = 1000000;
+time_t boot_time = 0;
+
+#pragma init(_boot_time_init)
+static int
+_boot_time_init(void)
+{
+	boot_time = time(NULL);
+	return (0);
+}
 
 clock_t
 ddi_get_lbolt(void)

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SYS_ZONE_H
@@ -46,6 +46,8 @@ extern "C" {
  * run on future releases.
  */
 
+#define	GLOBAL_ZONEID	0
+
 #if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 #include <sys/list.h>
@@ -53,6 +55,7 @@ extern "C" {
 typedef struct zone {
 	zoneid_t	zone_id;	/* ID of zone */
 	struct proc	*zone_zsched;	/* Dummy kernel "zsched" process */
+	time_t		zone_boot_time;
 	int fake_zone[10];
 } zone_t;
 
