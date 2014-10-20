@@ -1,0 +1,18 @@
+##################################################
+TC /tests/sharemgr/add/tc_add_share
+
+TP 9 tc_add_share PASS
+ 
+##################################################
+                 SUMMARY      
+                 =======      
+ 
+Number of Tests : 1
+
+PASS            : 1
+FAIL            : 0
+UNRESOLVED      : 0
+UNINITIATED     : 0
+OTHER           : 0
+ 
+##################################################

@@ -1,0 +1,172 @@
+##################################################
+TC /tests/sharemgr/add/tc_add_share
+
+TP 1 tc_add_share PASS
+TP 2 tc_add_share PASS
+TP 3 tc_add_share PASS
+TP 4 tc_add_share PASS
+TP 5 tc_add_share PASS
+TP 6 tc_add_share PASS
+TP 7 tc_add_share PASS
+TP 8 tc_add_share PASS
+TP 9 tc_add_share PASS
+##################################################
+TC /tests/sharemgr/create/tc_create_share
+
+TP 1 tc_create_share PASS
+TP 2 tc_create_share PASS
+TP 3 tc_create_share PASS
+TP 4 tc_create_share PASS
+TP 5 tc_create_share PASS
+TP 6 tc_create_share PASS
+TP 7 tc_create_share PASS
+TP 8 tc_create_share PASS
+TP 9 tc_create_share PASS
+TP 10 tc_create_share PASS
+TP 11 tc_create_share PASS
+TP 12 tc_create_share PASS
+TP 13 tc_create_share PASS
+##################################################
+TC /tests/sharemgr/delete/tc_delete_share
+
+TP 1 tc_delete_share PASS
+TP 2 tc_delete_share PASS
+TP 3 tc_delete_share PASS
+TP 4 tc_delete_share PASS
+TP 5 tc_delete_share PASS
+TP 6 tc_delete_share PASS
+TP 7 tc_delete_share PASS
+##################################################
+TC /tests/sharemgr/disable/tc_disable_share
+
+TP 1 tc_disable_share PASS
+TP 2 tc_disable_share PASS
+TP 3 tc_disable_share PASS
+TP 4 tc_disable_share FAIL
+TP 5 tc_disable_share PASS
+TP 6 tc_disable_share PASS
+TP 7 tc_disable_share PASS
+TP 8 tc_disable_share PASS
+TP 9 tc_disable_share PASS
+TP 10 tc_disable_share PASS
+##################################################
+TC /tests/sharemgr/move/tc_move_share
+
+TP 1 tc_move_share PASS
+TP 2 tc_move_share PASS
+TP 3 tc_move_share PASS
+TP 4 tc_move_share PASS
+TP 5 tc_move_share PASS
+TP 6 tc_move_share PASS
+TP 7 tc_move_share PASS
+TP 8 tc_move_share PASS
+##################################################
+TC /tests/sharemgr/remove/tc_remove_share
+
+TP 1 tc_remove_share PASS
+TP 2 tc_remove_share PASS
+TP 3 tc_remove_share PASS
+TP 4 tc_remove_share PASS
+TP 5 tc_remove_share PASS
+TP 6 tc_remove_share PASS
+TP 7 tc_remove_share PASS
+TP 8 tc_remove_share PASS
+TP 9 tc_remove_share PASS
+TP 10 tc_remove_share PASS
+##################################################
+TC /tests/sharemgr/set_/tc_set_
+
+TP 1 tc_set_ PASS
+TP 2 tc_set_ PASS
+TP 3 tc_set_ PASS
+TP 4 tc_set_ PASS
+TP 5 tc_set_ PASS
+TP 6 tc_set_ PASS
+TP 7 tc_set_ PASS
+TP 8 tc_set_ PASS
+TP 9 tc_set_ PASS
+TP 10 tc_set_ PASS
+TP 11 tc_set_ PASS
+TP 12 tc_set_ PASS
+##################################################
+TC /tests/sharemgr/set_security/tc_set_security
+
+TP 1 tc_set_security PASS
+TP 2 tc_set_security PASS
+TP 3 tc_set_security PASS
+TP 4 tc_set_security PASS
+TP 5 tc_set_security PASS
+TP 6 tc_set_security PASS
+TP 7 tc_set_security FAIL
+TP 8 tc_set_security PASS
+TP 9 tc_set_security PASS
+TP 10 tc_set_security PASS
+TP 11 tc_set_security PASS
+TP 12 tc_set_security PASS
+TP 13 tc_set_security PASS
+TP 14 tc_set_security PASS
+TP 15 tc_set_security PASS
+##################################################
+TC /tests/sharemgr/set_share/tc_set_share
+
+TP 1 tc_set_share PASS
+TP 2 tc_set_share PASS
+TP 3 tc_set_share PASS
+TP 4 tc_set_share PASS
+TP 5 tc_set_share FAIL
+TP 6 tc_set_share FAIL
+TP 7 tc_set_share PASS
+TP 8 tc_set_share FAIL
+##################################################
+TC /tests/sharemgr/show/tc_show
+
+TP 1 tc_show PASS
+TP 2 tc_show PASS
+##################################################
+TC /tests/sharemgr/unset_/tc_unset_
+
+TP 1 tc_unset_ PASS
+TP 2 tc_unset_ PASS
+TP 3 tc_unset_ PASS
+TP 4 tc_unset_ PASS
+TP 5 tc_unset_ PASS
+TP 6 tc_unset_ PASS
+TP 7 tc_unset_ PASS
+TP 8 tc_unset_ PASS
+TP 9 tc_unset_ PASS
+TP 10 tc_unset_ PASS
+TP 11 tc_unset_ PASS
+TP 12 tc_unset_ PASS
+##################################################
+TC /tests/sharemgr/usage/tc_usage_share
+
+TP 1 tc_usage_share PASS
+TP 2 tc_usage_share PASS
+TP 3 tc_usage_share PASS
+##################################################
+TC /tests/sharemgr/zfs/tc_zfs_share
+
+TP 1 tc_zfs_share PASS
+TP 2 tc_zfs_share PASS
+TP 3 tc_zfs_share PASS
+TP 4 tc_zfs_share PASS
+##################################################
+TC /tests/sharemgr/zones/tc_zones_share
+
+TP 1 tc_zones_share UNINITIATED
+TP 2 tc_zones_share UNINITIATED
+TP 3 tc_zones_share UNINITIATED
+ 
+##################################################
+                 SUMMARY      
+                 =======      
+ 
+Number of Tests : 116
+
+PASS            : 108
+FAIL            : 5
+UNRESOLVED      : 0
+UNINITIATED     : 3
+OTHER           : 0
+ 
+##################################################

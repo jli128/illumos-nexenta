@@ -1,0 +1,20 @@
+##################################################
+TC /tests/sharemgr/usage/tc_usage_share
+
+TP 1 tc_usage_share PASS
+TP 2 tc_usage_share PASS
+TP 3 tc_usage_share PASS
+ 
+##################################################
+                 SUMMARY      
+                 =======      
+ 
+Number of Tests : 3
+
+PASS            : 3
+FAIL            : 0
+UNRESOLVED      : 0
+UNINITIATED     : 0
+OTHER           : 0
+ 
+##################################################

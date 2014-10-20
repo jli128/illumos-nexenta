@@ -1,0 +1,18 @@
+##################################################
+TC /tests/zones_named/tc_zones_named
+
+TP 1 tc_zones_named UNTESTED
+ 
+##################################################
+                 SUMMARY      
+                 =======      
+ 
+Number of Tests : 1
+
+PASS            : 0
+FAIL            : 0
+UNRESOLVED      : 0
+UNINITIATED     : 0
+OTHER           : 1
+ 
+##################################################

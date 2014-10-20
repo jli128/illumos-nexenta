@@ -26,16 +26,20 @@ export SCRATCH_DIR=/var/tmp
 # Test needs to be run as root 
 # Make sure /dev/lofi does not exist
 #
-rm -rf /dev/lofi
-if [$? != 0]; then
+if [ $? != 0 ]; then
 	echo Need to be run as root
 	exit
 fi
+if [ -d /dev/lofi ] ; then
+	rm -rf /dev/lofi
+fi
 
+PATH=$PATH:$CTI_ROOT/bin
+export PATH
 #
 # To run entire suite
 #
-run_test lofi-tests
+run_test -U /var/tmp/test_results/lofi-tests lofi-tests $1
 
 #
 # To run component

@@ -1,0 +1,18 @@
+##################################################
+TC /tests/sharemgr/create/tc_create_share
+
+TP 6 tc_create_share PASS
+ 
+##################################################
+                 SUMMARY      
+                 =======      
+ 
+Number of Tests : 1
+
+PASS            : 1
+FAIL            : 0
+UNRESOLVED      : 0
+UNINITIATED     : 0
+OTHER           : 0
+ 
+##################################################

@@ -1,0 +1,29 @@
+##################################################
+TC /tests/sharemgr/set_/tc_set_
+
+TP 1 tc_set_ PASS
+TP 2 tc_set_ PASS
+TP 3 tc_set_ PASS
+TP 4 tc_set_ PASS
+TP 5 tc_set_ PASS
+TP 6 tc_set_ PASS
+TP 7 tc_set_ PASS
+TP 8 tc_set_ PASS
+TP 9 tc_set_ PASS
+TP 10 tc_set_ PASS
+TP 11 tc_set_ PASS
+TP 12 tc_set_ PASS
+ 
+##################################################
+                 SUMMARY      
+                 =======      
+ 
+Number of Tests : 12
+
+PASS            : 12
+FAIL            : 0
+UNRESOLVED      : 0
+UNINITIATED     : 0
+OTHER           : 0
+ 
+##################################################

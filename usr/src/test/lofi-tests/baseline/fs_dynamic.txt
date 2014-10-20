@@ -1,0 +1,26 @@
+##################################################
+TC /tests/fs_dynamic/tc_fs_dynamic
+
+TP 1 tc_fs_dynamic PASS
+TP 2 tc_fs_dynamic PASS
+TP 3 tc_fs_dynamic PASS
+TP 4 tc_fs_dynamic PASS
+TP 5 tc_fs_dynamic PASS
+TP 6 tc_fs_dynamic PASS
+TP 7 tc_fs_dynamic PASS
+TP 8 tc_fs_dynamic PASS
+TP 9 tc_fs_dynamic PASS
+ 
+##################################################
+                 SUMMARY      
+                 =======      
+ 
+Number of Tests : 9
+
+PASS            : 9
+FAIL            : 0
+UNRESOLVED      : 0
+UNINITIATED     : 0
+OTHER           : 0
+ 
+##################################################

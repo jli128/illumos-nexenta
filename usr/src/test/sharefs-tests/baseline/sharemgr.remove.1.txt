@@ -1,0 +1,18 @@
+##################################################
+TC /tests/sharemgr/remove/tc_remove_share
+
+TP 1 tc_remove_share FAIL
+ 
+##################################################
+                 SUMMARY      
+                 =======      
+ 
+Number of Tests : 1
+
+PASS            : 0
+FAIL            : 1
+UNRESOLVED      : 0
+UNINITIATED     : 0
+OTHER           : 0
+ 
+##################################################

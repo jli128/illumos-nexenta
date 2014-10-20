@@ -34,11 +34,6 @@ export TESTDIR=/share_tests # no default as promised so set here
 #export SHR_TMPDIR=         # default to /var/tmp/share
 
 #
-# Start with clean test environment
-#
-run_test sharefs-tests unconfigure
-
-#
 # Configure the test by using run_test (see README)
 #
 run_test sharefs-tests configure
@@ -46,10 +41,10 @@ run_test sharefs-tests configure
 #
 # To run entire suite
 #
-run_test sharefs-tests
+run_test -U /var/tmp/test_results/sharefs-tests sharefs-tests $1
 
 #
-# To run component
+# To run component sharemgr
 #
 #run_test sharefs-tests sharemgr
 
@@ -57,3 +52,8 @@ run_test sharefs-tests
 # To run individual testcase
 #
 #run_test sharefs-tests sharemgr/create:3
+
+#
+# Start with clean test environment
+#
+run_test sharefs-tests unconfigure

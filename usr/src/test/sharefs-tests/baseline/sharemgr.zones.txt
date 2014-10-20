@@ -1,0 +1,20 @@
+##################################################
+TC /tests/sharemgr/zones/tc_zones_share
+
+TP 1 tc_zones_share UNINITIATED
+TP 2 tc_zones_share UNINITIATED
+TP 3 tc_zones_share UNINITIATED
+ 
+##################################################
+                 SUMMARY      
+                 =======      
+ 
+Number of Tests : 3
+
+PASS            : 0
+FAIL            : 0
+UNRESOLVED      : 0
+UNINITIATED     : 3
+OTHER           : 0
+ 
+##################################################

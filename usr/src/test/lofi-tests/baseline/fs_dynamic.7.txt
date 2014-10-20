@@ -1,0 +1,18 @@
+##################################################
+TC /tests/fs_dynamic/tc_fs_dynamic
+
+TP 7 tc_fs_dynamic PASS
+ 
+##################################################
+                 SUMMARY      
+                 =======      
+ 
+Number of Tests : 1
+
+PASS            : 1
+FAIL            : 0
+UNRESOLVED      : 0
+UNINITIATED     : 0
+OTHER           : 0
+ 
+##################################################

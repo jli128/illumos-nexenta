@@ -1,0 +1,17 @@
+##################################################
+TC /tests/sharemgr/disable/tc_disable_share
+
+ 
+##################################################
+                 SUMMARY      
+                 =======      
+ 
+Number of Tests : 0
+
+PASS            : 0
+FAIL            : 0
+UNRESOLVED      : 0
+UNINITIATED     : 0
+OTHER           : 0
+ 
+##################################################

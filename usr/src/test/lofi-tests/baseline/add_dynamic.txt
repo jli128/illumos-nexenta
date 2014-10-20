@@ -1,0 +1,45 @@
+##################################################
+TC /tests/add_dynamic/tc_add_dynamic
+
+TP 1 tc_add_dynamic PASS
+TP 2 tc_add_dynamic PASS
+TP 3 tc_add_dynamic PASS
+TP 4 tc_add_dynamic PASS
+TP 5 tc_add_dynamic PASS
+TP 6 tc_add_dynamic PASS
+TP 7 tc_add_dynamic PASS
+TP 8 tc_add_dynamic PASS
+TP 9 tc_add_dynamic PASS
+TP 10 tc_add_dynamic PASS
+TP 11 tc_add_dynamic PASS
+TP 12 tc_add_dynamic PASS
+TP 13 tc_add_dynamic PASS
+TP 14 tc_add_dynamic PASS
+TP 15 tc_add_dynamic PASS
+TP 16 tc_add_dynamic PASS
+TP 17 tc_add_dynamic PASS
+TP 18 tc_add_dynamic PASS
+TP 19 tc_add_dynamic PASS
+TP 20 tc_add_dynamic PASS
+TP 21 tc_add_dynamic PASS
+TP 22 tc_add_dynamic PASS
+TP 23 tc_add_dynamic PASS
+TP 24 tc_add_dynamic PASS
+TP 25 tc_add_dynamic PASS
+TP 26 tc_add_dynamic PASS
+TP 27 tc_add_dynamic PASS
+TP 28 tc_add_dynamic PASS
+ 
+##################################################
+                 SUMMARY      
+                 =======      
+ 
+Number of Tests : 28
+
+PASS            : 28
+FAIL            : 0
+UNRESOLVED      : 0
+UNINITIATED     : 0
+OTHER           : 0
+ 
+##################################################

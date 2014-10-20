@@ -1,0 +1,18 @@
+##################################################
+TC /tests/sharemgr/set_security/tc_set_security
+
+TP 14 tc_set_security PASS
+ 
+##################################################
+                 SUMMARY      
+                 =======      
+ 
+Number of Tests : 1
+
+PASS            : 1
+FAIL            : 0
+UNRESOLVED      : 0
+UNINITIATED     : 0
+OTHER           : 0
+ 
+##################################################
