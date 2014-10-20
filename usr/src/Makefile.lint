@@ -403,6 +403,9 @@ COMMON_SUBDIRS = \
 	lib/libkstat \
 	lib/liblgrp \
 	lib/liblm \
+	lib/libm \
+	lib/libm1 \
+	lib/libmvec \
 	lib/libmalloc \
 	lib/libmapmalloc \
 	lib/libmapid \
