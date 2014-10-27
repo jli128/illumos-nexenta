@@ -1042,7 +1042,7 @@ emlxs_node_throttle_set(emlxs_port_t *port, NODELIST *ndlp)
 	/* Check per wwpn default */
 	(void) snprintf(prop, sizeof (prop), "w%s-depth",
 	    emlxs_wwn_xlate(buf1, sizeof (buf1),
-		(uint8_t *)&ndlp->nlp_portname));
+	    (uint8_t *)&ndlp->nlp_portname));
 
 	throttle = (uint32_t)ddi_prop_get_int(DDI_DEV_T_ANY,
 	    (void *)hba->dip, DDI_PROP_DONTPASS, prop, throttle);

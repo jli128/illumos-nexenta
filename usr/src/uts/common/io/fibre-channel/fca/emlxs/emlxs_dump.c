@@ -3451,7 +3451,8 @@ emlxs_dump_menlo_log(
 		    emlxs_dump_string_txtfile(fpCeeFile, buf1, 0, 0, 1);
 
 		/* print a caption for the current log */
-		(void) strlcpy(buf1, LEGEND_MENLO_LOG_PANIC_LOGS, sizeof (buf1));
+		(void) strlcpy(buf1, LEGEND_MENLO_LOG_PANIC_LOGS,
+		    sizeof (buf1));
 		buf2[0] = 0;
 		for (j = 0; j < 75; j++) {
 			(void) strlcat(buf2, "-", sizeof (buf2));
@@ -3983,7 +3984,8 @@ emlxs_dump_temp_event(
 	/* keep trying to dump more stuff. */
 
 	/* Write a warning at the top of the file */
-	(void) strlcpy(sBuf1, "WARNING: HBA Temperature Event:\n", sizeof (sBuf1));
+	(void) strlcpy(sBuf1, "WARNING: HBA Temperature Event:\n",
+	    sizeof (sBuf1));
 	switch (tempType) {
 	case TEMP_TYPE_CRITICAL:
 		(void) snprintf(sBuf2, sizeof (sBuf2),

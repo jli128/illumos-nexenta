@@ -5663,10 +5663,10 @@ emlxs_sli4_process_wqe_cmpl(emlxs_hba_t *hba, CQ_DESC_t *cq, CQE_CmplWQ_t *cqe)
 	}
 
 	if (sbp->pkt_flags & PACKET_IN_CHIPQ) {
-		atomic_dec_32(&hba->io_active);
+		atomic_add_32(&hba->io_active, -1);
 #ifdef NODE_THROTTLE_SUPPORT
 		if (sbp->node) {
-			atomic_dec_32(&sbp->node->io_active);
+			atomic_add_32(&sbp->node->io_active, -1);
 		}
 #endif /* NODE_THROTTLE_SUPPORT */
 	}
@@ -7493,7 +7493,8 @@ emlxs_sli4_resource_alloc(emlxs_hba_t *hba)
 	for (i = 0; i < EMLXS_MAX_RXQS; i++) {
 		bzero(&hba->sli.sli4.rxq[i], sizeof (RXQ_DESC_t));
 
-		mutex_init(&hba->sli.sli4.rxq[i].lock, NULL, MUTEX_DRIVER, NULL);
+		mutex_init(&hba->sli.sli4.rxq[i].lock, NULL, MUTEX_DRIVER,
+		    NULL);
 	}
 
 

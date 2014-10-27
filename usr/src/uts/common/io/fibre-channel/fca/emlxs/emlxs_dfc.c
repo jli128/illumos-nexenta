@@ -5660,7 +5660,7 @@ emlxs_dfc_send_ct(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 			    "%s: WWPN does not exists. %s",
 			    emlxs_dfc_xlate(dfc->cmd), emlxs_wwn_xlate(buffer,
-				sizeof (buffer), destid->wwpn));
+			    sizeof (buffer), destid->wwpn));
 
 			rval = DFC_ARG_INVALID;
 			goto done;
@@ -6721,7 +6721,7 @@ emlxs_dfc_send_els(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 			    "%s: WWPN does not exists. %s",
 			    emlxs_dfc_xlate(dfc->cmd), emlxs_wwn_xlate(buffer,
-				sizeof (buffer), destid->wwpn));
+			    sizeof (buffer), destid->wwpn));
 
 			rval = DFC_ARG_INVALID;
 			goto done;
@@ -10175,7 +10175,7 @@ emlxs_dfc_send_scsi_fcp(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 			    "%s: WWPN does not exists. %s",
 			    emlxs_dfc_xlate(dfc->cmd), emlxs_wwn_xlate(buffer,
-				sizeof (buffer), (uint8_t *)&cmdinfo->src_wwn));
+			    sizeof (buffer), (uint8_t *)&cmdinfo->src_wwn));
 
 			rval = DFC_ARG_INVALID;
 			goto done;
@@ -10187,7 +10187,7 @@ emlxs_dfc_send_scsi_fcp(emlxs_hba_t *hba, dfc_t *dfc, int32_t mode)
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "%s: WWPN does not exists. %s", emlxs_dfc_xlate(dfc->cmd),
 		    emlxs_wwn_xlate(buffer, sizeof (buffer),
-			(uint8_t *)&cmdinfo->dst_wwn));
+		    (uint8_t *)&cmdinfo->dst_wwn));
 
 		rval = DFC_ARG_INVALID;
 		goto done;

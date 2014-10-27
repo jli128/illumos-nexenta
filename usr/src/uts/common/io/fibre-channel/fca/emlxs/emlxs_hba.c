@@ -1427,7 +1427,7 @@ emlxs_decode_label(char *label, char *buffer, int bige, size_t len)
 	uint32_t i;
 	char name[16];
 
-	bzero(name, sizeof(name));
+	bzero(name, sizeof (name));
 	bcopy(label, name, MIN(sizeof (name), len));
 	/* bige is TRUE if the data format is big endian */
 

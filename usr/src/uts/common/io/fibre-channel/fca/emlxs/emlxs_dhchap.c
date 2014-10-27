@@ -6744,8 +6744,9 @@ emlxs_log_auth_event(
 	if (lwwn_str == NULL) {
 		return;
 	}
-	(void) snprintf(lwwn_str, 32, "%02X%02X%02X%02X%02X%02X%02X%02X", lwwn[0],
-	    lwwn[1], lwwn[2], lwwn[3], lwwn[4], lwwn[5], lwwn[6], lwwn[7]);
+	(void) snprintf(lwwn_str, 32, "%02X%02X%02X%02X%02X%02X%02X%02X",
+	    lwwn[0], lwwn[1], lwwn[2], lwwn[3], lwwn[4], lwwn[5], lwwn[6],
+	    lwwn[7]);
 
 	bcopy((void *)&auth_cfg->remote_entity, (void *)rwwn, 8);
 	rwwn_str = (char *)kmem_zalloc(32, KM_NOSLEEP);
@@ -6754,8 +6755,9 @@ emlxs_log_auth_event(
 		return;
 	}
 
-	(void) snprintf(rwwn_str, 32, "%02X%02X%02X%02X%02X%02X%02X%02X", rwwn[0],
-	    rwwn[1], rwwn[2], rwwn[3], rwwn[4], rwwn[5], rwwn[6], rwwn[7]);
+	(void) snprintf(rwwn_str, 32, "%02X%02X%02X%02X%02X%02X%02X%02X",
+	    rwwn[0], rwwn[1], rwwn[2], rwwn[3], rwwn[4], rwwn[5], rwwn[6],
+	    rwwn[7]);
 
 	(void) snprintf(ext_subclass, sizeof (ext_subclass),
 	    "ESC_%s_%s", DRIVER_NAME, subclass);
@@ -7847,9 +7849,9 @@ emlxs_auth_cfg_print(emlxs_hba_t *hba, emlxs_auth_cfg_t *auth_cfg)
 	    &emlxs_fcsp_detail_msg,
 	    "%s:%s:%x:%x:%x:%x%x%x%x:%x%x%x%x:%x%x%x%x%x%x%x%x:%x",
 	    emlxs_wwn_xlate(s_lwwpn, sizeof (s_lwwpn),
-		(uint8_t *)&auth_cfg->local_entity),
+	    (uint8_t *)&auth_cfg->local_entity),
 	    emlxs_wwn_xlate(s_rwwpn, sizeof (s_rwwpn),
-		(uint8_t *)&auth_cfg->remote_entity),
+	    (uint8_t *)&auth_cfg->remote_entity),
 	    auth_cfg->authentication_timeout,
 	    auth_cfg->authentication_mode,
 	    auth_cfg->bidirectional,
@@ -8517,9 +8519,9 @@ emlxs_auth_key_print(emlxs_hba_t *hba, emlxs_auth_key_t *auth_key)
 	    &emlxs_fcsp_detail_msg,
 	    "auth-key> %s:%s:%x:*%d chars*:%x:*%d chars*",
 	    emlxs_wwn_xlate(s_lwwpn, sizeof (s_lwwpn),
-		(uint8_t *)&auth_key->local_entity),
+	    (uint8_t *)&auth_key->local_entity),
 	    emlxs_wwn_xlate(s_rwwpn, sizeof (s_rwwpn),
-		(uint8_t *)&auth_key->remote_entity),
+	    (uint8_t *)&auth_key->remote_entity),
 	    auth_key->local_password_type, auth_key->local_password_length,
 	    auth_key->remote_password_type, auth_key->remote_password_length);
 
@@ -9353,9 +9355,9 @@ emlxs_dhc_delete_auth_cfg(
 		    &emlxs_dfc_error_msg,
 		    "dhc_delete_auth_cfg: entry not found. %s:%s",
 		    emlxs_wwn_xlate(s_lwwpn, sizeof (s_lwwpn),
-			(uint8_t *)&fcsp_cfg->lwwpn),
+		    (uint8_t *)&fcsp_cfg->lwwpn),
 		    emlxs_wwn_xlate(s_rwwpn, sizeof (s_rwwpn),
-			(uint8_t *)&fcsp_cfg->rwwpn));
+		    (uint8_t *)&fcsp_cfg->rwwpn));
 
 		mutex_exit(&hba->auth_lock);
 
@@ -9403,9 +9405,9 @@ emlxs_dhc_get_auth_key(emlxs_hba_t *hba, dfc_auth_password_t *dfc_auth_pwd)
 		    &emlxs_dfc_error_msg,
 		    "dhc_get_auth_key: entry not found. %s:%s",
 		    emlxs_wwn_xlate(s_lwwpn, sizeof (s_lwwpn),
-			(uint8_t *)&dfc_auth_pwd->lwwpn),
+		    (uint8_t *)&dfc_auth_pwd->lwwpn),
 		    emlxs_wwn_xlate(s_rwwpn, sizeof (s_rwwpn),
-			(uint8_t *)&dfc_auth_pwd->rwwpn));
+		    (uint8_t *)&dfc_auth_pwd->rwwpn));
 
 		mutex_exit(&hba->auth_lock);
 
@@ -9667,9 +9669,9 @@ emlxs_dhc_get_auth_status(emlxs_hba_t *hba, dfc_auth_status_t *fcsp_status)
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
 		    "dhc_get_auth_status: entry not found. %s:%s",
 		    emlxs_wwn_xlate(s_lwwpn, sizeof (s_lwwpn),
-			(uint8_t *)&fcsp_status->lwwpn),
+		    (uint8_t *)&fcsp_status->lwwpn),
 		    emlxs_wwn_xlate(s_rwwpn, sizeof (s_rwwpn),
-			(uint8_t *)&fcsp_status->rwwpn));
+		    (uint8_t *)&fcsp_status->rwwpn));
 
 		mutex_exit(&hba->auth_lock);
 

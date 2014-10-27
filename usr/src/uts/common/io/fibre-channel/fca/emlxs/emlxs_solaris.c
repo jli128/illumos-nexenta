@@ -5104,7 +5104,7 @@ set_throttle_done:
 					    "EMLXS_GET_THROTTLE: wwpn=%s "
 					    "depth=%d",
 					    emlxs_wwn_xlate(buf1, sizeof (buf1),
-						desc[j].wwpn),
+					    desc[j].wwpn),
 					    desc[j].throttle);
 
 					j++;
@@ -7177,7 +7177,7 @@ emlxs_hba_attach(dev_info_t *dip)
 		    hba->model_info.device_id, hba->model_info.model);
 		goto failed;
 	}
-#define FILTER_ORACLE_BRANDED
+#define	FILTER_ORACLE_BRANDED
 #ifdef FILTER_ORACLE_BRANDED
 
 	/* Oracle branded adapters are not supported in this driver */
@@ -11205,7 +11205,7 @@ emlxs_menlo_cmd_xlate(uint32_t cmd)
 		}
 	}
 
-	(void) snprintf(buffer, sizeof (buffer),"Cmd=0x%x", cmd);
+	(void) snprintf(buffer, sizeof (buffer), "Cmd=0x%x", cmd);
 	return (buffer);
 
 } /* emlxs_menlo_cmd_xlate() */
@@ -11267,7 +11267,7 @@ emlxs_mscmd_xlate(uint16_t mscmd)
 		}
 	}
 
-	(void) snprintf(buffer, sizeof (buffer),"Cmd=0x%x", mscmd);
+	(void) snprintf(buffer, sizeof (buffer), "Cmd=0x%x", mscmd);
 	return (buffer);
 
 } /* emlxs_mscmd_xlate() */
