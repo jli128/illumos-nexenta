@@ -164,9 +164,22 @@ function configure {
 			return
 		fi
 	elif [[ $fs_type == zfs ]]; then
-		ZFSPOOL=$(echo $strfs | awk '{print $3}')
-		if [[ $(echo $strfs | awk '{print $4}') != "ONLINE" ]]; then
-			cti_result FAIL "zpool<$ZFSPOOL> is not online"
+		#
+		# Do not assume that all the existing pool can be used for testing.
+		# Should always create a test pool for testing.
+		#
+		# The old code always uses root pool for testing purpose
+		# which is dangerous and always trashes the root pool after test.
+		#
+		# To fix the problem, always create a separate test pool
+		#
+		ZFSPOOL=test_pool
+		TESTPOOL_VDEV=$TESTDIR/testpool.file.$$
+		mkfile 2g $TESTPOOL_VDEV
+		create_zpool -f $ZFSPOOL $TESTPOOL_VDEV
+		if (( $? != 0 )); then
+			cti_result FAIL \
+				"failed to create zpool<test_pool>"
 			return
 		fi
 	else
@@ -225,6 +238,27 @@ function configure {
 
 #
 # NAME
+#	unconfig_test_pool
+#
+# DESCRIPTION
+#	This function is used to cleanup and destroy the pools 
+#	created for testing.  The function takes <poolname>
+#	as the only argument.
+#
+function unconfig_test_pool {
+	POOL=$1
+
+	umount /$POOL
+	if (( $? != 0 )); then
+		tet_infoline "WARNING: unable to umount $POOL"
+	fi
+	zpool destroy -f $POOL
+	[[ $? != 0 ]] && tet_infoline \
+	"WARNING: unable to remove $POOL"
+}
+
+#
+# NAME
 #       unconfig_test_suite
 #
 # DESCRIPTION
@@ -237,21 +271,15 @@ function unconfigure {
 	# clean up test fs
 	[[ $setup_once == "TRUE" ]] && clean_fs
 
-	# delete zfs pool if needed
-	if [[ -z $ZFSPOOL ]]; then
-		zpool list share_pool > /dev/null 2>&1
-		if (( $? == 0 )); then
-			umount /share_pool
-			ret=$((ret + $?))
-			if (( $ret != 0 )); then
-			    tet_infoline "WARNING: unable to umount /share_pool"
-			else
-			    zpool destroy -f share_pool
-			    ret=$((ret + $?))
-			    (( $ret != 0 )) && tet_infoline \
-					"WARNING: unable to remove share_pool"
-			fi
-		fi
+	# delete zfs test pools if needed
+	zpool list share_pool > /dev/null 2>&1
+	if (( $? == 0 )); then
+		unconfig_test_pool share_pool	
+	fi
+
+	zpool list test_pool > /dev/null 2>&1
+	if (( $? == 0 )); then
+		unconfig_test_pool test_pool	
 	fi
 
 	# remove temporary test directory if it is empty,
