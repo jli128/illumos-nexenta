@@ -40,6 +40,7 @@ SHFILES= \
 	genoffsets \
 	hgsetup \
 	nightly \
+	nightly_test \
 	onu \
 	onu-deb \
 	protocmp.terse \

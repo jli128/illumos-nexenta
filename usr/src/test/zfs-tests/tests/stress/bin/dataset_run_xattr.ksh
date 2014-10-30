@@ -27,7 +27,7 @@
 # ident	"@(#)dataset_run_xattr.ksh	1.3	07/07/31 SMI"
 #
 
-. $STF_SUITE/include/libtest.kshlib
+. $STF_SUITE/include/libtest.shlib
 
 #
 # Perform a bunch of extended attribute test on some newly created filesystem.

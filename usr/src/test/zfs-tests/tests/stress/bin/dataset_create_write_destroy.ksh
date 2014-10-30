@@ -27,7 +27,7 @@
 # ident	"@(#)dataset_create_write_destroy.ksh	1.3	07/10/09 SMI"
 #
 
-. ${STF_SUITE}/include/libtest.kshlib
+. ${STF_SUITE}/include/libtest.shlib
 
 #
 # Perform a bunch of read/writes on some newly created datasets.

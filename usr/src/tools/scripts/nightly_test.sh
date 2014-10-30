@@ -126,7 +126,7 @@ integer total_other=0
 #    $2 : Optional to specify a specific test within a suite to run. This is something like
 #	  delete or delete:2
 #
-run_suite () {
+function run_suite {
 	if [ -f ${TEST_RESULTS_DIR}/$1/testlog ] ; then
 		rm ${TEST_RESULTS_DIR}/$1/testlog
 	fi
@@ -175,7 +175,7 @@ run_suite () {
 #
 # run the predefined smoke tests. Takes no arguments
 #
-run_smoketests() {
+function run_smoketests {
 	for subtest in ${smoke_subtests[@]}; do
 		# Copy results from previous run from <test name>.txt to <test name>.prev
 		if [ -f ${TEST_RESULTS_DIR}/${smoke_test_suite[$subtest]}/$subtest.txt ] ; then
@@ -198,7 +198,7 @@ run_smoketests() {
 # $1 : Full path to the test results for the suite that was run.
 # $2 : The base name of the file where the tests results are stored.
 #
-prev_diff_to_email() {
+function prev_diff_to_email {
 	if [ -f $1/$2.prev ] ; then
 		diff $1/$2.prev $1/$2.txt >> $mail_msg_file
 	fi
@@ -211,7 +211,7 @@ prev_diff_to_email() {
 # $2 : The name of the baseline test file 
 # $3 : The name of the file where the test results are stored
 #
-baseline_diff_to_email() {
+function baseline_diff_to_email {
 	if [ -f $OPTHOME/$1/baseline/$2 ] ; then
 		diff $OPTHOME/$1/baseline/$2 \
 			${TEST_RESULTS_DIR}/$1/$3 >> $mail_msg_file
@@ -227,7 +227,7 @@ baseline_diff_to_email() {
 # $1 : Full path to summary file
 # return : number of PASS tests
 # 
-detect_num_pass () {
+function detect_num_pass  {
 	pass=`grep "PASS" $1 | grep ":" | awk '{ print $3 }'`
 }
 
@@ -236,7 +236,7 @@ detect_num_pass () {
 # $1 : Full path to summary file
 # return : number of FAIL tests
 # 
-detect_num_fail () {
+function detect_num_fail {
 	fail=`grep "FAIL" $1 | grep ":" | awk '{ print $3 }'`
 }
 
@@ -245,7 +245,7 @@ detect_num_fail () {
 # $1 : Full path to summary file
 # return : number of UNINITIATED tests
 # 
-detect_num_uninitiated () {
+function detect_num_uninitiated {
 	uninitiated=`grep "UNINITIATED" $1 | grep ":" | awk '{ print $3 }'`
 }
 
@@ -254,7 +254,7 @@ detect_num_uninitiated () {
 # $1 : Full path to summary file
 # return : number of  UNRESOLVED tests
 # 
-detect_num_unresolved () {
+function detect_num_unresolved {
 	unresolved=`grep "UNRESOLVED" $1 | grep ":" | awk '{ print $3 }'`
 }
 
@@ -264,7 +264,7 @@ detect_num_unresolved () {
 # $1 : Full path to summary file
 # return : number of OTHER tests
 # 
-detect_num_other () {
+function detect_num_other {
 	other=`grep "OTHER" $1 | grep ":" | awk '{ print $3 }'`
 }
 
@@ -273,7 +273,7 @@ detect_num_other () {
 # file
 # $1 : Full path to file to gather the statistics from
 #
-gather_current_statistics () {
+function gather_current_statistics {
 	# Look for PASS : in the test results summary file for this suite. Add the
 	# number of passes to our running total.
 	detect_num_pass $1
@@ -312,7 +312,7 @@ gather_current_statistics () {
 # file
 # $1 : Full path to file to gather the statistics from
 #
-gather_previous_statistics () {
+function gather_previous_statistics {
 	# Look for PASS : in the previous test results summary file for this suite. Add the
 	# number of passes to our running total.
 	detect_num_pass $1
@@ -350,7 +350,7 @@ gather_previous_statistics () {
 # file
 # $1 : Full path to file to gather the statistics from
 #
-gather_baseline_statistics () {
+function gather_baseline_statistics {
 	# Look for PASS : in the baseline summary file for this suite. Add the
 	# number of passed tests to our running total.
 	detect_num_pass $1
@@ -385,42 +385,42 @@ gather_baseline_statistics () {
 }
 
 # standard outputs for the email message
-previous_diffs_header () {
+function previous_diffs_header {
 	echo "\n==== Test run differences from previous run ====" >> $mail_msg_file
 	return
 }
 
-baseline_diffs_header () {
+function baseline_diffs_header {
 	echo "\n==== Test run differences from baseline run ====" >> $mail_msg_file
 	return
 }
 
-summary_failed_tests_header () {
+function summary_failed_tests_header {
 	echo "\n=========Summary for Failed test runs ==========" >> $mail_msg_file 
 	return
 }
 
-details_failed_tests_header () {
+function details_failed_tests_header {
 	echo "\n=========Details for Failed test runs ==========" >> $mail_msg_file 
 	return
 }
 
-previous_diffs_output () {
+function previous_diffs_output {
 	echo "\n"The previous run ran $prev_total_tests tests, $prev_total_pass passed, $prev_total_fail failed, $prev_total_uninitiated were uninitiated, $prev_total_unresolved were unresolved, and $prev_total_other had other results. >> $mail_msg_file
 	return
 }
 
-current_diffs_output () {
+function current_diffs_output {
 	echo "\n"The current run ran $total_tests tests, $total_pass passed, $total_fail failed, $total_uninitiated were uninitiated, $total_unresolved were unresolved, and $total_other had other results. >> $mail_msg_file
 	return
 }
 
-baseline_diffs_output () {
+function baseline_diffs_output {
 	echo "\n"The baseline run ran $baseline_total_tests tests, $baseline_total_pass passed, $baseline_total_fail failed, $baseline_total_uninitiated were uninitiated, $baseline_total_unresolved were unresolved, and $baseline_total_other had other results. >> $mail_msg_file
 	return
 }
 
-summary_failed_tests_output () {
+function summary_failed_tests_output {
 	grep FAIL $1 | grep -v ":" >> $mail_msg_file
 }
 
@@ -429,7 +429,7 @@ summary_failed_tests_output () {
 # $1 : test suite name
 # $2 : Full path name for the summary file for this test.
 #
-details_failed_tests_output () {
+function details_failed_tests_output {
 	grep FAIL $2 | grep -v ":" > tmp
 	file="tmp"
 	while read tp test_num test_name status; do
@@ -452,7 +452,7 @@ details_failed_tests_output () {
 #
 # Place the results of the smoke test run into the email message.
 #
-generate_smoke_test_email() {
+function generate_smoke_test_email {
 	prev_total_tests=0
 	prev_total_pass=0
 	prev_total_fail=0
@@ -514,7 +514,7 @@ generate_smoke_test_email() {
 # $1 : name of the suite
 # $2 : (optional) name of the specific test in the suite. Can be of the form delete or delete:2
 #
-generate_suite_email () {
+function generate_suite_email {
 	prev_total_tests=0
 	prev_total_pass=0
 	prev_total_fail=0
@@ -586,7 +586,7 @@ generate_suite_email () {
 #
 # Place the results of the "all tests" test run into the email message.
 #
-generate_all_test_email() {
+function generate_all_test_email {
 	prev_total_tests=0
 	prev_total_pass=0
 	prev_total_fail=0
@@ -684,7 +684,7 @@ generate_all_test_email() {
 # $1: List of files/directories in a directory to be scanned
 # $2: Name of the calling directory
 # returns: name of a directory to add to the message. It will also modify the message (list_msg)   
-find_tests() {
+function find_tests {
 	found_test=""
 	typeset -i count
 	count=0

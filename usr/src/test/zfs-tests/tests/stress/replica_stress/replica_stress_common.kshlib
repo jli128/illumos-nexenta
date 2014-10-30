@@ -27,6 +27,8 @@
 #
 
 . ${STF_SUITE}/include/libtest.shlib
+. ${STF_SUITE}/tests/stress/stress.cfg
+. ${STF_SUITE}/tests/stress/replica_stress/default.cfg
 
 function create_write_fs
 {
@@ -65,7 +67,7 @@ function cleanup
 
 	typeset fs
 	for fs in $($ZFS list -H -o name -t filesystem); do
-		[[ $fs == $pool ]] && continue
+		[[ ` echo $fs|awk -F'/' '{print $1}'` != $pool ]] && continue
 
 		if datasetexists $fs; then
 			typeset mpt=$(get_prop mountpoint $fs)

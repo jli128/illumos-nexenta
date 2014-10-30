@@ -28,7 +28,7 @@
 #
 
 . ${STF_SUITE}/include/libtest.shlib
-. ${STF_SUITE}/tests/stress/replica_stress/mirror_stress_common.kshlib
+. ${STF_SUITE}/tests/stress/replica_stress/replica_stress_common.kshlib
 
 ###############################################################################
 #
@@ -95,7 +95,7 @@ log_onexit cleanup
 typeset pool=
 typeset child_pids=
 
-for pool in $(get_mirrors); do
+for pool in $(get_pools); do
 	log_note "$CREATE_WRITE_DESTROY_SCRIPT $pool"
 	$CREATE_WRITE_DESTROY_SCRIPT $pool > /dev/null 2>&1 &
 	child_pids="$child_pids $!"

@@ -34,7 +34,7 @@
 # @return: 0 if all the work completed OK.
 # @use: TOTAL_COUNT log_note log_assert ZFS MKDIR RM
 
-. ${STF_SUITE}/include/libtest.kshlib
+. ${STF_SUITE}/include/libtest.shlib
 
 typeset -i child=0
 typeset -i count=0

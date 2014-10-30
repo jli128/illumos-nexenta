@@ -28,12 +28,12 @@
 #
 
 . ${STF_SUITE}/include/libtest.shlib
-. ${STF_SUITE}/tests/stress/replica_stress/mirror_stress_common.kshlib
+. ${STF_SUITE}/tests/stress/replica_stress/replica_stress_common.kshlib
 
 setup_mirrors $NUMBER_OF_MIRRORS $DISKS
 
 ln=0
-for pool in $(get_mirrors); do
+for pool in $(get_pools); do
 	$MKFILE 64m /var/tmp/slog.001.${ln}
 
 	$ZPOOL add $pool /var/tmp/slog.001.${ln}
