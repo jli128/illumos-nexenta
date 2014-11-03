@@ -220,6 +220,7 @@ mdb_amd64_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 	uint_t argc, reg_argc;
 	long fr_argv[32];
 	int start_index; /* index to save_instr where to start comparison */
+	int err;
 	int i;
 
 	struct {
@@ -255,14 +256,18 @@ mdb_amd64_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 		 * Ensure progress (increasing fp), and prevent
 		 * endless loop with the same FP.
 		 */
-		if (fp <= lastfp)
-			return (set_errno(EMDB_STKFRAME));
-
-		if (!fp_is_aligned(fp, xpv_panic))
-			return (set_errno(EMDB_STKALIGN));
-
-		if (mdb_tgt_vread(t, &fr, sizeof (fr), fp) != sizeof (fr))
-			return (-1);	/* errno has been set for us */
+		if (fp <= lastfp) {
+			err = EMDB_STKFRAME;
+			goto badfp;
+		}
+		if (!fp_is_aligned(fp, xpv_panic)) {
+			err = EMDB_STKALIGN;
+			goto badfp;
+		}
+		if (mdb_tgt_vread(t, &fr, sizeof (fr), fp) != sizeof (fr)) {
+			err = EMDB_NOMAP;
+			goto badfp;
+		}
 
 		if ((mdb_tgt_lookup_by_addr(t, pc, MDB_TGT_SYM_FUZZY,
 		    NULL, 0, &s, &sip) == 0) &&
@@ -391,6 +396,10 @@ mdb_amd64_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 	}
 
 	return (0);
+
+badfp:
+	mdb_printf("%p [%s]", fp, mdb_strerror(err));
+	return (set_errno(err));
 }
 
 /*
