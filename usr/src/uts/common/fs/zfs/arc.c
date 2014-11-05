@@ -1592,8 +1592,9 @@ arc_hdr_destroy(arc_buf_hdr_t *hdr)
 			list_remove(l2hdr->b_dev->l2ad_buflist, hdr);
 			ARCSTAT_INCR(arcstat_l2_size, -hdr->b_size);
 			ARCSTAT_INCR(arcstat_l2_asize, -l2hdr->b_asize);
-			vdev_space_update(l2hdr->b_dev->l2ad_vdev,
-			    -l2hdr->b_asize, 0, 0);
+			if (l2hdr->b_dev->l2ad_vdev)
+				vdev_space_update(l2hdr->b_dev->l2ad_vdev,
+				    -l2hdr->b_asize, 0, 0);
 			kmem_free(l2hdr, sizeof (l2arc_buf_hdr_t));
 			if (hdr->b_state == arc_l2c_only)
 				l2arc_hdr_stat_remove();
@@ -3476,8 +3477,9 @@ arc_release(arc_buf_t *buf, void *tag)
 
 	if (l2hdr) {
 		ARCSTAT_INCR(arcstat_l2_asize, -l2hdr->b_asize);
-		vdev_space_update(l2hdr->b_dev->l2ad_vdev,
-		    -l2hdr->b_asize, 0, 0);
+		if (l2hdr->b_dev->l2ad_vdev)
+			vdev_space_update(l2hdr->b_dev->l2ad_vdev,
+			    -l2hdr->b_asize, 0, 0);
 		kmem_free(l2hdr, sizeof (l2arc_buf_hdr_t));
 		ARCSTAT_INCR(arcstat_l2_size, -buf_size);
 		mutex_exit(&l2arc_buflist_mtx);
@@ -4625,8 +4627,10 @@ l2arc_evict_task(void *arg)
 	 * we are the only ones who knows about this device (the in-core
 	 * structure), so no new buffers can be created (e.g. if the pool is
 	 * re-imported while the asynchronous eviction is in progress) that
-	 * reference this same in-core structure
+	 * reference this same in-core structure. Also remove the vdev link
+	 * since further use of it as l2arc device is prohibited.
 	 */
+	d->dev->l2ad_vdev = NULL;
 	_l2arc_evict(d->dev, 0LL, B_TRUE, B_FALSE);
 
 	/* Same cleanup as in the synchronous path */
