@@ -59,6 +59,11 @@ function cleanup {
 			exit 1
 		fi
 	fi
+
+	# cleanup /dev/lofi to prepare for the next test
+	if [ -d /dev/lofi ]; then
+		rm -rf /dev/lofi
+	fi
 }
 
 # Build the dynamic configuration files for tp_fs_dynamic

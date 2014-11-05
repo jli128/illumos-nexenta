@@ -26,12 +26,12 @@ export SCRATCH_DIR=/var/tmp
 # Test needs to be run as root 
 # Make sure /dev/lofi does not exist
 #
-if [ $? != 0 ]; then
-	echo Need to be run as root
-	exit
-fi
-if [ -d /dev/lofi ] ; then
+if [ -d /dev/lofi ]; then
 	rm -rf /dev/lofi
+	if [$? != 0]; then
+		echo Need to be run as root
+		exit
+	fi
 fi
 
 PATH=$PATH:$CTI_ROOT/bin

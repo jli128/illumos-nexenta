@@ -59,6 +59,13 @@ function cleanup {
 			exit 1
 		fi
 	fi
+
+	#
+	# cleanup /dev/lofi to prepare for the next test
+	#
+	if [ -d /dev/lofi ]; then
+		rm -rf /dev/lofi
+	fi
 }
 
 default_lofi_size="10M"

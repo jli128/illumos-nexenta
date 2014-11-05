@@ -705,16 +705,16 @@ function cleanup_lofi_zfs {
 		esac
 	done
 
-	cmd="$ZPOOL export $zpool_name"
+	cmd="$ZPOOL destroy $zpool_name"
 	record_cmd_execution "$cmd"
 	cti_execute "UNRESOLVED" "$cmd"
 	if (( $? != 0 )); then
-		cti_report "Unable to export zpool '$zpool_arg'"
+		cti_report "Unable to remove zpool '$zpool_arg'"
 		return 1
 	fi
 
 	if [[ -n "$VERBOSE" ]]; then
-		cti_report "zpool '$zpool_arg' exported"
+		cti_report "zpool '$zpool_arg' removed"
 	fi
 
 	del_lofi_device $lofi_dev_or_file
@@ -1168,15 +1168,25 @@ function lofi_and_fs_tidy_up {
 
 	# Clean up ZFS config
 	if [[ -n "$zpool_name" ]]; then
-		cmd="zpool export $zpool_name"
-		record_cmd_execution "$cmd"
-		$cmd
-		if (( $? != 0 )); then
-			cti_report "zpool '$zpool_name' not cleaned up;" \
-			    "can't delete lofi device based on file" \
-			    "'$lofi_file'"
-			return 1
-		fi
+		status=1
+		errmsg='device is busy'
+		until [ $status == 0 ]; do
+			cmd="zpool export $zpool_name"
+			record_cmd_execution "$cmd"
+			$cmd 2>/tmp/err
+			if (( $? != 0)); then
+				# if this is busy signal then we want to retry
+				if [ "`grep "$errmsg" /tmp/err`" != "" ]; then
+					cti_report "zpool '$zpool_name' not cleaned up;" \
+					    "can't delete lofi device based on file" \
+					    "'$lofi_file'"
+				else # return here if error is something else
+					return 1
+				fi	
+			else
+				status=0
+			fi
+		done
 	fi
 
 	# Clean up UFS config

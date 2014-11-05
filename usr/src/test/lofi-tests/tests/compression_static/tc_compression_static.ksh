@@ -53,6 +53,12 @@ function startup {
 
 function cleanup {
 	cti_report "In cleanup"
+	#
+	# cleanup /dev/lofi to prepare for the next test
+	#
+	if [ -d /dev/lofi ]; then
+		rm -rf /dev/lofi
+	fi
 }
 
 #
