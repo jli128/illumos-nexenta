@@ -491,8 +491,11 @@ fop_link(
 {
 	int err;
 
-	/* Does from_name="" work here? */
-	err = linkat(fr_vp->v_fd, "", to_dvp->v_fd, to_name,
+	/*
+	 * Would prefer to specify "from" as the combination:
+	 * (fr_vp->v_fd, NULL) but linkat does not permit it.
+	 */
+	err = linkat(AT_FDCWD, fr_vp->v_path, to_dvp->v_fd, to_name,
 	    AT_SYMLINK_FOLLOW);
 	if (err == -1)
 		err = errno;
