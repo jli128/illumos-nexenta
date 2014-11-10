@@ -258,9 +258,9 @@ get_usage(zfs_help_t idx)
 	case HELP_ROLLBACK:
 		return (gettext("\trollback [-rRf] <snapshot>\n"));
 	case HELP_SEND:
-		return (gettext("\tsend [-DnPpRves] [-[iI] snapshot] "
+		return (gettext("\tsend [-DnPpRvLes] [-[iI] snapshot] "
 		    "<snapshot>\n"
-		    "\tsend [-e] [-i snapshot|bookmark] "
+		    "\tsend [-Le] [-i snapshot|bookmark] "
 		    "<filesystem|volume|snapshot>\n"));
 	case HELP_SET:
 		return (gettext("\tset <property=value> "
@@ -3657,7 +3657,7 @@ zfs_do_send(int argc, char **argv)
 	boolean_t extraverbose = B_FALSE;
 
 	/* check options */
-	while ((c = getopt(argc, argv, ":i:I:RDpvnPes")) != -1) {
+	while ((c = getopt(argc, argv, ":i:I:RDpvnPLes")) != -1) {
 		switch (c) {
 		case 'i':
 			if (fromname)
@@ -3691,6 +3691,9 @@ zfs_do_send(int argc, char **argv)
 			break;
 		case 'n':
 			flags.dryrun = B_TRUE;
+			break;
+		case 'L':
+			flags.largeblock = B_TRUE;
 			break;
 		case 'e':
 			flags.embed_data = B_TRUE;
@@ -3761,6 +3764,8 @@ zfs_do_send(int argc, char **argv)
 		if (zhp == NULL)
 			return (1);
 
+		if (flags.largeblock)
+			lzc_flags |= LZC_SEND_FLAG_LARGE_BLOCK;
 		if (flags.embed_data)
 			lzc_flags |= LZC_SEND_FLAG_EMBED_DATA;
 

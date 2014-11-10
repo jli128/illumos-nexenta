@@ -429,7 +429,6 @@ htable_adjust_reserve()
 /*
  * Search the active htables for one to steal. Start at a different hash
  * bucket every time to help spread the pain of stealing
- * (factored out from htable_steal())
  */
 static void
 htable_steal_active(hat_t *hat, uint_t cnt, uint_t threshold,
@@ -445,8 +444,7 @@ htable_steal_active(hat_t *hat, uint_t cnt, uint_t threshold,
 	do {
 		higher = NULL;
 		HTABLE_ENTER(h);
-		for (ht = hat->hat_ht_hash[h]; ht;
-		     ht = ht->ht_next) {
+		for (ht = hat->hat_ht_hash[h]; ht; ht = ht->ht_next) {
 
 			/*
 			 * Can we rule out reaping?
@@ -471,9 +469,9 @@ htable_steal_active(hat_t *hat, uint_t cnt, uint_t threshold,
 			 * - unload and invalidate all PTEs
 			 */
 			for (e = 0, va = ht->ht_vaddr;
-			     e < HTABLE_NUM_PTES(ht) && ht->ht_valid_cnt > 0 &&
-				 ht->ht_busy == 1 && ht->ht_lock_cnt == 0;
-			     ++e, va += MMU_PAGESIZE) {
+			    e < HTABLE_NUM_PTES(ht) && ht->ht_valid_cnt > 0 &&
+			    ht->ht_busy == 1 && ht->ht_lock_cnt == 0;
+			    ++e, va += MMU_PAGESIZE) {
 				pte = x86pte_get(ht, e);
 				if (!PTE_ISVALID(pte))
 					continue;
@@ -532,7 +530,6 @@ htable_steal_active(hat_t *hat, uint_t cnt, uint_t threshold,
 
 /*
  * Move hat to the end of the kas list
- * (factored out from htable_steal())
  */
 static void
 move_victim(hat_t *hat)
@@ -561,8 +558,8 @@ move_victim(hat_t *hat)
 }
 
 /*
- * This routine steals htables from user processes for htable_alloc() or
- * for htable_reap().
+ * This routine steals htables from user processes.  Called by htable_reap
+ * (reap=TRUE) or htable_alloc (reap=FALSE).
  */
 static htable_t *
 htable_steal(uint_t cnt, boolean_t reap)
@@ -592,7 +589,7 @@ htable_steal(uint_t cnt, boolean_t reap)
 
 		mutex_enter(&hat_list_lock);
 
-		/* skip the firt kernel hat */
+		/* skip the first hat (kernel) */
 		hat = kas.a_hat->hat_next;
 		for (;;) {
 			/*
@@ -729,14 +726,14 @@ htable_reap(void *handle)
 	reap_cnt = MAX(MIN(physmem / 20, active_ptables / 20), 10);
 
 	/*
-	 * Let htable_steal() do the work, we just call htable_free()
-	 */
-	XPV_DISALLOW_MIGRATE();
-	/*
 	 * Note: htable_dont_cache should be set at the time of
 	 * invoking htable_free()
 	 */
-	atomic_add_32(&htable_dont_cache, 1);
+	atomic_inc_32(&htable_dont_cache);
+	/*
+	 * Let htable_steal() do the work, we just call htable_free()
+	 */
+	XPV_DISALLOW_MIGRATE();
 	list = htable_steal(reap_cnt, B_TRUE);
 	XPV_ALLOW_MIGRATE();
 	while ((ht = list) != NULL) {
@@ -744,7 +741,7 @@ htable_reap(void *handle)
 		HATSTAT_INC(hs_reaped);
 		htable_free(ht);
 	}
-	atomic_add_32(&htable_dont_cache, -1);
+	atomic_dec_32(&htable_dont_cache);
 
 	/*
 	 * Free up excess reserves
