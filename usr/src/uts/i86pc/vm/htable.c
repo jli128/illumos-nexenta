@@ -624,7 +624,7 @@ htable_steal(uint_t cnt, boolean_t reap)
 			 */
 			hat_enter(hat);
 			while ((ht = hat->hat_ht_cached) != NULL &&
-			       stolen < cnt) {
+			    stolen < cnt) {
 				hat->hat_ht_cached = ht->ht_next;
 				ht->ht_next = list;
 				list = ht;
