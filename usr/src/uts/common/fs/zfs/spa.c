@@ -4290,11 +4290,11 @@ spa_import(const char *pool, nvlist_t *config, nvlist_t *props, uint64_t flags)
 
 	/* Set/activate meta feature as needed */
 	mutex_exit(&spa_namespace_lock);
-	if (readonly)
+	if (!spa_writeable(spa))
 		spa_check_special_feature(spa);
 	spa_history_log_version(spa, "import");
 
-	if (readonly)
+	if (!spa_writeable(spa))
 		return (0);
 
 	return (dsl_sync_task(spa->spa_name, NULL, spa_special_feature_activate,
