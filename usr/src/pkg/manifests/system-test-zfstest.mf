@@ -166,6 +166,7 @@ file path=opt/zfs-tests/bin/randfree_file mode=0555
 file path=opt/zfs-tests/bin/readmmap mode=0555
 file path=opt/zfs-tests/bin/rename_dir mode=0555
 file path=opt/zfs-tests/bin/rm_lnkcnt_zero_file mode=0555
+file path=opt/zfs-tests/bin/threadsappend mode=0555
 file path=opt/zfs-tests/bin/zfstest mode=0555
 file path=opt/zfs-tests/include/commands.cfg mode=0555
 file path=opt/zfs-tests/include/default.cfg mode=0555
@@ -2055,7 +2056,6 @@ file path=opt/zfs-tests/tests/functional/sparse/sparse.cfg mode=0555
 file path=opt/zfs-tests/tests/functional/sparse/sparse_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/threadsappend/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/threadsappend/setup mode=0555
-file path=opt/zfs-tests/tests/functional/threadsappend/threadsappend mode=0555
 file path=opt/zfs-tests/tests/functional/threadsappend/threadsappend_001_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/truncate/cleanup mode=0555

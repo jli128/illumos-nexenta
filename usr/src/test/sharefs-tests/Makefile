@@ -16,6 +16,6 @@
 
 .PARALLEL: $(SUBDIRS)
 
-SUBDIRS = baseline cmd doc tests lib include tet config
+SUBDIRS = cmd doc tests lib include tet config
 
 include $(SRC)/test/Makefile.com

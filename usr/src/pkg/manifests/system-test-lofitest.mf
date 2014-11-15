@@ -20,7 +20,6 @@ set name=info.classification \
     value=org.opensolaris.category.2008:Development/System
 set name=variant.arch value=$(ARCH)
 dir path=opt/lofi-tests
-dir path=opt/lofi-tests/baseline
 dir path=opt/lofi-tests/bin
 dir path=opt/lofi-tests/lib
 dir path=opt/lofi-tests/tests
@@ -34,64 +33,6 @@ dir path=opt/lofi-tests/tests/getsysinfo
 dir path=opt/lofi-tests/tests/zones_named
 file path=opt/lofi-tests/README mode=0444
 file path=opt/lofi-tests/STC.INFO mode=0444
-file path=opt/lofi-tests/baseline/add_dynamic.1.txt mode=0444
-file path=opt/lofi-tests/baseline/add_dynamic.10.txt mode=0444
-file path=opt/lofi-tests/baseline/add_dynamic.11.txt mode=0444
-file path=opt/lofi-tests/baseline/add_dynamic.12.txt mode=0444
-file path=opt/lofi-tests/baseline/add_dynamic.13.txt mode=0444
-file path=opt/lofi-tests/baseline/add_dynamic.14.txt mode=0444
-file path=opt/lofi-tests/baseline/add_dynamic.15.txt mode=0444
-file path=opt/lofi-tests/baseline/add_dynamic.16.txt mode=0444
-file path=opt/lofi-tests/baseline/add_dynamic.17.txt mode=0444
-file path=opt/lofi-tests/baseline/add_dynamic.18.txt mode=0444
-file path=opt/lofi-tests/baseline/add_dynamic.19.txt mode=0444
-file path=opt/lofi-tests/baseline/add_dynamic.2.txt mode=0444
-file path=opt/lofi-tests/baseline/add_dynamic.20.txt mode=0444
-file path=opt/lofi-tests/baseline/add_dynamic.21.txt mode=0444
-file path=opt/lofi-tests/baseline/add_dynamic.22.txt mode=0444
-file path=opt/lofi-tests/baseline/add_dynamic.23.txt mode=0444
-file path=opt/lofi-tests/baseline/add_dynamic.24.txt mode=0444
-file path=opt/lofi-tests/baseline/add_dynamic.25.txt mode=0444
-file path=opt/lofi-tests/baseline/add_dynamic.26.txt mode=0444
-file path=opt/lofi-tests/baseline/add_dynamic.27.txt mode=0444
-file path=opt/lofi-tests/baseline/add_dynamic.28.txt mode=0444
-file path=opt/lofi-tests/baseline/add_dynamic.3.txt mode=0444
-file path=opt/lofi-tests/baseline/add_dynamic.4.txt mode=0444
-file path=opt/lofi-tests/baseline/add_dynamic.5.txt mode=0444
-file path=opt/lofi-tests/baseline/add_dynamic.6.txt mode=0444
-file path=opt/lofi-tests/baseline/add_dynamic.7.txt mode=0444
-file path=opt/lofi-tests/baseline/add_dynamic.8.txt mode=0444
-file path=opt/lofi-tests/baseline/add_dynamic.9.txt mode=0444
-file path=opt/lofi-tests/baseline/add_dynamic.txt mode=0444
-file path=opt/lofi-tests/baseline/add_static.1.txt mode=0444
-file path=opt/lofi-tests/baseline/add_static.txt mode=0444
-file path=opt/lofi-tests/baseline/compression_dynamic.1.txt mode=0444
-file path=opt/lofi-tests/baseline/compression_dynamic.txt mode=0444
-file path=opt/lofi-tests/baseline/compression_static.1.txt mode=0444
-file path=opt/lofi-tests/baseline/compression_static.2.txt mode=0444
-file path=opt/lofi-tests/baseline/compression_static.3.txt mode=0444
-file path=opt/lofi-tests/baseline/compression_static.4.txt mode=0444
-file path=opt/lofi-tests/baseline/compression_static.5.txt mode=0444
-file path=opt/lofi-tests/baseline/compression_static.6.txt mode=0444
-file path=opt/lofi-tests/baseline/compression_static.txt mode=0444
-file path=opt/lofi-tests/baseline/delete.1.txt mode=0444
-file path=opt/lofi-tests/baseline/delete.2.txt mode=0444
-file path=opt/lofi-tests/baseline/delete.txt mode=0444
-file path=opt/lofi-tests/baseline/fs_dynamic.1.txt mode=0444
-file path=opt/lofi-tests/baseline/fs_dynamic.2.txt mode=0444
-file path=opt/lofi-tests/baseline/fs_dynamic.3.txt mode=0444
-file path=opt/lofi-tests/baseline/fs_dynamic.4.txt mode=0444
-file path=opt/lofi-tests/baseline/fs_dynamic.5.txt mode=0444
-file path=opt/lofi-tests/baseline/fs_dynamic.6.txt mode=0444
-file path=opt/lofi-tests/baseline/fs_dynamic.7.txt mode=0444
-file path=opt/lofi-tests/baseline/fs_dynamic.8.txt mode=0444
-file path=opt/lofi-tests/baseline/fs_dynamic.9.txt mode=0444
-file path=opt/lofi-tests/baseline/fs_dynamic.txt mode=0444
-file path=opt/lofi-tests/baseline/getsysinfo.1.txt mode=0444
-file path=opt/lofi-tests/baseline/getsysinfo.txt mode=0444
-file path=opt/lofi-tests/baseline/summary.txt mode=0444
-file path=opt/lofi-tests/baseline/zones_named.1.txt mode=0444
-file path=opt/lofi-tests/baseline/zones_named.txt mode=0444
 file path=opt/lofi-tests/bin/lofitest mode=0555
 file path=opt/lofi-tests/lib/fs_common mode=0555
 file path=opt/lofi-tests/lib/startup_cleanup_common mode=0555

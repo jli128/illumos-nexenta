@@ -114,7 +114,6 @@ file path=opt/onbld/bin/jstyle mode=0555
 file path=opt/onbld/bin/make_pkg_db mode=0555
 file path=opt/onbld/bin/mapfilechk mode=0555
 file path=opt/onbld/bin/nightly mode=0555
-file path=opt/onbld/bin/nightly_test mode=0555
 file path=opt/onbld/bin/onu mode=0555
 file path=opt/onbld/bin/onu-deb mode=0555
 file path=opt/onbld/bin/protocmp.terse mode=0555
