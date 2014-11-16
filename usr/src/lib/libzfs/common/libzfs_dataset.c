@@ -4378,6 +4378,8 @@ zfs_release_one(zfs_handle_t *zhp, void *arg)
 		fnvlist_free(torelease);
 	}
 
+	fnvlist_free(existing_holds);
+
 	if (ha->recursive)
 		rv = zfs_iter_filesystems(zhp, zfs_release_one, ha);
 	zfs_close(zhp);
