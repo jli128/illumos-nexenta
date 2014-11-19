@@ -162,9 +162,16 @@ static	uint32_t	mx_thrds = 2;	/* fallback default: see main() */
 
 static	thread_key_t	door_key;
 static	mutex_t		door_lock;
-static	cond_t		door_cv;
 static	int		cmd_door = -1;
+static	cond_t		cdoor_cv;
 static	int		auth_door = -1;
+static	cond_t		adoor_cv;
+
+typedef enum {
+	UNKNOWN_FUNC	= 0,
+	NFSAUTH_FUNC	= 1,
+	NFSCMD_FUNC	= 2
+} dr_cmd_t;
 
 /*
  * Our copy of some system variables obtained using sysconf(3c)
@@ -172,52 +179,65 @@ static	int		auth_door = -1;
 static long ngroups_max;	/* _SC_NGROUPS_MAX */
 static long pw_size;		/* _SC_GETPW_R_SIZE_MAX */
 
-void *
-mntd_door_thread(void *arg)
+static char *
+cmd2str(dr_cmd_t t)
 {
-	door_info_t	*dp = (door_info_t *)arg;
-	void		*proc = (void *)(uintptr_t)dp->di_proc;
+	switch (t) {
+	case NFSAUTH_FUNC:
+		return "NFSAUTH_FUNC";
+
+	case NFSCMD_FUNC:
+		return "NFSCMD_FUNC";
+
+	case UNKNOWN_FUNC:
+	default:
+		return "UNKNOWN_FUNC";
+	}
+}
+
+void *
+mntd_thr_start(void *arg)
+{
+	dr_cmd_t	*cp = (dr_cmd_t *)arg;
+	dr_cmd_t	 cmd = *cp;
 	static void	*value;
 	int		 dfd = 0;
-	char		 func[1024];
-
-	(void) mutex_lock(&door_lock);
-	while (auth_door == -1 || cmd_door == -1)
-		cond_wait(&door_cv, &door_lock);
-	(void) mutex_unlock(&door_lock);
 
 	value = (nm_thrds >= mx_thrds) ? (void *)1 : (void *)0;
 	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
 	(void) thr_setspecific(door_key, value);
 
-	bzero(func, 1024);
-	if (proc == (void *)nfsauth_func) {
+	switch (cmd) {
+	case NFSAUTH_FUNC:
+		(void) mutex_lock(&door_lock);
+		while (auth_door == -1)
+			cond_wait(&adoor_cv, &door_lock);
 		dfd = auth_door;
-		bcopy("nfsauth_func", func, strlen("nfsauth_func")+1);
-	} else if (proc == (void *)nfscmd_func) {
-		dfd = cmd_door;
-		bcopy("nfscmd_func", func, strlen("nfscmd_func")+1);
-	} else {
-#ifdef	DEBUG
-		char	buf[1024];
-		uint_t	len = 1024;
+		(void) mutex_unlock(&door_lock);
+		break;
 
-		bzero(buf, len);
-		(void) addrtosymstr(proc, buf, len);
-		syslog(LOG_ERR, "mntd_door_thread: unknown func \"%s\"", buf);
-#endif
+	case NFSCMD_FUNC:
+		(void) mutex_lock(&door_lock);
+		while (cmd_door == -1)
+			cond_wait(&cdoor_cv, &door_lock);
+		dfd = cmd_door;
+		(void) mutex_unlock(&door_lock);
+		break;
+
+	default:
+		syslog(LOG_NOTICE, "mntd_thr_start: %s", cmd2str(cmd));
+		free(cp);
 		thr_exit(NULL);
 	}
 
 	if (door_bind(dfd) < 0) {
-		/* Can't bind thread to door; game over ! */
-		syslog(LOG_ERR,
-		    "Unable to bind door for %s: %s", func, strerror(errno));
+		syslog(LOG_ERR, "Unable to bind door for %s: %m", cmd2str(cmd));
 		exit(20);
 	}
 #ifdef	DEBUG
-	syslog(LOG_NOTICE, "%s: (%d) Door Bound Successfully", func, dfd);
+	syslog(LOG_NOTICE, "%s Door Bound Successfully", cmd2str(cmd));
 #endif
+	free(cp);
 	door_return(NULL, 0, NULL, 0);
 
 	/* NOTREACHED */
@@ -228,16 +248,41 @@ mntd_door_thread(void *arg)
  * Manages stacksize and threadpool
  */
 static void
-mntd_door_create(door_info_t *dp)
+mntd_thr_create(door_info_t *dp)
 {
 	thread_t	 tid;
 	int		 num = 0;
 	int		 rc = 0;
 	size_t		 stksz = MOUNTD_STKSZ;
 	long		 flags = THR_DETACHED;
+	void		*proc;
+	dr_cmd_t	*cp;
+#ifdef	DEBUG
+	char		 func[1024] = {0};
+#endif
 
 	if (dp == NULL) {
-		syslog(LOG_NOTICE, "mntd_door_create: dp == NULL");
+		syslog(LOG_NOTICE, "mntd_thr_create: dp == NULL");
+		return;
+	}
+	proc = (void *)(uintptr_t)dp->di_proc;
+
+	if ((cp = (dr_cmd_t *)malloc(sizeof (dr_cmd_t))) == (dr_cmd_t *)NULL) {
+		syslog(LOG_ERR, "mntd_thr_create: %m");
+		return;
+	}
+
+#ifdef	DEBUG
+	(void) addrtosymstr(proc, func, sizeof (func));
+	syslog(LOG_NOTICE, "mntd_thr_create: func = %s", func);
+#endif
+
+	if (proc == (void *)nfsauth_func)
+		*cp = NFSAUTH_FUNC;
+	else if (proc == (void *)nfscmd_func)
+		*cp = NFSCMD_FUNC;
+	else {
+		free(cp);
 		return;
 	}
 
@@ -246,29 +291,31 @@ mntd_door_create(door_info_t *dp)
 		num -= 1;
 #ifdef	DEBUG
 		syslog(LOG_ERR,
-		    "mntd_door_create: %d threads already active", num);
+		    "mntd_thr_create: %d threads already active", num);
 #endif
+		free(cp);
 		return;
 	}
 
-	rc = thr_create(NULL, stksz, mntd_door_thread, (void *)dp, flags, &tid);
+	rc = thr_create(NULL, stksz, mntd_thr_start, (void *)cp, flags, &tid);
 	if (rc != 0) {
 		atomic_dec_32(&nm_thrds);
-		syslog(LOG_ERR, "mntd_door_create: %s", strerror(errno));
+		syslog(LOG_ERR, "mntd_thr_create: %m");
+		free(cp);
 		return;
 	}
 #ifdef	DEBUG
 	syslog(LOG_NOTICE,
-	    "mntd_door_create: tid %d created (nm_thrds = %d)", tid, nm_thrds);
+	    "mntd_thr_create: tid %d created (nm_thrds = %d)", tid, nm_thrds);
 #endif
 }
 
 static void
-mntd_door_destroy(void *arg)
+mntd_thr_destroy(void *arg)
 {
 	atomic_dec_32(&nm_thrds);
 #ifdef	DEBUG
-	syslog(LOG_NOTICE, "mntd_door_destroy: (nm_thrds = %d)", nm_thrds);
+	syslog(LOG_NOTICE, "mntd_thr_destroy: (nm_thrds = %d)", nm_thrds);
 #endif
 }
 
@@ -285,11 +332,10 @@ nfsauth_svc(void *arg)
 	/* register 'nfsauth_func' as the new door service */
 	(void) mutex_lock(&door_lock);
 	auth_door = door_create(nfsauth_func, NULL, flags);
-	cond_signal(&door_cv);
 	(void) mutex_unlock(&door_lock);
 
 	if (auth_door < 0) {
-		syslog(LOG_ERR, "nfsauth_svc: %s", strerror(errno));
+		syslog(LOG_ERR, "nfsauth_svc: %m");
 		exit(10);
 	}
 
@@ -328,6 +374,13 @@ nfsauth_svc(void *arg)
 	(void) _nfssys(MOUNTD_ARGS, &darg);
 
 	/*
+	 * Signal thread that kernel has door descriptor
+	 */
+	(void) mutex_lock(&door_lock);
+	cond_signal(&adoor_cv);
+	(void) mutex_unlock(&door_lock);
+
+	/*
 	 * Wait for incoming calls
 	 */
 	/*CONSTCOND*/
@@ -344,7 +397,6 @@ nfsauth_svc(void *arg)
  * nfs_cmd requests for character set conversion and other future
  * events.
  */
-
 static void *
 cmd_svc(void *arg)
 {
@@ -354,7 +406,6 @@ cmd_svc(void *arg)
 	/* register 'nfscmd_func' as the new door service */
 	(void) mutex_lock(&door_lock);
 	cmd_door = door_create(nfscmd_func, NULL, flags);
-	cond_signal(&door_cv);
 	(void) mutex_unlock(&door_lock);
 
 	if (cmd_door < 0) {
@@ -367,6 +418,13 @@ cmd_svc(void *arg)
 	 */
 	darg = cmd_door;
 	(void) _nfssys(NFSCMD_ARGS, &darg);
+
+	/*
+	 * Signal thread that kernel has door descriptor
+	 */
+	(void) mutex_lock(&door_lock);
+	cond_signal(&cdoor_cv);
+	(void) mutex_unlock(&door_lock);
 
 	/*
 	 * Wait for incoming calls
@@ -765,9 +823,13 @@ main(int argc, char *argv[])
 	svc_unreg(MOUNTPROG, MOUNTVERS_POSIX);
 	svc_unreg(MOUNTPROG, MOUNTVERS3);
 
+	(void) mutex_init(&door_lock, USYNC_THREAD, NULL);
+	(void) cond_init(&adoor_cv, USYNC_THREAD, NULL);
+	(void) cond_init(&cdoor_cv, USYNC_THREAD, NULL);
+
 	/* server function to create/optimize door threads */
-	(void) door_server_create(mntd_door_create);
-	if (thr_keycreate(&door_key, mntd_door_destroy) != 0) {
+	(void) door_server_create(mntd_thr_create);
+	if (thr_keycreate(&door_key, mntd_thr_destroy) != 0) {
 		fprintf(stderr, "thr_keycreate (server thread): %s\n",
 		    strerror(errno));
 		exit(3);
