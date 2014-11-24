@@ -2630,8 +2630,9 @@ userquota_propname_decode(const char *propname, boolean_t zoned,
 			*cp = '\0';
 			cp++;
 			*ridp = strtoull(cp, &end, 10);
-		} else
+		} else {
 			end = "";
+		}
 		if (numericsid) {
 			free(numericsid);
 			numericsid = NULL;
