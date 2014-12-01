@@ -185,6 +185,8 @@
 #include <sys/cos.h>
 #include <sys/cos_impl.h>
 #include <sys/zfeature.h>
+#include <sys/sysevent.h>
+#include <sys/sysevent_impl.h>
 
 #include "zfs_namecheck.h"
 #include "zfs_prop.h"
@@ -1530,6 +1532,34 @@ zfsvfs_rele(zfsvfs_t *zfsvfs, void *tag)
 	}
 }
 
+
+#define	ZFS_EVENT_CHANNEL "com.nexenta:zfs"
+#define	ZFS_EC_STATUS	"status.zfs"
+#define	ZPOOL_EC_STATUS "status.zpool"
+
+/*
+ * Publish events using GPEC subsystem
+ */
+
+static evchan_t *zfs_channel = NULL;
+
+static void
+zfs_event_post(const char *subclass, const char *operation, nvlist_t *ev_data)
+{
+
+	if (zfs_channel == NULL)
+		goto out;
+
+	fnvlist_add_string(ev_data, "operation", operation);
+
+	if (sysevent_evc_publish(zfs_channel, subclass,
+	    operation, "com.nexenta", "zfs-kernel", ev_data,
+	    EVCH_NOSLEEP) != 0)
+		cmn_err(CE_NOTE, "Failed to publish ZFS status event");
+out:
+	fnvlist_free(ev_data);
+}
+
 static int
 zfs_ioc_pool_create(zfs_cmd_t *zc)
 {
@@ -1537,6 +1567,7 @@ zfs_ioc_pool_create(zfs_cmd_t *zc)
 	nvlist_t *config, *props = NULL;
 	nvlist_t *rootprops = NULL;
 	nvlist_t *zplprops = NULL;
+	nvlist_t *event;
 
 	if (error = get_nvlist(zc->zc_nvlist_conf, zc->zc_nvlist_conf_size,
 	    zc->zc_iflags, &config))
@@ -1585,6 +1616,14 @@ zfs_ioc_pool_create(zfs_cmd_t *zc)
 	    ZPROP_SRC_LOCAL, rootprops, NULL)) != 0)
 		(void) spa_destroy(zc->zc_name);
 
+	if (error == 0) {
+		event = fnvlist_alloc();
+		fnvlist_add_string(event, "name", zc->zc_name);
+		fnvlist_add_nvlist(event, "config", config);
+		fnvlist_add_nvlist(event, "props", props);
+		zfs_event_post(ZPOOL_EC_STATUS, "create", event);
+	}
+
 pool_props_bad:
 	nvlist_free(rootprops);
 	nvlist_free(zplprops);
@@ -1598,10 +1637,15 @@ static int
 zfs_ioc_pool_destroy(zfs_cmd_t *zc)
 {
 	int error;
+	nvlist_t *event;
 	zfs_log_history(zc);
 	error = spa_destroy(zc->zc_name);
-	if (error == 0)
+	if (error == 0) {
 		zvol_remove_minors(zc->zc_name);
+		event = fnvlist_alloc();
+		fnvlist_add_string(event, "pool", zc->zc_name);
+		zfs_event_post(ZPOOL_EC_STATUS, "destroy", event);
+	}
 	return (error);
 }
 
@@ -1611,6 +1655,7 @@ zfs_ioc_pool_import(zfs_cmd_t *zc)
 	nvlist_t *config, *props = NULL;
 	uint64_t guid;
 	int error;
+	nvlist_t *event;
 
 	if ((error = get_nvlist(zc->zc_nvlist_conf, zc->zc_nvlist_conf_size,
 	    zc->zc_iflags, &config)) != 0)
@@ -1628,6 +1673,16 @@ zfs_ioc_pool_import(zfs_cmd_t *zc)
 		error = SET_ERROR(EINVAL);
 	else
 		error = spa_import(zc->zc_name, config, props, zc->zc_cookie);
+
+	if (error == 0) {
+		event = fnvlist_alloc();
+		fnvlist_add_string(event, "pool", zc->zc_name);
+		fnvlist_add_uint64(event, "guid", zc->zc_guid);
+		fnvlist_add_nvlist(event, "config", config);
+		if (props != NULL)
+			fnvlist_add_nvlist(event, "props", props);
+		zfs_event_post(ZPOOL_EC_STATUS, "import", event);
+	}
 
 	if (zc->zc_nvlist_dst != 0) {
 		int err;
@@ -1651,11 +1706,16 @@ zfs_ioc_pool_export(zfs_cmd_t *zc)
 	boolean_t force = (boolean_t)zc->zc_cookie;
 	boolean_t hardforce = (boolean_t)zc->zc_guid;
 	boolean_t saveconfig = (boolean_t)zc->zc_obj;
+	nvlist_t *event;
 
 	zfs_log_history(zc);
 	error = spa_export(zc->zc_name, NULL, force, hardforce, saveconfig);
-	if (error == 0)
+	if (error == 0) {
 		zvol_remove_minors(zc->zc_name);
+		event = fnvlist_alloc();
+		fnvlist_add_string(event, "pool", zc->zc_name);
+		zfs_event_post(ZPOOL_EC_STATUS, "export", event);
+	}
 	return (error);
 }
 
@@ -1913,6 +1973,7 @@ zfs_ioc_vdev_add(zfs_cmd_t *zc)
 	int error;
 	nvlist_t *config, **l2cache, **spares;
 	uint_t nl2cache = 0, nspares = 0;
+	nvlist_t *event;
 
 	error = spa_open(zc->zc_name, &spa, FTAG);
 	if (error != 0)
@@ -1944,6 +2005,13 @@ zfs_ioc_vdev_add(zfs_cmd_t *zc)
 
 	if (error == 0) {
 		error = spa_vdev_add(spa, config);
+		if (error == 0) {
+			event = fnvlist_alloc();
+			fnvlist_add_string(event, "pool", zc->zc_name);
+			fnvlist_add_nvlist(event, "config", config);
+			zfs_event_post(ZPOOL_EC_STATUS, "add", event);
+
+		}
 		nvlist_free(config);
 	}
 	spa_close(spa, FTAG);
@@ -1961,11 +2029,19 @@ zfs_ioc_vdev_remove(zfs_cmd_t *zc)
 {
 	spa_t *spa;
 	int error;
+	nvlist_t *event;
 
 	error = spa_open(zc->zc_name, &spa, FTAG);
 	if (error != 0)
 		return (error);
 	error = spa_vdev_remove(spa, zc->zc_guid, B_FALSE);
+	if (error == 0) {
+		event = fnvlist_alloc();
+		fnvlist_add_string(event, "pool", zc->zc_name);
+		fnvlist_add_uint64(event, "guid", zc->zc_guid);
+		zfs_event_post(ZPOOL_EC_STATUS, "remove", event);
+	}
+
 	spa_close(spa, FTAG);
 	return (error);
 }
@@ -2018,6 +2094,7 @@ zfs_ioc_vdev_attach(zfs_cmd_t *zc)
 	spa_t *spa;
 	int replacing = zc->zc_cookie;
 	nvlist_t *config;
+	nvlist_t *event;
 	int error;
 
 	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
@@ -2026,6 +2103,13 @@ zfs_ioc_vdev_attach(zfs_cmd_t *zc)
 	if ((error = get_nvlist(zc->zc_nvlist_conf, zc->zc_nvlist_conf_size,
 	    zc->zc_iflags, &config)) == 0) {
 		error = spa_vdev_attach(spa, zc->zc_guid, config, replacing);
+		if (error == 0) {
+			event = fnvlist_alloc();
+			fnvlist_add_string(event, "pool", zc->zc_name);
+			fnvlist_add_nvlist(event, "config", config);
+			fnvlist_add_int32(event, "replacing", replacing);
+			zfs_event_post(ZPOOL_EC_STATUS, "attach", event);
+		}
 		nvlist_free(config);
 	}
 
@@ -2038,12 +2122,18 @@ zfs_ioc_vdev_detach(zfs_cmd_t *zc)
 {
 	spa_t *spa;
 	int error;
+	nvlist_t *event;
 
 	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
 		return (error);
 
 	error = spa_vdev_detach(spa, zc->zc_guid, 0, B_FALSE);
-
+	if (error == 0) {
+		event = fnvlist_alloc();
+		fnvlist_add_string(event, "pool", zc->zc_name);
+		fnvlist_add_uint64(event, "guid", zc->zc_guid);
+		zfs_event_post(ZPOOL_EC_STATUS, "detach", event);
+	}
 	spa_close(spa, FTAG);
 	return (error);
 }
@@ -2827,6 +2917,7 @@ zfs_ioc_set_prop(zfs_cmd_t *zc)
 	zprop_source_t source = (received ? ZPROP_SRC_RECEIVED :
 	    ZPROP_SRC_LOCAL);
 	nvlist_t *errors;
+	nvlist_t *event;
 	int error;
 
 	if ((error = get_nvlist(zc->zc_nvlist_src, zc->zc_nvlist_src_size,
@@ -2852,6 +2943,12 @@ zfs_ioc_set_prop(zfs_cmd_t *zc)
 	if (zc->zc_nvlist_dst != NULL && errors != NULL) {
 		(void) put_nvlist(zc, errors);
 	}
+
+	event = fnvlist_alloc();
+	fnvlist_add_string(event, "fsname", zc->zc_name);
+	fnvlist_add_nvlist(event, "properties", nvl);
+	fnvlist_add_nvlist(event, "errors", errors);
+	zfs_event_post(ZFS_EC_STATUS, "set", event);
 
 	nvlist_free(errors);
 	nvlist_free(nvl);
@@ -2940,7 +3037,7 @@ zfs_ioc_pool_set_props(zfs_cmd_t *zc)
 	spa_t *spa;
 	int error;
 	nvpair_t *pair;
-
+	nvlist_t *event;
 	if (error = get_nvlist(zc->zc_nvlist_src, zc->zc_nvlist_src_size,
 	    zc->zc_iflags, &props))
 		return (error);
@@ -2971,6 +3068,13 @@ zfs_ioc_pool_set_props(zfs_cmd_t *zc)
 	}
 
 	error = spa_prop_set(spa, props);
+
+	if (error == 0) {
+		event = fnvlist_alloc();
+		fnvlist_add_string(event, "pool", zc->zc_name);
+		fnvlist_add_nvlist(event, "props", props);
+		zfs_event_post(ZPOOL_EC_STATUS, "set", event);
+	}
 
 	nvlist_free(props);
 	spa_close(spa, FTAG);
@@ -3298,6 +3402,7 @@ zfs_ioc_create(const char *fsname, nvlist_t *innvl, nvlist_t *outnvl)
 	dmu_objset_type_t type;
 	boolean_t is_insensitive = B_FALSE;
 	char parent[MAXNAMELEN];
+	nvlist_t *event;
 
 	if (nvlist_lookup_int32(innvl, "type", &type32) != 0)
 		return (SET_ERROR(EINVAL));
@@ -3384,6 +3489,15 @@ zfs_ioc_create(const char *fsname, nvlist_t *innvl, nvlist_t *outnvl)
 		if (error != 0)
 			(void) dsl_destroy_head(fsname);
 	}
+
+	if (error == 0) {
+		event = fnvlist_alloc();
+		fnvlist_add_string(event, "fsname", fsname);
+		fnvlist_add_int32(event, "type", type);
+		fnvlist_add_nvlist(event, "properties", nvprops);
+		zfs_event_post(ZFS_EC_STATUS, "create", event);
+	}
+
 	return (error);
 }
 
@@ -3401,6 +3515,7 @@ zfs_ioc_clone(const char *fsname, nvlist_t *innvl, nvlist_t *outnvl)
 	int error = 0;
 	nvlist_t *nvprops = NULL;
 	char *origin_name;
+	nvlist_t *event;
 
 	if (nvlist_lookup_string(innvl, "origin", &origin_name) != 0)
 		return (SET_ERROR(EINVAL));
@@ -3426,6 +3541,15 @@ zfs_ioc_clone(const char *fsname, nvlist_t *innvl, nvlist_t *outnvl)
 		if (error != 0)
 			(void) dsl_destroy_head(fsname);
 	}
+
+	if (error == 0) {
+		event = fnvlist_alloc();
+		fnvlist_add_string(event, "origin", origin_name);
+		fnvlist_add_string(event, "fsname", fsname);
+		fnvlist_add_nvlist(event, "properties", nvprops);
+		zfs_event_post(ZFS_EC_STATUS, "clone", event);
+	}
+
 	return (error);
 }
 
@@ -3444,6 +3568,7 @@ zfs_ioc_snapshot(const char *poolname, nvlist_t *innvl, nvlist_t *outnvl)
 	nvlist_t *props = NULL;
 	int error, poollen;
 	nvpair_t *pair;
+	nvlist_t *event;
 
 	(void) nvlist_lookup_nvlist(innvl, "props", &props);
 	if ((error = zfs_check_userprops(poolname, props)) != 0)
@@ -3487,6 +3612,13 @@ zfs_ioc_snapshot(const char *poolname, nvlist_t *innvl, nvlist_t *outnvl)
 	}
 
 	error = dsl_dataset_snapshot(snaps, props, outnvl);
+
+	event = fnvlist_alloc();
+	fnvlist_add_nvlist(event, "snaps", snaps);
+	fnvlist_add_nvlist(event, "errors", outnvl);
+	fnvlist_add_string(event, "pool", poolname);
+	zfs_event_post(ZFS_EC_STATUS, "snapshot", event);
+
 	return (error);
 }
 
@@ -3619,6 +3751,8 @@ zfs_ioc_destroy_snaps(const char *poolname, nvlist_t *innvl, nvlist_t *outnvl)
 	nvlist_t *snaps;
 	nvpair_t *pair;
 	boolean_t defer;
+	int error;
+	nvlist_t *event;
 
 	if (zfs_is_wormed(poolname))
 		return (SET_ERROR(EPERM));
@@ -3632,7 +3766,16 @@ zfs_ioc_destroy_snaps(const char *poolname, nvlist_t *innvl, nvlist_t *outnvl)
 		(void) zfs_unmount_snap(nvpair_name(pair));
 	}
 
-	return (dsl_destroy_snapshots_nvl(snaps, defer, outnvl));
+	error = dsl_destroy_snapshots_nvl(snaps, defer, outnvl);
+
+	if (error == 0) {
+		event = fnvlist_alloc();
+		fnvlist_add_nvlist(event, "snaps", snaps);
+		fnvlist_add_nvlist(event, "errors", outnvl);
+		zfs_event_post(ZFS_EC_STATUS, "destroy_snaps", event);
+	}
+
+	return (error);
 }
 
 /*
@@ -3741,6 +3884,7 @@ static int
 zfs_ioc_destroy(zfs_cmd_t *zc)
 {
 	int err;
+	nvlist_t *event;
 
 	if (zfs_is_wormed(zc->zc_name))
 		return (SET_ERROR(EPERM));
@@ -3757,6 +3901,14 @@ zfs_ioc_destroy(zfs_cmd_t *zc)
 		err = dsl_destroy_head(zc->zc_name);
 	if (zc->zc_objset_type == DMU_OST_ZVOL && err == 0)
 		(void) zvol_remove_minor(zc->zc_name);
+
+	if (err == 0) {
+		event = fnvlist_alloc();
+		fnvlist_add_string(event, "fsname", zc->zc_name);
+		fnvlist_add_int32(event, "type", zc->zc_objset_type);
+		zfs_event_post(ZFS_EC_STATUS, "destroy", event);
+	}
+
 	return (err);
 }
 
@@ -3774,6 +3926,8 @@ zfs_ioc_rollback(const char *fsname, nvlist_t *args, nvlist_t *outnvl)
 {
 	int error;
 	zfsvfs_t *zfsvfs;
+	nvlist_t *event;
+	int resume_err = 0;
 
 	if (zfs_is_wormed(fsname))
 		return (SET_ERROR(EPERM));
@@ -3781,16 +3935,22 @@ zfs_ioc_rollback(const char *fsname, nvlist_t *args, nvlist_t *outnvl)
 	if (getzfsvfs(fsname, &zfsvfs) == 0) {
 		error = zfs_suspend_fs(zfsvfs);
 		if (error == 0) {
-			int resume_err;
-
 			error = dsl_dataset_rollback(fsname, zfsvfs, outnvl);
 			resume_err = zfs_resume_fs(zfsvfs, fsname);
-			error = error ? error : resume_err;
 		}
 		VFS_RELE(zfsvfs->z_vfs);
 	} else {
 		error = dsl_dataset_rollback(fsname, NULL, outnvl);
 	}
+
+	if (error == 0) {
+		event = fnvlist_alloc();
+		fnvlist_add_string(event, "fsname", fsname);
+		fnvlist_add_int32(event, "resume_err", resume_err);
+		zfs_event_post(ZFS_EC_STATUS, "rollback", event);
+	}
+
+	error = error ? error : resume_err;
 	return (error);
 }
 
@@ -3817,6 +3977,8 @@ zfs_ioc_rename(zfs_cmd_t *zc)
 {
 	boolean_t recursive = zc->zc_cookie & 1;
 	char *at;
+	nvlist_t *event;
+	int error;
 
 	if (zfs_is_wormed(zc->zc_name))
 		return (SET_ERROR(EPERM));
@@ -3829,7 +3991,6 @@ zfs_ioc_rename(zfs_cmd_t *zc)
 	at = strchr(zc->zc_name, '@');
 	if (at != NULL) {
 		/* snaps must be in same fs */
-		int error;
 
 		if (strncmp(zc->zc_name, zc->zc_value, at - zc->zc_name + 1))
 			return (SET_ERROR(EXDEV));
@@ -3847,12 +4008,21 @@ zfs_ioc_rename(zfs_cmd_t *zc)
 		    at + 1, strchr(zc->zc_value, '@') + 1, recursive);
 		*at = '@';
 
-		return (error);
 	} else {
 		if (zc->zc_objset_type == DMU_OST_ZVOL)
 			(void) zvol_remove_minor(zc->zc_name);
-		return (dsl_dir_rename(zc->zc_name, zc->zc_value));
+		error = dsl_dir_rename(zc->zc_name, zc->zc_value);
 	}
+
+	if (error == 0) {
+		event = fnvlist_alloc();
+		fnvlist_add_string(event, "origin", zc->zc_name);
+		fnvlist_add_string(event, "fsname", zc->zc_value);
+		fnvlist_add_int32(event, "type", zc->zc_objset_type);
+		zfs_event_post(ZFS_EC_STATUS, "rename", event);
+	}
+
+	return (error);
 }
 
 static int
@@ -4270,6 +4440,7 @@ zfs_ioc_recv(zfs_cmd_t *zc)
 	char *tosnap;
 	char tofs[ZFS_MAXNAMELEN];
 	boolean_t first_recvd_props = B_FALSE;
+	nvlist_t *event;
 
 	if (dataset_namecheck(zc->zc_value, NULL, NULL) != 0 ||
 	    strchr(zc->zc_value, '@') == NULL ||
@@ -4391,6 +4562,15 @@ zfs_ioc_recv(zfs_cmd_t *zc)
 	zc->zc_cookie = off - fp->f_offset;
 	if (VOP_SEEK(fp->f_vnode, fp->f_offset, &off, NULL) == 0)
 		fp->f_offset = off;
+	if (error == 0) {
+		event = fnvlist_alloc();
+		if (props != NULL)
+			fnvlist_add_nvlist(event, "props", props);
+		fnvlist_add_string(event, "origin", zc->zc_name);
+		fnvlist_add_string(event, "tosnap", zc->zc_value);
+		fnvlist_add_uint64(event, "bytes", zc->zc_cookie);
+		zfs_event_post(ZFS_EC_STATUS, "recv", event);
+	}
 
 #ifdef	DEBUG
 	if (zfs_ioc_recv_inject_err) {
@@ -4766,6 +4946,8 @@ static int
 zfs_ioc_promote(zfs_cmd_t *zc)
 {
 	char *cp;
+	int error;
+	nvlist_t *event;
 
 	/*
 	 * We don't need to unmount *all* the origin fs's snapshots, but
@@ -4776,7 +4958,16 @@ zfs_ioc_promote(zfs_cmd_t *zc)
 		*cp = '\0';
 	(void) dmu_objset_find(zc->zc_value,
 	    zfs_unmount_snap_cb, NULL, DS_FIND_SNAPSHOTS);
-	return (dsl_dataset_promote(zc->zc_name, zc->zc_string));
+	error = dsl_dataset_promote(zc->zc_name, zc->zc_string);
+
+	if (error == 0) {
+		event = fnvlist_alloc();
+		fnvlist_add_string(event, "fsname", zc->zc_name);
+		fnvlist_add_string(event, "origin", zc->zc_value);
+		zfs_event_post(ZFS_EC_STATUS, "promote", event);
+	}
+
+	return (error);
 }
 
 /*
@@ -6828,6 +7019,10 @@ _init(void)
 	ASSERT(error == 0);
 	mutex_init(&zfs_share_lock, NULL, MUTEX_DEFAULT, NULL);
 
+	if (sysevent_evc_bind(ZFS_EVENT_CHANNEL, &zfs_channel,
+	    EVCH_HOLD_PEND | EVCH_CREAT) != 0)
+		cmn_err(CE_NOTE, "Failed to bind to zfs event channel");
+
 	return (0);
 }
 
@@ -6856,6 +7051,9 @@ _fini(void)
 	ldi_ident_release(zfs_li);
 	zfs_li = NULL;
 	mutex_destroy(&zfs_share_lock);
+
+	if (zfs_channel)
+		sysevent_evc_unbind(zfs_channel);
 
 	return (error);
 }
