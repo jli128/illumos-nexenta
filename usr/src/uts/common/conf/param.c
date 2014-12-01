@@ -595,10 +595,6 @@ param_calc(int platform_max_nprocs)
 		cmn_err(CE_NOTE, "maxusers limited to %d", MAX_MAXUSERS);
 	}
 
-	if (ngroups_max > NGRPS)
-		cmn_err(CE_NOTE, "ngroups_max of %d > %d, NFS AUTH_SYS will"
-		    " lookup for supplemental groups", ngroups_max, NGRPS);
-
 #ifdef DEBUG
 	/*
 	 * The purpose of maxusers is to prevent memory overcommit.
