@@ -87,7 +87,6 @@ NDMP_OBJ = \
 	ndmpd_dtime.o \
 	ndmpd_fhistory.o \
 	ndmpd_handler.o \
-	ndmpd_log.o \
 	ndmpd_main.o \
 	ndmpd_mark.o \
 	ndmpd_mover.o \

@@ -80,7 +80,6 @@ rootfs_dot_or_dotdot(char *name)
  */
 #define	STOP_ONERR(f)	((f)->ft_flags & FST_STOP_ONERR)
 #define	STOP_ONLONG(f)	((f)->ft_flags & FST_STOP_ONLONG)
-#define	VERBOSE(f)	((f)->ft_flags & FST_VERBOSE)
 
 #define	CALLBACK(pp, ep)	\
 	(*(ftp)->ft_callbk)((ftp)->ft_arg, pp, ep)
@@ -204,11 +203,11 @@ tryagain:
 	res = lstat64(path, st);
 	if (res != 0) {
 		if (errno == EIO || errno == EACCES){
-			NDMP_LOG(LOG_ERR, "Try again on path %s errno = (%d)", path, errno);
+			syslog(LOG_ERR, "Try again on path %s errno = (%d)", path, errno);
 			errno = 0;
 			goto tryagain;
 		}
-		NDMP_LOG(LOG_ERR, "Error on path %s errno = (%d)", path, errno);
+		syslog(LOG_ERR, "Error on path %s errno = (%d)", path, errno);
 		return (errno);
 	}
 
@@ -237,14 +236,14 @@ fs_getdents(DIR *fildes, char *pn_path, dent_arg_t *darg)
 
 	while ((ptr = readdir(fildes)) != NULL) {
 		if (ptr == NULL && ((errno == EIO || errno == EACCES))) {
-			NDMP_LOG(LOG_INFO, "Reposisiont to previous dirent");
+			syslog(LOG_INFO, "Reposisiont to previous dirent");
 			seekdir(fildes, last);
 			continue;
 		}
 tryone:
 		if ((last = telldir(fildes)) == -1) {
 			if (ptr == NULL && ((errno == EIO || errno == EACCES))) {
-				NDMP_LOG(LOG_INFO, "Capture current position interrupted");
+				syslog(LOG_INFO, "Capture current position interrupted");
 				goto tryone;
 			}
 			return (last);
@@ -260,11 +259,11 @@ tryagain:
 		res = lstat64(file_path, &st);
 		if (res != 0) {
 			if (errno == EIO || errno == EACCES){
-				NDMP_LOG(LOG_ERR, "Try again on path %s errno = (%d)", file_path, errno);
+				syslog(LOG_ERR, "Try again on path %s errno = (%d)", file_path, errno);
 				errno = 0;
 				goto tryagain;
 			}
-			NDMP_LOG(LOG_ERR, "Error on path %s errno = (%d)", file_path, errno);
+			syslog(LOG_ERR, "Error on path %s errno = (%d)", file_path, errno);
 			n_entries = -1;
 			break;
 		}
@@ -346,7 +345,7 @@ traverse_post(struct fs_traverse *ftp)
 	struct fst_node pn, en; /* parent and entry nodes */
 
 	if (!ftp || !ftp->ft_path || !*ftp->ft_path || !ftp->ft_callbk) {
-		NDMP_LOG(LOG_DEBUG, "Invalid argument");
+		syslog(LOG_ERR, "Invalid argument");
 		errno = EINVAL;
 		return (-1);
 	}
@@ -354,19 +353,19 @@ traverse_post(struct fs_traverse *ftp)
 	/* set the default log function if it's not already set */
 	if (!ftp->ft_logfp) {
 		ftp->ft_logfp = (ft_log_t)syslog;
-		NDMP_LOG(LOG_DEBUG, "Log to system log \"%s\"", ftp->ft_path);
+		syslog(LOG_DEBUG, "Log to system log \"%s\"", ftp->ft_path);
 	}
 
 	/* set the logical path to physical path if it's not already set */
 	if (!ftp->ft_lpath) {
-		NDMP_LOG(LOG_DEBUG,
+		syslog(LOG_DEBUG,
 		    "report the same paths: \"%s\"", ftp->ft_path);
 		ftp->ft_lpath = ftp->ft_path;
 	}
 
 	pl = strlen(ftp->ft_lpath);
 	if (pl + 1 > PATH_MAX) { /* +1 for the '/' */
-		NDMP_LOG(LOG_DEBUG, "lpath too long \"%s\"", ftp->ft_path);
+		syslog(LOG_ERR, "lpath too long \"%s\"", ftp->ft_path);
 		errno = ENAMETOOLONG;
 		return (-1);
 	}
@@ -375,7 +374,7 @@ traverse_post(struct fs_traverse *ftp)
 	rv = fs_getstat(ftp->ft_lpath, &pfh, &pst);
 
 	if (rv != 0) {
-		NDMP_LOG(LOG_DEBUG,
+		syslog(LOG_ERR,
 		    "Error %d on fs_getstat(%s)", rv, ftp->ft_path);
 		return (rv);
 	}
@@ -388,8 +387,6 @@ traverse_post(struct fs_traverse *ftp)
 		en.tn_fh = NULL;
 		en.tn_st = NULL;
 		rv = CALLBACK(&pn, &en);
-		if (VERBOSE(ftp))
-			NDMP_LOG(LOG_DEBUG, "CALLBACK(%s): %d", pn.tn_path, rv);
 		free(pfh.fh_fpath);
 		return (rv);
 	}
@@ -421,8 +418,6 @@ traverse_post(struct fs_traverse *ftp)
 			traverse_stats.fss_newdirs++;
 
 			*tsp->ts_end = '\0';
-			if (VERBOSE(ftp))
-				NDMP_LOG(LOG_DEBUG, "pl %d \"%s\"", pl, path);
 		}
 
 		next_dir = 0;
@@ -435,7 +430,7 @@ traverse_post(struct fs_traverse *ftp)
 			if (rv != 0) {
 				traverse_stats.fss_readdir_err++;
 
-				NDMP_LOG(LOG_DEBUG,
+				syslog(LOG_ERR,
 				    "Error %d on readdir(%s) pos %d",
 				    rv, path, tsp->ts_dpos);
 				if (STOP_ONERR(ftp))
@@ -447,9 +442,7 @@ traverse_post(struct fs_traverse *ftp)
 
 			/* done with this directory */
 			if (el == 0) {
-				if (VERBOSE(ftp))
-					NDMP_LOG(LOG_DEBUG,
-					    "Done(%s)", pn.tn_path);
+				syslog(LOG_DEBUG, "Done(%s)", pn.tn_path);
 				break;
 			}
 			nm[el] = '\0';
@@ -459,14 +452,10 @@ traverse_post(struct fs_traverse *ftp)
 				continue;
 			}
 
-			if (VERBOSE(ftp))
-				NDMP_LOG(LOG_DEBUG, "%u dname: \"%s\"",
-				    tsp->ts_dpos, nm);
-
 			if (pl + 1 + el > PATH_MAX) {
 				traverse_stats.fss_longpath_err++;
 
-				NDMP_LOG(LOG_ERR, "Path %s/%s is too long.",
+				syslog(LOG_ERR, "Path %s/%s is too long.",
 				    path, nm);
 				if (STOP_ONLONG(ftp))
 					rv = ENAMETOOLONG;
@@ -532,11 +521,6 @@ traverse_post(struct fs_traverse *ftp)
 				en.tn_st = &est;
 				rv = CALLBACK(&pn, &en);
 				free(efh.fh_fpath);
-				if (VERBOSE(ftp))
-					NDMP_LOG(LOG_DEBUG,
-					    "CALLBACK(%s/%s): %d",
-					    pn.tn_path, en.tn_path, rv);
-
 				if (rv != 0)
 					break;
 			}
@@ -568,10 +552,6 @@ traverse_post(struct fs_traverse *ftp)
 			assert(tsp != NULL);
 			pl = tsp->ts_end - path;
 
-			if (VERBOSE(ftp))
-				NDMP_LOG(LOG_DEBUG, "poped pl %d 0x%p \"%s\"",
-				    pl, tsp, path);
-
 			traverse_stats.fss_pops++;
 			traverse_stats.fss_dir_calls++;
 
@@ -583,9 +563,6 @@ traverse_post(struct fs_traverse *ftp)
 
 			rv = CALLBACK(&pn, &en);
 			free(efh.fh_fpath);
-			if (VERBOSE(ftp))
-				NDMP_LOG(LOG_DEBUG, "CALLBACK(%s/%s): %d",
-				    pn.tn_path, en.tn_path, rv);
 			/*
 			 * Does not need to free tsp here.  It will be released
 			 * later.
@@ -611,8 +588,6 @@ traverse_post(struct fs_traverse *ftp)
 		en.tn_fh = NULL;
 		en.tn_st = NULL;
 		rv = CALLBACK(&pn, &en);
-		if (VERBOSE(ftp))
-			NDMP_LOG(LOG_DEBUG, "CALLBACK(%s): %d", pn.tn_path, rv);
 	}
 
 	/*
@@ -667,7 +642,7 @@ traverse_level_nondir(struct fs_traverse *ftp,
 	if (n_entries < 0) {
 		traverse_stats.fss_readdir_err++;
 
-		NDMP_LOG(LOG_INFO,
+		syslog(LOG_INFO,
 			"Error getting dir entries for (%s) errno %d",
 				pnp->tn_path, errno);
 
@@ -689,14 +664,10 @@ traverse_level_nondir(struct fs_traverse *ftp,
 	for (i = 0; i < n_entries; i++, dent = (fs_dent_info_t *)
 	    ((char *)dent + dent->fd_len)) {
 
-		if (VERBOSE(ftp))
-			NDMP_LOG(LOG_DEBUG, "i %u dname: \"%s\"",
-			    dent->fd_fh.fh_fid, dent->fd_name);
-
 		if ((path_length + strlen(dent->fd_name)) > PATH_MAX) {
 			traverse_stats.fss_longpath_err++;
 
-			NDMP_LOG(LOG_ERR, "Path %s/%s is too long.",
+			syslog(LOG_ERR, "Path %s/%s is too long.",
 			    pnp->tn_path, dent->fd_name);
 			if (STOP_ONLONG(ftp))
 				rv = -ENAMETOOLONG;
@@ -750,24 +721,24 @@ traverse_level(struct fs_traverse *ftp)
 	dent_arg_t darg;
 
 	if (!ftp || !ftp->ft_path || !*ftp->ft_path || !ftp->ft_callbk) {
-		NDMP_LOG(LOG_DEBUG, "Invalid argument");
+		syslog(LOG_ERR, "Invalid argument");
 		errno = EINVAL;
 		return (-1);
 	}
 	/* set the default log function if it's not already set */
 	if (!ftp->ft_logfp) {
 		ftp->ft_logfp = (ft_log_t)syslog;
-		NDMP_LOG(LOG_DEBUG, "Log to system log \"%s\"", ftp->ft_path);
+		syslog(LOG_DEBUG, "Log to system log \"%s\"", ftp->ft_path);
 	}
 	if (!ftp->ft_lpath) {
-		NDMP_LOG(LOG_DEBUG,
+		syslog(LOG_DEBUG,
 		    "report the same paths \"%s\"", ftp->ft_path);
 		ftp->ft_lpath = ftp->ft_path;
 	}
 
 	pl = strlen(ftp->ft_lpath);
 	if (pl + 1 > PATH_MAX) { /* +1 for the '/' */
-		NDMP_LOG(LOG_DEBUG, "lpath too long \"%s\"", ftp->ft_path);
+		syslog(LOG_ERR, "lpath too long \"%s\"", ftp->ft_path);
 		errno = ENAMETOOLONG;
 		return (-1);
 	}
@@ -775,7 +746,7 @@ traverse_level(struct fs_traverse *ftp)
 	(void) memset(&pfh, 0, sizeof (pfh));
 	rv = fs_getstat(ftp->ft_lpath, &pfh, &pst);
 	if (rv != 0) {
-		NDMP_LOG(LOG_DEBUG,
+		syslog(LOG_ERR,
 		    "Error %d on fs_getstat(%s)", rv, ftp->ft_path);
 		return (-1);
 	}
@@ -788,9 +759,6 @@ traverse_level(struct fs_traverse *ftp)
 		pn.tn_fh = &pfh;
 		pn.tn_st = &pst;
 		rv = CALLBACK(&pn, &en);
-		if (VERBOSE(ftp))
-			NDMP_LOG(LOG_DEBUG, "CALLBACK(%s): %d", pn.tn_path, rv);
-
 		free(pfh.fh_fpath);
 		return (rv);
 	}
@@ -847,9 +815,6 @@ traverse_level(struct fs_traverse *ftp)
 			traverse_stats.fss_newdirs++;
 
 			*tsp->ts_end = '\0';
-			if (VERBOSE(ftp))
-				NDMP_LOG(LOG_DEBUG, "pl %d \"%s\"", pl, path);
-
 			rv = traverse_level_nondir(ftp, &pn, &darg);
 			if (rv < 0) {
 				NEGATE(rv);
@@ -887,7 +852,7 @@ traverse_level(struct fs_traverse *ftp)
 			if (rv != 0) {
 				traverse_stats.fss_readdir_err++;
 
-				NDMP_LOG(LOG_DEBUG,
+				syslog(LOG_ERR,
 				    "Error %d on readdir(%s) pos %d",
 				    rv, path, tsp->ts_dpos);
 				if (STOP_ONERR(ftp))
@@ -907,10 +872,6 @@ traverse_level(struct fs_traverse *ftp)
 				continue;
 			}
 
-			if (VERBOSE(ftp))
-				NDMP_LOG(LOG_DEBUG, "%u dname: \"%s\"",
-				    tsp->ts_dpos, nm);
-
 			if (pl + 1 + el > PATH_MAX) {
 				/*
 				 * The long paths were already encountered
@@ -919,7 +880,7 @@ traverse_level(struct fs_traverse *ftp)
 				 * We don't increase fss_longpath_err
 				 * counter for them again here.
 				 */
-				NDMP_LOG(LOG_ERR, "Path %s/%s is too long.",
+				syslog(LOG_ERR, "Path %s/%s is too long.",
 				    path, nm);
 				if (STOP_ONLONG(ftp))
 					rv = ENAMETOOLONG;
@@ -1004,10 +965,6 @@ skip_dir:
 				break;
 
 			traverse_stats.fss_pops++;
-
-			if (VERBOSE(ftp))
-				NDMP_LOG(LOG_DEBUG,
-				    "Poped pl %d \"%s\"", pl, path);
 
 			*tsp->ts_end = '\0';
 			pl = tsp->ts_end - path;
