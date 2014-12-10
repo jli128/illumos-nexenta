@@ -40,7 +40,6 @@
 
 #include <errno.h>
 #include <signal.h>
-#include <libgen.h>
 #include <libscf.h>
 #include <libintl.h>
 #include <sys/wait.h>
