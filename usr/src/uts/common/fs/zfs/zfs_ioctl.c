@@ -7053,7 +7053,7 @@ _fini(void)
 	mutex_destroy(&zfs_share_lock);
 
 	if (zfs_channel)
-		sysevent_evc_unbind(zfs_channel);
+		(void) sysevent_evc_unbind(zfs_channel);
 
 	return (error);
 }
