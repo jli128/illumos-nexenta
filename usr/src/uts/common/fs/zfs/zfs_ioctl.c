@@ -3494,7 +3494,8 @@ zfs_ioc_create(const char *fsname, nvlist_t *innvl, nvlist_t *outnvl)
 		event = fnvlist_alloc();
 		fnvlist_add_string(event, "fsname", fsname);
 		fnvlist_add_int32(event, "type", type);
-		fnvlist_add_nvlist(event, "properties", nvprops);
+		if (nvprops != NULL)
+			fnvlist_add_nvlist(event, "properties", nvprops);
 		zfs_event_post(ZFS_EC_STATUS, "create", event);
 	}
 
@@ -3546,7 +3547,8 @@ zfs_ioc_clone(const char *fsname, nvlist_t *innvl, nvlist_t *outnvl)
 		event = fnvlist_alloc();
 		fnvlist_add_string(event, "origin", origin_name);
 		fnvlist_add_string(event, "fsname", fsname);
-		fnvlist_add_nvlist(event, "properties", nvprops);
+		if (nvprops != NULL)
+			fnvlist_add_nvlist(event, "properties", nvprops);
 		zfs_event_post(ZFS_EC_STATUS, "clone", event);
 	}
 
