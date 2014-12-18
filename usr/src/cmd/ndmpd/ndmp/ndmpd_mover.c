@@ -1004,9 +1004,10 @@ ndmpd_mover_set_record_size_v3(ndmp_connection_t *connection, void *body)
 		syslog(LOG_DEBUG,
 		    "Invalid argument %d, should be > 0 and <= %d",
 		    request->len, ndmp_max_mover_recsize);
-	} else if (request->len == session->ns_mover.md_record_size)
+	} else if (request->len == session->ns_mover.md_record_size) {
 		reply.error = NDMP_NO_ERR;
-	else if (!(cp = realloc(session->ns_mover.md_buf, request->len))) {
+		session->ns_mover.md_pre_cond = TRUE;
+	} else if (!(cp = realloc(session->ns_mover.md_buf, request->len))) {
 		reply.error = NDMP_NO_MEM_ERR;
 	} else {
 		reply.error = NDMP_NO_ERR;
