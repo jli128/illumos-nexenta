@@ -1540,7 +1540,6 @@ ndmp_open_list_release(ndmp_connection_t *conn)
 	olp = LIST_FIRST(olhp);
 	while (olp != NULL) {
 		next = LIST_NEXT(olp, ol_q);
-		syslog(LOG_DEBUG, "olp->conn 0x%08x", olp->cl_conn);
 		if (olp->cl_conn == conn) {
 			syslog(LOG_DEBUG,
 			    "Removed dev: %s, sid: %d, lun: %d",

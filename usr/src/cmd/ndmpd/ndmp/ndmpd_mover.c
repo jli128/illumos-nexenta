@@ -3733,8 +3733,6 @@ mover_data_read_v3(void *cookie, int fd, ulong_t mode)
 		return;
 	}
 
-	syslog(LOG_DEBUG, "n %d", n);
-
 	session->ns_mover.md_w_index += n;
 
 	if (session->ns_mover.md_w_index == session->ns_mover.md_record_size) {
@@ -4354,8 +4352,6 @@ ndmpd_local_read_v3(ndmpd_session_t *session, char *data, ulong_t length)
 		session->ns_mover.md_w_index = n;
 		session->ns_mover.md_r_index = 0;
 		session->ns_mover.md_record_num++;
-
-		syslog(LOG_DEBUG, "n: %d", n);
 
 		/*
 		 * Discard data if the current data stream position is
