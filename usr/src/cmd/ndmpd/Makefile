@@ -1,6 +1,8 @@
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
 
 #
 # BSD 3 Clause License
@@ -119,11 +121,15 @@ MANIFEST = ndmp.xml
 ROOTMANIFESTDIR= $(ROOTSVCSYSTEM)
 $(ROOTMANIFEST) := FILEMODE = 444
 
-ROOTNDMPDDIR=	$(ROOTLIB)/ndmp
+ROOTNDMPDDIR = $(ROOTLIB)/ndmp
+LOGNDMPDDIR = $(ROOT)/var/log/ndmp
 ROOTNDMPDFILE = $(PROG:%=$(ROOTNDMPDDIR)/%)
 
 FILEMODE = 0444
 $(ROOTNDMPDFILE):= FILEMODE = 0555
+
+$(LOGNDMPDDIR):
+	$(INS.dir)
 
 $(ROOTNDMPDDIR):
 	$(INS.dir)
@@ -135,7 +141,8 @@ $(ROOTNDMPDDIR)/%: %
 
 all: $(PROG)
 
-install: all $(ROOTNDMPDDIR)  $(ROOTNDMPDFILE) $(ROOTSVCMETHOD) $(ROOTMANIFEST) 
+install: all $(ROOTNDMPDDIR) $(LOGNDMPDDIR) $(ROOTNDMPDFILE) $(ROOTSVCMETHOD) \
+	$(ROOTMANIFEST)
 
 check:	$(CHKMANIFEST)
 
