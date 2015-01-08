@@ -1620,7 +1620,8 @@ zfs_ioc_pool_create(zfs_cmd_t *zc)
 		event = fnvlist_alloc();
 		fnvlist_add_string(event, "name", zc->zc_name);
 		fnvlist_add_nvlist(event, "config", config);
-		fnvlist_add_nvlist(event, "props", props);
+		if (props != NULL)
+			fnvlist_add_nvlist(event, "props", props);
 		zfs_event_post(ZPOOL_EC_STATUS, "create", event);
 	}
 
