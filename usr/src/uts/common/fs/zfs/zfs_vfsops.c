@@ -1053,8 +1053,18 @@ zfsvfs_setup(zfsvfs_t *zfsvfs, boolean_t mounting)
 		readonly = zfsvfs->z_vfs->vfs_flag & VFS_RDONLY;
 		if (readonly != 0)
 			zfsvfs->z_vfs->vfs_flag &= ~VFS_RDONLY;
-		else
-			zfs_unlinked_drain(zfsvfs);
+		else {
+			/* zfs_unlinked_drain will VN_RELE when done */
+			VFS_HOLD(zfsvfs->z_vfs);
+			if (taskq_dispatch(dsl_pool_vnrele_taskq(
+			    spa_get_dsl(zfsvfs->z_os->os_spa)),
+			    (void (*)(void *))zfs_unlinked_drain, zfsvfs,
+			    TQ_SLEEP) == NULL) {
+				cmn_err(CE_NOTE,
+				    "async zfs_unlinked_drain dispatch failed");
+				zfs_unlinked_drain(zfsvfs);
+			}
+		}
 
 		/*
 		 * Parse and replay the intent log.

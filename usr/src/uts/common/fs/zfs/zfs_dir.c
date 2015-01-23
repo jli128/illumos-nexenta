@@ -466,7 +466,8 @@ zfs_unlinked_add(znode_t *zp, dmu_tx_t *tx)
 
 /*
  * Clean up any znodes that had no links when we either crashed or
- * (force) umounted the file system.
+ * (force) umounted the file system. Caller or invoking thread must
+ * VN_HOLD the vfs_t to correctly handle async operation.
  */
 void
 zfs_unlinked_drain(zfsvfs_t *zfsvfs)
@@ -514,6 +515,8 @@ zfs_unlinked_drain(zfsvfs_t *zfsvfs)
 		VN_RELE(ZTOV(zp));
 	}
 	zap_cursor_fini(&zc);
+
+	VFS_RELE(zfsvfs->z_vfs);
 }
 
 /*
