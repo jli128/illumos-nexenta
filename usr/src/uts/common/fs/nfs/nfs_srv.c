@@ -18,9 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -333,17 +334,14 @@ int
 rfs_cross_mnt(vnode_t **vpp, struct exportinfo **exip)
 {
 	struct exportinfo *exi;
-	vnode_t *vp;
+	vnode_t *vp = *vpp;
 	fid_t fid;
 	int error;
 
-	vp = *vpp;
-
-	/* traverse() releases argument in success */
-	VN_HOLD(*vpp);
+	VN_HOLD(vp);
 
 	if ((error = traverse(&vp)) != 0) {
-		VN_RELE(*vpp);
+		VN_RELE(vp);
 		return (error);
 	}
 
@@ -362,6 +360,8 @@ rfs_cross_mnt(vnode_t **vpp, struct exportinfo **exip)
 		 * It is not error, just subdir is not exported
 		 * or "nohide" is not set
 		 */
+		if (exi != NULL)
+			exi_rele(exi);
 		VN_RELE(vp);
 	} else {
 		/* go to submount */
@@ -371,6 +371,7 @@ rfs_cross_mnt(vnode_t **vpp, struct exportinfo **exip)
 		VN_RELE(*vpp);
 		*vpp = vp;
 	}
+
 	return (0);
 }
 
@@ -498,6 +499,9 @@ rfs_lookup(struct nfsdiropargs *da, struct nfsdiropres *dr,
 	 */
 	if (PUBLIC_FH2(fhp)) {
 		publicfh_flag = TRUE;
+
+		exi_rele(exi);
+
 		error = rfs_publicfh_mclookup(name, dvp, cr, &vp, &exi,
 		    &sec);
 	} else {
@@ -545,13 +549,7 @@ rfs_lookup(struct nfsdiropargs *da, struct nfsdiropres *dr,
 out:
 	VN_RELE(dvp);
 
-	/*
-	 * If publicfh_flag is true then we have called rfs_publicfh_mclookup
-	 * and have obtained a new exportinfo in exi which needs to be
-	 * released. Note the the original exportinfo pointed to by exi
-	 * will be released by the caller, comon_dispatch.
-	 */
-	if (publicfh_flag && exi != NULL)
+	if (exi != NULL)
 		exi_rele(exi);
 
 	/*
