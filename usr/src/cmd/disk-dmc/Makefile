@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
 
 
@@ -29,6 +29,7 @@ all: $(PROG)
 install: all $(ROOTUSRSBINPROG)
 
 clean:
+	$(RM) $(PROG)
 
 lint:	lint_PROG
 
