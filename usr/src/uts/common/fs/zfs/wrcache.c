@@ -488,7 +488,7 @@ wrc_activate_blkhdr(spa_t *spa, dsl_dataset_t *ds)
 
 	ASSERT(MUTEX_HELD(&wrc_data->wrc_lock));
 	if (!spa_has_special(spa) ||
-	    dsl_dataset_is_snapshot(ds) || !ds->ds_objset ||
+	    ds->ds_is_snapshot || !ds->ds_objset ||
 	    spa_specialclass_id(ds->ds_objset) != SPA_SPECIALCLASS_WRCACHE ||
 	    wrc_data->wrc_thr_exit)
 		return (NULL);
@@ -824,7 +824,7 @@ wrc_clean_special(dsl_pool_t *dp, dmu_tx_t *tx, uint64_t cur_txg)
 			break;
 
 		if (DS_IS_INCONSISTENT(ds) ||
-		    dsl_dataset_is_snapshot(ds) ||
+		    ds->ds_is_snapshot ||
 		    ds->ds_dir->dd_myname[0] == '$') {
 			dsl_dataset_rele(ds, FTAG);
 			continue;

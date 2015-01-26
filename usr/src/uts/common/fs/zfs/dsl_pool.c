@@ -23,6 +23,7 @@
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2011, 2014 by Delphix. All rights reserved.
  * Copyright (c) 2013 Steven Hartland. All rights reserved.
+ * Copyright (c) 2014 Spectra Logic Corporation, All rights reserved.
  */
 
 #include <sys/dsl_pool.h>
@@ -332,6 +333,8 @@ dsl_pool_close(dsl_pool_t *dp)
 	arc_flush(dp->dp_spa, B_FALSE);
 	txg_fini(dp);
 	dsl_scan_fini(dp);
+	dmu_buf_user_evict_wait();
+
 	rrw_destroy(&dp->dp_config_rwlock);
 	mutex_destroy(&dp->dp_lock);
 	taskq_destroy(dp->dp_vnrele_taskq);

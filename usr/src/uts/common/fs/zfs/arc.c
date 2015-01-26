@@ -3341,6 +3341,22 @@ arc_reclaim_thread(void)
 	thread_exit();
 }
 
+/*
+ * Threads can block in arc_get_data_buf() waiting for this thread to evict
+ * enough data and signal them to proceed. When this happens, the threads in
+ * arc_get_data_buf() are sleeping while holding the hash lock for their
+ * particular arc header. Thus, we must be careful to never sleep on a
+ * hash lock in this thread. This is to prevent the following deadlock:
+ *
+ *  - Thread A sleeps on CV in arc_get_data_buf() holding hash lock "L",
+ *    waiting for the reclaim thread to signal it.
+ *
+ *  - arc_reclaim_thread() tries to acquire hash lock "L" using mutex_enter,
+ *    fails, and goes to sleep forever.
+ *
+ * This possible deadlock is avoided by always acquiring a hash lock
+ * using mutex_tryenter() from arc_reclaim_thread().
+ */
 static void
 arc_user_evicts_thread(void)
 {
