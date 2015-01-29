@@ -218,19 +218,29 @@ CLOBBERFILES= $(PDIR) proto_list_$(PKGMACH) install-$(PKGMACH).out \
 # build environment and then reference (implicitly or explicitly) the all
 # or install targets.
 #
-$(NZA_OPEN_ONLY)MANIFESTS:sh= (		\
-	cd manifests;			\
-	rm -f driver-isal.mf;		\
-	rm -f network-aoe-target.mf;	\
-	print *.mf			\
-	)
+$(ENABLE_IPP_PRINTING)DISABLE_IPP_PRINTING = $(POUND_SIGN)
 
-$(NZA_KMODS)MANIFESTS:sh= (						\
-	cd manifests;							\
+$(DISABLE_IPP_PRINTING)REMOVE_MANIFESTS +=	\
+	-e 's/print-lp-ipp-ipp-listener.mf//'
+
+$(NZA_OPEN_ONLY)REMOVE_MANIFESTS +=		\
+	-e 's/driver-isal.mf//'			\
+	-e 's/network-aoe-target.mf//'
+
+#
+# Construct a command sequence to list all manifests
+#
+LIST_MANIFESTS = cd manifests;
+
+# Copy nza-closed manifests over
+$(NZA_KMODS)LIST_MANIFESTS += 						\
 	cp ../../../nza-closed/pkg/manifests/driver-isal.mf .;		\
 	cp ../../../nza-closed/pkg/manifests/network-aoe-target.mf .;	\
-	print *.mf							\
-	)
+
+# list manifests, remove some
+LIST_MANIFESTS += print *.mf | sed ${REMOVE_MANIFESTS}
+
+MANIFESTS = ${LIST_MANIFESTS:sh}
 
 PKGS= $(MANIFESTS:%.mf=%)
 DEP_PKGS= $(PKGS:%=$(PDIR)/%.dep)
