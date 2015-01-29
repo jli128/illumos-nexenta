@@ -23,10 +23,10 @@
 # Copyright (c) 1999-2000 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2014 PALO, Richard. All rights reserved.
 #
 
-JAVAFLAGS= -nowarn -O
+JAVAFLAGS = -source 1.5 -target 1.6 -nowarn -O
 JRE=$(JAVA_ROOT)/jre/lib
 VRT=$(SRC)/cmd/krb5/kadmin/gui/visualrt
 

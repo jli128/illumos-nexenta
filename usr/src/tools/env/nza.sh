@@ -20,7 +20,7 @@
 #
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
-# Copyright 2014 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 #
 
 # Configuration variables for the runtime environment of the nightly
@@ -198,6 +198,13 @@ export SPRO_VROOT="$SPRO_ROOT"
 
 # path to onbld tool binaries
 ONBLD_BIN="${ONBLD_TOOLS}/bin"
+
+# Set JAVA_ROOT to point to a JDK7 implementation. The build system expects
+# it in /usr/java, but if /usr/jdk/instances/openjdk7 exists it will be used
+# instead.
+if [ -d /usr/jdk/instances/openjdk7 ]; then
+    export JAVA_ROOT=/usr/jdk/instances/openjdk7
+fi
 
 # help lint find the proper note.h file
 export ONLY_LINT_DEFS=-I${SPRO_ROOT}/sunstudio12.1/prod/include/lint

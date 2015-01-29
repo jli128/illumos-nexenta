@@ -22,6 +22,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2014 PALO, Richard. All rights reserved.
  */
 
 import org.opensolaris.os.dtrace.*;
@@ -56,7 +58,7 @@ public class TestFunctionLookup {
 	    String f;
 	    boolean done = false;
 	    for (int i = 0; (i < 20) && !done; ++i) {
-		Thread.currentThread().sleep(100);
+		Thread.sleep(100);
 		a = consumer.getAggregate();
 		for (Aggregation agg : a.getAggregations()) {
 		    for (Tuple tuple : agg.asMap().keySet()) {
@@ -88,7 +90,7 @@ public class TestFunctionLookup {
 	    consumer.compile(userLookupProgram);
 	    consumer.enable();
 	    consumer.go();
-	    Thread.currentThread().sleep(500);
+	    Thread.sleep(500);
 	    Aggregate a = consumer.getAggregate();
 	    Number address;
 	    String f;

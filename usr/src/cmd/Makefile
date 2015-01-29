@@ -223,7 +223,6 @@ COMMON_SUBDIRS=		\
 	iscsitsvc	\
 	isns		\
 	itadm		\
-	java		\
 	kbd		\
 	keyserv		\
 	killall		\

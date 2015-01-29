@@ -23,7 +23,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * ident	"%Z%%M%	%I%	%E% SMI"
+ * Copyright 2014 PALO, Richard. All rights reserved.
  */
 package org.opensolaris.os.dtrace;
 
@@ -637,7 +637,7 @@ public class LocalConsumer implements Consumer {
 		// that listeners finish executing consumerStopped()
 		// before the stop() method returns.
 		synchronized (this) {
-		    if (state == State.STOPPED || state == state.CLOSED) {
+		    if (state == State.STOPPED || state == State.CLOSED) {
 			//
 			// This consumer was stopped just after calling
 			// go() but before starting (the premature return

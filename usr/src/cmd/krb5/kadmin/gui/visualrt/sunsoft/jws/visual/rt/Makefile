@@ -23,11 +23,11 @@
 # Copyright (c) 1999-2000 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2014 PALO, Richard. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
-JAVAFLAGS= -nowarn -O
+JAVAFLAGS = -source 1.5 -target 1.6 -nowarn -O
 GUIDIR=$(SRC)/cmd/krb5/kadmin/gui
 
 def             :=      TARGET= def

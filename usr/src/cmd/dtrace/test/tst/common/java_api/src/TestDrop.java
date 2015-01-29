@@ -23,7 +23,7 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * ident	"%Z%%M%	%I%	%E% SMI"
+ * Copyright 2014 PALO, Richard. All rights reserved.
  */
 import java.util.*;
 import java.util.concurrent.atomic.*;
@@ -63,7 +63,7 @@ public class TestDrop {
     {
 	while (consumer.isRunning() && !done.get()) {
 	    try {
-		Thread.currentThread().sleep(50);
+		Thread.sleep(50);
 	    } catch (InterruptedException e) {
 	    }
 

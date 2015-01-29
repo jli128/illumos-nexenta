@@ -23,14 +23,13 @@
 # Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2014 PALO, Richard. All rights reserved.
 #
 # cmd/pools/poold/com/sun/solaris/service/locality/Makefile
 
 include $(SRC)/cmd/Makefile.cmd
 
 CLASSPATH =	$(SRC)/cmd/pools/poold
-JAVAFLAGS +=	-source 1.4
 
 SOURCE =	LocalityDomain.java \
 		LocalityGroup.java

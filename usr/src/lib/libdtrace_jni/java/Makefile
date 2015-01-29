@@ -23,6 +23,8 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2014 PALO, Richard. All rights reserved.
+#
 
 include $(SRC)/Makefile.master
 
@@ -76,9 +78,9 @@ MANIFESTS= $(APIMANI)
 APICLASSPATH=$(CLASSES):$(APIJAVASRC)
 
 # javac flags
-JFLAGS= -g -d $(CLASSES) -sourcepath $(APICLASSPATH) -deprecation
-JFLAGS += -target 1.5
-JFLAGS += -Xlint
+JFLAGS= -g -d $(CLASSES) -sourcepath $(APICLASSPATH)
+JFLAGS += -source 1.5 -target 1.6
+JFLAGS += -Xlint:all,-rawtypes,-options
 
 # The default make rule for Java files
 COMPILE.java=$(JAVAC) $(JFLAGS)
@@ -88,7 +90,7 @@ $(CLASSES)/$(PKGPATH)/%.class:	$(APIJAVASRC)/$(PKGPATH)/%.java
 
 # javah generated headers
 APIHDR= LocalConsumer.h
-JNIHDRS=$(JNI)/$(APIHDRS)
+JNIHDRS=$(JNI)/$(APIHDR)
 
 # API classes with native methods
 JNI_CLASSNAMES=\
