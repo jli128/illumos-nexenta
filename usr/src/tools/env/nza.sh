@@ -239,3 +239,9 @@ export CW_NO_SHADOW=1
 
 # Uncomment this to disable support for IPP printing.
 # export ENABLE_IPP_PRINTING='#'
+
+# Uncomment the following variables and adjust the values to match the perl
+# version used for building.
+# export PERL_VERSION=5.16.1
+# export PERL_PKGVERS=-5161
+# export PERL_ARCH=i86pc-solaris-64int
