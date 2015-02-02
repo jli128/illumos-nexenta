@@ -6809,6 +6809,12 @@ stmf_dlun0_task_free(scsi_task_t *task)
 }
 
 /* ARGSUSED */
+void
+stmf_dlun0_task_done(scsi_task_t *task)
+{
+}
+
+/* ARGSUSED */
 stmf_status_t
 stmf_dlun0_abort(struct stmf_lu *lu, int abort_cmd, void *arg, uint32_t flags)
 {
@@ -6902,6 +6908,7 @@ stmf_dlun_init()
 	dlun0->lu_abort = stmf_dlun0_abort;
 	dlun0->lu_task_poll = stmf_dlun0_task_poll;
 	dlun0->lu_ctl = stmf_dlun0_ctl;
+	dlun0->lu_task_done = stmf_dlun0_task_done;
 
 	ilu = (stmf_i_lu_t *)dlun0->lu_stmf_private;
 	ilu->ilu_cur_task_cntr = &ilu->ilu_task_cntr1;
