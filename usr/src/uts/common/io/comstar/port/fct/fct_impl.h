@@ -20,6 +20,7 @@
  */
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef	_FCT_IMPL_H
@@ -72,7 +73,7 @@ typedef struct fct_i_cmd {
 	fct_struct_id_t		 icmd_struct_id;
 	uint32_t		 icmd_flags;
 	clock_t			 icmd_start_time;
-	struct fct_i_cmd	*icmd_next;	/* iport_abort_queue and irp */
+	list_node_t		icmd_node;	/* iport_abort_queue and irp */
 	struct fct_i_cmd	*icmd_solcmd_next;	/* iport_solcmd_queue */
 	fct_icmd_cb_t		 icmd_cb;
 	void			*icmd_cb_private;
@@ -116,7 +117,7 @@ typedef struct fct_i_remote_port {
 	/* For queueing to handle elses */
 	struct fct_i_remote_port	*irp_discovery_next;
 
-	fct_i_cmd_t			*irp_els_list;
+	list_t				irp_els_list;
 
 	/*
 	 * sa stands for session affecting, nsa is non session affecting.
@@ -232,7 +233,7 @@ typedef struct fct_i_local_port {
 	 * # of free cmds sitting on the iport_cached_cmdlist
 	 */
 	uint32_t		iport_cached_ncmds;
-	struct fct_i_cmd	*iport_cached_cmdlist;
+	list_t			iport_cached_cmdlist;
 	kmutex_t		iport_cached_cmd_lock;
 
 	/*
@@ -261,8 +262,8 @@ typedef struct fct_i_local_port {
 	kcondvar_t		iport_worker_cv;
 	struct fct_i_event	*iport_event_head;
 	struct fct_i_event	*iport_event_tail;
-	struct fct_i_cmd	*iport_abort_queue;
-	struct fct_i_cmd	**iport_ppicmd_term;
+	list_t			iport_abort_queue;
+	struct fct_i_cmd	*iport_ppicmd_term;
 
 	/* link initialization */
 	fct_status_t		iport_li_comp_status;
