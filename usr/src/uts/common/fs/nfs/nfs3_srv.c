@@ -479,8 +479,7 @@ rfs3_lookup(LOOKUP3args *args, LOOKUP3res *resp, struct exportinfo *exi,
 			    l_admin_low->tsl_doi || tp->tpc_tp.host_type !=
 			    SUN_CIPSO) {
 				VN_RELE(vp);
-				resp->status = NFS3ERR_ACCES;
-				error = 1;
+				error = EACCES;
 			}
 			if (tp != NULL)
 				TPC_RELE(tp);
@@ -510,8 +509,7 @@ rfs3_lookup(LOOKUP3args *args, LOOKUP3res *resp, struct exportinfo *exi,
 			if (!do_rfs_label_check(clabel, dvp,
 			    DOMINANCE_CHECK, exi)) {
 				VN_RELE(vp);
-				resp->status = NFS3ERR_ACCES;
-				error = 1;
+				error = EACCES;
 			}
 		}
 	}
