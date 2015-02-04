@@ -22,7 +22,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
  * Copyright (c) 2013 Joyent, Inc.  All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -775,12 +775,7 @@ vdev_disk_io_start(zio_t *zio)
 	 * If the vdev is closed, it's likely in the REMOVED or FAULTED state.
 	 * Nothing to be done here but return failure.
 	 */
-	if (dvd == NULL) {
-		zio->io_error = ENXIO;
-		rw_exit(&vd->vdev_tsd_lock);
-		return;
-	}
-	if (dvd->vd_lh == NULL) {
+	if (dvd == NULL || dvd->vd_lh == NULL) {
 		zio->io_error = ENXIO;
 		rw_exit(&vd->vdev_tsd_lock);
 		zio_interrupt(zio);
