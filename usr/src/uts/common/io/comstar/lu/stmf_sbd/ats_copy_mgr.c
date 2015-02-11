@@ -91,17 +91,16 @@ sbd_ats_do_handling_before_io(scsi_task_t *task, struct sbd_lu *sl,
 	 */
 
 	for (ats_state = list_head(&sl->sl_ats_io_list); ats_state != NULL;
-			ats_state = list_next(&sl->sl_ats_io_list, ats_state)) {
+	    ats_state = list_next(&sl->sl_ats_io_list, ats_state)) {
 
 		if (is_overlapping(ats_state->as_cur_ats_lba,
-				ats_state->as_cur_ats_len,
-				lba, count) == 0)
+		    ats_state->as_cur_ats_len, lba, count) == 0)
 			continue;
 
 		/* if the task is already listed just return */
 		if (task == ats_state->as_cur_ats_task) {
 			cmn_err(CE_WARN, "sbd_ats_handling_before_io: "
-				"task %p already on list", (void *) task);
+			    "task %p already on list", (void *) task);
 			ret = SBD_SUCCESS;
 			goto exit;
 		}
@@ -111,14 +110,14 @@ sbd_ats_do_handling_before_io(scsi_task_t *task, struct sbd_lu *sl,
 		 */
 
 		if ((cdb0 == SCMD_COMPARE_AND_WRITE) ||
-			(ats_state->as_cmd == SCMD_COMPARE_AND_WRITE)) {
+		    (ats_state->as_cmd == SCMD_COMPARE_AND_WRITE)) {
 			ret = SBD_BUSY;
 			goto exit;
 		}
 	}
 done:
 	ats_state_ret =
-		(ats_state_t *)kmem_zalloc(sizeof (ats_state_t), KM_SLEEP);
+	    (ats_state_t *)kmem_zalloc(sizeof (ats_state_t), KM_SLEEP);
 	ats_state_ret->as_cur_ats_lba = lba;
 	ats_state_ret->as_cur_ats_len = count;
 	ats_state_ret->as_cmd = cdb0;
@@ -175,7 +174,7 @@ sbd_ats_handling_before_io_no_retry(scsi_task_t *task, struct sbd_lu *sl,
 	uint64_t lba, uint64_t count)
 {
 	return (sbd_ats_do_handling_before_io(task, sl, lba, count,
-		SBD_ATS_NO_BUSY));
+	    SBD_ATS_NO_BUSY));
 }
 
 void
@@ -201,7 +200,7 @@ sbd_ats_remove_by_task(scsi_task_t *task)
 	}
 
 	for (ats_state = list_head(&sl->sl_ats_io_list); ats_state != NULL;
-			ats_state = list_next(&sl->sl_ats_io_list, ats_state)) {
+	    ats_state = list_next(&sl->sl_ats_io_list, ats_state)) {
 
 		if (ats_state->as_cur_ats_task == task) {
 			list_remove(&sl->sl_ats_io_list, ats_state);
@@ -294,11 +293,11 @@ sbd_handle_ats_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd,
 
 	/* if the command is no longer active return */
 	if (((scmd->flags & SBD_SCSI_CMD_ACTIVE) == 0) ||
-		(scmd->trans_data == NULL) ||
-		((scmd->flags & SBD_SCSI_CMD_TRANS_DATA) == 0) ||
-		(scmd->nbufs == 0xff))  {
+	    (scmd->trans_data == NULL) ||
+	    ((scmd->flags & SBD_SCSI_CMD_TRANS_DATA) == 0) ||
+	    (scmd->nbufs == 0xff))  {
 		cmn_err(CE_NOTE, "sbd_handle_ats_xfer_completion:handled"
-			"unexpected completion");
+		    "unexpected completion");
 		sbd_task_done(task);
 		return;
 	}
@@ -333,7 +332,7 @@ sbd_handle_ats_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd,
 
 ATS_XFER_DONE:
 	if (ATOMIC32_GET(scmd->len) == 0 ||
-			scmd->flags & SBD_SCSI_CMD_XFER_FAIL) {
+	    scmd->flags & SBD_SCSI_CMD_XFER_FAIL) {
 		stmf_free_dbuf(task, dbuf);
 		/*
 		 * if this is not the last buffer to be transfered then exit
@@ -362,8 +361,8 @@ ATS_XFER_DONE:
 			}
 		}
 		ASSERT(scmd->nbufs == 0 &&
-			(scmd->flags & SBD_SCSI_CMD_TRANS_DATA) &&
-			scmd->trans_data != NULL);
+		    (scmd->flags & SBD_SCSI_CMD_TRANS_DATA) &&
+		    scmd->trans_data != NULL);
 		kmem_free(scmd->trans_data, scmd->trans_data_len);
 		scmd->trans_data = NULL; /* force panic later if re-entered */
 		scmd->trans_data_len = 0;

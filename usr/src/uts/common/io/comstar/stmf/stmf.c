@@ -4138,7 +4138,7 @@ stmf_task_alloc(struct stmf_local_port *lport, stmf_scsi_session_t *ss,
 	itask->itask_read_xfer = itask->itask_write_xfer = 0;
 	itask->itask_audit_index = 0;
 	bzero(&itask->itask_audit_records[0],
-		sizeof (stmf_task_audit_rec_t) * ITASK_TASK_AUDIT_DEPTH);
+	    sizeof (stmf_task_audit_rec_t) * ITASK_TASK_AUDIT_DEPTH);
 
 	if (new_task) {
 		if (lu->lu_task_alloc(task) != STMF_SUCCESS) {
@@ -4491,8 +4491,8 @@ stmf_post_task(scsi_task_t *task, stmf_data_buf_t *dbuf)
 	 * to limit starvation.
 	 */
 	if (task->task_cdb[0] == SCMD_WRITE_SAME_G4 ||
-		task->task_cdb[0] == SCMD_WRITE_SAME_G1 ||
-		task->task_cdb[0] == SCMD_UNMAP) {
+	    task->task_cdb[0] == SCMD_WRITE_SAME_G1 ||
+	    task->task_cdb[0] == SCMD_UNMAP) {
 		w = &stmf_workers[0];
 	}
 
@@ -7783,6 +7783,7 @@ stmf_scsilib_tptid_validate(scsi_transport_id_t *tptid, uint32_t total_sz,
 		break;
 
 	case PROTOCOL_iSCSI:
+		/* CSTYLED */
 		{
 		iscsi_transport_id_t	*iscsiid;
 		uint16_t		adn_len, name_len;
@@ -7828,6 +7829,7 @@ stmf_scsilib_tptid_validate(scsi_transport_id_t *tptid, uint32_t total_sz,
 	case PROTOCOL_ADT:
 	case PROTOCOL_ATAPI:
 	default:
+		/* CSTYLED */
 		{
 		stmf_dflt_scsi_tptid_t *dflttpd;
 
@@ -7857,6 +7859,7 @@ stmf_scsilib_tptid_compare(scsi_transport_id_t *tpd1,
 	switch (tpd1->protocol_id) {
 
 	case PROTOCOL_iSCSI:
+		/* CSTYLED */
 		{
 		iscsi_transport_id_t *iscsitpd1, *iscsitpd2;
 		uint16_t len;
@@ -7872,6 +7875,7 @@ stmf_scsilib_tptid_compare(scsi_transport_id_t *tpd1,
 		break;
 
 	case PROTOCOL_SRP:
+		/* CSTYLED */
 		{
 		scsi_srp_transport_id_t *srptpd1, *srptpd2;
 
@@ -7884,6 +7888,7 @@ stmf_scsilib_tptid_compare(scsi_transport_id_t *tpd1,
 		break;
 
 	case PROTOCOL_FIBRE_CHANNEL:
+		/* CSTYLED */
 		{
 		scsi_fc_transport_id_t *fctpd1, *fctpd2;
 
@@ -7902,6 +7907,7 @@ stmf_scsilib_tptid_compare(scsi_transport_id_t *tpd1,
 	case PROTOCOL_ADT:
 	case PROTOCOL_ATAPI:
 	default:
+		/* CSTYLED */
 		{
 		stmf_dflt_scsi_tptid_t *dflt1, *dflt2;
 		uint16_t len;
