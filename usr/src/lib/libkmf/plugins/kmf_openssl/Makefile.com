@@ -54,6 +54,8 @@ CERRWARN	+=	-_gcc=-Wno-unused-label
 CERRWARN	+=	-_gcc=-Wno-unused-value
 CERRWARN	+=	-_gcc=-Wno-uninitialized
 
+LINTCHECKFLAGS	+=	-erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
+
 PICS=	$(OBJECTS:%=pics/%)
 
 lint:=	OPENSSLLIBS=	$(LINTSSLLIBS)

@@ -57,6 +57,7 @@ CLEANFILES +=   $(MSGFILES)
 # openssl forces us to ignore dubious pointer casts, thanks to its clever
 # use of macros for stack management.
 LINTFLAGS=      -umx -errtags \
+		-erroff=E_SUPPRESSION_DIRECTIVE_UNUSED \
 		-erroff=E_BAD_PTR_CAST_ALIGN,E_BAD_PTR_CAST
 $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 
