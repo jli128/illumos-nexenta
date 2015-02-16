@@ -4535,19 +4535,9 @@ stmf_post_task(scsi_task_t *task, stmf_data_buf_t *dbuf)
 
 	stmf_itl_task_start(itask);
 
-	itask->itask_worker_next = NULL;
-	if (w->worker_task_tail) {
-		w->worker_task_tail->itask_worker_next = itask;
-	} else {
-		w->worker_task_head = itask;
-	}
-	w->worker_task_tail = itask;
-	if (++(w->worker_queue_depth) > w->worker_max_qdepth_pu) {
-		w->worker_max_qdepth_pu = w->worker_queue_depth;
-	}
-	/* Measure task waitq time */
-	itask->itask_waitq_enter_timestamp = gethrtime();
+	STMF_ENQUEUE_ITASK(w, itask);
 	atomic_inc_32(&w->worker_ref_count);
+
 	itask->itask_cmd_stack[0] = ITASK_CMD_NEW_TASK;
 	itask->itask_ncmds = 1;
 	stmf_task_audit(itask, TE_TASK_START, CMD_OR_IOF_NA, dbuf);
@@ -4734,19 +4724,7 @@ stmf_data_xfer_done(scsi_task_t *task, stmf_data_buf_t *dbuf, uint32_t iof)
 		ASSERT(itask->itask_ncmds < ITASK_MAX_NCMDS);
 		itask->itask_cmd_stack[itask->itask_ncmds++] = cmd;
 		if (queue_it) {
-			itask->itask_worker_next = NULL;
-			if (w->worker_task_tail) {
-				w->worker_task_tail->itask_worker_next = itask;
-			} else {
-				w->worker_task_head = itask;
-			}
-			w->worker_task_tail = itask;
-			/* Measure task waitq time */
-			itask->itask_waitq_enter_timestamp = gethrtime();
-			if (++(w->worker_queue_depth) >
-			    w->worker_max_qdepth_pu) {
-				w->worker_max_qdepth_pu = w->worker_queue_depth;
-			}
+			STMF_ENQUEUE_ITASK(w, itask);
 			if ((w->worker_flags & STMF_WORKER_ACTIVE) == 0)
 				cv_signal(&w->worker_cv);
 		}
@@ -4860,18 +4838,7 @@ stmf_send_status_done(scsi_task_t *task, stmf_status_t s, uint32_t iof)
 		ASSERT(itask->itask_ncmds < ITASK_MAX_NCMDS);
 		itask->itask_cmd_stack[itask->itask_ncmds++] =
 		    ITASK_CMD_STATUS_DONE;
-		itask->itask_worker_next = NULL;
-		if (w->worker_task_tail) {
-			w->worker_task_tail->itask_worker_next = itask;
-		} else {
-			w->worker_task_head = itask;
-		}
-		w->worker_task_tail = itask;
-		/* Measure task waitq time */
-		itask->itask_waitq_enter_timestamp = gethrtime();
-		if (++(w->worker_queue_depth) > w->worker_max_qdepth_pu) {
-			w->worker_max_qdepth_pu = w->worker_queue_depth;
-		}
+		STMF_ENQUEUE_ITASK(w, itask);
 		if ((w->worker_flags & STMF_WORKER_ACTIVE) == 0)
 			cv_signal(&w->worker_cv);
 	}
@@ -4961,16 +4928,7 @@ stmf_queue_task_for_abort(scsi_task_t *task, stmf_status_t s)
 		return;
 	}
 	atomic_or_32(&itask->itask_flags, ITASK_IN_WORKER_QUEUE);
-	itask->itask_worker_next = NULL;
-	if (w->worker_task_tail) {
-		w->worker_task_tail->itask_worker_next = itask;
-	} else {
-		w->worker_task_head = itask;
-	}
-	w->worker_task_tail = itask;
-	if (++(w->worker_queue_depth) > w->worker_max_qdepth_pu) {
-		w->worker_max_qdepth_pu = w->worker_queue_depth;
-	}
+	STMF_ENQUEUE_ITASK(w, itask);
 
 	if ((w->worker_flags & STMF_WORKER_ACTIVE) == 0)
 		cv_signal(&w->worker_cv);
@@ -5108,16 +5066,7 @@ stmf_task_poll_lu(scsi_task_t *task, uint32_t timeout)
 		itask->itask_poll_timeout = ddi_get_lbolt() + t;
 	}
 	if ((itask->itask_flags & ITASK_IN_WORKER_QUEUE) == 0) {
-		itask->itask_worker_next = NULL;
-		if (w->worker_task_tail) {
-			w->worker_task_tail->itask_worker_next = itask;
-		} else {
-			w->worker_task_head = itask;
-		}
-		w->worker_task_tail = itask;
-		if (++(w->worker_queue_depth) > w->worker_max_qdepth_pu) {
-			w->worker_max_qdepth_pu = w->worker_queue_depth;
-		}
+		STMF_ENQUEUE_ITASK(w, itask);
 		atomic_or_32(&itask->itask_flags, ITASK_IN_WORKER_QUEUE);
 		if ((w->worker_flags & STMF_WORKER_ACTIVE) == 0)
 			cv_signal(&w->worker_cv);
@@ -5156,16 +5105,7 @@ stmf_task_poll_lport(scsi_task_t *task, uint32_t timeout)
 		itask->itask_poll_timeout = ddi_get_lbolt() + t;
 	}
 	if ((itask->itask_flags & ITASK_IN_WORKER_QUEUE) == 0) {
-		itask->itask_worker_next = NULL;
-		if (w->worker_task_tail) {
-			w->worker_task_tail->itask_worker_next = itask;
-		} else {
-			w->worker_task_head = itask;
-		}
-		w->worker_task_tail = itask;
-		if (++(w->worker_queue_depth) > w->worker_max_qdepth_pu) {
-			w->worker_max_qdepth_pu = w->worker_queue_depth;
-		}
+		STMF_ENQUEUE_ITASK(w, itask);
 		if ((w->worker_flags & STMF_WORKER_ACTIVE) == 0)
 			cv_signal(&w->worker_cv);
 	}
@@ -6262,17 +6202,13 @@ stmf_worker_loop:;
 				    NULL;
 			}
 		}
-		if ((itask = w->worker_task_head) == NULL) {
-			w->worker_task_tail = NULL;
-			break;
-		}
+		STMF_DEQUEUE_ITASK(w, itask);
 
+		if (!itask)
+			break;
 		task = itask->itask_task;
 		DTRACE_PROBE2(worker__active, stmf_worker_t, w,
 		    scsi_task_t *, task);
-		w->worker_task_head = itask->itask_worker_next;
-		if (w->worker_task_head == NULL)
-			w->worker_task_tail = NULL;
 		wait_queue = 0;
 		abort_free = 0;
 		if (itask->itask_ncmds > 0) {
