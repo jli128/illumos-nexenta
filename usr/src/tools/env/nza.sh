@@ -202,8 +202,8 @@ ONBLD_BIN="${ONBLD_TOOLS}/bin"
 # Set JAVA_ROOT to point to a JDK7 implementation. The build system expects
 # it in /usr/java, but if /usr/jdk/instances/openjdk7 exists it will be used
 # instead.
-if [ -d /usr/jdk/instances/openjdk7 ]; then
-    export JAVA_ROOT=/usr/jdk/instances/openjdk7
+if [ -d /usr/jdk/instances/openjdk1.7.0 ]; then
+    export JAVA_ROOT=/usr/jdk/instances/openjdk1.7.0
 fi
 
 # help lint find the proper note.h file
