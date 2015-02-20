@@ -41,12 +41,17 @@
 #include "stmf_sbd.h"
 #include "sbd_impl.h"
 
+uint8_t HardwareAcceleratedLocking = 1; /* 0 for not enbaled */
+uint8_t HardwareAcceleratedMove = 1;	/* 0 for not enabled */
+
 /* ATS routines. */
 #define	SBD_ATS_MAX_NBLKS	32
 
 uint8_t
 sbd_ats_max_nblks(void)
 {
+	if (HardwareAcceleratedLocking == 0)
+		return (0);
 	return (SBD_ATS_MAX_NBLKS);
 }
 
@@ -65,6 +70,9 @@ sbd_ats_do_handling_before_io(scsi_task_t *task, struct sbd_lu *sl,
 	ats_state_t *ats_state, *ats_state_ret;
 	sbd_cmd_t *scmd = (sbd_cmd_t *)task->task_lu_private;
 	uint8_t cdb0 = task->task_cdb[0];
+
+	if (HardwareAcceleratedLocking == 0)
+		return (SBD_SUCCESS);
 
 	mutex_enter(&sl->sl_lock);
 	/*
@@ -436,6 +444,12 @@ sbd_handle_ats(scsi_task_t *task, struct stmf_data_buf *initial_dbuf)
 	stmf_data_buf_t *dbuf;
 	uint8_t do_immediate_data = 0;
 	/* int ret; */
+
+	if (HardwareAcceleratedLocking == 0) {
+		stmf_scsilib_send_status(task, STATUS_CHECK,
+		    STMF_SAA_INVALID_OPCODE);
+		return;
+	}
 
 	task->task_cmd_xfer_length = 0;
 	if (task->task_additional_flags &
@@ -812,6 +826,13 @@ sbd_handle_xcopy(scsi_task_t *task, stmf_data_buf_t *dbuf)
 	uint32_t cmd_xfer_len;
 
 	cmd_xfer_len = READ_SCSI32(&task->task_cdb[10], uint32_t);
+
+
+	if (HardwareAcceleratedMove == 0) {
+		stmf_scsilib_send_status(task, STATUS_CHECK,
+		    STMF_SAA_INVALID_OPCODE);
+		return;
+	}
 
 	if (cmd_xfer_len == 0) {
 		task->task_cmd_xfer_length = 0;

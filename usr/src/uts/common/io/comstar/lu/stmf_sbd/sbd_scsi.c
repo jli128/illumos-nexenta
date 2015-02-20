@@ -109,6 +109,7 @@ void sbd_handle_identifying_info(scsi_task_t *task, stmf_data_buf_t *dbuf);
 static void sbd_handle_unmap_xfer(scsi_task_t *task, uint8_t *buf,
     uint32_t buflen);
 static void sbd_handle_unmap(scsi_task_t *task, stmf_data_buf_t *dbuf);
+uint8_t HardwareAcceleratedInit = 1;
 
 extern void sbd_pgr_initialize_it(scsi_task_t *, sbd_it_data_t *);
 extern int sbd_pgr_reservation_conflict(scsi_task_t *, struct sbd_lu *sl);
@@ -2473,6 +2474,12 @@ sbd_handle_write_same(scsi_task_t *task, struct stmf_data_buf *initial_dbuf)
 	uint8_t unmap;
 	uint8_t do_immediate_data = 0;
 	int ret;
+
+	if (HardwareAcceleratedInit == 0) {
+		stmf_scsilib_send_status(task, STATUS_CHECK,
+		    STMF_SAA_INVALID_OPCODE);
+		return;
+	}
 
 	task->task_cmd_xfer_length = 0;
 	if (task->task_additional_flags &
