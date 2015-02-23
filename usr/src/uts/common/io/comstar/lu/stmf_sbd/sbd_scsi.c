@@ -94,6 +94,12 @@
  */
 int stmf_sbd_unmap_max_nblks  = 0x002000;
 
+/*
+ * An /etc/system tunable which indicates if READ ops can run on the standby
+ * path or return an error.
+ */
+int stmf_standby_fail_reads = 0;
+
 stmf_status_t sbd_lu_reset_state(stmf_lu_t *lu);
 static void sbd_handle_sync_cache(struct scsi_task *task,
     struct stmf_data_buf *initial_dbuf);
@@ -3198,6 +3204,25 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	cdb0 = task->task_cdb[0];
 	cdb1 = task->task_cdb[1];
 	/*
+	 * Special case for different versions of Windows.
+	 * 1) Windows 2012 and VMWare will fail to discover LU's if a READ
+	 *    operation sent down the standby path returns an error. By default
+	 *    standby_fail_reads will be set to 0.
+	 * 2) Windows 2008 R2 has a severe performace problem if READ ops
+	 *    aren't rejected on the standby path. 2008 sends commands
+	 *    down the standby path which then must be proxied over to the
+	 *    active node and back.
+	 */
+	if ((sl->sl_access_state == SBD_LU_STANDBY) &&
+	    stmf_standby_fail_reads &&
+	    (cdb0 == SCMD_READ || cdb0 == SCMD_READ_G1 ||
+	    cdb0 == SCMD_READ_G4 || cdb0 == SCMD_READ_G5)) {
+		stmf_scsilib_send_status(task, STATUS_CHECK,
+		    STMF_SAA_LU_NO_ACCESS_STANDBY);
+		return;
+	}
+
+	/*
 	 * Don't go further if cmd is unsupported in standby mode
 	 */
 	if (sl->sl_access_state == SBD_LU_STANDBY) {
@@ -3214,6 +3239,10 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 		    cdb0 != SCMD_READ_CAPACITY &&
 		    cdb0 != SCMD_TEST_UNIT_READY &&
 		    cdb0 != SCMD_START_STOP &&
+		    cdb0 != SCMD_READ &&
+		    cdb0 != SCMD_READ_G1 &&
+		    cdb0 != SCMD_READ_G4 &&
+		    cdb0 != SCMD_READ_G5 &&
 		    !(cdb0 == SCMD_SVC_ACTION_IN_G4 &&
 		    cdb1 == SSVC_ACTION_READ_CAPACITY_G4) &&
 		    !(cdb0 == SCMD_MAINTENANCE_IN &&
