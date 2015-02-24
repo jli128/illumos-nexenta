@@ -24,7 +24,7 @@
  */
 /* Copyright (c) 2013 by Saso Kiselkov. All rights reserved. */
 /* Copyright (c) 2013, Joyent, Inc. All rights reserved. */
-/* Copyright (c) 2014, Nexenta Systems, Inc. All rights reserved. */
+/* Copyright 2015 Nexenta Systems, Inc. All rights reserved. */
 
 #include <sys/dmu.h>
 #include <sys/dmu_impl.h>
@@ -115,8 +115,6 @@ const dmu_object_type_info_t dmu_ot[DMU_OT_NUMTYPES] = {
 	{	DMU_BSWAP_UINT64,	TRUE,	"bpobj subobj"		},
 	{	DMU_BSWAP_UINT8,	TRUE,	"cos props"		},
 	{	DMU_BSWAP_UINT64,	TRUE,	"cos props size"	},
-	{	DMU_BSWAP_UINT8,	TRUE,	"vdev props"		},
-	{	DMU_BSWAP_UINT64,	TRUE,	"vdev props size"	},
 };
 
 const dmu_object_byteswap_info_t dmu_ot_byteswap[DMU_BSWAP_NUMFUNCS] = {
@@ -655,7 +653,7 @@ dmu_free_long_range_impl(objset_t *os, dnode_t *dn, uint64_t offset,
 		return (0);
 
 	if (length == DMU_OBJECT_END && offset == 0)
-	    dnode_evict_dbufs(dn, 0);	
+		dnode_evict_dbufs(dn, 0);
 
 	if (length == DMU_OBJECT_END || offset + length > object_size)
 		length = object_size - offset;

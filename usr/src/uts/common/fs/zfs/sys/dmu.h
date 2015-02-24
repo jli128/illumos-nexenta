@@ -23,10 +23,10 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011, 2014 by Delphix. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2013 DEY Storage Systems, Inc.
  * Copyright 2014 HybridCluster. All rights reserved.
  * Copyright (c) 2014 Spectra Logic Corporation, All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 /* Portions Copyright 2010 Robert Milkowski */
@@ -211,8 +211,6 @@ typedef enum dmu_object_type {
 	 */
 	DMU_OT_COS_PROPS,		/* UINT64 */
 	DMU_OT_COS_PROPS_SIZE,
-	DMU_OT_VDEV_PROPS,		/* UINT64 */
-	DMU_OT_VDEV_PROPS_SIZE,
 	DMU_OT_NUMTYPES,
 
 	/*

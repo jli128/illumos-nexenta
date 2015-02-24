@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/spa_impl.h>
@@ -75,7 +75,7 @@ vdev_store_props(vdev_t *vdev, objset_t *mos, uint64_t obj, uint64_t offset,
 
 	propname = vdev_prop_to_name(VDEV_PROP_PREFERRED_READ);
 	VERIFY(0 == nvlist_add_uint64(nvl, propname,
-		vdev->vdev_queue.vq_preferred_read));
+	    vdev->vdev_queue.vq_preferred_read));
 
 	if (vdev->vdev_queue.vq_cos) {
 		propname = vdev_prop_to_name(VDEV_PROP_COS);
@@ -99,7 +99,7 @@ vdev_store_props(vdev_t *vdev, objset_t *mos, uint64_t obj, uint64_t offset,
 	if (size > nvsize)
 		bzero(packed + nvsize, size - nvsize);
 	VERIFY(nvlist_pack(nvl, &packed, &nvsize, NV_ENCODE_XDR,
-		KM_SLEEP) == 0);
+	    KM_SLEEP) == 0);
 
 	vpph->vpph_guid = vdev->vdev_guid;
 	vpph->vpph_nvsize = nvsize;
@@ -465,8 +465,9 @@ spa_vdev_sync_props(void *arg1, dmu_tx_t *tx)
 
 	if (spa->spa_vdev_props_object == 0) {
 		VERIFY((spa->spa_vdev_props_object =
-		    dmu_object_alloc(mos, DMU_OT_VDEV_PROPS, 0,
-		    DMU_OT_VDEV_PROPS_SIZE, 8, tx)) > 0);
+		    dmu_object_alloc(mos, DMU_OT_PACKED_NVLIST,
+		    SPA_CONFIG_BLOCKSIZE, DMU_OT_PACKED_NVLIST_SIZE,
+		    sizeof (uint64_t), tx)) > 0);
 
 		VERIFY(zap_update(mos,
 		    DMU_POOL_DIRECTORY_OBJECT,
