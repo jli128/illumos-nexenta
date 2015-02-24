@@ -21,8 +21,8 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -1014,8 +1014,6 @@ ddt_repair_start(ddt_t *ddt, const blkptr_t *bp)
 			 */
 			if (class != DDT_CLASS_UNIQUE &&
 			    ddt_object_lookup(ddt, type, class, dde) == 0)
-				return (dde);
-			if (ddt_object_lookup(ddt, type, class, dde) == 0)
 				return (dde);
 		}
 	}
