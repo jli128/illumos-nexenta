@@ -22,8 +22,8 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011, 2014 by Delphix. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2014 Spectra Logic Corporation, All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -2763,7 +2763,7 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 	error = spa_dir_prop(spa, DMU_POOL_VDEV_PROPS,
 	    &spa->spa_vdev_props_object);
 	if (error == 0)
-		(void) spa_load_vdev_props(spa, B_FALSE);
+		(void) spa_load_vdev_props(spa);
 
 	/*
 	 * If the 'autoreplace' property is set, then post a resource notifying
@@ -3893,7 +3893,7 @@ spa_check_special_feature(spa_t *spa)
 		if (!spa_feature_is_enabled(spa, SPA_FEATURE_META_DEVICES)) {
 			VERIFY(nvlist_alloc(&props, NV_UNIQUE_NAME, 0) == 0);
 			VERIFY(nvlist_add_uint64(props,
-				FEATURE_META_DEVICES, 0) == 0);
+			    FEATURE_META_DEVICES, 0) == 0);
 			VERIFY(spa_prop_set(spa, props) == 0);
 			nvlist_free(props);
 		}
@@ -4283,7 +4283,7 @@ spa_import(const char *pool, nvlist_t *config, nvlist_t *props, uint64_t flags)
 	}
 
 	/* At this point, we can load spare props */
-	(void) spa_load_vdev_props(spa, B_TRUE);
+	(void) spa_load_vdev_props(spa);
 
 	/*
 	 * Check for any removed devices.
@@ -4316,7 +4316,7 @@ spa_import(const char *pool, nvlist_t *config, nvlist_t *props, uint64_t flags)
 		return (0);
 
 	return (dsl_sync_task(spa->spa_name, NULL, spa_special_feature_activate,
-		spa, 3, ZFS_SPACE_CHECK_RESERVED));
+	    spa, 3, ZFS_SPACE_CHECK_RESERVED));
 }
 
 nvlist_t *

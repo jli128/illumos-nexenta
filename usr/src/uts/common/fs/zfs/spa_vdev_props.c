@@ -521,7 +521,7 @@ spa_vdev_props_sync_task_do(spa_t *spa)
  * Load vdev properties from the vdev_props_object in the MOS
  */
 int
-spa_load_vdev_props(spa_t *spa, boolean_t load_aux)
+spa_load_vdev_props(spa_t *spa)
 {
 	objset_t *mos = spa->spa_meta_objset;
 	vdev_t *vdev;
@@ -558,7 +558,7 @@ spa_load_vdev_props(spa_t *spa, boolean_t load_aux)
 		char *packed = pbuf + sizeof (*vpph);
 		uint64_t nvsize = vpph->vpph_nvsize;
 
-		vdev = spa_lookup_by_guid(spa, vpph->vpph_guid, load_aux);
+		vdev = spa_lookup_by_guid(spa, vpph->vpph_guid, B_TRUE);
 		if (vdev == NULL)
 			continue;
 		vdev_parse_props(vdev, packed, nvsize);
