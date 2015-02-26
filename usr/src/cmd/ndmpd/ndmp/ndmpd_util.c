@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -38,7 +37,7 @@
  */
 /* Copyright (c) 2007, The Storage Networking Industry Association. */
 /* Copyright (c) 1996, 1997 PDC, Network Appliance. All Rights Reserved */
-/* Copyright 2014 Nexenta Systems, Inc. All rights reserved. */
+/* Copyright 2015 Nexenta Systems, Inc. All rights reserved. */
 
 #include <sys/types.h>
 #include <syslog.h>
@@ -596,7 +595,7 @@ ndmpd_save_nlist_v2(ndmpd_session_t *session, ndmp_name *nlist,
 		return (NDMP_NO_ERR);
 
 	session->ns_data.dd_nlist_len = 0;
-	session->ns_data.dd_nlist = ndmp_malloc(sizeof (ndmp_name)*nlistlen);
+	session->ns_data.dd_nlist = ndmp_malloc(sizeof (ndmp_name)*(nlistlen + 1));
 	if (session->ns_data.dd_nlist == 0)
 		return (NDMP_NO_MEM_ERR);
 

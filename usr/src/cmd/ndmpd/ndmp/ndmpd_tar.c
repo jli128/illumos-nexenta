@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -38,7 +37,7 @@
  */
 /* Copyright (c) 2007, The Storage Networking Industry Association. */
 /* Copyright (c) 1996, 1997 PDC, Network Appliance. All Rights Reserved */
-/* Copyright 2014 Nexenta Systems, Inc. All rights reserved. */
+/* Copyright 2015 Nexenta Systems, Inc. All rights reserved. */
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -1301,9 +1300,9 @@ ndmpd_tar_restore(ndmpd_session_t *session, ndmpd_module_params_t *mod_params,
 		tlm_arg.ba_dir = nlp->nlp_restore_path;
 		for (i = 0; i < nlp->nlp_nfiles; i++) {
 			ent = (ndmp_name *)MOD_GETNAME(mod_params, i);
-			tlm_arg.ba_sels[i] = ent->name;
+			tlm_arg.ba_sels[i] = strdup(ent->name);
 		}
-
+		tlm_arg.ba_count = i;
 
 		if (tm_tar_ops.tm_getfile != NULL) {
 			err = pthread_create(&wrtp, NULL,
