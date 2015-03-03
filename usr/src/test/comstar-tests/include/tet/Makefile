@@ -11,13 +11,27 @@
 
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
 
-.PARALLEL: $(SUBDIRS)
+include $(SRC)/Makefile.master
 
-SUBDIRS = libc-tests os-tests test-runner util-tests zfs-tests \
-	lofi-tests sharefs-tests comstar-tests
+ROOTOPTPKG = $(ROOT)/opt/comstar-tests
+TETINC = $(ROOTOPTPKG)/include/tet
 
-include Makefile.com
+FILES = commontest.h tet_api.h
+
+HDRS = $(FILES:%=$(TETINC)/%)
+$(HDRS) := FILEMODE = 0444
+
+all clean lint clobber:
+
+install: $(HDRS)
+
+$(HDRS): $(TETINC)
+
+$(TETINC):
+	$(INS.dir)
+
+$(TETINC)/%: %
+	$(INS.file)

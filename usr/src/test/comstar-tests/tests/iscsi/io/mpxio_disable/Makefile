@@ -8,16 +8,30 @@
 # source.  A copy of the CDDL is also available via the Internet at
 # http://www.illumos.org/license/CDDL.
 #
-
-#
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
+include $(SRC)/Makefile.master
 
-.PARALLEL: $(SUBDIRS)
+ROOTOPTPKG = $(ROOT)/opt/comstar-tests
+TESTDIR = $(ROOTOPTPKG)/tests/iscsi/io/mpxio_disable
 
-SUBDIRS = libc-tests os-tests test-runner util-tests zfs-tests \
-	lofi-tests sharefs-tests comstar-tests
+PROGS = tc_iscsi_io_mpxio_disable tp_iscsi_mpxiod_001 tp_iscsi_mpxiod_002 \
+	tp_iscsi_mpxiod_003 tp_iscsi_mpxiod_004 tp_iscsi_mpxiod_005 \
+	tp_iscsi_mpxiod_006 tp_iscsi_mpxiod_007
+	
 
-include Makefile.com
+CMDS = $(PROGS:%=$(TESTDIR)/%)
+$(CMDS) := FILEMODE = 0555
+
+all lint clean clobber:
+
+install: $(CMDS)
+
+$(CMDS): $(TESTDIR)
+
+$(TESTDIR):
+	$(INS.dir)
+
+$(TESTDIR)/%: %.ksh
+	$(INS.rename)

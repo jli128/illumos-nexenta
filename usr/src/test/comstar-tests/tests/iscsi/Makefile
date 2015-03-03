@@ -1,3 +1,4 @@
+
 #
 # This file and its contents are supplied under the terms of the
 # Common Development and Distribution License ("CDDL"), version 1.0.
@@ -8,16 +9,13 @@
 # source.  A copy of the CDDL is also available via the Internet at
 # http://www.illumos.org/license/CDDL.
 #
-
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
 
 .PARALLEL: $(SUBDIRS)
 
-SUBDIRS = libc-tests os-tests test-runner util-tests zfs-tests \
-	lofi-tests sharefs-tests comstar-tests
+SUBDIRS = auth discovery fs io smf tgmember visible
 
-include Makefile.com
+include $(SRC)/test/Makefile.com

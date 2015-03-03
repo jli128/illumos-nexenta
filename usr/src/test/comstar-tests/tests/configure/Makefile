@@ -8,16 +8,29 @@
 # source.  A copy of the CDDL is also available via the Internet at
 # http://www.illumos.org/license/CDDL.
 #
-
-#
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
+include $(SRC)/Makefile.master
 
-.PARALLEL: $(SUBDIRS)
+ROOTOPTPKG = $(ROOT)/opt/comstar-tests
+TESTDIR = $(ROOTOPTPKG)/tests/configure
 
-SUBDIRS = libc-tests os-tests test-runner util-tests zfs-tests \
-	lofi-tests sharefs-tests comstar-tests
+#PROGS = iscsi_configure fc_configure fcoe_configure
+PROGS = iscsi_configure
+	
 
-include Makefile.com
+CMDS = $(PROGS:%=$(TESTDIR)/%)
+$(CMDS) := FILEMODE = 0555
+
+all lint clean clobber:
+
+install: $(CMDS)
+
+$(CMDS): $(TESTDIR)
+
+$(TESTDIR):
+	$(INS.dir)
+
+$(TESTDIR)/%: %.ksh
+	$(INS.rename)

@@ -11,13 +11,26 @@
 
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
 
-.PARALLEL: $(SUBDIRS)
+include $(SRC)/Makefile.master
 
-SUBDIRS = libc-tests os-tests test-runner util-tests zfs-tests \
-	lofi-tests sharefs-tests comstar-tests
+ROOTOPTPKG = $(ROOT)/opt/comstar-tests
 
-include Makefile.com
+FILE = tet_scen
+
+TET_SCEN = $(FILE:%=$(ROOTOPTPKG)/%)
+$(TET_SCEN) := FILEMODE = 0444
+
+all: $(FILE)
+
+install: $(ROOTOPTPKG) $(TET_SCEN)
+
+clean lint clobber:
+
+$(ROOTOPTPKG):
+	$(INS.dir)
+
+$(ROOTOPTPKG)/%: %
+	$(INS.file)

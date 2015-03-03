@@ -11,13 +11,31 @@
 
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
 
-.PARALLEL: $(SUBDIRS)
+include $(SRC)/Makefile.master
 
-SUBDIRS = libc-tests os-tests test-runner util-tests zfs-tests \
-	lofi-tests sharefs-tests comstar-tests
+ROOTOPTPKG = $(ROOT)/opt/comstar-tests
+COMSTARINC = $(ROOTOPTPKG)/include
 
-include Makefile.com
+FILES = libfcoetest.h  libstmftest.h
+
+HDRS = $(FILES:%=$(COMSTARINC)/%)
+$(HDRS) := FILEMODE = 0444
+
+all clean lint clobber:
+
+install: $(HDRS)
+
+$(HDRS): $(COMSTARINC)
+
+$(COMSTARINC):
+	$(INS.dir)
+
+$(COMSTARINC)/%: %
+	$(INS.file)
+
+SUBDIRS = tet
+
+include $(SRC)/test/Makefile.com

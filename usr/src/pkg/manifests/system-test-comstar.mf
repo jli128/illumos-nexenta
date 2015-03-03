@@ -1,0 +1,203 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2015, Nexenta Systems Inc. All rights reserved.
+#
+
+set name=pkg.fmri value=pkg:/system/test/comstar@$(PKGVERS)
+set name=pkg.description value="COMSTAR Test Suite"
+set name=pkg.summary value="COMSTAR Functional and Stress Tests"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Development/System
+set name=variant.arch value=$(ARCH)
+dir path=opt/comstar-tests
+dir path=opt/comstar-tests/bin
+dir path=opt/comstar-tests/config
+dir path=opt/comstar-tests/include
+dir path=opt/comstar-tests/include/tet
+dir path=opt/comstar-tests/lib
+dir path=opt/comstar-tests/tests
+dir path=opt/comstar-tests/tests/configure
+dir path=opt/comstar-tests/tests/iscsi
+dir path=opt/comstar-tests/tests/iscsi/auth
+dir path=opt/comstar-tests/tests/iscsi/discovery
+dir path=opt/comstar-tests/tests/iscsi/fs
+dir path=opt/comstar-tests/tests/iscsi/io
+dir path=opt/comstar-tests/tests/iscsi/io/mpxio_disable
+dir path=opt/comstar-tests/tests/iscsi/io/mpxio_enable
+dir path=opt/comstar-tests/tests/iscsi/smf
+dir path=opt/comstar-tests/tests/iscsi/tgmember
+dir path=opt/comstar-tests/tests/iscsi/visible
+file path=opt/comstar-tests/README.ISCSI mode=0444
+file path=opt/comstar-tests/bin/br_port_offline mode=0555
+file path=opt/comstar-tests/bin/br_port_online mode=0555
+file path=opt/comstar-tests/bin/br_switch_reset mode=0555
+file path=opt/comstar-tests/bin/cn_port_offline mode=0555
+file path=opt/comstar-tests/bin/cn_port_online mode=0555
+file path=opt/comstar-tests/bin/iscsitest mode=0555
+file path=opt/comstar-tests/bin/link_reset_port mode=0555
+file path=opt/comstar-tests/bin/modify_chap_secret_ksh mode=0555
+file path=opt/comstar-tests/bin/modify_chap_secret_rsh mode=0555
+file path=opt/comstar-tests/bin/modify_radius_secret_ksh mode=0555
+file path=opt/comstar-tests/bin/port_offline mode=0555
+file path=opt/comstar-tests/bin/port_online mode=0555
+file path=opt/comstar-tests/bin/switch_reset mode=0555
+file path=opt/comstar-tests/bin/ts_port_offline mode=0555
+file path=opt/comstar-tests/bin/ts_port_online mode=0555
+file path=opt/comstar-tests/config/fc_disko.cfg mode=0444
+file path=opt/comstar-tests/config/fc_test_config.tmpl mode=0444
+file path=opt/comstar-tests/config/fcoe_disko.cfg mode=0444
+file path=opt/comstar-tests/config/fcoe_test_config.tmpl mode=0444
+file path=opt/comstar-tests/config/iscsi_disko.cfg mode=0444
+file path=opt/comstar-tests/config/iscsi_test_config.tmpl mode=0444
+file path=opt/comstar-tests/include/libfcoetest.h mode=0444
+file path=opt/comstar-tests/include/libstmftest.h mode=0444
+file path=opt/comstar-tests/include/tet/commontest.h mode=0444
+file path=opt/comstar-tests/include/tet/tet_api.h mode=0444
+file path=opt/comstar-tests/lib/comstar_cmd mode=0444
+file path=opt/comstar-tests/lib/comstar_common mode=0444
+file path=opt/comstar-tests/lib/comstar_fault mode=0444
+file path=opt/comstar-tests/lib/comstar_fcoe mode=0444
+file path=opt/comstar-tests/lib/comstar_fs mode=0444
+file path=opt/comstar-tests/lib/comstar_host mode=0444
+file path=opt/comstar-tests/lib/comstar_init mode=0444
+file path=opt/comstar-tests/lib/comstar_io mode=0444
+file path=opt/comstar-tests/lib/comstar_mpxio mode=0444
+file path=opt/comstar-tests/lib/comstar_smf mode=0444
+file path=opt/comstar-tests/lib/comstar_syslog mode=0444
+file path=opt/comstar-tests/lib/comstar_tcc mode=0444
+file path=opt/comstar-tests/lib/comstar_unix_cmd mode=0444
+file path=opt/comstar-tests/lib/comstar_utils mode=0444
+file path=opt/comstar-tests/lib/fc_host_cablepull mode=0444
+file path=opt/comstar-tests/lib/fc_target_cablepull mode=0444
+file path=opt/comstar-tests/lib/fcoet_smf mode=0444
+file path=opt/comstar-tests/lib/iscsi_host_cablepull mode=0444
+file path=opt/comstar-tests/lib/iscsi_target_cablepull mode=0444
+file path=opt/comstar-tests/lib/iscsiadm_command mode=0444
+file path=opt/comstar-tests/lib/iscsiadm_global mode=0444
+file path=opt/comstar-tests/lib/iscsiadm_info mode=0444
+file path=opt/comstar-tests/lib/iscsiadm_smf mode=0444
+file path=opt/comstar-tests/lib/iscsiadm_verify mode=0444
+file path=opt/comstar-tests/lib/iscsitadm_smf mode=0444
+file path=opt/comstar-tests/lib/isnsadm_smf mode=0444
+file path=opt/comstar-tests/lib/itadm_command mode=0444
+file path=opt/comstar-tests/lib/itadm_info mode=0444
+file path=opt/comstar-tests/lib/itadm_smf mode=0444
+file path=opt/comstar-tests/lib/itadm_verify mode=0444
+file path=opt/comstar-tests/lib/portal_utils mode=0444
+file path=opt/comstar-tests/lib/sbdadm_command mode=0444
+file path=opt/comstar-tests/lib/sbdadm_info mode=0444
+file path=opt/comstar-tests/lib/sbdadm_verify mode=0444
+file path=opt/comstar-tests/lib/stmfadm_command mode=0444
+file path=opt/comstar-tests/lib/stmfadm_info mode=0444
+file path=opt/comstar-tests/lib/stmfadm_verify mode=0444
+file path=opt/comstar-tests/lib/switch_fault mode=0444
+file path=opt/comstar-tests/lib/syntax_auto mode=0444
+file path=opt/comstar-tests/tests/configure/iscsi_configure mode=0555
+file path=opt/comstar-tests/tests/iscsi/auth/tc_iscsi_auth mode=0555
+file path=opt/comstar-tests/tests/iscsi/auth/tp_iscsi_auth_001 mode=0555
+file path=opt/comstar-tests/tests/iscsi/auth/tp_iscsi_auth_002 mode=0555
+file path=opt/comstar-tests/tests/iscsi/auth/tp_iscsi_auth_003 mode=0555
+file path=opt/comstar-tests/tests/iscsi/auth/tp_iscsi_auth_004 mode=0555
+file path=opt/comstar-tests/tests/iscsi/auth/tp_iscsi_auth_005 mode=0555
+file path=opt/comstar-tests/tests/iscsi/auth/tp_iscsi_auth_006 mode=0555
+file path=opt/comstar-tests/tests/iscsi/auth/tp_iscsi_auth_007 mode=0555
+file path=opt/comstar-tests/tests/iscsi/auth/tp_iscsi_auth_008 mode=0555
+file path=opt/comstar-tests/tests/iscsi/auth/tp_iscsi_auth_009 mode=0555
+file path=opt/comstar-tests/tests/iscsi/auth/tp_iscsi_auth_010 mode=0555
+file path=opt/comstar-tests/tests/iscsi/auth/tp_iscsi_auth_011 mode=0555
+file path=opt/comstar-tests/tests/iscsi/auth/tp_iscsi_auth_012 mode=0555
+file path=opt/comstar-tests/tests/iscsi/discovery/tc_iscsi_discovery mode=0555
+file path=opt/comstar-tests/tests/iscsi/discovery/tp_iscsi_discovery_001 \
+    mode=0555
+file path=opt/comstar-tests/tests/iscsi/discovery/tp_iscsi_discovery_002 \
+    mode=0555
+file path=opt/comstar-tests/tests/iscsi/discovery/tp_iscsi_discovery_003 \
+    mode=0555
+file path=opt/comstar-tests/tests/iscsi/discovery/tp_iscsi_discovery_004 \
+    mode=0555
+file path=opt/comstar-tests/tests/iscsi/discovery/tp_iscsi_discovery_005 \
+    mode=0555
+file path=opt/comstar-tests/tests/iscsi/fs/tc_iscsi_fs mode=0555
+file path=opt/comstar-tests/tests/iscsi/fs/tp_iscsi_fs_001 mode=0555
+file path=opt/comstar-tests/tests/iscsi/fs/tp_iscsi_fs_002 mode=0555
+file path=opt/comstar-tests/tests/iscsi/fs/tp_iscsi_fs_003 mode=0555
+file path=opt/comstar-tests/tests/iscsi/fs/tp_iscsi_fs_004 mode=0555
+file path=opt/comstar-tests/tests/iscsi/fs/tp_iscsi_fs_005 mode=0555
+file path=opt/comstar-tests/tests/iscsi/fs/tp_iscsi_fs_006 mode=0555
+file path=opt/comstar-tests/tests/iscsi/fs/tp_iscsi_fs_007 mode=0555
+file path=opt/comstar-tests/tests/iscsi/fs/tp_iscsi_fs_008 mode=0555
+file path=opt/comstar-tests/tests/iscsi/fs/tp_iscsi_fs_009 mode=0555
+file \
+    path=opt/comstar-tests/tests/iscsi/io/mpxio_disable/tc_iscsi_io_mpxio_disable \
+    mode=0555
+file path=opt/comstar-tests/tests/iscsi/io/mpxio_disable/tp_iscsi_mpxiod_001 \
+    mode=0555
+file path=opt/comstar-tests/tests/iscsi/io/mpxio_disable/tp_iscsi_mpxiod_002 \
+    mode=0555
+file path=opt/comstar-tests/tests/iscsi/io/mpxio_disable/tp_iscsi_mpxiod_003 \
+    mode=0555
+file path=opt/comstar-tests/tests/iscsi/io/mpxio_disable/tp_iscsi_mpxiod_004 \
+    mode=0555
+file path=opt/comstar-tests/tests/iscsi/io/mpxio_disable/tp_iscsi_mpxiod_005 \
+    mode=0555
+file path=opt/comstar-tests/tests/iscsi/io/mpxio_disable/tp_iscsi_mpxiod_006 \
+    mode=0555
+file path=opt/comstar-tests/tests/iscsi/io/mpxio_disable/tp_iscsi_mpxiod_007 \
+    mode=0555
+file \
+    path=opt/comstar-tests/tests/iscsi/io/mpxio_enable/tc_iscsi_io_mpxio_enable \
+    mode=0555
+file path=opt/comstar-tests/tests/iscsi/io/mpxio_enable/tp_iscsi_mpxioe_001 \
+    mode=0555
+file path=opt/comstar-tests/tests/iscsi/io/mpxio_enable/tp_iscsi_mpxioe_002 \
+    mode=0555
+file path=opt/comstar-tests/tests/iscsi/io/mpxio_enable/tp_iscsi_mpxioe_003 \
+    mode=0555
+file path=opt/comstar-tests/tests/iscsi/io/mpxio_enable/tp_iscsi_mpxioe_004 \
+    mode=0555
+file path=opt/comstar-tests/tests/iscsi/io/mpxio_enable/tp_iscsi_mpxioe_005 \
+    mode=0555
+file path=opt/comstar-tests/tests/iscsi/smf/tc_iscsi_smf mode=0555
+file path=opt/comstar-tests/tests/iscsi/smf/tp_iscsi_smf_001 mode=0555
+file path=opt/comstar-tests/tests/iscsi/smf/tp_iscsi_smf_002 mode=0555
+file path=opt/comstar-tests/tests/iscsi/smf/tp_iscsi_smf_003 mode=0555
+file path=opt/comstar-tests/tests/iscsi/smf/tp_iscsi_smf_004 mode=0555
+file path=opt/comstar-tests/tests/iscsi/tgmember/tc_tg_member mode=0555
+file path=opt/comstar-tests/tests/iscsi/tgmember/tp_tg_member_001 mode=0555
+file path=opt/comstar-tests/tests/iscsi/tgmember/tp_tg_member_002 mode=0555
+file path=opt/comstar-tests/tests/iscsi/tgmember/tp_tg_member_003 mode=0555
+file path=opt/comstar-tests/tests/iscsi/tgmember/tp_tg_member_004 mode=0555
+file path=opt/comstar-tests/tests/iscsi/tgmember/tp_tg_member_005 mode=0555
+file path=opt/comstar-tests/tests/iscsi/tgmember/tp_tg_member_006 mode=0555
+file path=opt/comstar-tests/tests/iscsi/tgmember/tp_tg_member_007 mode=0555
+file path=opt/comstar-tests/tests/iscsi/tgmember/tp_tg_member_008 mode=0555
+file path=opt/comstar-tests/tests/iscsi/tgmember/tp_tg_member_009 mode=0555
+file path=opt/comstar-tests/tests/iscsi/tgmember/tp_tg_member_010 mode=0555
+file path=opt/comstar-tests/tests/iscsi/visible/tc_iscsi_visible mode=0555
+file path=opt/comstar-tests/tests/iscsi/visible/tp_iscsi_visible_001 mode=0555
+file path=opt/comstar-tests/tests/iscsi/visible/tp_iscsi_visible_002 mode=0555
+file path=opt/comstar-tests/tests/iscsi/visible/tp_iscsi_visible_003 mode=0555
+file path=opt/comstar-tests/tests/iscsi/visible/tp_iscsi_visible_004 mode=0555
+file path=opt/comstar-tests/tests/iscsi/visible/tp_iscsi_visible_005 mode=0555
+file path=opt/comstar-tests/tests/iscsi/visible/tp_iscsi_visible_006 mode=0555
+file path=opt/comstar-tests/tests/iscsi/visible/tp_iscsi_visible_007 mode=0555
+file path=opt/comstar-tests/tests/iscsi/visible/tp_iscsi_visible_008 mode=0555
+file path=opt/comstar-tests/tests/iscsi/visible/tp_iscsi_visible_009 mode=0555
+file path=opt/comstar-tests/tests/iscsi/visible/tp_iscsi_visible_010 mode=0555
+file path=opt/comstar-tests/tests/iscsi/visible/tp_iscsi_visible_011 mode=0555
+file path=opt/comstar-tests/tests/iscsi/visible/tp_iscsi_visible_012 mode=0555
+file path=opt/comstar-tests/tests/iscsi/visible/tp_iscsi_visible_013 mode=0555
+file path=opt/comstar-tests/tests/iscsi/visible/tp_iscsi_visible_014 mode=0555
+file path=opt/comstar-tests/tet_scen mode=0444
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
